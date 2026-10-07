@@ -1,10 +1,21 @@
 """Business logic for tickets (creation, listing, edition, retrieval,
 assignment and comments)."""
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
+from backend.constants import TicketCategory, TicketPriority, TicketState
 from backend.models import Comment, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate, TicketUpdate
+
+
+def _like_pattern(term: str) -> str:
+    """Wrap a literal search term as an escaped SQL ``LIKE`` pattern.
+
+    ``%`` and ``_`` are escaped so they are matched literally instead of
+    acting as wildcards.
+    """
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
 
 
 class UserNotFoundError(Exception):
@@ -42,12 +53,43 @@ def create_ticket(session, payload: TicketCreate) -> Ticket:
     return ticket
 
 
-def list_tickets(session) -> list[Ticket]:
-    """Return every stored ticket, newest first (RF6).
+def list_tickets(
+    session,
+    *,
+    search: str | None = None,
+    category: TicketCategory | None = None,
+    priority: TicketPriority | None = None,
+    state: TicketState | None = None,
+) -> list[Ticket]:
+    """Return stored tickets, newest first (RF6), optionally searched and
+    filtered (RF7, RF8).
 
-    Read-only query: it never modifies the stored rows.
+    Every sent criterion is combined with AND. ``search`` matches partially
+    in ``title`` and ``description`` without distinguishing case; a blank
+    ``search`` behaves as if it were not sent. When no criteria are given the
+    query is identical to the plain listing. Read-only query: it never
+    modifies the stored rows.
     """
-    statement = select(Ticket).order_by(Ticket.created_at.desc(), Ticket.id.desc())
+    statement = select(Ticket)
+
+    if category is not None:
+        statement = statement.where(Ticket.category == category.value)
+    if priority is not None:
+        statement = statement.where(Ticket.priority == priority.value)
+    if state is not None:
+        statement = statement.where(Ticket.state == state.value)
+
+    if search is not None:
+        term = search.strip().lower()
+        if term:
+            statement = statement.where(
+                or_(
+                    Ticket.title.ilike(_like_pattern(term), escape="\\"),
+                    Ticket.description.ilike(_like_pattern(term), escape="\\"),
+                )
+            )
+
+    statement = statement.order_by(Ticket.created_at.desc(), Ticket.id.desc())
     return list(session.scalars(statement).all())
 
 

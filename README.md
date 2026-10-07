@@ -125,16 +125,33 @@ campo es inválido o la petición no contiene campos modificables. Los campos
 `id`, `state`, `assigned_to_id` y `created_at` no se pueden modificar con este
 endpoint; `updated_at` se actualiza automáticamente.
 
-### Listar tickets
+### Listar, buscar y filtrar tickets
 
 ```bash
+# Todos los tickets (más recientes primero)
 curl http://127.0.0.1:8000/api/tickets
+
+# Búsqueda parcial + filtros combinados con AND
+curl "http://127.0.0.1:8000/api/tickets?search=correo&priority=Alta&state=Nuevo"
 ```
 
-Devuelve `200 OK` con la lista de todos los tickets almacenados, ordenados de
-más reciente a más antiguo. Cada elemento contiene `id`, `title`, `description`,
+Devuelve `200 OK` con la lista de los tickets almacenados, ordenados de más
+reciente a más antiguo. Cada elemento contiene `id`, `title`, `description`,
 `category`, `priority`, `state`, `assigned_to_id`, `created_at` y
 `updated_at`. Si no hay tickets, responde `[]`.
+
+Parámetros de consulta (todos opcionales y combinables entre sí):
+
+| Parámetro | Valores | Efecto |
+|-----------|---------|--------|
+| `search` | texto libre | coincidencia parcial en `title` o `description`, sin distinguir mayúsculas; vacío o solo espacios equivale a no enviarlo; sin coincidencias → `200` con `[]` |
+| `category` | `Incidente`, `Consulta`, `Solicitud`, `Mantenimiento` | filtra por categoría |
+| `priority` | `Baja`, `Media`, `Alta`, `Crítica` | filtra por prioridad |
+| `state` | `Nuevo`, `En proceso`, `Resuelto`, `Cerrado` | filtra por estado |
+
+Sin parámetros el comportamiento es el original (listado completo). Un valor
+fuera de los enums (`category`, `priority`, `state`) responde `422`. No hay
+paginación ni ordenamiento configurable todavía.
 
 ### Consultar un ticket
 

@@ -129,7 +129,7 @@ _Identificadores en inglés (decisión de idioma aprobada); los valores de
 interfaz._
 
 ```
-GET    /api/tickets                 ?q=&state=&category=&priority=&assigned_to=&page=&size=
+GET    /api/tickets                 ?search=&state=&category=&priority=&assigned_to=&page=&size=
 POST   /api/tickets
 GET    /api/tickets/{id}
 PUT    /api/tickets/{id}            (title, description, category, priority)
@@ -333,12 +333,41 @@ GET    /api/catalogs                (states, categories, priorities)
   **Tarea 18**.
 
 ### Tarea 10 — Búsqueda y filtros de tickets (RF7, RF8)
-- **Objetivo:** endpoint central de consulta.
-- **Archivos:** `backend/routers/tickets.py`, `backend/services/ticket_service.py`,
-  `backend/tests/test_busqueda_filtro.py`.
-- **Prueba:** `pytest` — cada filtro aislado, filtros combinados, búsqueda
-  parcial, paginación sin repetidos ni huecos.
-- **Criterio de terminado:** todos los escenarios de filtrado probados.
+- **Objetivo:** convertir `GET /api/tickets` en el endpoint central de
+  consulta, sin crear endpoints nuevos ni cambiar su comportamiento por
+  defecto.
+- **Archivos:** `backend/routers/tickets.py` (query params con descripciones
+  en español), `backend/services/ticket_service.py` (`list_tickets` con
+  criterios y `_like_pattern`), `backend/tests/test_busqueda_filtro.py`,
+  `README.md`.
+- **Parámetros implementados (opcionales, combinables con AND):**
+  - `search` → coincidencia **parcial** en `title` o `description` **sin
+    distinguir mayúsculas** (SQL `ilike`); el texto se trata literalmente
+    (se escapan `%` y `_`); vacío o solo espacios equivale a no enviarlo;
+    sin coincidencias → `200` con `[]`.
+  - `category` (`TicketCategory`), `priority` (`TicketPriority`) y `state`
+    (`TicketState`) → únicamente valores existentes; un valor fuera del enum
+    → `422` (validación nativa de FastAPI/Pydantic sobre el query param).
+- **Reglas:** sin parámetros la consulta es idéntica a la anterior; orden
+  `created_at DESC, id DESC` conservado; respuesta `list[TicketResponse]`
+  sin cambios; consulta solo lectura; **cero cambios de modelo o BD** y
+  ningún schema nuevo (los parámetros se declaran en el router).
+- **Prueba:** `pytest` — 17 pruebas nuevas en `test_busqueda_filtro.py`:
+  listado sin parámetros intacto, búsqueda por `title`, por `description`,
+  case-insensitive (minúsculas y mayúsculas), sin resultados → `200 []`,
+  `search` en blanco = sin parámetro, comodines `%`/`_` escapados, filtros
+  aislados (`category`, `priority`, `state`), combinación de dos filtros,
+  combinación `search` + filtros (incluye el ejemplo del enunciado
+  `search=correo&priority=Alta&state=Nuevo`), `422` por valor inválido de
+  cada enum, orden de más reciente a más antiguo con y sin filtros, y
+  comprobación de que las consultas no modifican los tickets.
+- **Criterio de terminado:** la suite completa está en verde (todos los
+  escenarios de filtrado probados).
+- **Nota:** la redacción original incluía paginación sin repetidos ni
+  huecos; **no se implementó** (el `page`/`size` y el filtro `assigned_to`
+  del API objetivo siguen pendientes y no están asignados a una tarea). El
+  estado de las muestras de test se prepara directamente en la BD porque la
+  máquina de estados (RF3) sigue pendiente como **Tarea 18**.
 
 ### Tarea 11 — Frontend: listado con búsqueda y filtros
 - **Objetivo:** primera pantalla funcional.
@@ -417,7 +446,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 7 — Consultar un ticket individual | ✅ Completada |
 | 8 — Usuarios y asignación | ✅ Completada |
 | 9 — Comentarios | ✅ Completada |
-| 10 — Búsqueda y filtros | ⬜ Pendiente |
+| 10 — Búsqueda y filtros | ✅ Completada |
 | 11 — Frontend: listado | ⬜ Pendiente |
 | 12 — Frontend: crear ticket | ⬜ Pendiente |
 | 13 — Frontend: detalle y gestión | ⬜ Pendiente |

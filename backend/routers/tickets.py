@@ -1,8 +1,10 @@
-"""Ticket endpoints (creation, listing, retrieval, edition and assignment)."""
+"""Ticket endpoints (creation, listing with search and filters, retrieval,
+edition and assignment)."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from backend.constants import TicketCategory, TicketPriority, TicketState
 from backend.database import get_session
 from backend.schemas import TicketAssignment, TicketCreate, TicketResponse, TicketUpdate
 from backend.services import ticket_service
@@ -29,11 +31,43 @@ def create_ticket(
 @router.get(
     "",
     response_model=list[TicketResponse],
-    summary="Listar tickets",
+    summary="Listar, buscar y filtrar tickets",
 )
-def list_tickets(session: Session = Depends(get_session)) -> list[TicketResponse]:
-    """Return all stored tickets, newest first (RF6)."""
-    tickets = ticket_service.list_tickets(session)
+def list_tickets(
+    search: str | None = Query(
+        None,
+        description=(
+            "Texto parcial a buscar en title o description, sin distinguir "
+            "mayúsculas. Vacío o solo espacios equivale a no enviarlo."
+        ),
+    ),
+    category: TicketCategory | None = Query(
+        None,
+        description="Filtra por categoría (Incidente, Consulta, Solicitud, Mantenimiento).",
+    ),
+    priority: TicketPriority | None = Query(
+        None,
+        description="Filtra por prioridad (Baja, Media, Alta, Crítica).",
+    ),
+    state: TicketState | None = Query(
+        None,
+        description="Filtra por estado (Nuevo, En proceso, Resuelto, Cerrado).",
+    ),
+    session: Session = Depends(get_session),
+) -> list[TicketResponse]:
+    """Return all stored tickets, newest first (RF6), searchable by text and
+    filterable by category, priority and state (RF7, RF8).
+
+    The criteria are optional and combined with AND; without parameters the
+    response is the plain listing.
+    """
+    tickets = ticket_service.list_tickets(
+        session,
+        search=search,
+        category=category,
+        priority=priority,
+        state=state,
+    )
     return [TicketResponse.model_validate(ticket) for ticket in tickets]
 
 
