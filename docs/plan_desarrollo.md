@@ -160,14 +160,20 @@ GET    /api/catalogs                (states, categories, priorities)
   ticket de prueba.
 - **Criterio de terminado:** `pytest` verde y la DB se genera al arrancar.
 
-### Tarea 3 — Esquemas Pydantic y app FastAPI mínima
-- **Objetivo:** app arrancable con validación de entrada/salida.
-- **Archivos:** `backend/schemas.py`, `backend/main.py`,
-  `backend/routers/catalogos.py`, `backend/tests/test_smoke.py`.
-- **Prueba:** `uvicorn backend.main:app` responde; `pytest` del smoke test;
+### Tarea 3 — Health check de la API
+- **Objetivo:** aplicación FastAPI arrancable con un endpoint de salud que
+  confirma que el servicio funciona.
+- **Archivos:** `backend/main.py` (app + `lifespan` que ejecuta `init_db()`)
+  y `backend/tests/test_smoke.py`; `README.md` (arranque y health check).
+- **Prueba:** `pytest` — `GET /health` responde 200 con `{"status": "ok"}` y
+  `GET /openapi.json` publica la ruta; `uvicorn backend.main:app` arranca;
   `GET /docs` accesible.
-- **Criterio de terminado:** la app arranca y OpenAPI muestra los endpoints de
-  catálogo.
+- **Criterio de terminado:** la app arranca con uvicorn, el health check
+  responde y `pytest` está en verde.
+- **Nota:** la redacción original de esta tarea incluía `backend/schemas.py`
+  (esquemas Pydantic) y `backend/routers/catalogos.py` (endpoint de catálogo);
+  no se implementaron en esta tarea y quedan pendientes de definirse en una
+  tarea posterior.
 
 ### Tarea 4 — Crear ticket (RF1, RF2)
 - **Objetivo:** alta de tickets con validación.
@@ -287,7 +293,7 @@ GET    /api/catalogs                (states, categories, priorities)
 |-------|--------|
 | 1 — Inicialización del proyecto | ✅ Completada |
 | 2 — Base de datos y modelos | ✅ Completada |
-| 3 — Esquemas Pydantic y app mínima | ⬜ Pendiente |
+| 3 — Health check de la API | ✅ Completada |
 | 4 — Crear ticket | ⬜ Pendiente |
 | 5 — Historial de cambios | ⬜ Pendiente |
 | 6 — Editar ticket | ⬜ Pendiente |

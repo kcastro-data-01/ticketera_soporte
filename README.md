@@ -60,8 +60,6 @@ ticketera_soporte/
 
 ## Cómo ejecutar
 
-_Instrucciones completas disponibles al finalizar las tareas de implementación._
-
 ### Instalación de dependencias
 
 ```bash
@@ -78,10 +76,26 @@ python3 -m venv .venv
 > pip3 --python .venv/bin/python install -r requirements.txt
 > ```
 
+### Arranque de la API
+
+```bash
+.venv/bin/uvicorn backend.main:app --reload
+```
+
+La API queda disponible en `http://127.0.0.1:8000` y la documentación interactiva
+en `http://127.0.0.1:8000/docs`.
+
+### Health check
+
+```bash
+curl http://127.0.0.1:8000/health
+# {"status":"ok"}
+```
+
 ### Base de datos
 
-SQLite crea el archivo `ticketera.db` en la raíz del proyecto la primera vez que
-se llama a `init_db()` (se hará automáticamente al arrancar la API en la Tarea 3).
+SQLite crea el archivo `ticketera.db` en la raíz del proyecto automáticamente
+al arrancar la API (`init_db()` se ejecuta en el arranque).
 El archivo está excluido de Git (`.gitignore`) y sus tablas son: `users`,
 `tickets`, `comments` y `history`.
 
