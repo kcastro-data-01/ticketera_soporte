@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from backend.database import init_db
+from backend.routers.comentarios import router as comments_router
 from backend.routers.tickets import router as tickets_router
 from backend.routers.users import router as users_router
 
@@ -31,4 +32,5 @@ def health_check() -> dict[str, str]:
 
 
 app.include_router(tickets_router)
+app.include_router(comments_router)
 app.include_router(users_router)

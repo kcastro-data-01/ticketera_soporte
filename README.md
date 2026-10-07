@@ -176,6 +176,20 @@ Asigna un usuario existente al ticket (o lo desasigna con `null`). Respuestas:
 `200` con el ticket actualizado, `404` si el ticket o el usuario no existen,
 `422` si falta el campo. Solo cambian `assigned_to_id` y `updated_at`.
 
+### Agregar comentarios a un ticket
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/tickets/1/comments \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Hola, ¿hay novedades?"}'
+```
+
+Crea un comentario sobre un ticket existente. Respuestas: `201` con
+`{id, ticket_id, author, content, created_at}`, `404` si el ticket no existe
+y `422` si `content` falta, está vacío, es solo espacios o supera los 2000
+caracteres. `author` es opcional (por defecto `"Anónimo"`). Solo existe la
+creación: el listado de comentarios no está implementado todavía.
+
 ### Base de datos
 
 SQLite crea el archivo `ticketera.db` en la raíz del proyecto automáticamente

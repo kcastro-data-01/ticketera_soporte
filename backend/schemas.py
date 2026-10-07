@@ -9,6 +9,9 @@ from backend.constants import TicketCategory, TicketPriority, TicketState, UserR
 
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# Maximum length of a comment body, validated at the API layer (Task 9).
+COMMENT_MAX_LENGTH = 2000
+
 
 def _validate_title(value: str) -> str:
     """Shared rule (creation and edition): trimmed length between 3 and 200."""
@@ -148,3 +151,48 @@ class TicketAssignment(BaseModel):
     """
 
     assigned_to_id: int | None
+
+
+class CommentCreate(BaseModel):
+    """Payload accepted by ``POST /api/tickets/{ticket_id}/comments``.
+
+    ``ticket_id`` comes from the URL path, not from the body. ``author`` is
+    optional (no authentication) and defaults to "Anónimo".
+    """
+
+    content: str
+    author: str = "Anónimo"
+
+    @field_validator("content")
+    @classmethod
+    def content_must_not_be_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("el contenido no puede estar vacío")
+        if len(cleaned) > COMMENT_MAX_LENGTH:
+            raise ValueError(
+                f"el contenido debe tener como máximo {COMMENT_MAX_LENGTH} caracteres"
+            )
+        return cleaned
+
+    @field_validator("author")
+    @classmethod
+    def author_must_not_be_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("el autor no puede estar vacío")
+        if len(cleaned) > 120:
+            raise ValueError("el autor debe tener como máximo 120 caracteres")
+        return cleaned
+
+
+class CommentResponse(BaseModel):
+    """Comment returned by the API."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ticket_id: int
+    author: str
+    content: str
+    created_at: datetime

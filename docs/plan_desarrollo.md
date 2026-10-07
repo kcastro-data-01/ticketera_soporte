@@ -302,13 +302,35 @@ GET    /api/catalogs                (states, categories, priorities)
   (RF3) permanece pendiente como **Tarea 18**.
 
 ### Tarea 9 — Comentarios (RF5)
-- **Objetivo:** conversación sobre el ticket.
-- **Archivos:** `backend/routers/comentarios.py`,
-  `backend/tests/test_comentarios.py`.
-- **Prueba:** `pytest` — agrega, lista en orden cronológico, contenido vacío →
-  422, ticket inexistente → 404.
-- **Criterio de terminado:** los comentarios persisten y el historial los
-  menciona.
+- **Objetivo:** agregar un comentario a un ticket existente (creación únicamente).
+- **Archivos:** `backend/schemas.py` (`CommentCreate`, `CommentResponse`,
+  `COMMENT_MAX_LENGTH`), `backend/services/ticket_service.py`
+  (`create_comment`, reutiliza `TicketNotFoundError`),
+  `backend/routers/comentarios.py`, `backend/main.py` (registro del router),
+  `backend/tests/test_comentarios.py`, `README.md`.
+- **Endpoint nuevo:**
+  - `POST /api/tickets/{ticket_id}/comments` → `201` con
+    `{id, ticket_id, author, content, created_at}`; `404` si el ticket no
+    existe; `422` si `content` falta, está vacío, es solo espacios o supera
+    los 2000 caracteres (o si `author` se envía vacío).
+- **Reglas:** `content` viene del cuerpo y `ticket_id` de la URL; el
+  comentario se relaciona con el ticket mediante la relación existente
+  `Comment.ticket`/`Ticket.comments` (**sin cambios de modelo ni BD**) y se
+  persiste en SQLite. `author` es opcional (no hay autenticación) y por
+  defecto queda `"Anónimo"`; el límite de 2000 caracteres se valida en la
+  capa de API, no en la BD.
+- **Prueba:** `pytest` — 13 pruebas nuevas: creación 201 con datos
+  reflejados, autor por defecto y autor explícito, comentario asociado al
+  ticket correcto, persistencia en SQLite y relación `ticket.comments`,
+  ticket inexistente → 404, contenido vacío/solo espacios/sin campo → 422,
+  contenido > 2000 caracteres → 422, autor vacío → 422, estructura de la
+  respuesta y endpoint en OpenAPI.
+- **Criterio de terminado:** la suite completa está en verde.
+- **Nota:** la redacción original incluía listar comentarios en orden
+  cronológico y que "el historial los mencione"; **no se implementó**
+  (listado/edición/borrado de comentarios y RF9 de historial siguen
+  pendientes). La máquina de estados (RF3) permanece pendiente como
+  **Tarea 18**.
 
 ### Tarea 10 — Búsqueda y filtros de tickets (RF7, RF8)
 - **Objetivo:** endpoint central de consulta.
@@ -394,7 +416,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 6 — Editar ticket | ✅ Completada |
 | 7 — Consultar un ticket individual | ✅ Completada |
 | 8 — Usuarios y asignación | ✅ Completada |
-| 9 — Comentarios | ⬜ Pendiente |
+| 9 — Comentarios | ✅ Completada |
 | 10 — Búsqueda y filtros | ⬜ Pendiente |
 | 11 — Frontend: listado | ⬜ Pendiente |
 | 12 — Frontend: crear ticket | ⬜ Pendiente |

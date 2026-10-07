@@ -1,10 +1,10 @@
-"""Business logic for tickets (creation, listing, edition, retrieval and
-assignment)."""
+"""Business logic for tickets (creation, listing, edition, retrieval,
+assignment and comments)."""
 
 from sqlalchemy import select
 
-from backend.models import Ticket, User
-from backend.schemas import TicketCreate, TicketUpdate
+from backend.models import Comment, Ticket, User
+from backend.schemas import CommentCreate, TicketCreate, TicketUpdate
 
 
 class UserNotFoundError(Exception):
@@ -98,3 +98,23 @@ def assign_ticket(session, ticket_id: int, assigned_to_id: int | None) -> Ticket
     session.commit()
     session.refresh(ticket)
     return ticket
+
+
+def create_comment(session, ticket_id: int, payload: CommentCreate) -> Comment:
+    """Persist a comment on an existing ticket (RF5).
+
+    Raises:
+        ``TicketNotFoundError``: the ticket does not exist.
+    """
+    if session.get(Ticket, ticket_id) is None:
+        raise TicketNotFoundError(ticket_id)
+
+    comment = Comment(
+        ticket_id=ticket_id,
+        author=payload.author,
+        content=payload.content,
+    )
+    session.add(comment)
+    session.commit()
+    session.refresh(comment)
+    return comment
