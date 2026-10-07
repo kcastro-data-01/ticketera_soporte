@@ -108,6 +108,14 @@ Estados visibles: `Cargando...`, `No hay tickets para mostrar.` y
 resuelve con `GET /api/users` (si no es posible, se muestra `Usuario #id`;
 si el ticket no está asignado, `—`).
 
+El botón **Nuevo ticket** de la cabecera abre `/crear.html`, un formulario
+(título, descripción, categoría y prioridad) que da de alta tickets con
+`POST /api/tickets`: valida en el navegador que título y descripción no
+estén vacíos, muestra `Guardando...` mientras envía e impide envíos
+duplicados, presenta el detalle de validación si la API responde `422`, un
+mensaje de error si falla la red o el servidor, y al crearse el ticket
+muestra la confirmación y redirige al listado.
+
 ### Health check
 
 ```bash

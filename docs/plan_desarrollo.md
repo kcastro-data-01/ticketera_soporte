@@ -407,9 +407,40 @@ GET    /api/catalogs                (states, categories, priorities)
 - **Criterio de terminado:** se puede buscar y filtrar desde la UI.
 
 ### Tarea 12 — Frontend: crear ticket
-- **Objetivo:** alta desde la interfaz.
-- **Archivos:** `frontend/crear.html`, `frontend/js/crear.js`, `index.html`.
-- **Prueba:** manual — crear válido, crear inválido muestra errores.
+- **Objetivo:** alta de tickets desde la interfaz, reutilizando
+  `POST /api/tickets` (sin endpoints nuevos).
+- **Archivos:** `frontend/crear.html` (formulario), `frontend/js/crear.js`
+  (JavaScript vanilla), `frontend/css/estilos.css` (reutilizado + clases
+  mínimas nuevas: `.formulario`, `.enlace-boton`, `.estado.exito`,
+  `button:disabled`, `textarea`) y `frontend/index.html` (enlace **Nuevo
+  ticket** en la cabecera).
+- **Formulario:** título, descripción, categoría y prioridad; los selects
+  usan exactamente las opciones del backend (`Incidente`, `Consulta`,
+  `Solicitud`, `Mantenimiento` / `Baja`, `Media`, `Alta`, `Crítica`) sin
+  opción vacía, de modo que siempre hay valor válido.
+- **Comportamiento:** validación en el navegador (`novalidate` + chequeo
+  con `trim`: vacíos o solo espacios → mensaje en español sin llamar a la
+  API); envío con `fetch` `POST /api/tickets` y `Content-Type:
+  application/json`; estado `Guardando...` con botón deshabilitado y flag
+  `enviando` que **impide envíos duplicados** (tras el éxito sigue bloqueado
+  hasta redirigir); éxito → confirmación `Ticket #N creado correctamente`
+  y redirección a `index.html` a los 1,5 s; `422` → detalle de validación
+  de FastAPI en mensaje legible (`loc` + `msg`); error de red → `Error al
+  comunicarse con la API.`; otro código no-OK → `HTTP nnn`.
+- **No implementado (por alcance):** edición, asignación, comentarios,
+  cambio de estado, historial, paginación, frameworks ni backend nuevo.
+- **Prueba:** `pytest -q` → **125 en verde** (sin regresiones) +
+  validación manual con servidor real: `/crear.html` (200, campos
+  `form-crear`/`title`/`description`/`category`/`priority`/`guardar` y las
+  8 opciones de enum), enlace `Nuevo ticket` en `/`, assets `200`,
+  creación con el payload del formulario → `201` con el ticket creado,
+  título de 2 caracteres → `422` con mensaje en español (mostrado por la
+  UI), listado `GET /api/tickets` y `/health` intactos; además un harness
+  desechable de `node` sobre `crear.js` (**26 comprobaciones, todas en
+  verde**) cubrió recorte de espacios, los 3 mensajes de validación vacía,
+  bloqueo sin llamar a la API, `Guardando...`, botón deshabilitado,
+  anti-duplicados, payload exacto, interpretación del `422`, fallo de red,
+  error `500`, confirmación con id, bloqueo post-éxito y redirección.
 - **Criterio de terminado:** el alta funciona desde la UI y los errores se
   muestran.
 
@@ -478,7 +509,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 9 — Comentarios | ✅ Completada |
 | 10 — Búsqueda y filtros | ✅ Completada |
 | 11 — Frontend: listado | ✅ Completada |
-| 12 — Frontend: crear ticket | ⬜ Pendiente |
+| 12 — Frontend: crear ticket | ✅ Completada |
 | 13 — Frontend: detalle y gestión | ⬜ Pendiente |
 | 14 — Frontend: historial | ⬜ Pendiente |
 | 15 — Docker | ⬜ Pendiente |
