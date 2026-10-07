@@ -1,0 +1,271 @@
+# Plan de desarrollo — Ticketera de Soporte
+
+Plan aprobado el 2026-10-07. Desarrollo estrictamente por tareas: cada tarea se
+implementa, se prueba, se documenta y se commitea antes de pasar a la siguiente.
+**No se hace `push` a GitHub sin autorización.**
+
+## Requisitos funcionales
+
+| # | Requisito |
+|---|-----------|
+| RF1 | Crear ticket (título + descripción) |
+| RF2 | Seleccionar categoría y prioridad |
+| RF3 | Cambiar estado: Nuevo → En proceso → Resuelto → Cerrado |
+| RF4 | Asignar ticket a una persona |
+| RF5 | Agregar comentarios |
+| RF6 | Listado de tickets |
+| RF7 | Buscar tickets |
+| RF8 | Filtrar tickets |
+| RF9 | Historial de cambios |
+
+## Decisiones de diseño aprobadas
+
+1. **Categorías fijas:** Incidente, Consulta, Solicitud, Mantenimiento.
+2. **Sin autenticación.** Usuarios mínimos (tabla `users`) solo para asignar
+   tickets y como autor de comentarios/historial.
+3. **Idioma:** variables y funciones en inglés; textos visibles de la interfaz
+   en español.
+4. **Auditoría automática:** el historial se registra desde la capa de servicio,
+   nunca desde el frontend.
+5. **Estados, categorías y prioridades** como `enum` en código + columna de
+   texto en SQLite.
+6. **Transiciones de estado válidas:**
+   - `Nuevo → En proceso`
+   - `En proceso → Nuevo`, `En proceso → Resuelto`
+   - `Resuelto → En proceso`, `Resuelto → Cerrado`
+   - `Cerrado` es estado terminal.
+   - Transición inválida → HTTP 409.
+7. **Frontend estático** servido por el propio FastAPI (un solo contenedor Docker).
+8. **Pruebas con pytest** sobre la API usando base de datos temporal.
+
+## Arquitectura
+
+```
+ticketera_soporte/
+├── docker-compose.yml
+├── Dockerfile
+├── .dockerignore
+├── .gitignore
+├── requirements.txt
+├── README.md
+├── docs/
+│   ├── plan_desarrollo.md        # este documento
+│   └── api.md                    # documentación de endpoints
+├── backend/
+│   ├── main.py                   # app FastAPI + estáticos
+│   ├── database.py               # engine, sesión, creación de tablas
+│   ├── models.py                 # modelos SQLAlchemy
+│   ├── schemas.py                # esquemas Pydantic
+│   ├── constants.py              # enums: estados, prioridades, categorías
+│   ├── routers/
+│   │   ├── tickets.py
+│   │   ├── comentarios.py
+│   │   └── catalogos.py
+│   ├── services/
+│   │   ├── ticket_service.py     # lógica + transiciones de estado
+│   │   └── historial_service.py  # registro de auditoría
+│   └── tests/
+│       ├── conftest.py
+│       ├── test_tickets.py
+│       ├── test_estados.py
+│       ├── test_comentarios.py
+│       └── test_busqueda_filtro.py
+└── frontend/
+    ├── index.html                # listado + búsqueda/filtros
+    ├── detalle.html              # detalle, comentarios, historial
+    ├── crear.html                # formulario de creación
+    ├── css/estilos.css
+    └── js/
+        ├── api.js
+        ├── listado.js
+        ├── detalle.js
+        └── crear.js
+```
+
+### Modelo de datos
+
+```
+users        (id, nombre, email, rol, activo)
+tickets      (id, titulo, descripcion, categoria, prioridad,
+              estado, asignado_a_id -> users.id NULL,
+              creado_en, actualizado_en)
+comentarios  (id, ticket_id -> tickets.id, autor, contenido, creado_en)
+historial    (id, ticket_id -> tickets.id, accion, campo,
+              valor_anterior, valor_nuevo, autor, creado_en)
+```
+
+### Endpoints
+
+```
+GET    /api/tickets                 ?q=&estado=&categoria=&prioridad=&asignado_a=&pagina=&tamano=
+POST   /api/tickets
+GET    /api/tickets/{id}
+PUT    /api/tickets/{id}            (titulo, descripcion, categoria, prioridad)
+PATCH  /api/tickets/{id}/estado     {estado, motivo?}
+PATCH  /api/tickets/{id}/asignar    {usuario_id}
+POST   /api/tickets/{id}/comentarios
+GET    /api/tickets/{id}/comentarios
+GET    /api/tickets/{id}/historial
+GET    /api/usuarios
+GET    /api/catalogos
+```
+
+## Tareas
+
+### Tarea 1 — Inicialización del proyecto
+- **Objetivo:** esqueleto del repo, dependencias, Git listo.
+- **Archivos:** `.gitignore`, `requirements.txt`, `README.md`,
+  `docs/plan_desarrollo.md`, estructura de carpetas.
+- **Prueba:** `pip install -r requirements.txt` sin errores;
+  `python -c "import fastapi"` OK.
+- **Criterio de terminado:** el entorno instala limpio, el plan está en `docs/`
+  y existe un commit inicial.
+
+### Tarea 2 — Base de datos y modelos
+- **Objetivo:** capa de persistencia y modelos de datos.
+- **Archivos:** `backend/database.py`, `backend/models.py`,
+  `backend/constants.py`, `backend/tests/conftest.py`.
+- **Prueba:** `pytest` verificando creación de tablas e inserción/lectura de un
+  ticket de prueba.
+- **Criterio de terminado:** `pytest` verde y la DB se genera al arrancar.
+
+### Tarea 3 — Esquemas Pydantic y app FastAPI mínima
+- **Objetivo:** app arrancable con validación de entrada/salida.
+- **Archivos:** `backend/schemas.py`, `backend/main.py`,
+  `backend/routers/catalogos.py`, `backend/tests/test_smoke.py`.
+- **Prueba:** `uvicorn backend.main:app` responde; `pytest` del smoke test;
+  `GET /docs` accesible.
+- **Criterio de terminado:** la app arranca y OpenAPI muestra los endpoints de
+  catálogo.
+
+### Tarea 4 — Crear ticket (RF1, RF2)
+- **Objetivo:** alta de tickets con validación.
+- **Archivos:** `backend/routers/tickets.py`, `backend/services/ticket_service.py`,
+  `backend/tests/test_tickets.py`.
+- **Prueba:** `pytest` — creación OK (201), campos inválidos → 422,
+  categoría desconocida → 422.
+- **Criterio de terminado:** se crea y consulta un ticket con todos los campos
+  y las pruebas pasan.
+
+### Tarea 5 — Historial de cambios (RF9)
+- **Objetivo:** auditoría enganchada a todas las mutaciones.
+- **Archivos:** `backend/services/historial_service.py`,
+  `backend/routers/tickets.py` (GET historial), `backend/tests/test_historial.py`.
+- **Prueba:** `pytest` — al crear un ticket aparece 1 entrada; al modificar un
+  campo se registra valor anterior/nuevo.
+- **Criterio de terminado:** toda creación queda registrada y el endpoint
+  devuelve el historial ordenado.
+
+### Tarea 6 — Editar ticket
+- **Objetivo:** actualización con registro en historial.
+- **Archivos:** `backend/routers/tickets.py`, `backend/services/ticket_service.py`,
+  `backend/tests/test_tickets.py`.
+- **Prueba:** `pytest` — actualiza, historial registra campo/anterior/nuevo,
+  404 si no existe.
+- **Criterio de terminado:** la edición funciona y el historial refleja
+  exactamente los cambios.
+
+### Tarea 7 — Máquina de estados (RF3)
+- **Objetivo:** transiciones válidas con historial.
+- **Archivos:** `backend/services/ticket_service.py`,
+  `backend/routers/tickets.py` (`PATCH /estado`), `backend/tests/test_estados.py`.
+- **Prueba:** `pytest` — transición válida OK; `Nuevo → Cerrado` → 409;
+  `Cerrado` terminal; historial correcto.
+- **Criterio de terminado:** todas las transiciones cubiertas por pruebas.
+
+### Tarea 8 — Usuarios y asignación (RF4)
+- **Objetivo:** asignar/desasignar tickets.
+- **Archivos:** `backend/routers/tickets.py` (`PATCH /asignar`),
+  `backend/services/ticket_service.py`, `backend/tests/test_asignacion.py`.
+- **Prueba:** `pytest` — asigna, reasigna (historial), desasigna,
+  usuario inválido → 404.
+- **Criterio de terminado:** la asignación funciona de extremo a extremo y
+  queda auditada.
+
+### Tarea 9 — Comentarios (RF5)
+- **Objetivo:** conversación sobre el ticket.
+- **Archivos:** `backend/routers/comentarios.py`,
+  `backend/tests/test_comentarios.py`.
+- **Prueba:** `pytest` — agrega, lista en orden cronológico, contenido vacío →
+  422, ticket inexistente → 404.
+- **Criterio de terminado:** los comentarios persisten y el historial los
+  menciona.
+
+### Tarea 10 — Listado, búsqueda y filtros (RF6, RF7, RF8)
+- **Objetivo:** endpoint central de consulta.
+- **Archivos:** `backend/routers/tickets.py`, `backend/services/ticket_service.py`,
+  `backend/tests/test_busqueda_filtro.py`.
+- **Prueba:** `pytest` — cada filtro aislado, filtros combinados, búsqueda
+  parcial, paginación sin repetidos ni huecos.
+- **Criterio de terminado:** todos los escenarios de filtrado probados.
+
+### Tarea 11 — Frontend: listado con búsqueda y filtros
+- **Objetivo:** primera pantalla funcional.
+- **Archivos:** `frontend/index.html`, `frontend/css/estilos.css`,
+  `frontend/js/api.js`, `frontend/js/listado.js`, `backend/main.py` (estáticos).
+- **Prueba:** manual en navegador + `pytest` en verde.
+- **Criterio de terminado:** se puede buscar y filtrar desde la UI.
+
+### Tarea 12 — Frontend: crear ticket
+- **Objetivo:** alta desde la interfaz.
+- **Archivos:** `frontend/crear.html`, `frontend/js/crear.js`, `index.html`.
+- **Prueba:** manual — crear válido, crear inválido muestra errores.
+- **Criterio de terminado:** el alta funciona desde la UI y los errores se
+  muestran.
+
+### Tarea 13 — Frontend: detalle, estados, asignación, comentarios
+- **Objetivo:** toda la gestión de un ticket.
+- **Archivos:** `frontend/detalle.html`, `frontend/js/detalle.js`.
+- **Prueba:** manual — transición inválida no se ofrece, asignación y
+  comentarios funcionan.
+- **Criterio de terminado:** todos los flujos de gestión funcionan desde la UI.
+
+### Tarea 14 — Frontend: historial de cambios
+- **Objetivo:** visualizar la auditoría.
+- **Archivos:** `frontend/detalle.html`, `frontend/js/detalle.js`,
+  `frontend/css/estilos.css`.
+- **Prueba:** manual — cada tipo de cambio aparece reflejado.
+- **Criterio de terminado:** el historial se ve completo y legible.
+
+### Tarea 15 — Docker
+- **Objetivo:** el sistema corre con un solo comando.
+- **Archivos:** `Dockerfile`, `docker-compose.yml`, `.dockerignore`,
+  `README.md`.
+- **Prueba:** `docker compose up --build` y flujo completo desde el navegador;
+  persistencia de la DB tras reiniciar.
+- **Criterio de terminado:** el contenedor levanta, sirve API + frontend y la
+  DB persiste.
+
+### Tarea 16 — Documentación final y revisión
+- **Objetivo:** README completo y cierre.
+- **Archivos:** `README.md`, `docs/plan_desarrollo.md`, `docs/api.md`.
+- **Prueba:** RF1–RF9 mapeados a endpoints y pruebas; `pytest` completo en verde.
+- **Criterio de terminado:** documentación cubre todo y `pytest` en verde.
+
+### Tarea 17 — Push a GitHub (con autorización)
+- **Objetivo:** publicar en GitHub.
+- **Archivos:** ninguno nuevo.
+- **Prueba:** `git log` y `git status` limpios.
+- **Criterio de terminado:** push realizado con autorización expresa.
+
+## Estado del avance
+
+| Tarea | Estado |
+|-------|--------|
+| 1 — Inicialización del proyecto | ✅ Completada |
+| 2 — Base de datos y modelos | ⬜ Pendiente |
+| 3 — Esquemas Pydantic y app mínima | ⬜ Pendiente |
+| 4 — Crear ticket | ⬜ Pendiente |
+| 5 — Historial de cambios | ⬜ Pendiente |
+| 6 — Editar ticket | ⬜ Pendiente |
+| 7 — Máquina de estados | ⬜ Pendiente |
+| 8 — Usuarios y asignación | ⬜ Pendiente |
+| 9 — Comentarios | ⬜ Pendiente |
+| 10 — Listado, búsqueda y filtros | ⬜ Pendiente |
+| 11 — Frontend: listado | ⬜ Pendiente |
+| 12 — Frontend: crear ticket | ⬜ Pendiente |
+| 13 — Frontend: detalle y gestión | ⬜ Pendiente |
+| 14 — Frontend: historial | ⬜ Pendiente |
+| 15 — Docker | ⬜ Pendiente |
+| 16 — Documentación final | ⬜ Pendiente |
+| 17 — Push a GitHub | ⬜ Pendiente (requiere autorización) |
