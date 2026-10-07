@@ -1,9 +1,9 @@
-"""Business logic for tickets (Task 4: creation, Task 5: listing)."""
+"""Business logic for tickets (Task 4: creation, Task 5: listing, Task 6: edition)."""
 
 from sqlalchemy import select
 
 from backend.models import Ticket
-from backend.schemas import TicketCreate
+from backend.schemas import TicketCreate, TicketUpdate
 
 
 def create_ticket(session, payload: TicketCreate) -> Ticket:
@@ -32,3 +32,27 @@ def list_tickets(session) -> list[Ticket]:
     """
     statement = select(Ticket).order_by(Ticket.created_at.desc(), Ticket.id.desc())
     return list(session.scalars(statement).all())
+
+
+def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | None:
+    """Apply a partial update to an existing ticket.
+
+    Returns ``None`` when the ticket does not exist (the router answers 404).
+    Only the fields present in ``TicketUpdate`` are touched; the ORM triggers
+    ``updated_at`` through the model's ``onupdate=utc_now``.
+    """
+    ticket = session.get(Ticket, ticket_id)
+    if ticket is None:
+        return None
+
+    changes = {
+        field: value
+        for field, value in payload.model_dump(mode="json", exclude_unset=True).items()
+        if value is not None
+    }
+    for field, value in changes.items():
+        setattr(ticket, field, value)
+
+    session.commit()
+    session.refresh(ticket)
+    return ticket

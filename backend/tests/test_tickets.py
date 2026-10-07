@@ -1,4 +1,6 @@
-"""Tests for ticket creation (Task 4: RF1, RF2)."""
+"""Tests for ticket creation (Task 4), listing (Task 5) and edition (Task 6)."""
+
+from datetime import datetime
 
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -249,3 +251,225 @@ def test_list_tickets_does_not_modify_stored_data(client, engine):
 
     assert response.status_code == 200
     assert before == after
+
+
+# ---------------------------------------------------------------------------
+# Edition (Task 6: PATCH /api/tickets/{ticket_id})
+# ---------------------------------------------------------------------------
+
+def create_ticket(client, **overrides) -> dict:
+    """Helper: create a ticket and return its response body."""
+    payload = {**VALID_PAYLOAD, **overrides}
+    response = client.post("/api/tickets", json=payload)
+    assert response.status_code == 201
+    return response.json()
+
+
+def test_patch_existing_ticket_returns_200(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={"title": "Título actualizado"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_patch_updates_only_title(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={"title": "Solo cambia el título"},
+    )
+    data = response.json()
+
+    assert data["title"] == "Solo cambia el título"
+    assert data["description"] == ticket["description"]
+    assert data["category"] == ticket["category"]
+    assert data["priority"] == ticket["priority"]
+
+
+def test_patch_updates_only_description(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={"description": "Solo cambia la descripción."},
+    )
+    data = response.json()
+
+    assert data["description"] == "Solo cambia la descripción."
+    assert data["title"] == ticket["title"]
+    assert data["category"] == ticket["category"]
+    assert data["priority"] == ticket["priority"]
+
+
+def test_patch_updates_only_category(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={"category": TicketCategory.REQUEST.value},
+    )
+    data = response.json()
+
+    assert data["category"] == TicketCategory.REQUEST.value
+    assert data["title"] == ticket["title"]
+    assert data["description"] == ticket["description"]
+    assert data["priority"] == ticket["priority"]
+
+
+def test_patch_updates_only_priority(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={"priority": TicketPriority.LOW.value},
+    )
+    data = response.json()
+
+    assert data["priority"] == TicketPriority.LOW.value
+    assert data["title"] == ticket["title"]
+    assert data["description"] == ticket["description"]
+    assert data["category"] == ticket["category"]
+
+
+def test_patch_updates_multiple_fields_at_once(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={
+            "title": "Título y prioridad cambiados",
+            "priority": TicketPriority.CRITICAL.value,
+        },
+    )
+    data = response.json()
+
+    assert data["title"] == "Título y prioridad cambiados"
+    assert data["priority"] == TicketPriority.CRITICAL.value
+    assert data["description"] == ticket["description"]
+    assert data["category"] == ticket["category"]
+
+
+def test_patch_persists_changes_in_sqlite(client, engine):
+    ticket = create_ticket(client)
+
+    client.patch(f"/api/tickets/{ticket['id']}", json={"title": "Persistido en disco"})
+
+    fresh_session = sessionmaker(bind=engine, expire_on_commit=False)()
+    try:
+        stored = fresh_session.get(Ticket, ticket["id"])
+        assert stored is not None
+        assert stored.title == "Persistido en disco"
+    finally:
+        fresh_session.close()
+
+
+def test_patch_missing_ticket_returns_404(client):
+    response = client.patch("/api/tickets/9999", json={"title": "Este no existe"})
+
+    assert response.status_code == 404
+
+
+def test_patch_invalid_title_returns_422(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(f"/api/tickets/{ticket['id']}", json={"title": "ab"})
+
+    assert response.status_code == 422
+
+
+def test_patch_blank_description_returns_422(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(f"/api/tickets/{ticket['id']}", json={"description": "   "})
+
+    assert response.status_code == 422
+
+
+def test_patch_invalid_category_returns_422(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={"category": "Categoría inventada"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_patch_invalid_priority_returns_422(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={"priority": "Urgentísima"},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("payload", [{}, {"title": None}])
+def test_patch_without_modifiable_fields_returns_422(client, payload):
+    ticket = create_ticket(client)
+
+    response = client.patch(f"/api/tickets/{ticket['id']}", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_patch_cannot_modify_protected_fields(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={
+            "title": "Título nuevo",
+            "id": 999,
+            "state": TicketState.CLOSED.value,
+            "assigned_to_id": 42,
+            "created_at": "2000-01-01T00:00:00",
+        },
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["id"] == ticket["id"]
+    assert data["state"] == TicketState.NEW.value
+    assert data["assigned_to_id"] is None
+    assert data["created_at"] == ticket["created_at"]
+
+
+def test_patch_with_only_protected_fields_returns_422(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={
+            "state": TicketState.CLOSED.value,
+            "assigned_to_id": 1,
+            "id": 7,
+            "created_at": "2000-01-01T00:00:00",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_patch_updates_updated_at(client):
+    ticket = create_ticket(client)
+
+    response = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={"title": "El título también cambia updated_at"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert datetime.fromisoformat(data["updated_at"]) > datetime.fromisoformat(
+        ticket["updated_at"]
+    )
+    assert data["created_at"] == ticket["created_at"]

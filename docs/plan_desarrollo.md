@@ -224,13 +224,28 @@ GET    /api/catalogs                (states, categories, priorities)
   tarea posterior.
 
 ### Tarea 6 — Editar ticket
-- **Objetivo:** actualización con registro en historial.
-- **Archivos:** `backend/routers/tickets.py`, `backend/services/ticket_service.py`,
-  `backend/tests/test_tickets.py`.
-- **Prueba:** `pytest` — actualiza, historial registra campo/anterior/nuevo,
-  404 si no existe.
-- **Criterio de terminado:** la edición funciona y el historial refleja
-  exactamente los cambios.
+- **Objetivo:** actualización parcial de los datos básicos de un ticket.
+- **Archivos:** `backend/schemas.py` (`TicketUpdate` + validaciones
+  compartidas `_validate_title`/`_validate_description`),
+  `backend/services/ticket_service.py` (`update_ticket`),
+  `backend/routers/tickets.py` (`PATCH`),
+  `backend/tests/test_tickets.py` (sección de edición), `README.md`.
+- **Endpoint:** `PATCH /api/tickets/{ticket_id}` → `200` con
+  `TicketResponse`; `404` si el ticket no existe; `422` si algún campo es
+  inválido o la petición no incluye ningún campo modificable.
+- **Reglas:** campos opcionales `title`, `description`, `category`,
+  `priority` (actualización parcial) con las mismas validaciones que la
+  creación; `id`, `state`, `assigned_to_id` y `created_at` no son editables
+  mediante este endpoint; `updated_at` se refresca automáticamente por el
+  `onupdate=utc_now` del modelo (sin modificar `models.py`).
+- **Prueba:** `pytest` — 17 pruebas: 200, edición individual de cada campo,
+  campos combinados, persistencia en SQLite, 404 inexistente, 422 por título/
+  descripción/categoría/prioridad inválidos, 422 sin campos modificables
+  (`{}` y `title: null`), campos protegidos intactos (y 422 si solo se envían
+  esos), `updated_at` incrementado y `created_at` intacto.
+- **Criterio de terminado:** la suite completa está en verde.
+- **Nota:** la redacción original incluía registrar la edición en el
+  historial; **no se implementó** (RF9 sigue pendiente de definir).
 
 ### Tarea 7 — Máquina de estados (RF3)
 - **Objetivo:** transiciones válidas con historial.
@@ -325,7 +340,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 3 — Health check de la API | ✅ Completada |
 | 4 — Crear ticket | ✅ Completada |
 | 5 — Consultar y listar tickets | ✅ Completada |
-| 6 — Editar ticket | ⬜ Pendiente |
+| 6 — Editar ticket | ✅ Completada |
 | 7 — Máquina de estados | ⬜ Pendiente |
 | 8 — Usuarios y asignación | ⬜ Pendiente |
 | 9 — Comentarios | ⬜ Pendiente |

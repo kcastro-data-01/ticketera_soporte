@@ -110,6 +110,21 @@ Categorías válidas: `Incidente`, `Consulta`, `Solicitud`, `Mantenimiento`.
 Prioridades válidas: `Baja`, `Media`, `Alta`, `Crítica`. Los datos inválidos
 responden `422 Unprocessable Entity`.
 
+### Editar un ticket
+
+```bash
+curl -X PATCH http://127.0.0.1:8000/api/tickets/1 \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Nuevo título del ticket"}'
+```
+
+Actualización **parcial**: envía solo los campos que quieras cambiar entre
+`title`, `description`, `category` y `priority`. Respuestas: `200 OK` con el
+ticket actualizado, `404 Not Found` si el ticket no existe y `422` si algún
+campo es inválido o la petición no contiene campos modificables. Los campos
+`id`, `state`, `assigned_to_id` y `created_at` no se pueden modificar con este
+endpoint; `updated_at` se actualiza automáticamente.
+
 ### Listar tickets
 
 ```bash
