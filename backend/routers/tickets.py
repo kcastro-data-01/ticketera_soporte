@@ -1,4 +1,4 @@
-"""Ticket endpoints (Task 4: creation only)."""
+"""Ticket endpoints (creation, listing, retrieval and edition)."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -34,6 +34,25 @@ def list_tickets(session: Session = Depends(get_session)) -> list[TicketResponse
     """Return all stored tickets, newest first (RF6)."""
     tickets = ticket_service.list_tickets(session)
     return [TicketResponse.model_validate(ticket) for ticket in tickets]
+
+
+@router.get(
+    "/{ticket_id}",
+    response_model=TicketResponse,
+    summary="Consultar un ticket",
+)
+def get_ticket(
+    ticket_id: int,
+    session: Session = Depends(get_session),
+) -> TicketResponse:
+    """Return a single ticket by id (read-only)."""
+    ticket = ticket_service.get_ticket(session, ticket_id)
+    if ticket is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticket {ticket_id} no encontrado",
+        )
+    return TicketResponse.model_validate(ticket)
 
 
 @router.patch(

@@ -1,4 +1,5 @@
-"""Tests for ticket creation (Task 4), listing (Task 5) and edition (Task 6)."""
+"""Tests for ticket creation (Task 4), listing (Task 5), edition (Task 6)
+and retrieval (Task 7)."""
 
 from datetime import datetime
 
@@ -473,3 +474,94 @@ def test_patch_updates_updated_at(client):
         ticket["updated_at"]
     )
     assert data["created_at"] == ticket["created_at"]
+
+
+# ---------------------------------------------------------------------------
+# Retrieval (Task 7: GET /api/tickets/{ticket_id})
+# ---------------------------------------------------------------------------
+
+def test_get_ticket_returns_200(client):
+    ticket = create_ticket(client)
+
+    response = client.get(f"/api/tickets/{ticket['id']}")
+
+    assert response.status_code == 200
+
+
+def test_get_ticket_data_matches_stored_record(client, engine):
+    ticket = create_ticket(client)
+
+    response = client.get(f"/api/tickets/{ticket['id']}")
+    data = response.json()
+
+    # Compare with a brand new session reading the SQLite file directly.
+    fresh_session = sessionmaker(bind=engine, expire_on_commit=False)()
+    try:
+        stored = fresh_session.get(Ticket, ticket["id"])
+        assert stored is not None
+        assert data["id"] == stored.id
+        assert data["title"] == stored.title
+        assert data["description"] == stored.description
+        assert data["category"] == stored.category
+        assert data["priority"] == stored.priority
+        assert data["state"] == stored.state
+        assert data["assigned_to_id"] == stored.assigned_to_id
+        assert data["created_at"] == ticket["created_at"]
+        assert data["updated_at"] == ticket["updated_at"]
+    finally:
+        fresh_session.close()
+
+
+def test_get_missing_ticket_returns_404(client):
+    response = client.get("/api/tickets/9999")
+
+    assert response.status_code == 404
+
+
+def test_get_ticket_does_not_modify_the_ticket(client, engine):
+    ticket = create_ticket(client)
+
+    def snapshot() -> tuple:
+        fresh_session = sessionmaker(bind=engine)()
+        try:
+            stored = fresh_session.get(Ticket, ticket["id"])
+            return (
+                stored.title,
+                stored.description,
+                stored.category,
+                stored.priority,
+                stored.state,
+                stored.assigned_to_id,
+                stored.created_at,
+                stored.updated_at,
+            )
+        finally:
+            fresh_session.close()
+
+    before = snapshot()
+    response = client.get(f"/api/tickets/{ticket['id']}")
+    after = snapshot()
+
+    assert response.status_code == 200
+    assert before == after
+
+
+def test_get_ticket_response_structure(client):
+    ticket = create_ticket(client)
+
+    data = client.get(f"/api/tickets/{ticket['id']}").json()
+
+    assert set(data.keys()) == EXPECTED_TICKET_KEYS
+    assert isinstance(data["id"], int)
+    assert isinstance(data["title"], str)
+    assert isinstance(data["category"], str)
+    assert isinstance(data["priority"], str)
+    assert isinstance(data["state"], str)
+    assert data["assigned_to_id"] is None
+
+
+def test_get_ticket_is_exposed_in_openapi(client):
+    schema = client.get("/openapi.json").json()
+
+    assert "/api/tickets/{ticket_id}" in schema["paths"]
+    assert "get" in schema["paths"]["/api/tickets/{ticket_id}"]

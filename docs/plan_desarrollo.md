@@ -199,8 +199,8 @@ GET    /api/catalogs                (states, categories, priorities)
 - **Criterio de terminado:** la suite completa está en verde con la creación
   funcionando de extremo a extremo.
 - **Nota:** la consulta individual `GET /api/tickets/{id}` de la redacción
-  original no se implementó en esta tarea (solo creación) y queda pendiente de
-  definirse en una tarea posterior.
+  original no se implementó en esta tarea (solo creación); se implementó
+  posteriormente en la **Tarea 7**.
 
 ### Tarea 5 — Consultar y listar tickets (RF6)
 - **Objetivo:** devolver los tickets existentes mediante la API (solo lectura).
@@ -247,14 +247,21 @@ GET    /api/catalogs                (states, categories, priorities)
 - **Nota:** la redacción original incluía registrar la edición en el
   historial; **no se implementó** (RF9 sigue pendiente de definir).
 
-### Tarea 7 — Máquina de estados (RF3)
-- **Objetivo:** transiciones válidas con historial.
-- **Archivos:** `backend/services/ticket_service.py`,
-  `backend/routers/tickets.py` (`PATCH /api/tickets/{id}/state`),
-  `backend/tests/test_estados.py`.
-- **Prueba:** `pytest` — transición válida OK; `Nuevo → Cerrado` → 409;
-  `Cerrado` terminal; historial correcto.
-- **Criterio de terminado:** todas las transiciones cubiertas por pruebas.
+### Tarea 7 — Consultar un ticket individual
+- **Objetivo:** devolver un ticket existente por su id (solo lectura).
+- **Archivos:** `backend/services/ticket_service.py` (`get_ticket`),
+  `backend/routers/tickets.py` (`GET`), `backend/tests/test_tickets.py`
+  (sección de consulta), `README.md`.
+- **Endpoint:** `GET /api/tickets/{ticket_id}` → `200` con `TicketResponse`
+  (mismo esquema del listado); `404` si el ticket no existe.
+- **Reglas:** la consulta no modifica ningún dato del ticket.
+- **Prueba:** `pytest` — 6 pruebas: ticket existente responde `200`, los datos
+  coinciden con los almacenados (sesión nueva sobre SQLite), id inexistente →
+  `404`, la consulta no modifica el ticket (instantánea antes/después),
+  estructura de la respuesta (9 campos) y presencia en `/openapi.json`.
+- **Criterio de terminado:** la suite completa está en verde.
+- **Nota:** la máquina de estados (RF3) no forma parte de esta tarea; queda
+  pendiente como **Tarea 18** de este plan.
 
 ### Tarea 8 — Usuarios y asignación (RF4)
 - **Objetivo:** asignar/desasignar tickets.
@@ -331,6 +338,21 @@ GET    /api/catalogs                (states, categories, priorities)
 - **Prueba:** `git log` y `git status` limpios.
 - **Criterio de terminado:** push realizado con autorización expresa.
 
+### Tarea 18 — Máquina de estados (RF3)
+- **Objetivo:** permitir cambiar el estado de un ticket respetando las
+  transiciones aprobadas (decisión 6).
+- **Archivos:** `backend/services/ticket_service.py`,
+  `backend/routers/tickets.py` (`PATCH /api/tickets/{id}/state`),
+  `backend/tests/test_estados.py`.
+- **Endpoint:** `PATCH /api/tickets/{id}/state` con `{state, reason?}`;
+  transición inválida → HTTP 409; `Cerrado` es estado terminal.
+- **Prueba:** `pytest` — transición válida OK; `Nuevo → Cerrado` → 409;
+  `Cerrado` terminal.
+- **Criterio de terminado:** todas las transiciones cubiertas por pruebas.
+- **Estado:** ⬜ Pendiente de implementar. Registrada aquí para no entrar en
+  conflicto con la **Tarea 7** (Consultar un ticket individual). El registro de
+  estos cambios en el historial (RF9) se definirá en una tarea propia.
+
 ## Estado del avance
 
 | Tarea | Estado |
@@ -341,7 +363,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 4 — Crear ticket | ✅ Completada |
 | 5 — Consultar y listar tickets | ✅ Completada |
 | 6 — Editar ticket | ✅ Completada |
-| 7 — Máquina de estados | ⬜ Pendiente |
+| 7 — Consultar un ticket individual | ✅ Completada |
 | 8 — Usuarios y asignación | ⬜ Pendiente |
 | 9 — Comentarios | ⬜ Pendiente |
 | 10 — Búsqueda y filtros | ⬜ Pendiente |
@@ -352,3 +374,4 @@ GET    /api/catalogs                (states, categories, priorities)
 | 15 — Docker | ⬜ Pendiente |
 | 16 — Documentación final | ⬜ Pendiente |
 | 17 — Push a GitHub | ⬜ Pendiente (requiere autorización) |
+| 18 — Máquina de estados (RF3) | ⬜ Pendiente |

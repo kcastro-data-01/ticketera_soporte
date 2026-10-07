@@ -136,6 +136,15 @@ más reciente a más antiguo. Cada elemento contiene `id`, `title`, `description
 `category`, `priority`, `state`, `assigned_to_id`, `created_at` y
 `updated_at`. Si no hay tickets, responde `[]`.
 
+### Consultar un ticket
+
+```bash
+curl http://127.0.0.1:8000/api/tickets/1
+```
+
+Devuelve `200 OK` con el ticket solicitado (mismos campos que el listado) o
+`404 Not Found` si el id no existe. La consulta no modifica el ticket.
+
 ### Base de datos
 
 SQLite crea el archivo `ticketera.db` en la raíz del proyecto automáticamente

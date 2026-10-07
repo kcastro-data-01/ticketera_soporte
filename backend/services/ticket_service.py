@@ -1,4 +1,4 @@
-"""Business logic for tickets (Task 4: creation, Task 5: listing, Task 6: edition)."""
+"""Business logic for tickets (creation, listing, retrieval and edition)."""
 
 from sqlalchemy import select
 
@@ -32,6 +32,11 @@ def list_tickets(session) -> list[Ticket]:
     """
     statement = select(Ticket).order_by(Ticket.created_at.desc(), Ticket.id.desc())
     return list(session.scalars(statement).all())
+
+
+def get_ticket(session, ticket_id: int) -> Ticket | None:
+    """Return a ticket by id, or ``None`` when it does not exist."""
+    return session.get(Ticket, ticket_id)
 
 
 def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | None:
