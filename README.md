@@ -116,6 +116,28 @@ duplicados, presenta el detalle de validación si la API responde `422`, un
 mensaje de error si falla la red o el servidor, y al crearse el ticket
 muestra la confirmación y redirige al listado.
 
+El **ID** de cada fila del listado abre `/detalle.html?id={id}`, la pantalla
+de detalle y gestión: muestra los 9 datos del ticket (ID, título, descripción,
+categoría, prioridad, estado, persona asignada y fechas de creación y
+actualización) con `GET /api/tickets/{id}` — si no existe se muestra un
+mensaje claro — y permite, con los endpoints existentes:
+
+- **editar** título, descripción, categoría y prioridad (`PATCH
+  /api/tickets/{id}`): valida en el navegador los campos vacíos, presenta el
+  detalle de validación si la API responde `422` y, tras un cambio exitoso,
+  recarga el ticket para actualizar la información en pantalla;
+- **asignar o desasignar** una persona: el selector se llena con
+  `GET /api/users` e incluye la opción "Sin asignar" (`PATCH
+  /api/tickets/{id}/assign`);
+- **agregar comentarios** (`POST /api/tickets/{id}/comments`) con
+  confirmación de creación; la consulta de los comentarios existentes queda
+  pendiente de la tarea correspondiente, ya que el backend todavía no expone
+  un endpoint para listarlos (se indica en la propia pantalla).
+
+Los tres botones se deshabilitan mientras hay una operación en curso para
+evitar envíos duplicados. El cambio de estado no está en esta pantalla: es
+funcionalidad de una tarea posterior.
+
 ### Health check
 
 ```bash

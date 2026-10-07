@@ -444,12 +444,35 @@ GET    /api/catalogs                (states, categories, priorities)
 - **Criterio de terminado:** el alta funciona desde la UI y los errores se
   muestran.
 
-### Tarea 13 — Frontend: detalle, estados, asignación, comentarios
-- **Objetivo:** toda la gestión de un ticket.
-- **Archivos:** `frontend/detalle.html`, `frontend/js/detalle.js`.
-- **Prueba:** manual — transición inválida no se ofrece, asignación y
-  comentarios funcionan.
-- **Criterio de terminado:** todos los flujos de gestión funcionan desde la UI.
+### Tarea 13 — Frontend: detalle, edición, asignación y comentarios
+- **Objetivo:** consultar y gestionar un ticket desde la UI con los endpoints
+  existentes: ver los 9 datos del ticket (`GET /api/tickets/{id}`), editar
+  título/descripción/categoría/prioridad (`PATCH /api/tickets/{id}`),
+  asignar/desasignar (`GET /api/users` + `PATCH /api/tickets/{id}/assign`) y
+  agregar comentarios (`POST /api/tickets/{id}/comments`). El ID de cada fila
+  del listado abre `detalle.html?id={id}`.
+- **Fuera de alcance (a propósito):** cambio de estado (Tarea 18) e historial
+  (Tarea 14). La consulta de comentarios existentes queda **pendiente**: el
+  backend solo expone `POST`, no `GET`, por lo que la pantalla permite
+  agregar comentarios y muestra una nota explícita al respecto.
+- **Archivos:** creados `frontend/detalle.html`, `frontend/js/detalle.js`;
+  modificados `frontend/js/app.js` (enlace del ID), `frontend/css/estilos.css`
+  (estilos de detalle y enlace de tabla).
+- **Prueba:** manual — `pytest` 125 en verde; con el servidor real: apertura
+  de ticket existente e inexistente (`404` con mensaje claro), edición con
+  recarga de datos en pantalla (`updated_at` cambia), título de 2 caracteres y
+  categoría inválida → `422` mostrado, alta de usuario (`role` obligatorio,
+  enum `Administrador`/`Soporte`), asignación → `assigned_to_id: 1`,
+  desasignación → `null`, usuario inexistente → `404`, comentario → `201`,
+  listado y `/health` intactos; además un harness desechable de `node` sobre
+  `detalle.js` y el enlace de `app.js` (**34 comprobaciones, todas en verde**)
+  cubrió parseo del id por query string, render de los 9 campos, 404, payload
+  del PATCH, validación local y `422`, recarga silenciosa post-éxito,
+  bloqueo de botones y anti-duplicados, asignar/desasignar con `null`,
+  mensajes del backend, alta y validación de comentarios y el enlace del
+  listado.
+- **Criterio de terminado:** todos los flujos de gestión (sin estados ni
+  historial) funcionan desde la UI.
 
 ### Tarea 14 — Frontend: historial de cambios
 - **Objetivo:** visualizar la auditoría.
@@ -510,7 +533,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 10 — Búsqueda y filtros | ✅ Completada |
 | 11 — Frontend: listado | ✅ Completada |
 | 12 — Frontend: crear ticket | ✅ Completada |
-| 13 — Frontend: detalle y gestión | ⬜ Pendiente |
+| 13 — Frontend: detalle y gestión | ✅ Completada |
 | 14 — Frontend: historial | ⬜ Pendiente |
 | 15 — Docker | ⬜ Pendiente |
 | 16 — Documentación final | ⬜ Pendiente |

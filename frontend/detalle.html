@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalle del ticket — Ticketera de Soporte</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <header class="cabecera">
+    <div>
+      <h1>Ticketera de Soporte</h1>
+      <p>Detalle y gestión del ticket</p>
+    </div>
+    <nav class="cabecera-enlaces">
+      <a href="index.html" class="enlace-boton">Volver al listado</a>
+    </nav>
+  </header>
+
+  <main class="contenido">
+    <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
+
+    <section id="panel-ticket" class="filtros detalle" aria-label="Datos del ticket">
+      <div class="campo-dato">
+        <span class="etiqueta">ID</span>
+        <span id="ver-id">—</span>
+      </div>
+      <div class="campo-dato ancho">
+        <span class="etiqueta">Título</span>
+        <span id="ver-title">—</span>
+      </div>
+      <div class="campo-dato ancho">
+        <span class="etiqueta">Descripción</span>
+        <span id="ver-description">—</span>
+      </div>
+      <div class="campo-dato">
+        <span class="etiqueta">Categoría</span>
+        <span id="ver-category">—</span>
+      </div>
+      <div class="campo-dato">
+        <span class="etiqueta">Prioridad</span>
+        <span id="ver-priority">—</span>
+      </div>
+      <div class="campo-dato">
+        <span class="etiqueta">Estado</span>
+        <span id="ver-state">—</span>
+      </div>
+      <div class="campo-dato">
+        <span class="etiqueta">Asignado a</span>
+        <span id="ver-assigned">—</span>
+      </div>
+      <div class="campo-dato">
+        <span class="etiqueta">Fecha de creación</span>
+        <span id="ver-created">—</span>
+      </div>
+      <div class="campo-dato">
+        <span class="etiqueta">Fecha de actualización</span>
+        <span id="ver-updated">—</span>
+      </div>
+    </section>
+
+    <section class="seccion" aria-label="Edición del ticket">
+      <h2>Editar ticket</h2>
+      <form id="form-editar" class="filtros formulario" novalidate>
+        <label class="campo">
+          <span>Título *</span>
+          <input type="text" id="title" name="title" required maxlength="200">
+        </label>
+        <label class="campo">
+          <span>Descripción *</span>
+          <textarea id="description" name="description" required></textarea>
+        </label>
+        <label class="campo">
+          <span>Categoría</span>
+          <select id="category" name="category">
+            <option value="Incidente">Incidente</option>
+            <option value="Consulta">Consulta</option>
+            <option value="Solicitud">Solicitud</option>
+            <option value="Mantenimiento">Mantenimiento</option>
+          </select>
+        </label>
+        <label class="campo">
+          <span>Prioridad</span>
+          <select id="priority" name="priority">
+            <option value="Baja">Baja</option>
+            <option value="Media">Media</option>
+            <option value="Alta">Alta</option>
+            <option value="Crítica">Crítica</option>
+          </select>
+        </label>
+        <div class="acciones">
+          <button type="submit" id="guardar">Guardar cambios</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="seccion" aria-label="Asignación del ticket">
+      <h2>Asignación</h2>
+      <div class="filtros formulario">
+        <label class="campo">
+          <span>Persona asignada</span>
+          <select id="usuario">
+            <option value="">Sin asignar</option>
+          </select>
+        </label>
+        <div class="acciones">
+          <button type="button" id="asignar">Guardar asignación</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="seccion" aria-label="Comentarios del ticket">
+      <h2>Comentarios</h2>
+      <p class="nota">
+        Agregar comentarios está disponible. La consulta de los comentarios
+        existentes queda pendiente de la tarea correspondiente: el backend
+        todavía no expone un endpoint para listarlos.
+      </p>
+      <form id="form-comentario" class="filtros formulario" novalidate>
+        <label class="campo">
+          <span>Nuevo comentario</span>
+          <textarea
+            id="contenido"
+            name="content"
+            maxlength="2000"
+            placeholder="Escribe aquí el comentario"
+          ></textarea>
+        </label>
+        <div class="acciones">
+          <button type="submit" id="comentar">Agregar comentario</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="js/detalle.js" defer></script>
+</body>
+</html>

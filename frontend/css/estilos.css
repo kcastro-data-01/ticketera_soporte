@@ -222,3 +222,56 @@ button:disabled {
 .listado tbody tr:last-child td {
   border-bottom: none;
 }
+
+/* Pantalla de detalle (Tarea 13) */
+
+.enlace-tabla {
+  color: var(--color-primario);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.enlace-tabla:hover {
+  text-decoration: underline;
+}
+
+.detalle {
+  align-items: flex-start;
+}
+
+.campo-dato {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.95rem;
+  white-space: pre-wrap;
+}
+
+.campo-dato .etiqueta {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-tenue);
+}
+
+.campo-dato.ancho {
+  flex: 1 1 100%;
+}
+
+.seccion {
+  margin-top: 1.75rem;
+}
+
+.seccion h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.nota {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: #eef2f7;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--color-tenue);
+}

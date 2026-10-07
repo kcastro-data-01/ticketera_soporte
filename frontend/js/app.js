@@ -76,12 +76,23 @@ function appendCell(row, text) {
   row.appendChild(cell);
 }
 
+/* El ID del listado abre la pantalla de detalle (Tarea 13). */
+function appendIdCell(row, ticketId) {
+  const cell = document.createElement("td");
+  const link = document.createElement("a");
+  link.className = "enlace-tabla";
+  link.href = `detalle.html?id=${ticketId}`;
+  link.textContent = ticketId;
+  cell.appendChild(link);
+  row.appendChild(cell);
+}
+
 function renderTickets(tickets) {
   const elements = getElements();
   clearRows();
   tickets.forEach((ticket) => {
     const row = document.createElement("tr");
-    appendCell(row, ticket.id);
+    appendIdCell(row, ticket.id);
     appendCell(row, ticket.title);
     appendCell(row, ticket.category);
     appendCell(row, ticket.priority);
