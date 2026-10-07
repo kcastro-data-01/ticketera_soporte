@@ -110,6 +110,17 @@ Categorías válidas: `Incidente`, `Consulta`, `Solicitud`, `Mantenimiento`.
 Prioridades válidas: `Baja`, `Media`, `Alta`, `Crítica`. Los datos inválidos
 responden `422 Unprocessable Entity`.
 
+### Listar tickets
+
+```bash
+curl http://127.0.0.1:8000/api/tickets
+```
+
+Devuelve `200 OK` con la lista de todos los tickets almacenados, ordenados de
+más reciente a más antiguo. Cada elemento contiene `id`, `title`, `description`,
+`category`, `priority`, `state`, `assigned_to_id`, `created_at` y
+`updated_at`. Si no hay tickets, responde `[]`.
+
 ### Base de datos
 
 SQLite crea el archivo `ticketera.db` en la raíz del proyecto automáticamente

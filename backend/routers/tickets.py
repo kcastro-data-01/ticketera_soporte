@@ -23,3 +23,14 @@ def create_ticket(
     """Create a ticket with title, description, category and priority (RF1, RF2)."""
     ticket = ticket_service.create_ticket(session, payload)
     return TicketResponse.model_validate(ticket)
+
+
+@router.get(
+    "",
+    response_model=list[TicketResponse],
+    summary="Listar tickets",
+)
+def list_tickets(session: Session = Depends(get_session)) -> list[TicketResponse]:
+    """Return all stored tickets, newest first (RF6)."""
+    tickets = ticket_service.list_tickets(session)
+    return [TicketResponse.model_validate(ticket) for ticket in tickets]

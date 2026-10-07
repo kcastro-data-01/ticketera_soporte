@@ -202,15 +202,26 @@ GET    /api/catalogs                (states, categories, priorities)
   original no se implementó en esta tarea (solo creación) y queda pendiente de
   definirse en una tarea posterior.
 
-### Tarea 5 — Historial de cambios (RF9)
-- **Objetivo:** auditoría enganchada a todas las mutaciones.
-- **Archivos:** `backend/services/historial_service.py`,
-  `backend/routers/tickets.py` (`GET /api/tickets/{id}/history`),
-  `backend/tests/test_historial.py`.
-- **Prueba:** `pytest` — al crear un ticket aparece 1 entrada; al modificar un
-  campo se registra valor anterior/nuevo.
-- **Criterio de terminado:** toda creación queda registrada y el endpoint
-  devuelve el historial ordenado.
+### Tarea 5 — Consultar y listar tickets (RF6)
+- **Objetivo:** devolver los tickets existentes mediante la API (solo lectura).
+- **Archivos:** `backend/routers/tickets.py` (`GET`), 
+  `backend/services/ticket_service.py` (`list_tickets`),
+  `backend/tests/test_tickets.py` (sección de listado), `README.md`.
+- **Endpoint:** `GET /api/tickets` → `200` con la lista de tickets
+  (`list[TicketResponse]`), ordenada por `created_at` DESC e `id` DESC
+  (más recientes primero). Reutiliza `TicketResponse`: sin nuevos schemas.
+  Los parámetros de consulta (`q`, `state`, `category`, …) se ignoran hasta la
+  Tarea 10.
+- **Prueba:** `pytest` — 6 pruebas: lista vacía responde `200` y `[]`, los
+  tickets creados aparecen en la lista, los datos corresponden a los registros
+  almacenados (lectura con sesión nueva sobre SQLite), estructura de la
+  respuesta (9 campos), presencia en `/openapi.json` y verificación de que la
+  consulta no modifica los datos.
+- **Criterio de terminado:** la suite completa está en verde con el listado
+  funcionando.
+- **Nota:** la redacción anterior de la Tarea 5 (historial de cambios, RF9) se
+  retiró del plan para este alcance; RF9 queda pendiente de definirse en una
+  tarea posterior.
 
 ### Tarea 6 — Editar ticket
 - **Objetivo:** actualización con registro en historial.
@@ -248,7 +259,7 @@ GET    /api/catalogs                (states, categories, priorities)
 - **Criterio de terminado:** los comentarios persisten y el historial los
   menciona.
 
-### Tarea 10 — Listado, búsqueda y filtros (RF6, RF7, RF8)
+### Tarea 10 — Búsqueda y filtros de tickets (RF7, RF8)
 - **Objetivo:** endpoint central de consulta.
 - **Archivos:** `backend/routers/tickets.py`, `backend/services/ticket_service.py`,
   `backend/tests/test_busqueda_filtro.py`.
@@ -313,12 +324,12 @@ GET    /api/catalogs                (states, categories, priorities)
 | 2 — Base de datos y modelos | ✅ Completada |
 | 3 — Health check de la API | ✅ Completada |
 | 4 — Crear ticket | ✅ Completada |
-| 5 — Historial de cambios | ⬜ Pendiente |
+| 5 — Consultar y listar tickets | ✅ Completada |
 | 6 — Editar ticket | ⬜ Pendiente |
 | 7 — Máquina de estados | ⬜ Pendiente |
 | 8 — Usuarios y asignación | ⬜ Pendiente |
 | 9 — Comentarios | ⬜ Pendiente |
-| 10 — Listado, búsqueda y filtros | ⬜ Pendiente |
+| 10 — Búsqueda y filtros | ⬜ Pendiente |
 | 11 — Frontend: listado | ⬜ Pendiente |
 | 12 — Frontend: crear ticket | ⬜ Pendiente |
 | 13 — Frontend: detalle y gestión | ⬜ Pendiente |
