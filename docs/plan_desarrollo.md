@@ -24,7 +24,10 @@ implementa, se prueba, se documenta y se commitea antes de pasar a la siguiente.
 2. **Sin autenticación.** Usuarios mínimos (tabla `users`) solo para asignar
    tickets y como autor de comentarios/historial.
 3. **Idioma:** variables y funciones en inglés; textos visibles de la interfaz
-   en español.
+   en español. En consecuencia, tablas, columnas y campos de la API usan
+   identificadores en inglés, mientras que los valores de los enums
+   (`Nuevo`, `Incidente`, `Baja`…) se guardan en español porque se muestran
+   directamente en la UI.
 4. **Auditoría automática:** el historial se registra desde la capa de servicio,
    nunca desde el frontend.
 5. **Estados, categorías y prioridades** como `enum` en código + columna de
@@ -37,6 +40,8 @@ implementa, se prueba, se documenta y se commitea antes de pasar a la siguiente.
    - Transición inválida → HTTP 409.
 7. **Frontend estático** servido por el propio FastAPI (un solo contenedor Docker).
 8. **Pruebas con pytest** sobre la API usando base de datos temporal.
+9. **Base de datos:** archivo `ticketera.db` en la raíz del proyecto, creado
+   automáticamente por `init_db()` y excluido de Git por `.gitignore`.
 
 ## Arquitectura
 
@@ -84,30 +89,47 @@ ticketera_soporte/
 
 ### Modelo de datos
 
+_Implementado en la Tarea 2. Identificadores (tablas, columnas, relaciones) en
+inglés según la decisión de idioma; los valores guardados en `category`,
+`priority` y `state` son los textos en español de `backend/constants.py` porque
+se muestran en la interfaz._
+
 ```
-users        (id, nombre, email, rol, activo)
-tickets      (id, titulo, descripcion, categoria, prioridad,
-              estado, asignado_a_id -> users.id NULL,
-              creado_en, actualizado_en)
-comentarios  (id, ticket_id -> tickets.id, autor, contenido, creado_en)
-historial    (id, ticket_id -> tickets.id, accion, campo,
-              valor_anterior, valor_nuevo, autor, creado_en)
+users    (id, name, email UNIQUE, role, is_active)
+tickets  (id, title, description, category, priority, state,
+          assigned_to_id -> users.id NULL,
+          created_at, updated_at)
+comments (id, ticket_id -> tickets.id CASCADE, author, content, created_at)
+history  (id, ticket_id -> tickets.id CASCADE, action, field,
+          old_value, new_value, author, created_at)
 ```
+
+Restricciones a nivel de base de datos:
+- `title`: entre 3 y 200 caracteres y no vacío.
+- `description`, `content`, `action`: no vacíos.
+- `category`, `priority`, `state`: valores de los enums aprobados.
+- `email` de usuario: único.
+- Claves foráneas activas (`PRAGMA foreign_keys=ON`).
+- `state` inicial por defecto: `Nuevo`; `assigned_to_id` admite `NULL`.
 
 ### Endpoints
 
+_Identificadores en inglés (decisión de idioma aprobada); los valores de
+`state`, `category` y `priority` se envían en español tal como los muestra la
+interfaz._
+
 ```
-GET    /api/tickets                 ?q=&estado=&categoria=&prioridad=&asignado_a=&pagina=&tamano=
+GET    /api/tickets                 ?q=&state=&category=&priority=&assigned_to=&page=&size=
 POST   /api/tickets
 GET    /api/tickets/{id}
-PUT    /api/tickets/{id}            (titulo, descripcion, categoria, prioridad)
-PATCH  /api/tickets/{id}/estado     {estado, motivo?}
-PATCH  /api/tickets/{id}/asignar    {usuario_id}
-POST   /api/tickets/{id}/comentarios
-GET    /api/tickets/{id}/comentarios
-GET    /api/tickets/{id}/historial
-GET    /api/usuarios
-GET    /api/catalogos
+PUT    /api/tickets/{id}            (title, description, category, priority)
+PATCH  /api/tickets/{id}/state      {state, reason?}
+PATCH  /api/tickets/{id}/assign     {user_id}
+POST   /api/tickets/{id}/comments
+GET    /api/tickets/{id}/comments
+GET    /api/tickets/{id}/history
+GET    /api/users
+GET    /api/catalogs                (states, categories, priorities)
 ```
 
 ## Tareas
@@ -124,7 +146,9 @@ GET    /api/catalogos
 ### Tarea 2 — Base de datos y modelos
 - **Objetivo:** capa de persistencia y modelos de datos.
 - **Archivos:** `backend/database.py`, `backend/models.py`,
-  `backend/constants.py`, `backend/tests/conftest.py`.
+  `backend/constants.py`, `backend/tests/conftest.py`,
+  `backend/tests/test_models.py`, `backend/tests/test_constants.py`,
+  `pytest.ini`.
 - **Prueba:** `pytest` verificando creación de tablas e inserción/lectura de un
   ticket de prueba.
 - **Criterio de terminado:** `pytest` verde y la DB se genera al arrancar.
@@ -253,7 +277,7 @@ GET    /api/catalogos
 | Tarea | Estado |
 |-------|--------|
 | 1 — Inicialización del proyecto | ✅ Completada |
-| 2 — Base de datos y modelos | ⬜ Pendiente |
+| 2 — Base de datos y modelos | ✅ Completada |
 | 3 — Esquemas Pydantic y app mínima | ⬜ Pendiente |
 | 4 — Crear ticket | ⬜ Pendiente |
 | 5 — Historial de cambios | ⬜ Pendiente |

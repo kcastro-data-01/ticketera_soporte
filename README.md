@@ -78,6 +78,13 @@ python3 -m venv .venv
 > pip3 --python .venv/bin/python install -r requirements.txt
 > ```
 
+### Base de datos
+
+SQLite crea el archivo `ticketera.db` en la raíz del proyecto la primera vez que
+se llama a `init_db()` (se hará automáticamente al arrancar la API en la Tarea 3).
+El archivo está excluido de Git (`.gitignore`) y sus tablas son: `users`,
+`tickets`, `comments` y `history`.
+
 ### Pruebas
 
 ```bash
