@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ticketera de Soporte</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <header class="cabecera">
+    <h1>Ticketera de Soporte</h1>
+    <p>Consulta de tickets con búsqueda y filtros</p>
+  </header>
+
+  <main class="contenido">
+    <form id="form-filtros" class="filtros">
+      <label class="campo campo-busqueda">
+        <span>Buscar</span>
+        <input
+          type="search"
+          id="search"
+          name="search"
+          placeholder="Título o descripción"
+          autocomplete="off"
+        >
+      </label>
+
+      <label class="campo">
+        <span>Categoría</span>
+        <select id="category" name="category">
+          <option value="">Todas</option>
+          <option value="Incidente">Incidente</option>
+          <option value="Consulta">Consulta</option>
+          <option value="Solicitud">Solicitud</option>
+          <option value="Mantenimiento">Mantenimiento</option>
+        </select>
+      </label>
+
+      <label class="campo">
+        <span>Prioridad</span>
+        <select id="priority" name="priority">
+          <option value="">Todas</option>
+          <option value="Baja">Baja</option>
+          <option value="Media">Media</option>
+          <option value="Alta">Alta</option>
+          <option value="Crítica">Crítica</option>
+        </select>
+      </label>
+
+      <label class="campo">
+        <span>Estado</span>
+        <select id="state" name="state">
+          <option value="">Todos</option>
+          <option value="Nuevo">Nuevo</option>
+          <option value="En proceso">En proceso</option>
+          <option value="Resuelto">Resuelto</option>
+          <option value="Cerrado">Cerrado</option>
+        </select>
+      </label>
+
+      <div class="acciones">
+        <button type="submit" id="buscar">Buscar</button>
+        <button type="button" id="limpiar" class="secundario">Limpiar filtros</button>
+      </div>
+    </form>
+
+    <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
+
+    <table class="listado">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Título</th>
+          <th>Categoría</th>
+          <th>Prioridad</th>
+          <th>Estado</th>
+          <th>Asignado a</th>
+          <th>Fecha de creación</th>
+        </tr>
+      </thead>
+      <tbody id="lista-tickets"></tbody>
+    </table>
+  </main>
+
+  <script src="js/app.js" defer></script>
+</body>
+</html>

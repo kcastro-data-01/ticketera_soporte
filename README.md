@@ -85,6 +85,29 @@ python3 -m venv .venv
 La API queda disponible en `http://127.0.0.1:8000` y la documentación interactiva
 en `http://127.0.0.1:8000/docs`.
 
+### Frontend
+
+Con la API arrancada, abre <http://127.0.0.1:8000/> en el navegador. FastAPI
+sirve los archivos de `frontend/` desde el mismo origen que la API (montaje
+estático añadido al final de `backend/main.py`), por lo que no hace falta
+CORS ni otro servidor: abrir el HTML con `file://` o con
+`python -m http.server` bloquearía los `fetch` a la API por ser cross-origin.
+
+La pantalla permite:
+
+- ver el listado de tickets (ID, título, categoría, prioridad, estado,
+  persona asignada y fecha de creación);
+- buscar por título o descripción (usa el parámetro `search`);
+- filtrar por categoría, prioridad y estado (parámetros `category`,
+  `priority` y `state`), con opción "Todos/Todas" en cada selector;
+- combinar búsqueda y filtros con **Buscar** (solo se envían los parámetros
+  con valor) y volver al listado completo con **Limpiar filtros**.
+
+Estados visibles: `Cargando...`, `No hay tickets para mostrar.` y
+`Error al comunicarse con la API.`. El nombre de la persona asignada se
+resuelve con `GET /api/users` (si no es posible, se muestra `Usuario #id`;
+si el ticket no está asignado, `—`).
+
 ### Health check
 
 ```bash

@@ -1,0 +1,175 @@
+/* Estilos del listado de tickets (Tarea 11). Sin frameworks. */
+
+:root {
+  --color-fondo: #f5f7fa;
+  --color-superficie: #ffffff;
+  --color-borde: #d9dee5;
+  --color-texto: #1f2933;
+  --color-tenue: #6b7280;
+  --color-primario: #2563eb;
+  --color-primario-oscuro: #1d4ed8;
+  --color-error: #b91c1c;
+  --color-vacio: #92400e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+}
+
+.cabecera {
+  background: var(--color-primario);
+  color: #ffffff;
+  padding: 1rem 1.5rem;
+}
+
+.cabecera h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.cabecera p {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.contenido {
+  max-width: 1100px;
+  margin: 1.5rem auto;
+  padding: 0 1rem;
+}
+
+/* Formulario de búsqueda y filtros */
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--color-tenue);
+}
+
+.campo-busqueda {
+  flex: 1 1 220px;
+}
+
+.campo input,
+.campo select {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background: #ffffff;
+  color: var(--color-texto);
+}
+
+.campo input:focus,
+.campo select:focus {
+  outline: 2px solid var(--color-primario);
+  outline-offset: 1px;
+}
+
+.acciones {
+  display: flex;
+  gap: 0.5rem;
+}
+
+button {
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-primario);
+  color: #ffffff;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--color-primario-oscuro);
+}
+
+button.secundario {
+  background: #e5e7eb;
+  color: var(--color-texto);
+}
+
+button.secundario:hover {
+  background: #d1d5db;
+}
+
+/* Estados de la interfaz */
+
+.estado {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background: #e5e7eb;
+  font-size: 0.95rem;
+}
+
+.estado.cargando {
+  color: var(--color-tenue);
+}
+
+.estado.vacio {
+  background: #fef3c7;
+  color: var(--color-vacio);
+}
+
+.estado.error {
+  background: #fee2e2;
+  color: var(--color-error);
+}
+
+/* Listado */
+
+.listado {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.95rem;
+}
+
+.listado th,
+.listado td {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.listado th {
+  background: #eef2f7;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-tenue);
+}
+
+.listado tbody tr:hover {
+  background: #f9fafb;
+}
+
+.listado tbody tr:last-child td {
+  border-bottom: none;
+}

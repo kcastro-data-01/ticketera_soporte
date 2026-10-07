@@ -1,8 +1,10 @@
 """FastAPI application entry point for the support ticket system."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
 from backend.routers.comentarios import router as comments_router
@@ -34,3 +36,9 @@ def health_check() -> dict[str, str]:
 app.include_router(tickets_router)
 app.include_router(comments_router)
 app.include_router(users_router)
+
+# Serve the frontend (Task 11) from the same origin as the API, so the
+# browser can call /api/* without CORS. Registered last: every route above
+# keeps its priority over this catch-all mount.
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

@@ -91,8 +91,7 @@ ticketera_soporte/
     ├── crear.html                # formulario de creación
     ├── css/estilos.css
     └── js/
-        ├── api.js
-        ├── listado.js
+        ├── app.js
         ├── detalle.js
         └── crear.js
 ```
@@ -370,10 +369,41 @@ GET    /api/catalogs                (states, categories, priorities)
   máquina de estados (RF3) sigue pendiente como **Tarea 18**.
 
 ### Tarea 11 — Frontend: listado con búsqueda y filtros
-- **Objetivo:** primera pantalla funcional.
+- **Objetivo:** primera pantalla funcional que consulta la API.
 - **Archivos:** `frontend/index.html`, `frontend/css/estilos.css`,
-  `frontend/js/api.js`, `frontend/js/listado.js`, `backend/main.py` (estáticos).
-- **Prueba:** manual en navegador + `pytest` en verde.
+  `frontend/js/app.js` (JavaScript vanilla, sin frameworks ni librerías) y
+  `backend/main.py` (montaje estático mínimo). Se eliminaron los `.gitkeep`
+  de `frontend/css/` y `frontend/js/`.
+- **Integración con FastAPI:** el frontend se sirve desde la propia API con
+  `app.mount("/", StaticFiles(directory=..., html=True))` añadido **al final**
+  de `main.py`, después de todas las rutas, para no eclipsar ningún endpoint
+  existente (`/health` y `/api/*` siguen respondiendo igual). Era necesario:
+  abrir el HTML con `file://` o con `python -m http.server` haría los
+  `fetch` cross-origin y la API no envía cabeceras CORS; añadir
+  `CORSMiddleware` habría sido un cambio backend mayor. Si en el futuro se
+  prefiere no montar en `/`, la alternativa sería servirlo desde otro origen
+  **con** CORS habilitado.
+- **Funcionalidad:** listado vía `GET /api/tickets` con columnas ID,
+  título, categoría, prioridad, estado, asignado a y fecha de creación; el
+  nombre de la persona asignada se resuelve con `GET /api/users` (si no es
+  posible → `Usuario #id`; sin asignar → `—`); búsqueda y filtros se envían
+  **contra la API** con los parámetros ya existentes (`search`, `category`,
+  `priority`, `state`), omitiendo los que no tienen valor; botones
+  **Buscar** y **Limpiar filtros**; estados de interfaz `Cargando...`,
+  `No hay tickets para mostrar.` y `Error al comunicarse con la API.`.
+- **No implementado (por alcance):** creación, edición, asignación,
+  comentarios, cambio de estado, historial, autenticación, paginación,
+  Docker ni frameworks frontend.
+- **Prueba:** `pytest -q` → **125 en verde** (sin regresiones; el montaje no
+  afecta a las pruebas existentes) + validación manual: servidor real con
+  uvicorn — `/` carga (200, 7 columnas, campos y botones presentes),
+  `/css/estilos.css` y `/js/app.js` (200), `/health` intacto, búsqueda por
+  título, por descripción, case-insensitive, filtros aislados, combinaciones
+  (incluido `search=correo&priority=Alta&state=Nuevo`), resultado vacío
+  (`200 []`), error de API (`422`), `state=En+proceso` decodificado y 404
+  JSON en rutas definidas; además, un harness desechable de `node` sobre
+  `app.js` con stubs de DOM/fetch verificó la construcción de URLs y los
+  tres estados de interfaz (**20 comprobaciones, todas en verde**).
 - **Criterio de terminado:** se puede buscar y filtrar desde la UI.
 
 ### Tarea 12 — Frontend: crear ticket
@@ -447,7 +477,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 8 — Usuarios y asignación | ✅ Completada |
 | 9 — Comentarios | ✅ Completada |
 | 10 — Búsqueda y filtros | ✅ Completada |
-| 11 — Frontend: listado | ⬜ Pendiente |
+| 11 — Frontend: listado | ✅ Completada |
 | 12 — Frontend: crear ticket | ⬜ Pendiente |
 | 13 — Frontend: detalle y gestión | ⬜ Pendiente |
 | 14 — Frontend: historial | ⬜ Pendiente |
