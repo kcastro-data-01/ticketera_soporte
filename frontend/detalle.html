@@ -131,6 +131,33 @@
         </div>
       </form>
     </section>
+
+    <section class="seccion" aria-label="Historial del ticket">
+      <h2>Historial de cambios</h2>
+      <div class="filtros formulario">
+        <div class="acciones">
+          <button type="button" id="historial">Ver historial</button>
+        </div>
+      </div>
+      <p
+        id="historial-estado"
+        class="estado"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></p>
+      <table class="listado" id="tabla-historial" hidden>
+        <thead>
+          <tr>
+            <th>Fecha y hora</th>
+            <th>Persona</th>
+            <th>Acción</th>
+            <th>Detalle</th>
+          </tr>
+        </thead>
+        <tbody id="historial-cuerpo"></tbody>
+      </table>
+    </section>
   </main>
 
   <script src="js/detalle.js" defer></script>

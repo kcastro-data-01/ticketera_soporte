@@ -475,11 +475,49 @@ GET    /api/catalogs                (states, categories, priorities)
   historial) funcionan desde la UI.
 
 ### Tarea 14 — Frontend: historial de cambios
-- **Objetivo:** visualizar la auditoría.
-- **Archivos:** `frontend/detalle.html`, `frontend/js/detalle.js`,
-  `frontend/css/estilos.css`.
-- **Prueba:** manual — cada tipo de cambio aparece reflejado.
-- **Criterio de terminado:** el historial se ve completo y legible.
+- **Objetivo:** consultar desde la UI el historial de cambios de un ticket
+  (RF9, solo lectura), con una forma clara de abrirlo desde `detalle.html`.
+- **Endpoint:** `GET /api/tickets/{ticket_id}/history` — ya estaba previsto
+  en la superficie de API del plan y era la única pieza que faltaba: el modelo
+  `History` existía (`action`, `field`, `old_value`, `new_value`, `author`,
+  `created_at`) pero no había forma de leerlo. Implementado como endpoint
+  mínimo (esquema `HistoryResponse` espejo del modelo, servicio
+  `get_ticket_history` y ruta en `routers/tickets.py`): `200` con las
+  entradas ordenadas de más antigua a más reciente (`created_at` con `id`
+  como desempate, sin paginación), `[]` si no hay entradas y `404 Ticket N
+  no encontrado`. Solo lee: **no crea registros** ni modifica modelos/BD.
+- **Alcance del historial consultable hoy (documentado, no es otra tarea):**
+  ninguna operación de la API escribe en `history` — solo los tests de modelo
+  insertan filas —, así que un ticket dado de alta o editado por la API
+  responde `[]` y la UI muestra el estado vacío hasta que exista el registro
+  de auditoría.
+- **Frontend:** sección **Historial de cambios** en `detalle.html` con botón
+  **Ver historial** que llama al endpoint y pinta una tabla `.listado` (Fecha
+  y hora / Persona / Acción / Detalle) usando solo `textContent`; `Persona`
+  muestra `—` sin autor y `Detalle` compone `campo: anterior → nuevo` con los
+  campos reales (`—` si no hay). Estados manejados: `Cargando...`, vacío
+  (`.estado.vacio`), `404` con el detalle del backend, `HTTP nnn` y fallo de
+  red. El botón entra en la misma flag `ocupado` (4 botones bloqueados
+  durante cualquier operación, anti-duplicados incluido).
+- **Archivos:** creados `backend/tests/test_historial.py`; modificados
+  `backend/schemas.py`, `backend/services/ticket_service.py`,
+  `backend/routers/tickets.py`, `frontend/detalle.html`,
+  `frontend/js/detalle.js`, `README.md`, `docs/plan_desarrollo.md`
+  (`frontend/css/estilos.css` reutilizado sin cambios: `.listado` y
+  `.estado.vacio` ya existían).
+- **Prueba:** `pytest -q` → **131 en verde** (125 previos + 6 nuevos:
+  `[]` sin entradas, `404`, orden cronológico, campos del modelo con opcionales
+  en `null`, detalle del cambio y aislamiento entre tickets); harness
+  desechable de `node` sobre `detalle.js` y el HTML (**27 comprobaciones, en
+  verde**) cubrió presencia de la sección, ausencia de `innerHTML`, listener
+  del botón, render de registros (fecha, `—`, acción y detalle), vacío, `404`,
+  `500`, fallo de red, bloqueo/anti-duplicados y `formatDetalleHistorial`;
+  manual con servidor real: ticket con historial (3 entradas insertadas
+  directamente en la BD → `200` en orden), sin historial (`200 []`),
+  inexistente (`404`), ruta visible en `openapi.json`, `detalle.html`/`detalle.js`
+  `200` con el botón presente, `/health` y listado intactos.
+- **Criterio de terminado:** el historial se consulta desde la UI, se ve
+  legible y los errores/vacíos se muestran.
 
 ### Tarea 15 — Docker
 - **Objetivo:** el sistema corre con un solo comando.
@@ -534,7 +572,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 11 — Frontend: listado | ✅ Completada |
 | 12 — Frontend: crear ticket | ✅ Completada |
 | 13 — Frontend: detalle y gestión | ✅ Completada |
-| 14 — Frontend: historial | ⬜ Pendiente |
+| 14 — Frontend: historial | ✅ Completada |
 | 15 — Docker | ⬜ Pendiente |
 | 16 — Documentación final | ⬜ Pendiente |
 | 17 — Push a GitHub | ⬜ Pendiente (requiere autorización) |

@@ -4,7 +4,7 @@ assignment and comments)."""
 from sqlalchemy import or_, select
 
 from backend.constants import TicketCategory, TicketPriority, TicketState
-from backend.models import Comment, Ticket, User
+from backend.models import Comment, History, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate, TicketUpdate
 
 
@@ -96,6 +96,25 @@ def list_tickets(
 def get_ticket(session, ticket_id: int) -> Ticket | None:
     """Return a ticket by id, or ``None`` when it does not exist."""
     return session.get(Ticket, ticket_id)
+
+
+def get_ticket_history(session, ticket_id: int) -> list[History] | None:
+    """Return the audit entries stored for a ticket, oldest first (RF9).
+
+    Returns ``None`` when the ticket does not exist so the router can
+    distinguish "missing ticket" from "no entries yet". Ordering is
+    ``created_at`` with ``id`` as tiebreaker; there is no pagination.
+    The function only reads the ``history`` table: it never creates entries.
+    """
+    if session.get(Ticket, ticket_id) is None:
+        return None
+
+    entries = session.scalars(
+        select(History)
+        .where(History.ticket_id == ticket_id)
+        .order_by(History.created_at, History.id)
+    ).all()
+    return list(entries)
 
 
 def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | None:

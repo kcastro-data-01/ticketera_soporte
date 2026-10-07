@@ -196,3 +196,23 @@ class CommentResponse(BaseModel):
     author: str
     content: str
     created_at: datetime
+
+
+class HistoryResponse(BaseModel):
+    """History entry returned by ``GET /api/tickets/{ticket_id}/history`` (RF9).
+
+    Mirrors the ``History`` model as-is: ``field``, ``old_value``,
+    ``new_value`` and ``author`` are optional and come back as ``null``
+    when the record does not provide them.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ticket_id: int
+    action: str
+    field: str | None = None
+    old_value: str | None = None
+    new_value: str | None = None
+    author: str | None = None
+    created_at: datetime

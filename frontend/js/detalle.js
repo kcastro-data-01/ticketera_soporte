@@ -1,7 +1,7 @@
-/* Tarea 13 — Detalle y gestión de un ticket con los endpoints existentes:
-   GET/PATCH /api/tickets/{id}, PATCH .../assign, GET /api/users y
-   POST .../comments. Sin cambio de estado (pendiente como Tarea 18).
-   JavaScript vanilla, sin frameworks ni librerías externas. */
+/* Tarea 13/14 — Detalle y gestión de un ticket con los endpoints existentes:
+   GET/PATCH /api/tickets/{id}, PATCH .../assign, GET /api/users,
+   POST .../comments y GET .../history. Sin cambio de estado (pendiente como
+   Tarea 18). JavaScript vanilla, sin frameworks ni librerías externas. */
 
 const API_USERS_URL = "/api/users";
 
@@ -34,6 +34,10 @@ function getElements() {
     formComentario: document.getElementById("form-comentario"),
     contenido: document.getElementById("contenido"),
     comentar: document.getElementById("comentar"),
+    historial: document.getElementById("historial"),
+    historialEstado: document.getElementById("historial-estado"),
+    tablaHistorial: document.getElementById("tabla-historial"),
+    historialCuerpo: document.getElementById("historial-cuerpo"),
   };
 }
 
@@ -62,6 +66,7 @@ function bloquearBotones(bloqueado) {
   elements.guardar.disabled = bloqueado;
   elements.asignar.disabled = bloqueado;
   elements.comentar.disabled = bloqueado;
+  elements.historial.disabled = bloqueado;
 }
 
 function formatFecha(value) {
@@ -323,6 +328,98 @@ async function agregarComentario() {
   }
 }
 
+function mostrarHistorialEstado(message, type) {
+  const elements = getElements();
+  elements.historialEstado.textContent = message;
+  elements.historialEstado.className = type ? `estado ${type}` : "estado";
+  elements.historialEstado.hidden = false;
+}
+
+function ocultarHistorialEstado() {
+  const elements = getElements();
+  elements.historialEstado.textContent = "";
+  elements.historialEstado.hidden = true;
+}
+
+/* Describe el cambio con los campos que realmente trae el registro:
+   campo modificado y valores anterior → nuevo; "—" si no hay detalle. */
+function formatDetalleHistorial(entry) {
+  const partes = [];
+  if (entry.field) partes.push(entry.field);
+  const hayValores = entry.old_value !== null || entry.new_value !== null;
+  if (hayValores) {
+    partes.push(`${entry.old_value ?? "—"} → ${entry.new_value ?? "—"}`);
+  }
+  return partes.length > 0 ? partes.join(": ") : "—";
+}
+
+function appendCeldaHistorial(row, text) {
+  const cell = document.createElement("td");
+  cell.textContent = text;
+  row.appendChild(cell);
+}
+
+/* Renderiza con textContent: los datos del backend nunca se interpretan
+   como HTML. */
+function renderHistorial(entries) {
+  const elements = getElements();
+  elements.historialCuerpo.replaceChildren();
+  if (!Array.isArray(entries) || entries.length === 0) {
+    elements.tablaHistorial.hidden = true;
+    mostrarHistorialEstado(
+      "No hay cambios registrados para este ticket.",
+      "vacio"
+    );
+    return;
+  }
+  entries.forEach((entry) => {
+    const row = document.createElement("tr");
+    appendCeldaHistorial(row, formatFecha(entry.created_at));
+    appendCeldaHistorial(row, entry.author || "—");
+    appendCeldaHistorial(row, entry.action || "—");
+    appendCeldaHistorial(row, formatDetalleHistorial(entry));
+    elements.historialCuerpo.appendChild(row);
+  });
+  ocultarHistorialEstado();
+  elements.tablaHistorial.hidden = false;
+}
+
+async function cargarHistorial() {
+  if (ocupado || ticketId === null) return;
+  ocupado = true;
+  bloquearBotones(true);
+  const elements = getElements();
+  elements.tablaHistorial.hidden = true;
+  mostrarHistorialEstado("Cargando...", "cargando");
+  try {
+    const response = await fetch(`/api/tickets/${ticketId}/history`);
+    if (response.status === 404) {
+      mostrarHistorialEstado(
+        await mensajeDeDetalle(
+          response,
+          `No se encontró el ticket #${ticketId}.`
+        ),
+        "error"
+      );
+      return;
+    }
+    if (!response.ok) {
+      mostrarHistorialEstado(
+        `No se pudo cargar el historial (HTTP ${response.status}).`,
+        "error"
+      );
+      return;
+    }
+    const entries = await response.json();
+    renderHistorial(entries);
+  } catch (error) {
+    mostrarHistorialEstado("Error al comunicarse con la API.", "error");
+  } finally {
+    ocupado = false;
+    bloquearBotones(false);
+  }
+}
+
 async function init() {
   const elements = getElements();
 
@@ -335,6 +432,7 @@ async function init() {
     event.preventDefault();
     agregarComentario();
   });
+  elements.historial.addEventListener("click", () => cargarHistorial());
 
   ticketId = getTicketId();
   if (ticketId === null) {

@@ -1,12 +1,18 @@
 """Ticket endpoints (creation, listing with search and filters, retrieval,
-edition and assignment)."""
+edition, assignment and history)."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from backend.constants import TicketCategory, TicketPriority, TicketState
 from backend.database import get_session
-from backend.schemas import TicketAssignment, TicketCreate, TicketResponse, TicketUpdate
+from backend.schemas import (
+    HistoryResponse,
+    TicketAssignment,
+    TicketCreate,
+    TicketResponse,
+    TicketUpdate,
+)
 from backend.services import ticket_service
 from backend.services.ticket_service import TicketNotFoundError, UserNotFoundError
 
@@ -88,6 +94,30 @@ def get_ticket(
             detail=f"Ticket {ticket_id} no encontrado",
         )
     return TicketResponse.model_validate(ticket)
+
+
+@router.get(
+    "/{ticket_id}/history",
+    response_model=list[HistoryResponse],
+    summary="Historial de cambios de un ticket",
+)
+def get_ticket_history(
+    ticket_id: int,
+    session: Session = Depends(get_session),
+) -> list[HistoryResponse]:
+    """Return the audit entries recorded for a ticket, oldest first (RF9).
+
+    Read-only: it exposes the existing ``history`` rows and never creates
+    them. Optional model fields (``field``, ``old_value``, ``new_value``,
+    ``author``) are returned as ``null`` when unavailable.
+    """
+    entries = ticket_service.get_ticket_history(session, ticket_id)
+    if entries is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticket {ticket_id} no encontrado",
+        )
+    return [HistoryResponse.model_validate(entry) for entry in entries]
 
 
 @router.patch(

@@ -132,9 +132,17 @@ mensaje claro — y permite, con los endpoints existentes:
 - **agregar comentarios** (`POST /api/tickets/{id}/comments`) con
   confirmación de creación; la consulta de los comentarios existentes queda
   pendiente de la tarea correspondiente, ya que el backend todavía no expone
-  un endpoint para listarlos (se indica en la propia pantalla).
+  un endpoint para listarlos (se indica en la propia pantalla);
+- **consultar el historial de cambios** con el botón **Ver historial**
+  (`GET /api/tickets/{id}/history`): muestra una tabla con fecha y hora,
+  persona (`—` si no hay), acción y detalle (`campo: anterior → nuevo`) en
+  orden cronológico; maneja historial vacío (`No hay cambios registrados
+  para este ticket.`), ticket inexistente (`404` del backend), error HTTP y
+  fallo de red. El backend solo **lee** las entradas: ninguna operación de la
+  API las crea todavía, por lo que un ticket dado de alta desde la interfaz
+  mostrará el estado vacío hasta que se implemente el registro de auditoría.
 
-Los tres botones se deshabilitan mientras hay una operación en curso para
+Todos los botones se deshabilitan mientras hay una operación en curso para
 evitar envíos duplicados. El cambio de estado no está en esta pantalla: es
 funcionalidad de una tarea posterior.
 
@@ -259,6 +267,24 @@ Crea un comentario sobre un ticket existente. Respuestas: `201` con
 y `422` si `content` falta, está vacío, es solo espacios o supera los 2000
 caracteres. `author` es opcional (por defecto `"Anónimo"`). Solo existe la
 creación: el listado de comentarios no está implementado todavía.
+
+### Consultar el historial de cambios
+
+```bash
+curl http://127.0.0.1:8000/api/tickets/1/history
+```
+
+Devuelve `200 OK` con las entradas de auditoría del ticket en la tabla
+`history`, ordenadas de más antigua a más reciente (sin paginación). Cada
+entrada contiene exactamente los campos del modelo: `id`, `ticket_id`,
+`action`, `field`, `old_value`, `new_value`, `author` y `created_at`; los
+opcionales vienen en `null` cuando el registro no los define. Respuestas:
+`200` con `[]` si el ticket no tiene entradas y `404` si el ticket no existe.
+
+> **Alcance actual:** el endpoint solo **lee** el historial. Hoy ninguna
+> operación de la API crea entradas en `history` (el registro de auditoría
+> está fuera del alcance de esta tarea), así que un ticket creado o editado
+> por la API responderá `[]` hasta que ese registro se implemente.
 
 ### Base de datos
 
