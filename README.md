@@ -92,6 +92,24 @@ curl http://127.0.0.1:8000/health
 # {"status":"ok"}
 ```
 
+### Crear un ticket
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/tickets \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "No enciende la impresora",
+    "description": "La impresora del piso 2 no responde desde ayer.",
+    "category": "Incidente",
+    "priority": "Alta"
+  }'
+```
+
+Devuelve `201 Created` con el ticket creado (el estado inicial es `Nuevo`).
+Categorías válidas: `Incidente`, `Consulta`, `Solicitud`, `Mantenimiento`.
+Prioridades válidas: `Baja`, `Media`, `Alta`, `Crítica`. Los datos inválidos
+responden `422 Unprocessable Entity`.
+
 ### Base de datos
 
 SQLite crea el archivo `ticketera.db` en la raíz del proyecto automáticamente

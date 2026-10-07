@@ -1,10 +1,12 @@
 """Shared pytest fixtures: a temporary SQLite database per test."""
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from backend.database import Base, enable_sqlite_foreign_keys
+from backend.database import Base, enable_sqlite_foreign_keys, get_session
+from backend.main import app
 
 
 @pytest.fixture
@@ -31,3 +33,15 @@ def session(engine):
     db = testing_session()
     yield db
     db.close()
+
+
+@pytest.fixture
+def client(session):
+    """FastAPI test client whose requests use the temporary test database."""
+    def override_get_session():
+        yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()

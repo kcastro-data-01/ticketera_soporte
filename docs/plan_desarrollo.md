@@ -176,13 +176,31 @@ GET    /api/catalogs                (states, categories, priorities)
   tarea posterior.
 
 ### Tarea 4 — Crear ticket (RF1, RF2)
-- **Objetivo:** alta de tickets con validación.
-- **Archivos:** `backend/routers/tickets.py`, `backend/services/ticket_service.py`,
-  `backend/tests/test_tickets.py`.
-- **Prueba:** `pytest` — creación OK (201), campos inválidos → 422,
-  categoría desconocida → 422.
-- **Criterio de terminado:** se crea y consulta un ticket con todos los campos
-  y las pruebas pasan.
+- **Objetivo:** alta de tickets mediante la API, con validación de entrada.
+- **Archivos:** `backend/schemas.py` (`TicketCreate`, `TicketResponse`),
+  `backend/routers/tickets.py`, `backend/services/ticket_service.py`,
+  `backend/main.py` (registro del router),
+  `backend/tests/conftest.py` (fixture `client`),
+  `backend/tests/test_tickets.py`, `README.md` (ejemplo del endpoint).
+- **Endpoint:** `POST /api/tickets` → `201` con el ticket creado
+  (`id`, `title`, `description`, `category`, `priority`, `state`,
+  `assigned_to_id`, `created_at`, `updated_at`).
+- **Validaciones (422):** `title` obligatorio y con 3–200 caracteres (espejo
+  del CHECK de la BD, con `strip`), `description` obligatoria y no vacía,
+  `category` y `priority` deben ser valores de los enums de
+  `backend/constants.py`.
+- **Estado inicial:** el valor por defecto del modelo
+  (`TicketState.NEW.value` = `Nuevo`), sin definirlo en el endpoint.
+- **Prueba:** `pytest` — 15 pruebas: creación 201, datos reflejados,
+  persistencia real en SQLite (sesión nueva), estado inicial según constants,
+  presencia en `/openapi.json`, ausencia de título/descripción, título
+  inválido, descripción en blanco, categoría y prioridad inválidas, nada
+  persiste en payload inválido y guardado con `title` recortado.
+- **Criterio de terminado:** la suite completa está en verde con la creación
+  funcionando de extremo a extremo.
+- **Nota:** la consulta individual `GET /api/tickets/{id}` de la redacción
+  original no se implementó en esta tarea (solo creación) y queda pendiente de
+  definirse en una tarea posterior.
 
 ### Tarea 5 — Historial de cambios (RF9)
 - **Objetivo:** auditoría enganchada a todas las mutaciones.
@@ -294,7 +312,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 1 — Inicialización del proyecto | ✅ Completada |
 | 2 — Base de datos y modelos | ✅ Completada |
 | 3 — Health check de la API | ✅ Completada |
-| 4 — Crear ticket | ⬜ Pendiente |
+| 4 — Crear ticket | ✅ Completada |
 | 5 — Historial de cambios | ⬜ Pendiente |
 | 6 — Editar ticket | ⬜ Pendiente |
 | 7 — Máquina de estados | ⬜ Pendiente |

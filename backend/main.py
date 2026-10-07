@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from backend.database import init_db
+from backend.routers.tickets import router as tickets_router
 
 
 @asynccontextmanager
@@ -26,3 +27,6 @@ app = FastAPI(
 def health_check() -> dict[str, str]:
     """Return the status of the service (health check)."""
     return {"status": "ok"}
+
+
+app.include_router(tickets_router)
