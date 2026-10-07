@@ -53,6 +53,8 @@ ticketera_soporte/
 ├── .gitignore
 ├── requirements.txt
 ├── README.md
+├── pytest.ini                    # configuración de pytest
+├── ticketera.db                  # base de datos generada (ignorada por Git)
 ├── docs/
 │   ├── plan_desarrollo.md        # este documento
 │   └── api.md                    # documentación de endpoints
@@ -71,8 +73,13 @@ ticketera_soporte/
 │   │   └── historial_service.py  # registro de auditoría
 │   └── tests/
 │       ├── conftest.py
+│       ├── test_models.py
+│       ├── test_constants.py
+│       ├── test_smoke.py
 │       ├── test_tickets.py
 │       ├── test_estados.py
+│       ├── test_historial.py
+│       ├── test_asignacion.py
 │       ├── test_comentarios.py
 │       └── test_busqueda_filtro.py
 └── frontend/
@@ -89,10 +96,10 @@ ticketera_soporte/
 
 ### Modelo de datos
 
-_Implementado en la Tarea 2. Identificadores (tablas, columnas, relaciones) en
-inglés según la decisión de idioma; los valores guardados en `category`,
-`priority` y `state` son los textos en español de `backend/constants.py` porque
-se muestran en la interfaz._
+_Implementado en `backend/models.py`. Identificadores (tablas, columnas,
+relaciones) en inglés según la decisión de idioma; los valores guardados en
+`category`, `priority` y `state` son los textos en español de
+`backend/constants.py` porque se muestran en la interfaz._
 
 ```
 users    (id, name, email UNIQUE, role, is_active)
@@ -174,7 +181,8 @@ GET    /api/catalogs                (states, categories, priorities)
 ### Tarea 5 — Historial de cambios (RF9)
 - **Objetivo:** auditoría enganchada a todas las mutaciones.
 - **Archivos:** `backend/services/historial_service.py`,
-  `backend/routers/tickets.py` (GET historial), `backend/tests/test_historial.py`.
+  `backend/routers/tickets.py` (`GET /api/tickets/{id}/history`),
+  `backend/tests/test_historial.py`.
 - **Prueba:** `pytest` — al crear un ticket aparece 1 entrada; al modificar un
   campo se registra valor anterior/nuevo.
 - **Criterio de terminado:** toda creación queda registrada y el endpoint
@@ -192,14 +200,15 @@ GET    /api/catalogs                (states, categories, priorities)
 ### Tarea 7 — Máquina de estados (RF3)
 - **Objetivo:** transiciones válidas con historial.
 - **Archivos:** `backend/services/ticket_service.py`,
-  `backend/routers/tickets.py` (`PATCH /estado`), `backend/tests/test_estados.py`.
+  `backend/routers/tickets.py` (`PATCH /api/tickets/{id}/state`),
+  `backend/tests/test_estados.py`.
 - **Prueba:** `pytest` — transición válida OK; `Nuevo → Cerrado` → 409;
   `Cerrado` terminal; historial correcto.
 - **Criterio de terminado:** todas las transiciones cubiertas por pruebas.
 
 ### Tarea 8 — Usuarios y asignación (RF4)
 - **Objetivo:** asignar/desasignar tickets.
-- **Archivos:** `backend/routers/tickets.py` (`PATCH /asignar`),
+- **Archivos:** `backend/routers/tickets.py` (`PATCH /api/tickets/{id}/assign`),
   `backend/services/ticket_service.py`, `backend/tests/test_asignacion.py`.
 - **Prueba:** `pytest` — asigna, reasigna (historial), desasigna,
   usuario inválido → 404.
