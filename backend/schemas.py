@@ -1,10 +1,13 @@
-"""Pydantic schemas for ticket input and output validation (Tasks 4 and 6)."""
+"""Pydantic schemas for input and output validation (Tasks 4, 6 and 8)."""
 
+import re
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from backend.constants import TicketCategory, TicketPriority, TicketState
+from backend.constants import TicketCategory, TicketPriority, TicketState, UserRole
+
+_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _validate_title(value: str) -> str:
@@ -97,3 +100,51 @@ class TicketResponse(BaseModel):
     assigned_to_id: int | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class UserCreate(BaseModel):
+    """Payload accepted by ``POST /api/users`` (minimal user data)."""
+
+    name: str
+    email: str
+    role: UserRole
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("el nombre no puede estar vacío")
+        if len(cleaned) > 120:
+            raise ValueError("el nombre debe tener como máximo 120 caracteres")
+        return cleaned
+
+    @field_validator("email")
+    @classmethod
+    def email_must_be_valid(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        if not _EMAIL_PATTERN.match(cleaned):
+            raise ValueError("el email no tiene un formato válido")
+        if len(cleaned) > 255:
+            raise ValueError("el email debe tener como máximo 255 caracteres")
+        return cleaned
+
+
+class UserResponse(BaseModel):
+    """User returned by the API."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    email: str
+    role: UserRole
+
+
+class TicketAssignment(BaseModel):
+    """Payload accepted by ``PATCH /api/tickets/{ticket_id}/assign``.
+
+    ``assigned_to_id`` is required but nullable: ``null`` unassigns the ticket.
+    """
+
+    assigned_to_id: int | None

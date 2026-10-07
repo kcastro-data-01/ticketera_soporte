@@ -145,6 +145,37 @@ curl http://127.0.0.1:8000/api/tickets/1
 Devuelve `200 OK` con el ticket solicitado (mismos campos que el listado) o
 `404 Not Found` si el id no existe. La consulta no modifica el ticket.
 
+### Crear y listar usuarios
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Ana Pérez", "email": "ana@soporte.local", "role": "Soporte"}'
+
+curl http://127.0.0.1:8000/api/users
+```
+
+`POST /api/users` devuelve `201` con `{id, name, email, role}`. Errores:
+`422` si `name` está vacío, el `email` no tiene formato válido o el `role` no
+es `Administrador`/`Soporte`; `409 Conflict` si el email ya está registrado.
+`GET /api/users` devuelve `200` con la lista de usuarios (solo lectura).
+
+### Asignar o desasignar un ticket
+
+```bash
+curl -X PATCH http://127.0.0.1:8000/api/tickets/1/assign \
+  -H "Content-Type: application/json" \
+  -d '{"assigned_to_id": 1}'
+
+curl -X PATCH http://127.0.0.1:8000/api/tickets/1/assign \
+  -H "Content-Type: application/json" \
+  -d '{"assigned_to_id": null}'
+```
+
+Asigna un usuario existente al ticket (o lo desasigna con `null`). Respuestas:
+`200` con el ticket actualizado, `404` si el ticket o el usuario no existen,
+`422` si falta el campo. Solo cambian `assigned_to_id` y `updated_at`.
+
 ### Base de datos
 
 SQLite crea el archivo `ticketera.db` en la raíz del proyecto automáticamente

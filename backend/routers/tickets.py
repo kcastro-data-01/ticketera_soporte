@@ -1,11 +1,12 @@
-"""Ticket endpoints (creation, listing, retrieval and edition)."""
+"""Ticket endpoints (creation, listing, retrieval, edition and assignment)."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_session
-from backend.schemas import TicketCreate, TicketResponse, TicketUpdate
+from backend.schemas import TicketAssignment, TicketCreate, TicketResponse, TicketUpdate
 from backend.services import ticket_service
+from backend.services.ticket_service import TicketNotFoundError, UserNotFoundError
 
 router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
 
@@ -71,5 +72,31 @@ def update_ticket(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ticket {ticket_id} no encontrado",
+        )
+    return TicketResponse.model_validate(ticket)
+
+
+@router.patch(
+    "/{ticket_id}/assign",
+    response_model=TicketResponse,
+    summary="Asignar o desasignar un ticket",
+)
+def assign_ticket(
+    ticket_id: int,
+    payload: TicketAssignment,
+    session: Session = Depends(get_session),
+) -> TicketResponse:
+    """Assign a user to a ticket; ``assigned_to_id: null`` unassigns it (RF4)."""
+    try:
+        ticket = ticket_service.assign_ticket(session, ticket_id, payload.assigned_to_id)
+    except TicketNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticket {ticket_id} no encontrado",
+        )
+    except UserNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Usuario {error.user_id} no encontrado",
         )
     return TicketResponse.model_validate(ticket)

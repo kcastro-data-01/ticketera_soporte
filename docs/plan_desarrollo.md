@@ -66,10 +66,12 @@ ticketera_soporte/
 │   ├── constants.py              # enums: estados, prioridades, categorías
 │   ├── routers/
 │   │   ├── tickets.py
+│   │   ├── users.py
 │   │   ├── comentarios.py
 │   │   └── catalogos.py
 │   ├── services/
 │   │   ├── ticket_service.py     # lógica + transiciones de estado
+│   │   ├── user_service.py       # creación y consulta de usuarios
 │   │   └── historial_service.py  # registro de auditoría
 │   └── tests/
 │       ├── conftest.py
@@ -77,6 +79,7 @@ ticketera_soporte/
 │       ├── test_constants.py
 │       ├── test_smoke.py
 │       ├── test_tickets.py
+│       ├── test_users.py
 │       ├── test_estados.py
 │       ├── test_historial.py
 │       ├── test_asignacion.py
@@ -135,6 +138,7 @@ PATCH  /api/tickets/{id}/assign     {user_id}
 POST   /api/tickets/{id}/comments
 GET    /api/tickets/{id}/comments
 GET    /api/tickets/{id}/history
+POST   /api/users
 GET    /api/users
 GET    /api/catalogs                (states, categories, priorities)
 ```
@@ -264,13 +268,38 @@ GET    /api/catalogs                (states, categories, priorities)
   pendiente como **Tarea 18** de este plan.
 
 ### Tarea 8 — Usuarios y asignación (RF4)
-- **Objetivo:** asignar/desasignar tickets.
-- **Archivos:** `backend/routers/tickets.py` (`PATCH /api/tickets/{id}/assign`),
-  `backend/services/ticket_service.py`, `backend/tests/test_asignacion.py`.
-- **Prueba:** `pytest` — asigna, reasigna (historial), desasigna,
-  usuario inválido → 404.
-- **Criterio de terminado:** la asignación funciona de extremo a extremo y
-  queda auditada.
+- **Objetivo:** crear y listar usuarios mínimos; asignar/desasignar tickets.
+- **Archivos:** `backend/schemas.py` (`UserCreate`, `UserResponse`,
+  `TicketAssignment`), `backend/services/user_service.py`,
+  `backend/services/ticket_service.py` (`assign_ticket` y excepciones
+  `TicketNotFoundError`/`UserNotFoundError`), `backend/routers/users.py`,
+  `backend/routers/tickets.py` (`PATCH …/assign`), `backend/main.py`
+  (registro del router de usuarios), `backend/tests/test_users.py`,
+  `backend/tests/test_asignacion.py`, `README.md`.
+- **Endpoints nuevos:**
+  - `POST /api/users` → `201` con `{id, name, email, role}`; `422` si `name`
+    está vacío, `email` con formato inválido o `role` fuera de `UserRole`;
+    `409 Conflict` si el email ya existe (sin crear duplicados).
+  - `GET /api/users` → `200` con la lista de usuarios (solo lectura).
+  - `PATCH /api/tickets/{ticket_id}/assign` con `{assigned_to_id}` → `200`
+    con `TicketResponse`; `assigned_to_id: null` desasigna; `404` si el ticket
+    o el usuario no existen; `422` si el campo falta.
+- **Reglas:** no se alteran `title`, `description`, `category`, `priority`,
+  `state` ni `created_at`; `updated_at` se refresca por el `onupdate` del
+  modelo; todo se persiste en SQLite. Validación de email con regex propia
+  (sin añadir dependencias).
+- **Prueba:** `pytest` — 25 pruebas nuevas (13 de usuarios y 12 de
+  asignación): creación 201 con datos reflejados, `name` vacío → 422, email
+  inválido → 422, role inválido → 422, email duplicado → 409 sin segundo
+  registro, listado 200 con estructura `{id, name, email, role}`, asignación
+  200 con `assigned_to_id` almacenado y persistido, 404 por usuario/ticket
+  inexistente, `null` desasigna y persiste, demás campos intactos,
+  `updated_at` incrementado, estructura de `TicketResponse` y endpoints en
+  OpenAPI.
+- **Criterio de terminado:** la suite completa está en verde.
+- **Nota:** la redacción original incluía auditar la asignación en el
+  historial; **no se implementó** (RF9 sigue pendiente). La máquina de estados
+  (RF3) permanece pendiente como **Tarea 18**.
 
 ### Tarea 9 — Comentarios (RF5)
 - **Objetivo:** conversación sobre el ticket.
@@ -364,7 +393,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 5 — Consultar y listar tickets | ✅ Completada |
 | 6 — Editar ticket | ✅ Completada |
 | 7 — Consultar un ticket individual | ✅ Completada |
-| 8 — Usuarios y asignación | ⬜ Pendiente |
+| 8 — Usuarios y asignación | ✅ Completada |
 | 9 — Comentarios | ⬜ Pendiente |
 | 10 — Búsqueda y filtros | ⬜ Pendiente |
 | 11 — Frontend: listado | ⬜ Pendiente |

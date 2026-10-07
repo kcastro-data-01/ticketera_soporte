@@ -1,9 +1,26 @@
-"""Business logic for tickets (creation, listing, retrieval and edition)."""
+"""Business logic for tickets (creation, listing, edition, retrieval and
+assignment)."""
 
 from sqlalchemy import select
 
-from backend.models import Ticket
+from backend.models import Ticket, User
 from backend.schemas import TicketCreate, TicketUpdate
+
+
+class UserNotFoundError(Exception):
+    """Raised when assigning a ticket to a user that does not exist."""
+
+    def __init__(self, user_id: int):
+        self.user_id = user_id
+        super().__init__(f"User {user_id} not found")
+
+
+class TicketNotFoundError(Exception):
+    """Raised when the target ticket of an operation does not exist."""
+
+    def __init__(self, ticket_id: int):
+        self.ticket_id = ticket_id
+        super().__init__(f"Ticket {ticket_id} not found")
 
 
 def create_ticket(session, payload: TicketCreate) -> Ticket:
@@ -58,6 +75,26 @@ def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | No
     for field, value in changes.items():
         setattr(ticket, field, value)
 
+    session.commit()
+    session.refresh(ticket)
+    return ticket
+
+
+def assign_ticket(session, ticket_id: int, assigned_to_id: int | None) -> Ticket:
+    """Assign a ticket to a user, or unassign it when ``assigned_to_id`` is None.
+
+    Raises:
+        ``TicketNotFoundError``: the ticket does not exist.
+        ``UserNotFoundError``: the target user does not exist.
+    """
+    ticket = session.get(Ticket, ticket_id)
+    if ticket is None:
+        raise TicketNotFoundError(ticket_id)
+
+    if assigned_to_id is not None and session.get(User, assigned_to_id) is None:
+        raise UserNotFoundError(assigned_to_id)
+
+    ticket.assigned_to_id = assigned_to_id
     session.commit()
     session.refresh(ticket)
     return ticket
