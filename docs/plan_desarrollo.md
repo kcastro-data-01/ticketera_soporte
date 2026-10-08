@@ -603,11 +603,45 @@ GET    /api/catalogs                (states, categories, priorities)
 - **Criterio de terminado:** documentación cubre todo lo implementado, distingue
   lo pendiente y `pytest` en verde.
 
-### Tarea 17 — Push a GitHub (con autorización)
-- **Objetivo:** publicar en GitHub.
-- **Archivos:** ninguno nuevo.
-- **Prueba:** `git log` y `git status` limpios.
-- **Criterio de terminado:** push realizado con autorización expresa.
+### Tarea 17 — Revisión final y publicación
+- **Objetivo:** última revisión integral del proyecto antes de implementar la
+  máquina de estados (Tarea 18) y publicar en GitHub.
+- **Estado:** revisión completada; **la publicación (push) queda pendiente de
+  autorización expresa** y la realiza el titular del repositorio.
+- **Revisión ejecutada:**
+  - **Git:** `main` en `3209529` (Tarea 16) sincronizado con `origin`
+    (`kcastro-data-01/ticketera_soporte`), working tree limpio, sin cambios
+    ajenos a la tarea.
+  - **Estructura:** sin archivos temporales, logs, `.env` ni artefactos
+    accidentales; única SQLite = `ticketera.db` (ignorada por Git, 0 tickets);
+    sin secretos en el código, en la config de Git ni en la URL del remoto.
+  - **Backend:** imports OK; 3 routers + `/health` + estáticos registrados;
+    los 4 esquemas compatibles con sus modelos; sin `TODO`/`debugger`/
+    `console.log`/`pdb`; sin credenciales hardcodeadas.
+  - **Frontend:** enlaces `href`/`src` y rutas generadas por JS
+    (`detalle.html?id=`, `index.html`) existen; los `fetch` apuntan solo a
+    endpoints reales; manejo de `404`/`422`/fallo de red presente; navegación
+    `index ↔ crear ↔ detalle` verificada (todas las páginas y assets `200`).
+  - **Documentación:** README, `docs/api.md` y este plan coinciden con el
+    código; 10 endpoints registrados = 10 documentados (sin faltantes ni
+    inventados); RF3 aparece como pendiente en los tres documentos.
+  - **Pruebas:** `pytest -q` → **138 en verde**, con el único warning
+    conocido de deprecación de `starlette.testclient` (ajeno, no afecta).
+  - **App local:** `GET /health` → `200 {"status":"ok"}`, `GET /` → `200`
+    con el frontend, `GET /docs` → `200`, y la API responde
+    (`GET /api/tickets?priority=Alta` → `200 []`).
+  - **Docker:** `docker compose config` válido; sin cambios de Docker.
+- **Máquina de estados confirmada como NO implementada:** no existe endpoint
+  `PATCH .../state`, `TicketUpdate` no acepta `state` y no hay lógica de
+  transiciones; los estados siguen siendo `Nuevo`, `En proceso`, `Resuelto` y
+  `Cerrado`, y el cambio controlado corresponde a la **Tarea 18**.
+- **Hallazgo (documentado, no corregido, sin impacto):**
+  `backend/services/user_service.py` define `get_user()`, que no se usa en
+  ninguna parte del código; se deja constancia en vez de eliminarlo para no
+  modificar código en una revisión sin cambios de negocio.
+- **Archivos:** solo `docs/plan_desarrollo.md` (esta constancia).
+- **Criterio de terminado:** revisión completa sin fallos; push con
+  autorización expresa (pendiente).
 
 ### Tarea 18 — Máquina de estados (RF3)
 - **Objetivo:** permitir cambiar el estado de un ticket respetando las
@@ -644,5 +678,5 @@ GET    /api/catalogs                (states, categories, priorities)
 | 14 — Frontend: historial | ✅ Completada |
 | 15 — Docker | ✅ Completada |
 | 16 — Documentación final | ✅ Completada |
-| 17 — Push a GitHub | ⬜ Pendiente (requiere autorización) |
+| 17 — Revisión final y publicación | ⬜ Revisión completada; publicación pendiente (requiere autorización) |
 | 18 — Máquina de estados (RF3) | ⬜ Pendiente |
