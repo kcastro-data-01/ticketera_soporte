@@ -142,6 +142,14 @@ GET    /api/users
 GET    /api/catalogs                (states, categories, priorities)
 ```
 
+> **Nota (Tarea 16):** este es el bosquejo **original** del plan, conservado
+> como histórico. El estado real del código está documentado en
+> [`docs/api.md`](api.md). Diferencias con lo implementado: la edición usa
+> `PATCH /api/tickets/{id}` (no `PUT`); no existen paginación
+> (`page`/`size`), `PATCH .../state` (Tarea 18), `GET .../comments`,
+> `GET /api/catalogs` ni el filtro `assigned_to_id`; `assign` recibe
+> `assigned_to_id` (no `user_id`).
+
 ## Tareas
 
 ### Tarea 1 — Inicialización del proyecto
@@ -556,10 +564,44 @@ GET    /api/catalogs                (states, categories, priorities)
   frontend en `localhost:8000` y la DB persiste al recrear el contenedor.
 
 ### Tarea 16 — Documentación final y revisión
-- **Objetivo:** README completo y cierre.
-- **Archivos:** `README.md`, `docs/plan_desarrollo.md`, `docs/api.md`.
-- **Prueba:** RF1–RF9 mapeados a endpoints y pruebas; `pytest` completo en verde.
-- **Criterio de terminado:** documentación cubre todo y `pytest` en verde.
+- **Objetivo:** README completo, documentación de API y cierre revisado, sin
+  cambiar funcionalidad.
+- **Archivos:** creado `docs/api.md`; modificados `README.md` y
+  `docs/plan_desarrollo.md`.
+- **`docs/api.md` (nuevo):** documenta los 10 endpoints realmente
+  implementados (`/health`, tickets: crear/listar+buscar+filtrar/consultar/
+  editar/asignar, usuarios: crear/listar, comentarios: crear, historial:
+  leer) con método, ruta, propósito, parámetros, body, respuestas, errores y
+  ejemplos; incluye los objetos comunes (ticket y enums), el mapeo
+  RF1–RF9 → endpoint → estado → archivo de pruebas y una sección explícita
+  **"No implementado (aún)"** (`PATCH .../state` de la Tarea 18,
+  `GET .../comments`, escritura automática de historial, autenticación por
+  decisión, paginación y `GET /api/catalogs`).
+- **README:** se añadieron objetivo del proyecto, sección
+  "Funcionalidades implementadas y pendientes" (con nota sobre RF3),
+  requisitos (Python 3.10+ o Docker + Compose), árbol de estructura
+  actualizado (`.dockerignore`, `pytest.ini`, `docs/api.md`, descripción de
+  las 3 páginas), comando de pruebas real (`.venv/bin/python -m pytest -q`)
+  y enlace a `docs/api.md`; se conservan sin cambios la ejecución local, la
+  sección Docker y toda la referencia de endpoints existentes.
+- **Plan:** bosquejo histórico de endpoints anotado con sus diferencias reales
+  frente al código (apunta a `docs/api.md`); Tarea 16 marcada completada;
+  T17 y T18 siguen pendientes; tabla de estado con una fila por tarea.
+- **Revisión estática:** imports de backend OK; referencias `href`/`src` del
+  frontend (`crear.html`, `index.html`, `detalle.html`, `css/estilos.css`,
+  `js/*.js`) existentes; sin `TODO`/`FIXME`/`console.log`/`debugger`/`pdb`;
+  sin `.env`, logs ni temporales; única SQLite = `ticketera.db` (ignorada por
+  Git); sin tokens, credenciales ni secretos en el código, el config de Git ni
+  la URL del remoto; endpoints documentados = endpoints de `openapi.json`.
+- **Prueba:** `pytest -q` → **138 en verde** (sin regresiones); aplicación
+  local: `GET /health` → `200 {"status":"ok"}`, `GET /docs` → `200`,
+  `GET /` → `200 text/html` con el frontend y las 7 referencias
+  `href`/`src` en `200`; `docker compose config` válido; los 10 endpoints de
+  `docs/api.md` comparados uno a uno con `openapi.json` (idénticos) y sus
+  ejemplos ejecutados contra el servidor real (`201`, `200`, `200 []`,
+  `404` y `409` tal como están documentados).
+- **Criterio de terminado:** documentación cubre todo lo implementado, distingue
+  lo pendiente y `pytest` en verde.
 
 ### Tarea 17 — Push a GitHub (con autorización)
 - **Objetivo:** publicar en GitHub.
@@ -601,6 +643,6 @@ GET    /api/catalogs                (states, categories, priorities)
 | 13 — Frontend: detalle y gestión | ✅ Completada |
 | 14 — Frontend: historial | ✅ Completada |
 | 15 — Docker | ✅ Completada |
-| 16 — Documentación final | ⬜ Pendiente |
+| 16 — Documentación final | ✅ Completada |
 | 17 — Push a GitHub | ⬜ Pendiente (requiere autorización) |
 | 18 — Máquina de estados (RF3) | ⬜ Pendiente |

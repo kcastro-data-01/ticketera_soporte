@@ -2,6 +2,11 @@
 
 Sistema de gestión de tickets de soporte desarrollado como práctica de Pasantes de Inteligencia Artificial.
 
+**Objetivo:** registrar, priorizar, asignar y dar seguimiento a solicitudes de
+soporte mediante una API REST y una interfaz web sencilla: crear tickets con
+categoría y prioridad, asignarlos a una persona, comentarlos, buscarlos y
+filtrarlos, y consultar su historial de cambios.
+
 ## Requisitos funcionales
 
 - Crear un ticket con título y descripción.
@@ -13,6 +18,37 @@ Sistema de gestión de tickets de soporte desarrollado como práctica de Pasante
 - Buscar tickets.
 - Filtrar tickets.
 - Consultar el historial de cambios de cada ticket.
+
+> El estado real de cada requisito (implementado o pendiente) está en
+> [Funcionalidades](#funcionalidades-implementadas-y-pendientes).
+
+## Funcionalidades implementadas y pendientes
+
+**Implementadas**
+
+- API: health check, creación, consulta, listado, búsqueda y filtros de
+  tickets, edición de datos básicos, asignación/desasignación, alta y listado
+  de usuarios, creación de comentarios y lectura del historial de cambios.
+- Frontend (servido por la misma aplicación): listado con búsqueda y filtros,
+  creación de tickets, y pantalla de detalle con edición, asignación,
+  comentarios y consulta de historial.
+- Ejecución local y con Docker (`docker compose up --build`), con persistencia
+  de SQLite en un volumen.
+- Suite de pruebas con pytest (138 pruebas) y documentación en
+  [docs/api.md](docs/api.md).
+
+**Pendientes**
+
+- **Cambio de estado de tickets (RF3)** — máquina de estados aprobada, en la
+  Tarea 18 del plan; hoy el estado solo se lee y se usa como filtro.
+- **Listado de comentarios** — solo existe la creación
+  (`GET .../comments` no está implementado).
+- **Registro automático de historial (RF9, escritura)** — la lectura existe,
+  pero hoy ningún endpoint crea entradas en `history`.
+- **Paginación** — los listados devuelven el resultado completo.
+
+**Fuera de alcance por decisión aprobada:** autenticación y autorización (la
+API es abierta; los usuarios solo sirven para asignación y firma).
 
 ## Tecnologías
 
@@ -30,11 +66,14 @@ Sistema de gestión de tickets de soporte desarrollado como práctica de Pasante
 ticketera_soporte/
 ├── docker-compose.yml
 ├── Dockerfile
+├── .dockerignore
 ├── .gitignore
+├── pytest.ini                  # configuración de pytest
 ├── requirements.txt
 ├── README.md
 ├── docs/
-│   └── plan_desarrollo.md      # Plan de desarrollo por tareas
+│   ├── plan_desarrollo.md      # Plan de desarrollo por tareas
+│   └── api.md                  # Documentación de la API
 ├── backend/
 │   ├── main.py                 # Aplicación FastAPI
 │   ├── database.py             # Conexión y sesiones de SQLite
@@ -45,9 +84,9 @@ ticketera_soporte/
 │   ├── services/               # Lógica de negocio y auditoría
 │   └── tests/                  # Pruebas con pytest
 └── frontend/
-    ├── index.html
-    ├── crear.html
-    ├── detalle.html
+    ├── index.html              # Listado con búsqueda y filtros
+    ├── crear.html              # Alta de tickets
+    ├── detalle.html            # Detalle y gestión del ticket
     ├── css/
     └── js/
 ```
@@ -57,6 +96,14 @@ ticketera_soporte/
 1. **Categorías fijas:** Incidente, Consulta, Solicitud, Mantenimiento.
 2. **Sin autenticación:** existen usuarios mínimos (solo para asignar tickets y firmar comentarios/historial).
 3. **Idioma:** variables y funciones en inglés; textos visibles de la interfaz en español.
+
+## Requisitos
+
+- **Ejecución local:** Python 3.10 o superior con `pip` (probado con Python
+  3.12 y 3.14).
+- **Ejecución con Docker:** Docker con el plugin de Docker Compose
+  (`docker compose version` debe responder).
+- **Git** para el control de versiones (opcional para ejecutar el proyecto).
 
 ## Cómo ejecutar
 
@@ -333,8 +380,20 @@ El archivo está excluido de Git (`.gitignore`) y sus tablas son: `users`,
 ### Pruebas
 
 ```bash
-pytest backend/tests
+.venv/bin/python -m pytest -q
+# o, con pytest instalado en el entorno activo:
+pytest
 ```
+
+La suite completa (138 pruebas) usa bases de datos temporales por test y no
+modifica `ticketera.db`.
+
+### Documentación de la API
+
+El detalle de cada endpoint (método, parámetros, body, respuestas, errores y
+ejemplos), junto con el mapeo RF1–RF9 y la lista de lo **no implementado**,
+está en [docs/api.md](docs/api.md). La documentación interactiva se sirve en
+`/docs` con la aplicación arrancada.
 
 ## Plan de desarrollo
 
