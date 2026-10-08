@@ -116,27 +116,78 @@ async function loadUsers() {
   }
 }
 
+/* FastAPI devuelve `detail`; solo se muestra si es texto, para no exponer
+   estructuras internas de validación al usuario. */
+async function readApiDetail(response) {
+  try {
+    const body = await response.json();
+    if (body && typeof body.detail === "string") {
+      return body.detail;
+    }
+  } catch (error) {
+    /* Cuerpo no JSON: se muestra únicamente el código HTTP. */
+  }
+  return "";
+}
+
 async function fetchTickets() {
   showStatus("Cargando...", "cargando");
   clearRows();
 
+  /* 1) La URL se construye una sola vez. 2) Una única petición HTTP por
+     ejecución de fetchTickets(). */
+  const url = buildTicketsUrl(getFilters());
+
+  let response;
   try {
-    const response = await fetch(buildTicketsUrl(getFilters()));
-    if (!response.ok) {
-      throw new Error(`La API respondió ${response.status}`);
-    }
-    const tickets = await response.json();
-    if (!Array.isArray(tickets)) {
-      throw new Error("Respuesta inesperada de la API");
-    }
-    if (tickets.length === 0) {
-      showStatus("No hay tickets para mostrar.", "vacio");
-      return;
-    }
+    response = await fetch(url);
+  } catch (error) {
+    console.error("No se pudo conectar con el servidor:", error);
+    showStatus(
+      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "error"
+    );
+    return;
+  }
+
+  if (!response.ok) {
+    const detail = await readApiDetail(response);
+    console.error(`La API respondió ${response.status}`, detail);
+    showStatus(
+      detail
+        ? `Error de API (${response.status}): ${detail}`
+        : `Error de API (${response.status}).`,
+      "error"
+    );
+    return;
+  }
+
+  let tickets;
+  try {
+    tickets = await response.json();
+  } catch (error) {
+    console.error("La API no devolvió JSON válido:", error);
+    showStatus("Respuesta inválida del servidor.", "error");
+    return;
+  }
+
+  if (!Array.isArray(tickets)) {
+    console.error("La API no devolvió una lista de tickets:", tickets);
+    showStatus("Respuesta inválida del servidor.", "error");
+    return;
+  }
+
+  if (tickets.length === 0) {
+    showStatus("No hay tickets para mostrar.", "vacio");
+    return;
+  }
+
+  try {
     hideStatus();
     renderTickets(tickets);
   } catch (error) {
-    showStatus("Error al comunicarse con la API.", "error");
+    console.error("No se pudieron representar los tickets:", error);
+    showStatus("Respuesta inválida del servidor.", "error");
   }
 }
 

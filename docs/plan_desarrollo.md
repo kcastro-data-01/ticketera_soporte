@@ -687,6 +687,45 @@ GET    /api/catalogs                (states, categories, priorities)
   documentación actualizada y `docker compose config` válido.
 - **Estado:** ✅ Completada.
 
+### Tarea 19 — Mejora del manejo de errores de API
+- **Objetivo:** que el listado distinga la causa real de un fallo en lugar
+  de mostrar siempre el mensaje genérico "Error al comunicarse con la API."
+  (reportado al pulsar "Limpiar filtros", aunque `GET /api/tickets` funciona
+  correctamente al limpiar los filtros).
+- **Alcance:** solo `fetchTickets()` en `frontend/js/app.js`; sin cambios en
+  la búsqueda, los filtros, el botón "Limpiar filtros", la URL (`GET
+  /api/tickets` cuando no hay filtros) ni en el backend.
+- **Mensajes:** fallo de `fetch` → "No se pudo conectar con el servidor.
+  Comprueba que está en ejecución."; respuesta 4xx/5xx → "Error de API
+  (código): detail" cuando FastAPI devuelve `detail` de texto, y solo
+  "Error de API (código)." cuando no existe o es una estructura de
+  validación (no se exponen detalles internos); cuerpo no JSON o JSON que
+  no es un array → "Respuesta inválida del servidor.". Los éxitos conservan
+  "Cargando...", "No hay tickets para mostrar." y el pintado del listado.
+  El error real se registra con `console.error` para diagnóstico en
+  consola, sin stack traces en la interfaz.
+- **Archivos:** `frontend/js/app.js`, `frontend/tests/app_errors.test.js`
+  (infraestructura mínima de pruebas frontend con `node:test`, que no
+  existía en el proyecto), `README.md`, `docs/plan_desarrollo.md`.
+- **Pruebas:** `node --test frontend/tests/app_errors.test.js` → **10 en
+  verde** (200 con tickets, 200 vacío, URL con y sin filtros, error HTTP
+  con `detail` de texto / estructurado / sin JSON, error de conexión, JSON
+  inválido, JSON que no es array y una prueba dedicada que comprueba, en
+  los 4 escenarios principales, que **cada ejecución de `fetchTickets()`
+  realiza exactamente una petición HTTP** —aserción presente también en el
+  resto de pruebas—; `pytest -q` → **151 en verde**. La URL se construye
+  una sola vez, fuera del `try` del `fetch`, para que una excepción local
+  no se clasifique como error de conexión.
+- **Validación manual:** recorrido con DOM real (jsdom) contra el servidor
+  en marcha: carga, búsqueda con filtros y "Limpiar filtros" → `GET
+  /api/tickets` → pintado sin error, con **exactamente una petición GET
+  por acción** (1 + 1 + 1); las formas reales de error de la API
+  (404 con `detail` de texto y 422 con `detail` de lista) quedan cubiertas
+  por los mensajes nuevos.
+- **Criterio de terminado:** pruebas frontend y pytest en verde,
+  `docker compose config` válido y diff limitado a la tarea.
+- **Estado:** ✅ Completada.
+
 ## Estado del avance
 
 | Tarea | Estado |
@@ -709,3 +748,4 @@ GET    /api/catalogs                (states, categories, priorities)
 | 16 — Documentación final | ✅ Completada |
 | 17 — Revisión final y publicación | ⬜ Revisión completada; publicación pendiente (requiere autorización) |
 | 18 — Máquina de estados (RF3) | ✅ Completada |
+| 19 — Manejo de errores de API | ✅ Completada |

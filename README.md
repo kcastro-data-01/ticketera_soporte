@@ -35,7 +35,8 @@ filtrarlos, y consultar su historial de cambios.
   cambio de estado, comentarios y consulta de historial.
 - Ejecución local y con Docker (`docker compose up --build`), con persistencia
   de SQLite en un volumen.
-- Suite de pruebas con pytest (151 pruebas) y documentación en
+- Suite de pruebas con pytest (151 pruebas), pruebas del frontend con
+  `node:test` (10 pruebas) y documentación en
   [docs/api.md](docs/api.md).
 
 **Pendientes**
@@ -88,7 +89,8 @@ ticketera_soporte/
     ├── crear.html              # Alta de tickets
     ├── detalle.html            # Detalle y gestión del ticket
     ├── css/
-    └── js/
+    ├── js/
+    └── tests/                  # Pruebas del frontend (node:test)
 ```
 
 ## Decisiones de diseño
@@ -390,10 +392,17 @@ El archivo está excluido de Git (`.gitignore`) y sus tablas son: `users`,
 .venv/bin/python -m pytest -q
 # o, con pytest instalado en el entorno activo:
 pytest
+
+# Pruebas del frontend (Node.js, sin dependencias):
+node --test frontend/tests/app_errors.test.js
 ```
 
 La suite completa (151 pruebas) usa bases de datos temporales por test y no
-modifica `ticketera.db`.
+modifica `ticketera.db`. Las 10 pruebas del frontend cargan
+`frontend/js/app.js` en un contexto aislado y verifican el manejo de
+errores de `fetchTickets()` (conexión, error HTTP, respuesta inválida y
+casos de éxito), comprobando en cada caso que una ejecución realiza
+exactamente una petición HTTP.
 
 ### Documentación de la API
 
