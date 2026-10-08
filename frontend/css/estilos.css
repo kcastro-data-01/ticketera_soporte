@@ -453,10 +453,9 @@ button.secundario:disabled:hover {
   flex: none;
 }
 
-/* ---------- 12. Badges (preparados, sin conectar: T20.2+) ----------
-   Componente reutilizable; estas clases todavía no se usan en HTML
-   ni JavaScript. El texto visible del badge da la información, nunca
-   solo el color. */
+/* ---------- 12. Badges (T20.1 preparados; T20.3 conectados) ----------
+   Componente reutilizable. El texto visible del badge da la información,
+   nunca solo el color. */
 
 .badge,
 .badge-estado,
@@ -521,6 +520,13 @@ button.secundario:disabled:hover {
   background: #fbe4e4;
   border-color: #f3c4c4;
   color: #a61b1b;
+}
+
+/* Usuario activo (listado de usuarios, Tarea 20.3) */
+.badge-activo {
+  background: var(--color-exito-fondo);
+  border-color: var(--color-exito);
+  color: var(--color-exito);
 }
 
 /* ---------- 13. Responsive base ----------

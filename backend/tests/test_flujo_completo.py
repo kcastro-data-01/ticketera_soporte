@@ -137,3 +137,71 @@ def test_assignment_errors_are_reported(client):
 
     # El ticket no queda asignado por error.
     assert client.get(f"/api/tickets/{ticket['id']}").json()["assigned_to_id"] is None
+
+
+def test_user_management_and_assignment_integration(client):
+    """Task 20.3 flow: create/list users and assign a ticket between them.
+
+    Steps: create a user, list the users, create a ticket, assign it to the
+    created user, read the ticket back (the assignment persists), create a
+    second user, change the assignment and read it back again.
+    """
+    # 1. Crear usuario.
+    first = client.post(
+        "/api/users",
+        json={
+            "name": "Ana Pérez",
+            "email": "ana.perez@soporte.local",
+            "role": "Soporte",
+        },
+    )
+    assert first.status_code == 201
+    first_id = first.json()["id"]
+
+    # 2. Obtener usuarios: el creado aparece y es listable.
+    users = client.get("/api/users")
+    assert users.status_code == 200
+    assert [user["id"] for user in users.json()] == [first_id]
+    assert users.json()[0]["name"] == "Ana Pérez"
+
+    # 3. Crear ticket.
+    ticket = create_ticket(client)
+    assert ticket["assigned_to_id"] is None
+
+    # 4. Asignar el ticket al usuario creado.
+    assigned = client.patch(
+        f"/api/tickets/{ticket['id']}/assign",
+        json={"assigned_to_id": first_id},
+    )
+    assert assigned.status_code == 200
+    assert assigned.json()["assigned_to_id"] == first_id
+
+    # 5-6. Consultar de nuevo: la asignación persiste.
+    reloaded = client.get(f"/api/tickets/{ticket['id']}").json()
+    assert reloaded["assigned_to_id"] == first_id
+
+    # 7. Crear un segundo usuario (rol por defecto: Soporte).
+    second = client.post(
+        "/api/users",
+        json={"name": "Carlos Gómez", "email": "carlos.gomez@soporte.local"},
+    )
+    assert second.status_code == 201
+    second_id = second.json()["id"]
+    assert second.json()["role"] == "Soporte"
+    assert {user["id"] for user in client.get("/api/users").json()} == {
+        first_id,
+        second_id,
+    }
+
+    # 8. Cambiar la asignación al segundo usuario.
+    changed = client.patch(
+        f"/api/tickets/{ticket['id']}/assign",
+        json={"assigned_to_id": second_id},
+    )
+    assert changed.status_code == 200
+    assert changed.json()["assigned_to_id"] == second_id
+
+    # 9. Consultar de nuevo: la nueva asignación persiste.
+    final = client.get(f"/api/tickets/{ticket['id']}").json()
+    assert final["assigned_to_id"] == second_id
+    assert final["created_at"] == ticket["created_at"]

@@ -117,3 +117,74 @@ def test_list_users_is_exposed_in_openapi(client):
     assert "/api/users" in schema["paths"]
     assert "post" in schema["paths"]["/api/users"]
     assert "get" in schema["paths"]["/api/users"]
+
+
+# ---------------------------------------------------------------------------
+# Defaults and active listing (Task 20.3)
+# ---------------------------------------------------------------------------
+
+
+def test_create_user_without_role_defaults_to_support(client):
+    response = client.post(
+        "/api/users",
+        json={"name": "Persona Sin Rol", "email": "sinrol@soporte.local"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["role"] == UserRole.SUPPORT.value
+    assert response.json()["role"] == "Soporte"
+
+
+def test_create_user_stores_user_active(client, engine):
+    client.post("/api/users", json=VALID_USER)
+
+    fresh_session = sessionmaker(bind=engine)()
+    try:
+        stored = fresh_session.query(User).one()
+        assert stored.is_active is True
+    finally:
+        fresh_session.close()
+
+
+def test_list_users_excludes_inactive_users(client, session):
+    """Only active users (the assignable ones) are listed."""
+    client.post("/api/users", json=VALID_USER)
+    session.add(
+        User(
+            name="Usuario Inactivo",
+            email="inactivo@soporte.local",
+            role=UserRole.SUPPORT.value,
+            is_active=False,
+        )
+    )
+    session.commit()
+
+    data = client.get("/api/users").json()
+
+    assert [user["email"] for user in data] == [VALID_USER["email"]]
+
+
+def test_inactive_user_is_still_stored(client, engine):
+    """Filtering the listing must not delete or deactivate rows."""
+    client.post("/api/users", json=VALID_USER)
+    session2 = sessionmaker(bind=engine)()
+    try:
+        session2.add(
+            User(
+                name="Usuario Inactivo",
+                email="inactivo@soporte.local",
+                role=UserRole.ADMIN.value,
+                is_active=False,
+            )
+        )
+        session2.commit()
+    finally:
+        session2.close()
+
+    data = client.get("/api/users").json()
+    fresh_session = sessionmaker(bind=engine)()
+    try:
+        assert len(data) == 1
+        assert fresh_session.query(User).count() == 2
+    finally:
+        fresh_session.close()

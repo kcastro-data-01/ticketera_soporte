@@ -247,7 +247,7 @@ Crea el usuario mínimo usado para asignación y firma (sin autenticación).
 |-------|------|--------|
 | `name` | string | obligatorio, no vacío, máx. 120 |
 | `email` | string | formato de email válido, máx. 255, **único** |
-| `role` | enum | `Administrador` \| `Soporte` |
+| `role` | enum | `Administrador` \| `Soporte`; opcional, por defecto `Soporte` |
 
 **Respuestas:** `201` con `{id, name, email, role}` · `422` si `name` está
 vacío, el email no cumple el formato o el rol no es válido · `409 Conflict` si
@@ -261,7 +261,8 @@ curl -X POST http://127.0.0.1:8000/api/users \
 
 ### `GET /api/users`
 
-Devuelve todos los usuarios registrados (solo lectura).
+Devuelve los usuarios **activos** disponibles para asignar tickets (solo
+lectura, orden por id). Los usuarios inactivos no se listan.
 
 - `200` → lista de usuarios; `[]` si no hay.
 

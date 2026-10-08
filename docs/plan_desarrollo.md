@@ -776,6 +776,47 @@ GET    /api/catalogs                (states, categories, priorities)
   `docker compose config` válido y diff limitado a la tarea.
 - **Estado:** ✅ Completada.
 
+### Tarea 20.3 — Gestión de usuarios
+- **Objetivo:** administrar usuarios desde la propia aplicación para que
+  aparezcan en el selector de asignación, manteniendo la identidad visual
+  de la Tarea 20.1 y sin autenticación.
+- **Estado previo:** `POST` y `GET /api/users` ya existían (T8) con
+  validaciones (nombre/email/rol → `422`, email duplicado → `409`), pero
+  `role` era obligatorio en la API, el listado no filtraba inactivos y no
+  había interfaz de alta.
+- **Solución:** `role` opcional con por defecto `Soporte` (igual que la
+  BD) y `GET /api/users` devuelve solo usuarios **activos**; página nueva
+  `usuarios.html` + `usuarios.js` (alta con validación local de nombre,
+  correo y rol, listado con estados de carga/vacío/error, el usuario nuevo
+  aparece sin recargar, `409`/`422` con el detalle del backend y mensajes
+  de éxito/error en su propio bloque de estado); navegación «Usuarios» en
+  las cabeceras de las páginas y «Tickets» en la de usuarios; en el
+  detalle, nota «No hay usuarios disponibles. Puedes crear uno desde
+  Usuarios» con selector deshabilitado y guardado bloqueado cuando la
+  lista está vacía (el fallo de red ya se maneja desde la T20.2).
+- **Archivos:** `backend/schemas.py`, `backend/services/user_service.py`,
+  `backend/routers/users.py` (solo docstring), `frontend/usuarios.html`,
+  `frontend/js/usuarios.js` (nuevos), `frontend/index.html`,
+  `frontend/crear.html`, `frontend/detalle.html`, `frontend/js/detalle.js`,
+  `frontend/css/estilos.css` (`.badge-activo` con tokens existentes),
+  tests (`test_users.py` +4, `test_flujo_completo.py` +1,
+  `frontend/tests/usuarios_ui.test.js` nuevo con 13 pruebas,
+  `frontend/tests/detalle_flujo.test.js` +1 y el id `usuarios-nota`) y
+  documentación.
+- **Pruebas:** `pytest -q` → **173 en verde**; `node --test` de los tres
+  ficheros del frontend → **38 en verde** (10 + 15 + 13);
+  `docker compose config --quiet` → válido.
+- **Validación manual:** integración contra el servidor real (20
+  comprobaciones, 0 fallos): crear usuario, listarlo, crear ticket,
+  asignar → reconsultar (persiste), segundo usuario con rol por defecto,
+  cambiar asignación → reconsultar (persiste), más email duplicado
+  (`409`) y rol inválido (`422`) sin efectos en el listado. El script usa
+  emails únicos y un conteo inicial (baseline) porque `ticketera.db` de
+  desarrollo ya contiene datos.
+- **Criterio de terminado:** pruebas frontend y pytest en verde,
+  `docker compose config` válido y diff limitado a la tarea.
+- **Estado:** ✅ Completada.
+
 ## Estado del avance
 
 | Tarea | Estado |
@@ -801,3 +842,4 @@ GET    /api/catalogs                (states, categories, priorities)
 | 19 — Manejo de errores de API | ✅ Completada |
 | 20.1 — Modernización visual base | ✅ Completada |
 | 20.2 — Hora, comentarios y asignación | ✅ Completada |
+| 20.3 — Gestión de usuarios | ✅ Completada |

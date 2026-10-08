@@ -24,8 +24,14 @@ def create_user(session, payload: UserCreate) -> User | None:
 
 
 def list_users(session) -> list[User]:
-    """Return every registered user ordered by id (read-only query)."""
-    statement = select(User).order_by(User.id)
+    """Return the active users available to assign tickets, ordered by id.
+
+    Read-only: only rows with ``is_active`` are exposed, so the frontend
+    selector never offers an inactive user.
+    """
+    statement = (
+        select(User).where(User.is_active.is_(True)).order_by(User.id)
+    )
     return list(session.scalars(statement).all())
 
 

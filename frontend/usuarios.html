@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usuarios — Ticketera de Soporte</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <header class="cabecera">
+    <div>
+      <h1>Ticketera de Soporte</h1>
+      <p>Administración de usuarios</p>
+    </div>
+    <nav class="cabecera-enlaces">
+      <a href="index.html" class="enlace-boton">Tickets</a>
+    </nav>
+  </header>
+
+  <main class="contenido">
+    <section class="seccion" aria-label="Agregar usuario">
+      <h2>Agregar usuario</h2>
+      <form id="form-usuario" class="filtros formulario" novalidate>
+        <label class="campo">
+          <span>Nombre *</span>
+          <input
+            type="text"
+            id="nombre"
+            name="nombre"
+            required
+            maxlength="120"
+            placeholder="Nombre completo"
+          >
+        </label>
+
+        <label class="campo">
+          <span>Correo electrónico *</span>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            maxlength="255"
+            placeholder="nombre@soporte.local"
+          >
+        </label>
+
+        <label class="campo">
+          <span>Rol *</span>
+          <select id="rol" name="rol">
+            <option value="Soporte" selected>Soporte</option>
+            <option value="Administrador">Administrador</option>
+          </select>
+        </label>
+
+        <div class="acciones">
+          <button type="submit" id="crear">Agregar usuario</button>
+        </div>
+      </form>
+
+      <p id="estado-usuario" class="estado" role="status" aria-live="polite" hidden></p>
+    </section>
+
+    <section class="seccion" aria-label="Usuarios registrados">
+      <h2>Usuarios registrados</h2>
+      <p id="usuarios-estado" class="estado" role="status" aria-live="polite" hidden></p>
+      <table id="tabla-usuarios" class="listado" hidden>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Correo</th>
+            <th>Rol</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="cuerpo-usuarios"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="js/usuarios.js" defer></script>
+</body>
+</html>

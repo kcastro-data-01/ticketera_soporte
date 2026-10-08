@@ -44,6 +44,7 @@ function getElements() {
     guardar: document.getElementById("guardar"),
     usuario: document.getElementById("usuario"),
     asignar: document.getElementById("asignar"),
+    usuariosNota: document.getElementById("usuarios-nota"),
     estadoActual: document.getElementById("estado-actual"),
     estadoDestino: document.getElementById("estado-destino"),
     cambiarEstado: document.getElementById("cambiar-estado"),
@@ -187,11 +188,20 @@ function renderUsuarios(users) {
   usersById = new Map(users.map((user) => [user.id, user.name]));
   const elements = getElements();
   elements.usuario.replaceChildren();
-  elements.usuario.disabled = false;
   const sinAsignar = document.createElement("option");
   sinAsignar.value = "";
   sinAsignar.textContent = "Sin asignar";
   elements.usuario.appendChild(sinAsignar);
+
+  if (users.length === 0) {
+    /* Sin usuarios no hay nada que asignar: se explica cómo crear uno. */
+    elements.usuario.disabled = true;
+    elements.usuariosNota.hidden = false;
+    return;
+  }
+  elements.usuario.disabled = false;
+  elements.usuariosNota.hidden = true;
+
   users.forEach((user) => {
     const option = document.createElement("option");
     option.value = String(user.id);
@@ -207,6 +217,7 @@ function renderUsuariosNoDisponibles() {
   const elements = getElements();
   elements.usuario.replaceChildren();
   elements.usuario.disabled = true;
+  elements.usuariosNota.hidden = true;
   const option = document.createElement("option");
   option.value = "";
   option.textContent = "No se pudo cargar la lista de usuarios";
@@ -304,6 +315,13 @@ async function guardarAsignacion() {
     return;
   }
   const elements = getElements();
+  if (elements.usuario.disabled) {
+    showStatus(
+      "No hay usuarios disponibles: crea uno desde la página de Usuarios.",
+      "error"
+    );
+    return;
+  }
   const valor = elements.usuario.value;
   const assignedToId = valor === "" ? null : Number(valor);
 

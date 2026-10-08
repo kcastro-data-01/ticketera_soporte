@@ -36,6 +36,6 @@ def create_user(
     summary="Listar usuarios",
 )
 def list_users(session: Session = Depends(get_session)) -> list[UserResponse]:
-    """Return all registered users (read-only)."""
+    """Return the active users available for assignment (read-only)."""
     users = user_service.list_users(session)
     return [UserResponse.model_validate(user) for user in users]

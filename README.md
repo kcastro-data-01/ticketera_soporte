@@ -31,15 +31,16 @@ filtrarlos, y consultar su historial de cambios.
   estado con máquina de estados (RF3), alta y listado de usuarios, creación
   y consulta de comentarios y lectura del historial de cambios.
 - Frontend (servido por la misma aplicación): listado con búsqueda y filtros,
-  creación de tickets, y pantalla de detalle con edición, asignación,
+  creación de tickets, pantalla de detalle con edición, asignación,
   cambio de estado, listado y creación de comentarios y consulta de
-  historial; las fechas y horas se muestran en hora local de Costa Rica
-  (`America/Costa_Rica`, UTC-6) a partir de marcas de tiempo en UTC con
-  desplazamiento explícito.
+  historial, y administración de usuarios (alta y listado con navegación
+  entre páginas); las fechas y horas se muestran en hora local de Costa
+  Rica (`America/Costa_Rica`, UTC-6) a partir de marcas de tiempo en UTC
+  con desplazamiento explícito.
 - Ejecución local y con Docker (`docker compose up --build`), con persistencia
   de SQLite en un volumen.
-- Suite de pruebas con pytest (168 pruebas), pruebas del frontend con
-  `node:test` (24 pruebas en dos ficheros) y documentación en
+- Suite de pruebas con pytest (173 pruebas), pruebas del frontend con
+  `node:test` (38 pruebas en tres ficheros) y documentación en
   [docs/api.md](docs/api.md).
 
 **Pendientes**
@@ -215,7 +216,10 @@ mensaje claro — y permite, con los endpoints existentes:
   recarga el ticket para actualizar la información en pantalla;
 - **asignar o desasignar** una persona: el selector se llena con
   `GET /api/users` e incluye la opción "Sin asignar" (`PATCH
-  /api/tickets/{id}/assign`);
+  /api/tickets/{id}/assign`); si no hay usuarios, se muestra la nota
+  «No hay usuarios disponibles. Puedes crear uno desde Usuarios» y el
+  guardado queda bloqueado, y si `GET /api/users` falla se desactiva el
+  selector con un error claro;
 - **cambiar el estado** (`PATCH /api/tickets/{id}/state`): muestra el estado
   actual y solo ofrece los destinos posibles desde él — `Nuevo → En proceso →
   Resuelto → Cerrado` —, con confirmación si el cambio se aplica (`200`),
@@ -328,10 +332,12 @@ curl -X POST http://127.0.0.1:8000/api/users \
 curl http://127.0.0.1:8000/api/users
 ```
 
-`POST /api/users` devuelve `201` con `{id, name, email, role}`. Errores:
+`POST /api/users` devuelve `201` con `{id, name, email, role}` (si `role`
+se omite, se guarda `Soporte`). Errores:
 `422` si `name` está vacío, el `email` no tiene formato válido o el `role` no
 es `Administrador`/`Soporte`; `409 Conflict` si el email ya está registrado.
-`GET /api/users` devuelve `200` con la lista de usuarios (solo lectura).
+`GET /api/users` devuelve `200` con los usuarios **activos** disponibles
+para asignar (solo lectura, orden por id).
 
 ### Asignar o desasignar un ticket
 
@@ -398,18 +404,23 @@ pytest
 # Pruebas del frontend (Node.js, sin dependencias):
 node --test frontend/tests/app_errors.test.js
 node --test frontend/tests/detalle_flujo.test.js
+node --test frontend/tests/usuarios_ui.test.js
 ```
 
-La suite completa (168 pruebas) usa bases de datos temporales por test y no
-modifica `ticketera.db`. Las pruebas del frontend (24 en total) cargan los
+La suite completa (173 pruebas) usa bases de datos temporales por test y no
+modifica `ticketera.db`. Las pruebas del frontend (38 en total) cargan los
 scripts reales en un contexto aislado con `node:test`:
 `frontend/tests/app_errors.test.js` (10) verifica el manejo de errores de
 `fetchTickets()` (conexión, error HTTP, respuesta inválida y casos de
 éxito), comprobando en cada caso que una ejecución realiza exactamente una
-petición HTTP, y `frontend/tests/detalle_flujo.test.js` (14) cubre la hora
+petición HTTP; `frontend/tests/detalle_flujo.test.js` (15) cubre la hora
 de Costa Rica en el detalle y el listado, el listado de comentarios
 (carga, vacío, errores y refresco tras agregar) y la asignación de
-usuarios (detalle del backend, desasignación y usuarios no disponibles).
+usuarios (detalle del backend, desasignación, usuarios no disponibles y
+lista vacía); y `frontend/tests/usuarios_ui.test.js` (13) cubre el listado
+de usuarios (éxito, vacío y errores), las validaciones del formulario
+(nombre, correo y rol) y el alta (éxito con recarga, email duplicado y
+datos inválidos).
 
 ### Documentación de la API
 

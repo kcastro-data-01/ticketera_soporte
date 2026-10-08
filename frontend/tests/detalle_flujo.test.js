@@ -59,6 +59,7 @@ const ELEMENT_IDS = [
   "guardar",
   "usuario",
   "asignar",
+  "usuarios-nota",
   "estado-actual",
   "estado-destino",
   "cambiar-estado",
@@ -441,6 +442,11 @@ test("usuarios no disponibles: select deshabilitado y no se envía nada", async 
     harness.node("usuario").children[0].textContent,
     "No se pudo cargar la lista de usuarios"
   );
+  assert.equal(
+    harness.node("usuarios-nota").hidden,
+    true,
+    "la nota de lista vacía no corresponde a un fallo de red"
+  );
 
   await harness.call("guardarAsignacion");
 
@@ -451,4 +457,35 @@ test("usuarios no disponibles: select deshabilitado y no se envía nada", async 
   );
   assert.equal(harness.node("estado-carga").className, "estado error");
   assert.ok(harness.consoleErrors.length > 0);
+});
+
+test("sin usuarios: nota visible, select deshabilitado y guardado bloqueado", async () => {
+  const harness = createHarness(makeFetch({ users: jsonResponse(200, []) }));
+
+  await harness.init();
+
+  assert.equal(harness.node("usuario").disabled, true);
+  assert.deepEqual(
+    harness.node("usuario").children.map((option) => option.textContent),
+    ["Sin asignar"]
+  );
+  /* El mensaje vive en el HTML estático de detalle.html. */
+  const detalleHtml = fs.readFileSync(
+    path.join(__dirname, "..", "detalle.html"),
+    "utf8"
+  );
+  assert.ok(detalleHtml.includes("No hay usuarios disponibles"));
+  assert.ok(detalleHtml.includes('href="usuarios.html"'));
+  assert.ok(detalleHtml.includes('id="usuarios-nota"'));
+  assert.equal(harness.node("usuarios-nota").hidden, false);
+
+  harness.clearCalls();
+  await harness.call("guardarAsignacion");
+
+  assert.deepEqual(harness.urls(), [], "no debe enviar una asignación sin usuarios");
+  assert.match(
+    harness.node("estado-carga").textContent,
+    /No hay usuarios disponibles/
+  );
+  assert.equal(harness.node("estado-carga").className, "estado error");
 });
