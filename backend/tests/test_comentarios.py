@@ -1,4 +1,6 @@
-"""Tests for comment creation on tickets (Task 9: RF5)."""
+"""Tests for comment creation on tickets (Task 9: RF5) and listing (Task 20.2)."""
+
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import sessionmaker
 
@@ -193,3 +195,97 @@ def test_comment_endpoint_is_exposed_in_openapi(client):
     path = "/api/tickets/{ticket_id}/comments"
     assert path in schema["paths"]
     assert "post" in schema["paths"][path]
+    assert "get" in schema["paths"][path]
+
+
+# ---------------------------------------------------------------------------
+# Listing (Task 20.2)
+# ---------------------------------------------------------------------------
+
+
+def test_list_comments_returns_200(client):
+    ticket = create_ticket(client)
+
+    response = client.get(f"/api/tickets/{ticket['id']}/comments")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_comments_returns_created_comments_in_order(client):
+    ticket = create_ticket(client)
+    for content in ("Primero.", "Segundo.", "Tercero."):
+        created = client.post(
+            f"/api/tickets/{ticket['id']}/comments",
+            json={"content": content},
+        )
+        assert created.status_code == 201
+
+    data = client.get(f"/api/tickets/{ticket['id']}/comments").json()
+
+    assert [comment["content"] for comment in data] == [
+        "Primero.",
+        "Segundo.",
+        "Tercero.",
+    ]
+    assert [comment["id"] for comment in data] == sorted(
+        comment["id"] for comment in data
+    )
+
+
+def test_list_comments_orders_by_created_at_not_by_id(client, session):
+    """Rows are sorted chronologically: id order must not drive the result."""
+    ticket = create_ticket(client)
+    recent = Comment(
+        ticket_id=ticket["id"],
+        author="Ana",
+        content="Más reciente",
+        created_at=datetime(2026, 10, 8, 11, 0, tzinfo=timezone.utc),
+    )
+    older = Comment(
+        ticket_id=ticket["id"],
+        author="Ana",
+        content="Más antiguo",
+        created_at=datetime(2026, 10, 8, 9, 0, tzinfo=timezone.utc),
+    )
+    session.add(recent)  # lower id, later timestamp
+    session.add(older)
+    session.commit()
+
+    data = client.get(f"/api/tickets/{ticket['id']}/comments").json()
+
+    assert [comment["content"] for comment in data] == ["Más antiguo", "Más reciente"]
+
+
+def test_list_comments_response_structure(client):
+    ticket = create_ticket(client)
+    client.post(
+        f"/api/tickets/{ticket['id']}/comments",
+        json={"content": "Comentario para revisar la estructura del listado."},
+    )
+
+    data = client.get(f"/api/tickets/{ticket['id']}/comments").json()
+
+    assert isinstance(data, list) and len(data) == 1
+    assert set(data[0].keys()) == COMMENT_RESPONSE_KEYS
+
+
+def test_list_comments_on_missing_ticket_returns_404(client):
+    response = client.get("/api/tickets/9999/comments")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Ticket 9999 no encontrado"
+
+
+def test_list_comments_is_read_only(client, session):
+    ticket = create_ticket(client)
+    client.post(
+        f"/api/tickets/{ticket['id']}/comments",
+        json={"content": "Comentario que no debe duplicarse."},
+    )
+
+    first = client.get(f"/api/tickets/{ticket['id']}/comments").json()
+    second = client.get(f"/api/tickets/{ticket['id']}/comments").json()
+
+    assert first == second
+    assert len(session.query(Comment).all()) == 1

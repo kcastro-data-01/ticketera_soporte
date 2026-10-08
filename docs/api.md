@@ -15,7 +15,10 @@ Documentación de los endpoints **realmente implementados** en el código
 - **Formato:** JSON. Identificadores de campos en inglés; los valores de los
   enums (`Incidente`, `Nuevo`, `Alta`…) llegan en español tal como los muestra
   la interfaz.
-- **Fechas:** ISO-8601 (`created_at`, `updated_at`, `created_at` de historial).
+- **Fechas:** ISO-8601 en UTC con desplazamiento explícimo (`...Z`, p. ej.
+  `2026-10-07T19:29:19.391813Z`) en `created_at`, `updated_at` y
+  `created_at` de historial/comentarios; la interfaz las muestra en hora
+  local de Costa Rica (`America/Costa_Rica`, UTC-6) sin desfases.
 
 ## Resumen de endpoints
 
@@ -29,6 +32,7 @@ Documentación de los endpoints **realmente implementados** en el código
 | `PATCH` | `/api/tickets/{ticket_id}/assign` | Asignar o desasignar un usuario |
 | `PATCH` | `/api/tickets/{ticket_id}/state` | Cambiar el estado (máquina de estados) |
 | `POST` | `/api/tickets/{ticket_id}/comments` | Agregar un comentario |
+| `GET` | `/api/tickets/{ticket_id}/comments` | Listar comentarios (cronológico) |
 | `GET` | `/api/tickets/{ticket_id}/history` | Historial de cambios (solo lectura) |
 | `POST` | `/api/users` | Crear un usuario |
 | `GET` | `/api/users` | Listar usuarios |
@@ -46,8 +50,8 @@ Documentación de los endpoints **realmente implementados** en el código
   "priority": "Alta",
   "state": "Nuevo",
   "assigned_to_id": null,
-  "created_at": "2026-10-07T19:29:19.391813",
-  "updated_at": "2026-10-07T19:29:19.391813"
+  "created_at": "2026-10-07T19:29:19.391813Z",
+  "updated_at": "2026-10-07T19:29:19.391813Z"
 }
 ```
 
@@ -224,8 +228,8 @@ curl -X PATCH http://127.0.0.1:8000/api/tickets/1/state \
   "priority": "Alta",
   "state": "En proceso",
   "assigned_to_id": null,
-  "created_at": "2026-10-07T19:29:19.391813",
-  "updated_at": "2026-10-08T12:00:00.000000"
+  "created_at": "2026-10-07T19:29:19.391813Z",
+  "updated_at": "2026-10-08T12:00:00.000000Z"
 }
 ```
 
@@ -267,8 +271,7 @@ Devuelve todos los usuarios registrados (solo lectura).
 
 ### `POST /api/tickets/{ticket_id}/comments`
 
-Agrega un comentario a un ticket existente (RF5). **Solo creación:** hoy no
-existe endpoint para listar comentarios.
+Agrega un comentario a un ticket existente (RF5).
 
 **Body:**
 
@@ -284,6 +287,19 @@ existe endpoint para listar comentarios.
 curl -X POST http://127.0.0.1:8000/api/tickets/1/comments \
   -H "Content-Type: application/json" \
   -d '{"content": "Hola, ¿hay novedades?"}'
+```
+
+### `GET /api/tickets/{ticket_id}/comments`
+
+Devuelve los comentarios guardados del ticket, de más antiguo a más reciente
+(`created_at` con `id` como desempate), sin paginación (RF5, solo lectura).
+
+- `200` → lista de `{id, ticket_id, author, content, created_at}`; `[]` si
+  el ticket no tiene comentarios.
+- `404` si el ticket no existe.
+
+```bash
+curl http://127.0.0.1:8000/api/tickets/1/comments
 ```
 
 ---
@@ -325,7 +341,7 @@ curl http://127.0.0.1:8000/api/tickets/1/history
 | RF2 | Categoría y prioridad | `POST/PATCH /api/tickets` | ✅ Implementado | `test_tickets.py`, `test_constants.py` |
 | RF3 | Cambiar estado | `PATCH .../state` | ✅ Implementado | `test_estados.py` |
 | RF4 | Asignar a una persona | `PATCH .../assign` | ✅ Implementado | `test_asignacion.py`, `test_users.py` |
-| RF5 | Agregar comentarios | `POST .../comments` | ✅ Implementado (creación) | `test_comentarios.py` |
+| RF5 | Agregar comentarios | `POST .../comments` + `GET .../comments` | ✅ Implementado (creación y listado) | `test_comentarios.py` |
 | RF6 | Listado | `GET /api/tickets` | ✅ Implementado | `test_tickets.py` |
 | RF7 | Buscar | `GET /api/tickets?search=` | ✅ Implementado | `test_busqueda_filtro.py` |
 | RF8 | Filtrar | `GET /api/tickets?category=&priority=&state=` | ✅ Implementado | `test_busqueda_filtro.py` |
@@ -339,7 +355,6 @@ la base de datos también tienen cobertura (`test_smoke.py`,
 
 Para no confundir lo documentado arriba con lo que **no existe**:
 
-- **`GET /api/tickets/{ticket_id}/comments`** — listado de comentarios.
 - **Escritura de historial para acciones distintas al cambio de estado** —
   creación, edición, asignación y comentarios todavía no crean entradas en
   `history` (la lectura y el registro de cambios de estado sí existen).

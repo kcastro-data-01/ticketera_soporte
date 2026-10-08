@@ -7,7 +7,7 @@ defined in ``backend.constants`` because they are shown in the UI.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, Text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, Text, TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.constants import (
@@ -23,6 +23,28 @@ from backend.database import Base
 def utc_now() -> datetime:
     """Current UTC timestamp used as default for audit columns."""
     return datetime.now(timezone.utc)
+
+
+class UTCDateTime(TypeDecorator):
+    """Timezone-aware ``DateTime`` that always reads back as UTC.
+
+    SQLite has no native timezone storage: the aware UTC value written by
+    ``utc_now`` is stored as a bare wall time and read back *naive*. A naive
+    ``datetime`` serializes to JSON without an offset (``2026-10-08T16:49:56``)
+    and browsers then interpret it as local time, shifting the displayed hour
+    by the viewer's UTC offset. Restoring ``tzinfo=timezone.utc`` on read makes
+    every API response carry an explicit ``+00:00``, so the instant is
+    unambiguous and the frontend can render Costa Rica local time correctly.
+    The stored values are already UTC wall times, so no migration is needed.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
 
 
 def _sql_in(values: tuple[str, ...]) -> str:
@@ -87,12 +109,12 @@ class Ticket(Base):
         index=True,
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         nullable=False,
         default=utc_now,
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         nullable=False,
         default=utc_now,
         onupdate=utc_now,
@@ -134,7 +156,7 @@ class Comment(Base):
     author: Mapped[str] = mapped_column(String(120), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         nullable=False,
         default=utc_now,
     )
@@ -170,7 +192,7 @@ class History(Base):
     new_value: Mapped[str | None] = mapped_column(Text)
     author: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         nullable=False,
         default=utc_now,
     )

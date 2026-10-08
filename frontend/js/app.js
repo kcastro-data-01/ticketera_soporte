@@ -59,7 +59,12 @@ function clearRows() {
 }
 
 function formatFecha(value) {
-  return new Date(value).toLocaleString("es-ES");
+  /* Hora local de Costa Rica (America/Costa_Rica, UTC-6), sin importar
+     la zona horaria del navegador: la API envía marcas de tiempo en UTC
+     con desplazamiento explícito. */
+  return new Date(value).toLocaleString("es-ES", {
+    timeZone: "America/Costa_Rica",
+  });
 }
 
 function assignedText(ticket) {

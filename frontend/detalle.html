@@ -133,10 +133,17 @@
     <section class="seccion" aria-label="Comentarios del ticket">
       <h2>Comentarios</h2>
       <p class="nota">
-        Agregar comentarios está disponible. La consulta de los comentarios
-        existentes queda pendiente de la tarea correspondiente: el backend
-        todavía no expone un endpoint para listarlos.
+        Los comentarios se muestran de más antiguo a más reciente. Al no haber
+        inicio de sesión, el autor de un comentario nuevo es «Anónimo».
       </p>
+      <p
+        id="comentarios-estado"
+        class="estado"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></p>
+      <div id="lista-comentarios" class="comentarios" hidden></div>
       <form id="form-comentario" class="filtros formulario" novalidate>
         <label class="campo">
           <span>Nuevo comentario</span>

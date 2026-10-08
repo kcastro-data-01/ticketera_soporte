@@ -1,4 +1,4 @@
-"""Comment endpoints (Task 9: creation only, RF5)."""
+"""Comment endpoints (Task 9: creation; Task 20.2: listing, RF5)."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -31,3 +31,27 @@ def create_comment(
             detail=f"Ticket {ticket_id} no encontrado",
         )
     return CommentResponse.model_validate(comment)
+
+
+@router.get(
+    "/{ticket_id}/comments",
+    response_model=list[CommentResponse],
+    summary="Comentarios de un ticket",
+)
+def list_comments(
+    ticket_id: int,
+    session: Session = Depends(get_session),
+) -> list[CommentResponse]:
+    """Return the comments stored for a ticket, oldest first (RF5).
+
+    Read-only: it exposes the existing ``comments`` rows and never creates
+    them. A missing ticket is answered with ``404``; an existing ticket
+    without comments returns an empty list.
+    """
+    comments = ticket_service.get_ticket_comments(session, ticket_id)
+    if comments is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticket {ticket_id} no encontrado",
+        )
+    return [CommentResponse.model_validate(comment) for comment in comments]

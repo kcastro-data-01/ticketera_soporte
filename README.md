@@ -29,20 +29,21 @@ filtrarlos, y consultar su historial de cambios.
 - API: health check, creación, consulta, listado, búsqueda y filtros de
   tickets, edición de datos básicos, asignación/desasignación, cambio de
   estado con máquina de estados (RF3), alta y listado de usuarios, creación
-  de comentarios y lectura del historial de cambios.
+  y consulta de comentarios y lectura del historial de cambios.
 - Frontend (servido por la misma aplicación): listado con búsqueda y filtros,
   creación de tickets, y pantalla de detalle con edición, asignación,
-  cambio de estado, comentarios y consulta de historial.
+  cambio de estado, listado y creación de comentarios y consulta de
+  historial; las fechas y horas se muestran en hora local de Costa Rica
+  (`America/Costa_Rica`, UTC-6) a partir de marcas de tiempo en UTC con
+  desplazamiento explícito.
 - Ejecución local y con Docker (`docker compose up --build`), con persistencia
   de SQLite en un volumen.
-- Suite de pruebas con pytest (151 pruebas), pruebas del frontend con
-  `node:test` (10 pruebas) y documentación en
+- Suite de pruebas con pytest (168 pruebas), pruebas del frontend con
+  `node:test` (24 pruebas en dos ficheros) y documentación en
   [docs/api.md](docs/api.md).
 
 **Pendientes**
 
-- **Listado de comentarios** — solo existe la creación
-  (`GET .../comments` no está implementado).
 - **Registro de historial para el resto de acciones (RF9, escritura)** — la
   lectura existe y el cambio de estado ya deja su entrada, pero creación,
   edición, asignación y comentarios todavía no crean registros en `history`.
@@ -221,10 +222,11 @@ mensaje claro — y permite, con los endpoints existentes:
   mensaje del backend si la transición no está permitida (`409`) y una nota
   cuando el ticket está `Cerrado` (estado final, sin transiciones); el
   selector se desactiva en ese caso y el backend vuelve a validar siempre;
-- **agregar comentarios** (`POST /api/tickets/{id}/comments`) con
-  confirmación de creación; la consulta de los comentarios existentes queda
-  pendiente de la tarea correspondiente, ya que el backend todavía no expone
-  un endpoint para listarlos (se indica en la propia pantalla);
+- **agregar y consultar comentarios** (`POST /api/tickets/{id}/comments` y
+  `GET /api/tickets/{id}/comments`): lista los comentarios de más antiguo a
+  más reciente con autor, hora local de Costa Rica y texto, con estados de
+  carga, lista vacía y error diferenciados; al agregar un comentario, la
+  lista se actualiza sola sin recargar la página;
 - **consultar el historial de cambios** con el botón **Ver historial**
   (`GET /api/tickets/{id}/history`): muestra una tabla con fecha y hora,
   persona (`—` si no hay), acción y detalle (`campo: anterior → nuevo`) en
@@ -395,14 +397,19 @@ pytest
 
 # Pruebas del frontend (Node.js, sin dependencias):
 node --test frontend/tests/app_errors.test.js
+node --test frontend/tests/detalle_flujo.test.js
 ```
 
-La suite completa (151 pruebas) usa bases de datos temporales por test y no
-modifica `ticketera.db`. Las 10 pruebas del frontend cargan
-`frontend/js/app.js` en un contexto aislado y verifican el manejo de
-errores de `fetchTickets()` (conexión, error HTTP, respuesta inválida y
-casos de éxito), comprobando en cada caso que una ejecución realiza
-exactamente una petición HTTP.
+La suite completa (168 pruebas) usa bases de datos temporales por test y no
+modifica `ticketera.db`. Las pruebas del frontend (24 en total) cargan los
+scripts reales en un contexto aislado con `node:test`:
+`frontend/tests/app_errors.test.js` (10) verifica el manejo de errores de
+`fetchTickets()` (conexión, error HTTP, respuesta inválida y casos de
+éxito), comprobando en cada caso que una ejecución realiza exactamente una
+petición HTTP, y `frontend/tests/detalle_flujo.test.js` (14) cubre la hora
+de Costa Rica en el detalle y el listado, el listado de comentarios
+(carga, vacío, errores y refresco tras agregar) y la asignación de
+usuarios (detalle del backend, desasignación y usuarios no disponibles).
 
 ### Documentación de la API
 

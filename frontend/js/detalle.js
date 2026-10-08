@@ -1,7 +1,7 @@
-/* Tarea 13/14/18 — Detalle y gestión de un ticket con los endpoints
+/* Tarea 13/14/18/20.2 — Detalle y gestión de un ticket con los endpoints
    existentes: GET/PATCH /api/tickets/{id}, PATCH .../assign,
-   PATCH .../state, GET /api/users, POST .../comments y GET .../history.
-   JavaScript vanilla, sin frameworks ni librerías externas. */
+   PATCH .../state, GET /api/users, POST y GET .../comments y
+   GET .../history. JavaScript vanilla, sin frameworks ni librerías. */
 
 const API_USERS_URL = "/api/users";
 
@@ -18,6 +18,9 @@ const TRANSICIONES = {
 let ticketId = null;
 let usersById = new Map();
 let ocupado = false;
+/* false cuando GET /api/users falla: bloquea la asignación para que un
+   select sin usuarios no desasigne el ticket por accidente. */
+let usuariosCargados = false;
 
 function getElements() {
   return {
@@ -48,6 +51,8 @@ function getElements() {
     formComentario: document.getElementById("form-comentario"),
     contenido: document.getElementById("contenido"),
     comentar: document.getElementById("comentar"),
+    comentariosEstado: document.getElementById("comentarios-estado"),
+    listaComentarios: document.getElementById("lista-comentarios"),
     historial: document.getElementById("historial"),
     historialEstado: document.getElementById("historial-estado"),
     tablaHistorial: document.getElementById("tabla-historial"),
@@ -87,7 +92,12 @@ function bloquearBotones(bloqueado) {
 }
 
 function formatFecha(value) {
-  return new Date(value).toLocaleString("es-ES");
+  /* Hora local de Costa Rica (America/Costa_Rica, UTC-6), sin importar
+     la zona horaria del navegador: la API envía marcas de tiempo en UTC
+     con desplazamiento explícito. */
+  return new Date(value).toLocaleString("es-ES", {
+    timeZone: "America/Costa_Rica",
+  });
 }
 
 function nombreAsignado(ticket) {
@@ -173,9 +183,11 @@ function renderEstadoControl(ticket) {
 }
 
 function renderUsuarios(users) {
+  usuariosCargados = true;
   usersById = new Map(users.map((user) => [user.id, user.name]));
   const elements = getElements();
   elements.usuario.replaceChildren();
+  elements.usuario.disabled = false;
   const sinAsignar = document.createElement("option");
   sinAsignar.value = "";
   sinAsignar.textContent = "Sin asignar";
@@ -188,14 +200,29 @@ function renderUsuarios(users) {
   });
 }
 
+/* Sin lista de usuarios el select queda deshabilitado con una opción que
+   explica el motivo: así no se puede "guardar" una asignación vacía por
+   accidente ni se desasigna el ticket sin querer. */
+function renderUsuariosNoDisponibles() {
+  const elements = getElements();
+  elements.usuario.replaceChildren();
+  elements.usuario.disabled = true;
+  const option = document.createElement("option");
+  option.value = "";
+  option.textContent = "No se pudo cargar la lista de usuarios";
+  elements.usuario.appendChild(option);
+}
+
 async function cargarUsuarios() {
   try {
     const response = await fetch(API_USERS_URL);
-    if (!response.ok) return;
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const users = await response.json();
-    if (Array.isArray(users)) renderUsuarios(users);
+    if (!Array.isArray(users)) throw new Error("respuesta inválida");
+    renderUsuarios(users);
   } catch (error) {
-    /* Sin usuarios se conserva la opción "Sin asignar". */
+    console.error("GET /api/users:", error);
+    renderUsuariosNoDisponibles();
   }
 }
 
@@ -269,6 +296,13 @@ async function guardarEdicion() {
 
 async function guardarAsignacion() {
   if (ocupado || ticketId === null) return;
+  if (!usuariosCargados) {
+    showStatus(
+      "No se pudo cargar la lista de usuarios: recarga la página para intentarlo de nuevo.",
+      "error"
+    );
+    return;
+  }
   const elements = getElements();
   const valor = elements.usuario.value;
   const assignedToId = valor === "" ? null : Number(valor);
@@ -415,11 +449,110 @@ async function agregarComentario() {
     }
     elements.contenido.value = "";
     showStatus("Comentario agregado correctamente.", "exito");
+    /* El comentario nuevo aparece en la lista sin recargar la página. */
+    await cargarComentarios();
   } catch (error) {
     showStatus("Error al comunicarse con la API.", "error");
   } finally {
     ocupado = false;
     bloquearBotones(false);
+  }
+}
+
+function mostrarComentariosEstado(message, type) {
+  const elements = getElements();
+  elements.comentariosEstado.textContent = message;
+  elements.comentariosEstado.className = type ? `estado ${type}` : "estado";
+  elements.comentariosEstado.hidden = false;
+}
+
+function ocultarComentariosEstado() {
+  const elements = getElements();
+  elements.comentariosEstado.textContent = "";
+  elements.comentariosEstado.hidden = true;
+}
+
+/* Renderiza con textContent: los datos del backend nunca se interpretan
+   como HTML. */
+function renderComentarios(comments) {
+  const elements = getElements();
+  elements.listaComentarios.replaceChildren();
+  if (!Array.isArray(comments) || comments.length === 0) {
+    elements.listaComentarios.hidden = true;
+    mostrarComentariosEstado(
+      "Este ticket todavía no tiene comentarios.",
+      "vacio"
+    );
+    return;
+  }
+  comments.forEach((comment) => {
+    const card = document.createElement("article");
+    card.className = "comentario";
+
+    const header = document.createElement("div");
+    header.className = "comentario-cabecera";
+    const author = document.createElement("span");
+    author.className = "comentario-autor";
+    author.textContent = comment.author || "Anónimo";
+    const fecha = document.createElement("span");
+    fecha.className = "comentario-fecha";
+    fecha.textContent = formatFecha(comment.created_at);
+    header.appendChild(author);
+    header.appendChild(fecha);
+
+    const content = document.createElement("p");
+    content.className = "comentario-contenido";
+    content.textContent = comment.content;
+
+    card.appendChild(header);
+    card.appendChild(content);
+    elements.listaComentarios.appendChild(card);
+  });
+  ocultarComentariosEstado();
+  elements.listaComentarios.hidden = false;
+}
+
+async function cargarComentarios() {
+  if (ticketId === null) return;
+  const elements = getElements();
+  elements.listaComentarios.hidden = true;
+  mostrarComentariosEstado("Cargando comentarios...", "cargando");
+  try {
+    const response = await fetch(`/api/tickets/${ticketId}/comments`);
+    if (response.status === 404) {
+      mostrarComentariosEstado(
+        await mensajeDeDetalle(
+          response,
+          `No se encontró el ticket #${ticketId}.`
+        ),
+        "error"
+      );
+      return;
+    }
+    if (!response.ok) {
+      mostrarComentariosEstado(
+        `No se pudieron cargar los comentarios (HTTP ${response.status}).`,
+        "error"
+      );
+      return;
+    }
+    let comments = null;
+    try {
+      comments = await response.json();
+    } catch (parseError) {
+      comments = null;
+    }
+    if (!Array.isArray(comments)) {
+      mostrarComentariosEstado("Respuesta inválida del servidor.", "error");
+      return;
+    }
+    renderComentarios(comments);
+  } catch (error) {
+    console.error("GET comentarios:", error);
+    mostrarComentariosEstado(
+      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "error"
+    );
   }
 }
 
@@ -542,7 +675,10 @@ async function init() {
   }
 
   await cargarUsuarios();
-  await cargarTicket();
+  const ticketCargado = await cargarTicket();
+  if (ticketCargado) {
+    await cargarComentarios();
+  }
 }
 
 if (typeof document !== "undefined") {

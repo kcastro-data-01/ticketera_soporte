@@ -140,6 +140,26 @@ def get_ticket_history(session, ticket_id: int) -> list[History] | None:
     return list(entries)
 
 
+def get_ticket_comments(session, ticket_id: int) -> list[Comment] | None:
+    """Return the comments stored for a ticket, oldest first (RF5).
+
+    Returns ``None`` when the ticket does not exist so the router can
+    distinguish "missing ticket" from "no comments yet". Ordering is
+    ``created_at`` with ``id`` as tiebreaker (chronological); there is no
+    pagination. The function only reads the ``comments`` table: it never
+    creates entries.
+    """
+    if session.get(Ticket, ticket_id) is None:
+        return None
+
+    comments = session.scalars(
+        select(Comment)
+        .where(Comment.ticket_id == ticket_id)
+        .order_by(Comment.created_at, Comment.id)
+    ).all()
+    return list(comments)
+
+
 def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | None:
     """Apply a partial update to an existing ticket.
 

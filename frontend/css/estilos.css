@@ -617,3 +617,44 @@ button.secundario:disabled:hover {
     animation: none !important;
   }
 }
+
+/* ---------- 15. Comentarios (Tarea 20.2) ----------
+   Solo componentes nuevos construidos con los tokens existentes:
+   no cambia la paleta ni la identidad de la Tarea 20.1. */
+
+.comentarios {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+}
+
+.comentario {
+  background: var(--color-superficie-alta);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-suave);
+  padding: 0.65rem 0.9rem;
+  box-shadow: var(--sombra-suave);
+}
+
+.comentario-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue-fuerte);
+}
+
+.comentario-autor {
+  font-weight: 600;
+  color: var(--color-texto);
+}
+
+.comentario-contenido {
+  margin: 0.35rem 0 0;
+  font-size: var(--texto-md);
+  white-space: pre-wrap;
+}

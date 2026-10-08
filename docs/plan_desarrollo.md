@@ -726,6 +726,56 @@ GET    /api/catalogs                (states, categories, priorities)
   `docker compose config` válido y diff limitado a la tarea.
 - **Estado:** ✅ Completada.
 
+### Tarea 20.1 — Modernización visual base
+- **Objetivo:** sentar un sistema visual moderno con la paleta morado
+  pastel aprobada, en un único fichero `frontend/css/estilos.css` (tokens,
+  tipografía, superficies, botones, inputs, foco visible, clases de estado y
+  prioridad preparadas, badges, tablas y responsive base), sin tocar HTML,
+  JavaScript ni backend y sin cambiar funcionalidad.
+- **Archivos:** `frontend/css/estilos.css` (commit `cc2a32a`).
+- **Estado:** ✅ Completada.
+
+### Tarea 20.2 — Corregir hora, comentarios y asignación
+- **Objetivo:** corregir tres problemas funcionales sin alterar la
+  identidad visual de la Tarea 20.1: (1) la interfaz mostraba la hora UTC
+  como si fuera local (+6 h de desfase en Costa Rica), (2) no se podían
+  consultar los comentarios existentes y (3) la asignación no manejaba el
+  fallo de la lista de usuarios.
+- **Causas:** SQLite no almacena zonas horarias —el UTC consciente se
+  guardaba y se leía *naive*—, la API emitía marcas de tiempo sin
+  desplazamiento y `formatFecha` no fijaba la zona horaria; solo existía
+  `POST .../comments` (el listado estaba declarado como pendiente); y si
+  `GET /api/users` fallaba en silencio, el select quedaba solo con
+  «Sin asignar» y pulsar «Guardar asignación» desasignaba sin querer.
+- **Solución:** type decorator `UTCDateTime` que restaura `tzinfo=UTC` en
+  la lectura —la API emite `...Z` explícito, sin migración porque las filas
+  ya guardaban la hora UTC— y `formatFecha` con
+  `timeZone: "America/Costa_Rica"` en listado y detalle; nuevo
+  `GET /api/tickets/{id}/comments` (servicio espejo del historial, orden
+  cronológico `created_at, id`) con estados de carga/vacío/error y
+  refresco automático tras cada `POST`; y la lista de usuarios distingue
+  éxito de fallo (select deshabilitado con opción explicativa y bloqueo en
+  `guardarAsignacion` para no desasignar por accidente).
+- **Archivos:** `backend/models.py`, `backend/services/ticket_service.py`,
+  `backend/routers/comentarios.py`, `frontend/js/app.js`,
+  `frontend/js/detalle.js`, `frontend/detalle.html`,
+  `frontend/css/estilos.css` (solo componentes `.comentario*` construidos
+  con los tokens existentes), tests (`test_comentarios.py` ampliado con el
+  GET; `test_fechas.py` y `test_flujo_completo.py` nuevos;
+  `frontend/tests/detalle_flujo.test.js` nuevo) y documentación.
+- **Pruebas:** `pytest -q` → **168 en verde**; `node --test
+  frontend/tests/app_errors.test.js` → **10 en verde** (sin cambios);
+  `node --test frontend/tests/detalle_flujo.test.js` → **14 en verde**;
+  `docker compose config --quiet` → válido.
+- **Validación manual:** prueba de integración contra el servidor real
+  (27 comprobaciones, 0 fallos): crear/consultar ticket, agregar dos
+  comentarios y listarlos en orden cronológico, asignar → reconsultar
+  (conserva) → desasignar, usuario inexistente → `404`, y todas las marcas
+  de tiempo ≈ hora UTC actual con desplazamiento explícito (desfase 0,0 s).
+- **Criterio de terminado:** pruebas frontend y pytest en verde,
+  `docker compose config` válido y diff limitado a la tarea.
+- **Estado:** ✅ Completada.
+
 ## Estado del avance
 
 | Tarea | Estado |
@@ -749,3 +799,5 @@ GET    /api/catalogs                (states, categories, priorities)
 | 17 — Revisión final y publicación | ⬜ Revisión completada; publicación pendiente (requiere autorización) |
 | 18 — Máquina de estados (RF3) | ✅ Completada |
 | 19 — Manejo de errores de API | ✅ Completada |
+| 20.1 — Modernización visual base | ✅ Completada |
+| 20.2 — Hora, comentarios y asignación | ✅ Completada |
