@@ -109,6 +109,27 @@
       </div>
     </section>
 
+    <section class="seccion" aria-label="Cambio de estado del ticket">
+      <h2>Cambio de estado</h2>
+      <div class="filtros formulario">
+        <div class="campo">
+          <span>Estado actual</span>
+          <strong id="estado-actual">—</strong>
+        </div>
+        <label class="campo">
+          <span>Pasar a</span>
+          <select id="estado-destino"></select>
+        </label>
+        <div class="acciones">
+          <button type="button" id="cambiar-estado">Cambiar estado</button>
+        </div>
+      </div>
+      <p class="nota" id="estado-final" hidden>
+        Este ticket está <b>Cerrado</b>: es un estado final y no admite más
+        cambios de estado.
+      </p>
+    </section>
+
     <section class="seccion" aria-label="Comentarios del ticket">
       <h2>Comentarios</h2>
       <p class="nota">

@@ -27,6 +27,7 @@ Documentación de los endpoints **realmente implementados** en el código
 | `GET` | `/api/tickets/{ticket_id}` | Consultar un ticket |
 | `PATCH` | `/api/tickets/{ticket_id}` | Editar título/descripción/categoría/prioridad |
 | `PATCH` | `/api/tickets/{ticket_id}/assign` | Asignar o desasignar un usuario |
+| `PATCH` | `/api/tickets/{ticket_id}/state` | Cambiar el estado (máquina de estados) |
 | `POST` | `/api/tickets/{ticket_id}/comments` | Agregar un comentario |
 | `GET` | `/api/tickets/{ticket_id}/history` | Historial de cambios (solo lectura) |
 | `POST` | `/api/users` | Crear un usuario |
@@ -58,7 +59,8 @@ Documentación de los endpoints **realmente implementados** en el código
 una lista de objetos `{loc, msg, type}` propia de FastAPI/Pydantic.
 
 **Códigos habituales:** `200` OK · `201` creado · `404` recurso inexistente ·
-`409` conflicto (solo email duplicado de usuario) · `422` datos inválidos.
+`409` conflicto (email duplicado de usuario o transición de estado no
+permitida) · `422` datos inválidos.
 
 ---
 
@@ -171,6 +173,62 @@ curl -X PATCH http://127.0.0.1:8000/api/tickets/1/assign \
   -d '{"assigned_to_id": 1}'
 ```
 
+### `PATCH /api/tickets/{ticket_id}/state`
+
+Cambia el estado del ticket a través de la máquina de estados (RF3). Solo se
+aceptan los avances lineales; no hay saltos, retrocesos ni transiciones
+automáticas, y `Cerrado` es un estado final. Cada cambio exitoso registra
+**exactamente una** entrada en `history` (`action` = `"Cambio de estado"`,
+`field` = `"state"`, `old_value`/`new_value` con los estados, `author` =
+`"Anónimo"`) en la misma operación de base de datos que la actualización del
+ticket. Una transición rechazada no toca el ticket ni el historial.
+
+**Transiciones permitidas:**
+
+| Desde | Hasta |
+|-------|-------|
+| `Nuevo` | `En proceso` |
+| `En proceso` | `Resuelto` |
+| `Resuelto` | `Cerrado` |
+
+Todo lo demás queda fuera: saltos (`Nuevo → Resuelto`), retrocesos
+(`En proceso → Nuevo`), mantener el mismo estado (`Nuevo → Nuevo`) y
+cualquier cambio sobre `Cerrado`.
+
+**Body** (JSON, obligatorio):
+
+| Campo | Tipo | Reglas |
+|-------|------|--------|
+| `state` | enum | uno de los valores de `state`; debe ser un destino permitido desde el estado actual |
+
+**Respuestas:**
+
+- `200` → el ticket con el estado nuevo y `updated_at` actualizado.
+- `404` → `{"detail": "Ticket 999 no encontrado"}` si el ticket no existe.
+- `409` → `{"detail": "Transición de 'Nuevo' a 'Resuelto' no permitida"}`
+  cuando la transición no está permitida (incluye mantener el mismo estado).
+- `422` → si falta `state` o el valor no pertenece al enum.
+
+```bash
+curl -X PATCH http://127.0.0.1:8000/api/tickets/1/state \
+  -H "Content-Type: application/json" \
+  -d '{"state": "En proceso"}'
+```
+
+```json
+{
+  "id": 1,
+  "title": "No enciende la impresora",
+  "description": "La impresora del piso 2 no responde desde ayer.",
+  "category": "Incidente",
+  "priority": "Alta",
+  "state": "En proceso",
+  "assigned_to_id": null,
+  "created_at": "2026-10-07T19:29:19.391813",
+  "updated_at": "2026-10-08T12:00:00.000000"
+}
+```
+
 ---
 
 ## Usuarios
@@ -246,10 +304,12 @@ vienen en `null` cuando el registro no los define.
 **Respuestas:** `200` con la lista · `200` con `[]` si el ticket no tiene
 entradas · `404` si el ticket no existe.
 
-> **Limitación actual:** el endpoint solo **lee**. Ninguna operación de la API
-> crea entradas en `history` todavía (el registro automático de auditoría
-> está pendiente; por decisión aprobada se hará desde la capa de servicio,
-> nunca desde el frontend), así que un ticket creado por la API responde `[]`.
+> **Alcance de la escritura:** hoy solo el **cambio de estado** (RF3) crea
+> entradas en `history`, desde la capa de servicio y de forma atómica con la
+> actualización del ticket. El resto de acciones (creación, edición,
+> asignación, comentarios) todavía no deja registro; ese registro automático
+> de auditoría sigue pendiente y, por decisión aprobada, se hará siempre
+> desde la capa de servicio, nunca desde el frontend.
 
 ```bash
 curl http://127.0.0.1:8000/api/tickets/1/history
@@ -263,13 +323,13 @@ curl http://127.0.0.1:8000/api/tickets/1/history
 |----|-----------|-------------|--------|---------|
 | RF1 | Crear ticket | `POST /api/tickets` | ✅ Implementado | `test_tickets.py` |
 | RF2 | Categoría y prioridad | `POST/PATCH /api/tickets` | ✅ Implementado | `test_tickets.py`, `test_constants.py` |
-| RF3 | Cambiar estado | — | ⬜ **Pendiente** (Tarea 18) | — |
+| RF3 | Cambiar estado | `PATCH .../state` | ✅ Implementado | `test_estados.py` |
 | RF4 | Asignar a una persona | `PATCH .../assign` | ✅ Implementado | `test_asignacion.py`, `test_users.py` |
 | RF5 | Agregar comentarios | `POST .../comments` | ✅ Implementado (creación) | `test_comentarios.py` |
 | RF6 | Listado | `GET /api/tickets` | ✅ Implementado | `test_tickets.py` |
 | RF7 | Buscar | `GET /api/tickets?search=` | ✅ Implementado | `test_busqueda_filtro.py` |
 | RF8 | Filtrar | `GET /api/tickets?category=&priority=&state=` | ✅ Implementado | `test_busqueda_filtro.py` |
-| RF9 | Historial de cambios | `GET .../history` | ✅ Lectura implementada; ✍️ **escritura automática pendiente** | `test_historial.py` |
+| RF9 | Historial de cambios | `GET .../history` | ✅ Lectura implementada; ✍️ escritura automática solo por cambio de estado (el resto, pendiente) | `test_historial.py`, `test_estados.py` |
 
 Salud (`GET /health`), usuarios (`POST/GET /api/users`) y la configuración de
 la base de datos también tienen cobertura (`test_smoke.py`,
@@ -279,12 +339,10 @@ la base de datos también tienen cobertura (`test_smoke.py`,
 
 Para no confundir lo documentado arriba con lo que **no existe**:
 
-- **`PATCH /api/tickets/{ticket_id}/state`** — cambio de estado y máquina de
-  transiciones (RF3). Es la **Tarea 18**; hoy el estado solo se puede leer y
-  usar como filtro de listado.
 - **`GET /api/tickets/{ticket_id}/comments`** — listado de comentarios.
-- **Escritura automática de historial** — ningún endpoint crea entradas en
-  `history` (la lectura sí existe).
+- **Escritura de historial para acciones distintas al cambio de estado** —
+  creación, edición, asignación y comentarios todavía no crean entradas en
+  `history` (la lectura y el registro de cambios de estado sí existen).
 - **Autenticación / autorización** — excluidas por decisión aprobada; no es
   un defecto pendiente.
 - **Paginación y ordenamiento** — `GET /api/tickets` devuelve todo el

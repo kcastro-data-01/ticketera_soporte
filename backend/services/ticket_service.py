@@ -34,6 +34,29 @@ class TicketNotFoundError(Exception):
         super().__init__(f"Ticket {ticket_id} not found")
 
 
+class InvalidTransitionError(Exception):
+    """Raised when the requested state change is not an allowed transition.
+
+    ``current`` and ``target`` keep the Spanish values shown by the UI so the
+    router can build a clear message (answered as HTTP 409).
+    """
+
+    def __init__(self, current: str, target: str):
+        self.current = current
+        self.target = target
+        super().__init__(f"Transition from {current} to {target} not allowed")
+
+
+# Allowed state transitions (RF3, Task 18): linear forward workflow only —
+# no jumps and no backwards moves. "Cerrado" is terminal.
+ALLOWED_TRANSITIONS: dict[TicketState, frozenset[TicketState]] = {
+    TicketState.NEW: frozenset({TicketState.IN_PROGRESS}),
+    TicketState.IN_PROGRESS: frozenset({TicketState.RESOLVED}),
+    TicketState.RESOLVED: frozenset({TicketState.CLOSED}),
+    TicketState.CLOSED: frozenset(),
+}
+
+
 def create_ticket(session, payload: TicketCreate) -> Ticket:
     """Persist a new ticket.
 
@@ -156,6 +179,44 @@ def assign_ticket(session, ticket_id: int, assigned_to_id: int | None) -> Ticket
         raise UserNotFoundError(assigned_to_id)
 
     ticket.assigned_to_id = assigned_to_id
+    session.commit()
+    session.refresh(ticket)
+    return ticket
+
+
+def change_ticket_state(session, ticket_id: int, new_state: TicketState) -> Ticket:
+    """Move a ticket to another state through an allowed transition (RF3).
+
+    The state update and its audit entry are both added to the session and
+    committed in one go, so a failure cannot leave a ticket updated without
+    its history entry nor an orphan history entry. A rejected transition
+    raises before anything is written, so it never reaches the history.
+
+    Raises:
+        ``TicketNotFoundError``: the ticket does not exist.
+        ``InvalidTransitionError``: the transition is not allowed. Staying in
+            the same state is rejected as well: only the linear forward
+            moves (``Nuevo → En proceso → Resuelto → Cerrado``) are valid.
+    """
+    ticket = session.get(Ticket, ticket_id)
+    if ticket is None:
+        raise TicketNotFoundError(ticket_id)
+
+    current_state = TicketState(ticket.state)
+    if new_state == current_state or new_state not in ALLOWED_TRANSITIONS[current_state]:
+        raise InvalidTransitionError(current_state.value, new_state.value)
+
+    ticket.state = new_state.value  # ``updated_at`` refreshed by ``onupdate``
+    session.add(
+        History(
+            ticket_id=ticket.id,
+            action="Cambio de estado",
+            field="state",
+            old_value=current_state.value,
+            new_value=new_state.value,
+            author="Anónimo",  # same convention as comments: no authentication
+        )
+    )
     session.commit()
     session.refresh(ticket)
     return ticket

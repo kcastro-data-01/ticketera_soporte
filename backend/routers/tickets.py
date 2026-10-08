@@ -1,5 +1,5 @@
 """Ticket endpoints (creation, listing with search and filters, retrieval,
-edition, assignment and history)."""
+edition, assignment, state changes and history)."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -11,10 +11,15 @@ from backend.schemas import (
     TicketAssignment,
     TicketCreate,
     TicketResponse,
+    TicketStateUpdate,
     TicketUpdate,
 )
 from backend.services import ticket_service
-from backend.services.ticket_service import TicketNotFoundError, UserNotFoundError
+from backend.services.ticket_service import (
+    InvalidTransitionError,
+    TicketNotFoundError,
+    UserNotFoundError,
+)
 
 router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
 
@@ -162,5 +167,40 @@ def assign_ticket(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Usuario {error.user_id} no encontrado",
+        )
+    return TicketResponse.model_validate(ticket)
+
+
+@router.patch(
+    "/{ticket_id}/state",
+    response_model=TicketResponse,
+    summary="Cambiar el estado de un ticket",
+)
+def change_ticket_state(
+    ticket_id: int,
+    payload: TicketStateUpdate,
+    session: Session = Depends(get_session),
+) -> TicketResponse:
+    """Move a ticket through the allowed workflow transitions (RF3).
+
+    Only the forward linear moves are accepted: ``Nuevo → En proceso``,
+    ``En proceso → Resuelto`` and ``Resuelto → Cerrado``. Any jump, step
+    back, repeated state or change on a ``Cerrado`` ticket is answered with
+    ``409 Conflict``. The new state comes from the existing ``TicketState``
+    enum, so an unknown value is rejected with ``422``.
+    """
+    try:
+        ticket = ticket_service.change_ticket_state(session, ticket_id, payload.state)
+    except TicketNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticket {ticket_id} no encontrado",
+        )
+    except InvalidTransitionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Transición de '{error.current}' a '{error.target}' no permitida"
+            ),
         )
     return TicketResponse.model_validate(ticket)

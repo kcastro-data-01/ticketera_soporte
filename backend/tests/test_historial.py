@@ -31,7 +31,8 @@ def create_ticket(client, **overrides) -> dict:
 
 
 def add_history(session, ticket_id: int, created_at: datetime, **overrides) -> None:
-    """Insert a history row directly (the API does not create entries)."""
+    """Insert a history row directly (state changes are recorded by the API;
+    other actions still have no writer and are inserted here)."""
     entry = History(
         ticket_id=ticket_id,
         action=overrides.pop("action", "created"),

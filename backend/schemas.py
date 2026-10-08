@@ -153,6 +153,16 @@ class TicketAssignment(BaseModel):
     assigned_to_id: int | None
 
 
+class TicketStateUpdate(BaseModel):
+    """Payload accepted by ``PATCH /api/tickets/{ticket_id}/state`` (RF3).
+
+    Reuses the existing ``TicketState`` enum: an unknown value is rejected
+    with the usual FastAPI/Pydantic ``422``.
+    """
+
+    state: TicketState
+
+
 class CommentCreate(BaseModel):
     """Payload accepted by ``POST /api/tickets/{ticket_id}/comments``.
 

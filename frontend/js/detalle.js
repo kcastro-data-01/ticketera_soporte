@@ -1,9 +1,19 @@
-/* Tarea 13/14 — Detalle y gestión de un ticket con los endpoints existentes:
-   GET/PATCH /api/tickets/{id}, PATCH .../assign, GET /api/users,
-   POST .../comments y GET .../history. Sin cambio de estado (pendiente como
-   Tarea 18). JavaScript vanilla, sin frameworks ni librerías externas. */
+/* Tarea 13/14/18 — Detalle y gestión de un ticket con los endpoints
+   existentes: GET/PATCH /api/tickets/{id}, PATCH .../assign,
+   PATCH .../state, GET /api/users, POST .../comments y GET .../history.
+   JavaScript vanilla, sin frameworks ni librerías externas. */
 
 const API_USERS_URL = "/api/users";
+
+/* Transiciones válidas desde cada estado (espejo del backend para ofrecer
+   solo destinos posibles; el backend siempre vuelve a validar). Avances
+   lineales: Nuevo → En proceso → Resuelto → Cerrado (Cerrado es final). */
+const TRANSICIONES = {
+  "Nuevo": ["En proceso"],
+  "En proceso": ["Resuelto"],
+  "Resuelto": ["Cerrado"],
+  "Cerrado": [],
+};
 
 let ticketId = null;
 let usersById = new Map();
@@ -31,6 +41,10 @@ function getElements() {
     guardar: document.getElementById("guardar"),
     usuario: document.getElementById("usuario"),
     asignar: document.getElementById("asignar"),
+    estadoActual: document.getElementById("estado-actual"),
+    estadoDestino: document.getElementById("estado-destino"),
+    cambiarEstado: document.getElementById("cambiar-estado"),
+    estadoFinal: document.getElementById("estado-final"),
     formComentario: document.getElementById("form-comentario"),
     contenido: document.getElementById("contenido"),
     comentar: document.getElementById("comentar"),
@@ -67,6 +81,9 @@ function bloquearBotones(bloqueado) {
   elements.asignar.disabled = bloqueado;
   elements.comentar.disabled = bloqueado;
   elements.historial.disabled = bloqueado;
+  /* El botón de estado solo se activa si hay alguna transición posible. */
+  elements.cambiarEstado.disabled =
+    bloqueado || elements.estadoDestino.options.length === 0;
 }
 
 function formatFecha(value) {
@@ -131,6 +148,28 @@ function renderTicket(ticket) {
     ticket.assigned_to_id === null || ticket.assigned_to_id === undefined
       ? ""
       : String(ticket.assigned_to_id);
+
+  renderEstadoControl(ticket);
+}
+
+/* Muestra el estado actual y solo ofrece los destinos posibles desde él.
+   Con "Cerrado" no queda ninguna transición: se oculta el selector útil y
+   se explica que el estado es final. */
+function renderEstadoControl(ticket) {
+  const elements = getElements();
+  const destinos = TRANSICIONES[ticket.state] || [];
+  elements.estadoActual.textContent = ticket.state;
+  elements.estadoDestino.replaceChildren();
+  destinos.forEach((estado) => {
+    const option = document.createElement("option");
+    option.value = estado;
+    option.textContent = estado;
+    elements.estadoDestino.appendChild(option);
+  });
+  const sinTransiciones = destinos.length === 0;
+  elements.estadoDestino.disabled = sinTransiciones;
+  elements.cambiarEstado.disabled = sinTransiciones;
+  elements.estadoFinal.hidden = !sinTransiciones;
 }
 
 function renderUsuarios(users) {
@@ -270,6 +309,62 @@ async function guardarAsignacion() {
         : "Asignación guardada correctamente.",
       "exito"
     );
+    await cargarTicket({ silencioso: true });
+  } catch (error) {
+    showStatus("Error al comunicarse con la API.", "error");
+  } finally {
+    ocupado = false;
+    bloquearBotones(false);
+  }
+}
+
+async function cambiarEstado() {
+  if (ocupado || ticketId === null) return;
+  const elements = getElements();
+  const destino = elements.estadoDestino.value;
+  if (!destino) return; /* sin transiciones posibles (ticket cerrado) */
+
+  ocupado = true;
+  bloquearBotones(true);
+  try {
+    const response = await fetch(`/api/tickets/${ticketId}/state`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state: destino }),
+    });
+    if (response.status === 404) {
+      showStatus(
+        await mensajeDeDetalle(
+          response,
+          `No se encontró el ticket #${ticketId}.`
+        ),
+        "error"
+      );
+      return;
+    }
+    if (response.status === 409) {
+      showStatus(
+        await mensajeDeDetalle(
+          response,
+          "La transición de estado no está permitida."
+        ),
+        "error"
+      );
+      return;
+    }
+    if (response.status === 422) {
+      const body = await response.json().catch(() => null);
+      showStatus(formatValidation(body), "error");
+      return;
+    }
+    if (!response.ok) {
+      showStatus(
+        `No se pudo cambiar el estado (HTTP ${response.status}).`,
+        "error"
+      );
+      return;
+    }
+    showStatus(`Estado actualizado a «${destino}».`, "exito");
     await cargarTicket({ silencioso: true });
   } catch (error) {
     showStatus("Error al comunicarse con la API.", "error");
@@ -428,6 +523,7 @@ async function init() {
     guardarEdicion();
   });
   elements.asignar.addEventListener("click", () => guardarAsignacion());
+  elements.cambiarEstado.addEventListener("click", () => cambiarEstado());
   elements.formComentario.addEventListener("submit", (event) => {
     event.preventDefault();
     agregarComentario();

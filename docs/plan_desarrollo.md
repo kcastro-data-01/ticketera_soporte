@@ -32,12 +32,15 @@ implementa, se prueba, se documenta y se commitea antes de pasar a la siguiente.
    nunca desde el frontend.
 5. **Estados, categorías y prioridades** como `enum` en código + columna de
    texto en SQLite.
-6. **Transiciones de estado válidas:**
+6. **Transiciones de estado válidas:** solo avances lineales (la versión
+   original de esta decisión permitía reversas; la Tarea 18 la ajustó al
+   spec aprobado del RF3):
    - `Nuevo → En proceso`
-   - `En proceso → Nuevo`, `En proceso → Resuelto`
-   - `Resuelto → En proceso`, `Resuelto → Cerrado`
+   - `En proceso → Resuelto`
+   - `Resuelto → Cerrado`
    - `Cerrado` es estado terminal.
-   - Transición inválida → HTTP 409.
+   - Transición inválida (salto, retroceso, mismo estado o cualquier cambio
+     sobre `Cerrado`) → HTTP 409.
 7. **Frontend estático** servido por el propio FastAPI (un solo contenedor Docker).
 8. **Pruebas con pytest** sobre la API usando base de datos temporal.
 9. **Base de datos:** archivo `ticketera.db` en la raíz del proyecto, creado
@@ -644,19 +647,45 @@ GET    /api/catalogs                (states, categories, priorities)
   autorización expresa (pendiente).
 
 ### Tarea 18 — Máquina de estados (RF3)
-- **Objetivo:** permitir cambiar el estado de un ticket respetando las
-  transiciones aprobadas (decisión 6).
-- **Archivos:** `backend/services/ticket_service.py`,
+- **Objetivo:** permitir cambiar el estado de un ticket con transiciones
+  controladas (decisión 6, ajustada: solo avances lineales).
+- **Archivos:** `backend/schemas.py` (`TicketStateUpdate`),
+  `backend/services/ticket_service.py` (`InvalidTransitionError`,
+  `ALLOWED_TRANSITIONS`, `change_ticket_state`),
   `backend/routers/tickets.py` (`PATCH /api/tickets/{id}/state`),
-  `backend/tests/test_estados.py`.
-- **Endpoint:** `PATCH /api/tickets/{id}/state` con `{state, reason?}`;
-  transición inválida → HTTP 409; `Cerrado` es estado terminal.
-- **Prueba:** `pytest` — transición válida OK; `Nuevo → Cerrado` → 409;
-  `Cerrado` terminal.
-- **Criterio de terminado:** todas las transiciones cubiertas por pruebas.
-- **Estado:** ⬜ Pendiente de implementar. Registrada aquí para no entrar en
-  conflicto con la **Tarea 7** (Consultar un ticket individual). El registro de
-  estos cambios en el historial (RF9) se definirá en una tarea propia.
+  `backend/tests/test_estados.py`, `frontend/detalle.html`,
+  `frontend/js/detalle.js`, `docs/api.md`, `README.md`.
+- **Endpoint:** `PATCH /api/tickets/{id}/state` con `{state}`; reutiliza el
+  enum `TicketState` (valor desconocido o campo ausente → 422), ticket
+  inexistente → 404 y transición no permitida → 409 con
+  `{"detail": "Transición de 'Nuevo' a 'Resuelto' no permitida"}`.
+- **Transiciones:** `Nuevo → En proceso`, `En proceso → Resuelto`,
+  `Resuelto → Cerrado`; `Cerrado` es terminal; mismo estado rechazado con
+  409; sin transiciones automáticas.
+- **Historial:** cada cambio exitoso crea exactamente una entrada
+  (`action` = `"Cambio de estado"`, `field` = `"state"`, `old_value` y
+  `new_value` con los estados, `author` = `"Anónimo"`) en la misma sesión y
+  `commit` que la actualización del ticket (atomicidad); las transiciones
+  rechazadas no escriben nada. **Ajuste respecto al plan original:** el
+  registro en `history` se implementó dentro de esta tarea, no en una tarea
+  propia, porque el RF3 lo exige de forma explícita.
+- **Frontend:** la pantalla de detalle muestra el estado actual, solo ofrece
+  los destinos posibles desde él (mapa espejo de `ALLOWED_TRANSITIONS`),
+  desactiva el selector y el botón cuando el ticket está `Cerrado` y explica
+  con una nota que es un estado final; presenta el éxito y el mensaje `409`
+  del backend y recarga el ticket. El historial se sigue consultando con el
+  botón existente (sin endpoint nuevo ni entradas duplicadas).
+- **Prueba:** `pytest -q` → **151 en verde** (`test_estados.py` agrupa
+  transiciones válidas, las 9 inválidas → 409 sin historial, 404, 422,
+  historial exacto y cronológico y `updated_at`).
+- **Validación manual:** recorrido completo `Nuevo → En proceso → Resuelto →
+  Cerrado` → 200 en cada paso; saltos, retrocesos, mismo estado y cualquier
+  destino sobre `Cerrado` → 409; estado desconocido y body sin `state` →
+  422; ticket inexistente → 404; historial con exactamente 3 entradas en
+  orden cronológico; control de estado del frontend verificado con harness.
+- **Criterio de terminado:** todas las transiciones cubiertas por pruebas,
+  documentación actualizada y `docker compose config` válido.
+- **Estado:** ✅ Completada.
 
 ## Estado del avance
 
@@ -679,4 +708,4 @@ GET    /api/catalogs                (states, categories, priorities)
 | 15 — Docker | ✅ Completada |
 | 16 — Documentación final | ✅ Completada |
 | 17 — Revisión final y publicación | ⬜ Revisión completada; publicación pendiente (requiere autorización) |
-| 18 — Máquina de estados (RF3) | ⬜ Pendiente |
+| 18 — Máquina de estados (RF3) | ✅ Completada |

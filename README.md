@@ -27,24 +27,24 @@ filtrarlos, y consultar su historial de cambios.
 **Implementadas**
 
 - API: health check, creación, consulta, listado, búsqueda y filtros de
-  tickets, edición de datos básicos, asignación/desasignación, alta y listado
-  de usuarios, creación de comentarios y lectura del historial de cambios.
+  tickets, edición de datos básicos, asignación/desasignación, cambio de
+  estado con máquina de estados (RF3), alta y listado de usuarios, creación
+  de comentarios y lectura del historial de cambios.
 - Frontend (servido por la misma aplicación): listado con búsqueda y filtros,
   creación de tickets, y pantalla de detalle con edición, asignación,
-  comentarios y consulta de historial.
+  cambio de estado, comentarios y consulta de historial.
 - Ejecución local y con Docker (`docker compose up --build`), con persistencia
   de SQLite en un volumen.
-- Suite de pruebas con pytest (138 pruebas) y documentación en
+- Suite de pruebas con pytest (151 pruebas) y documentación en
   [docs/api.md](docs/api.md).
 
 **Pendientes**
 
-- **Cambio de estado de tickets (RF3)** — máquina de estados aprobada, en la
-  Tarea 18 del plan; hoy el estado solo se lee y se usa como filtro.
 - **Listado de comentarios** — solo existe la creación
   (`GET .../comments` no está implementado).
-- **Registro automático de historial (RF9, escritura)** — la lectura existe,
-  pero hoy ningún endpoint crea entradas en `history`.
+- **Registro de historial para el resto de acciones (RF9, escritura)** — la
+  lectura existe y el cambio de estado ya deja su entrada, pero creación,
+  edición, asignación y comentarios todavía no crean registros en `history`.
 - **Paginación** — los listados devuelven el resultado completo.
 
 **Fuera de alcance por decisión aprobada:** autenticación y autorización (la
@@ -213,6 +213,12 @@ mensaje claro — y permite, con los endpoints existentes:
 - **asignar o desasignar** una persona: el selector se llena con
   `GET /api/users` e incluye la opción "Sin asignar" (`PATCH
   /api/tickets/{id}/assign`);
+- **cambiar el estado** (`PATCH /api/tickets/{id}/state`): muestra el estado
+  actual y solo ofrece los destinos posibles desde él — `Nuevo → En proceso →
+  Resuelto → Cerrado` —, con confirmación si el cambio se aplica (`200`),
+  mensaje del backend si la transición no está permitida (`409`) y una nota
+  cuando el ticket está `Cerrado` (estado final, sin transiciones); el
+  selector se desactiva en ese caso y el backend vuelve a validar siempre;
 - **agregar comentarios** (`POST /api/tickets/{id}/comments`) con
   confirmación de creación; la consulta de los comentarios existentes queda
   pendiente de la tarea correspondiente, ya que el backend todavía no expone
@@ -222,13 +228,14 @@ mensaje claro — y permite, con los endpoints existentes:
   persona (`—` si no hay), acción y detalle (`campo: anterior → nuevo`) en
   orden cronológico; maneja historial vacío (`No hay cambios registrados
   para este ticket.`), ticket inexistente (`404` del backend), error HTTP y
-  fallo de red. El backend solo **lee** las entradas: ninguna operación de la
-  API las crea todavía, por lo que un ticket dado de alta desde la interfaz
-  mostrará el estado vacío hasta que se implemente el registro de auditoría.
+  fallo de red. Cada cambio de estado exitoso crea una entrada de historial
+  (acción `Cambio de estado`) desde el backend, en la misma operación que la
+  actualización del ticket; el resto de acciones (creación, edición,
+  asignación, comentarios) todavía no deja registro, por lo que esas
+  operaciones no aparecen en la tabla.
 
 Todos los botones se deshabilitan mientras hay una operación en curso para
-evitar envíos duplicados. El cambio de estado no está en esta pantalla: es
-funcionalidad de una tarea posterior.
+evitar envíos duplicados.
 
 ### Health check
 
@@ -385,7 +392,7 @@ El archivo está excluido de Git (`.gitignore`) y sus tablas son: `users`,
 pytest
 ```
 
-La suite completa (138 pruebas) usa bases de datos temporales por test y no
+La suite completa (151 pruebas) usa bases de datos temporales por test y no
 modifica `ticketera.db`.
 
 ### Documentación de la API
