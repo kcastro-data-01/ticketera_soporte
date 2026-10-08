@@ -1,16 +1,71 @@
-/* Estilos del listado de tickets (Tarea 11). Sin frameworks. */
+/* ============================================================
+   Ticketera de Soporte — sistema visual base (Tarea 20.1)
+   Identidad: MORADO PASTEL. El morado se reserva para identidad
+   y acción (botones, enlaces, focus, navegación, acentos); los
+   fondos generales permanecen muy claros.
+   HTML/CSS/JS vanilla: sin frameworks, sin build, sin dependencias.
+   ============================================================ */
+
+/* ---------- 1. Tokens ---------- */
 
 :root {
-  --color-fondo: #f5f7fa;
-  --color-superficie: #ffffff;
-  --color-borde: #d9dee5;
-  --color-texto: #1f2933;
-  --color-tenue: #6b7280;
-  --color-primario: #2563eb;
-  --color-primario-oscuro: #1d4ed8;
+  /* Identidad y acción */
+  --color-primario: #9b7ebd;
+  --color-primario-oscuro: #8869ae;
+  --color-primario-suave: #cdbbea;
+  --color-primario-tenue: #ede6f6;
+  --color-primario-foco: rgba(155, 126, 189, 0.32);
+  --color-enlace: #7e5fa8;
+
+  /* Fondos y superficies */
+  --color-fondo: #faf7fd;
+  --color-superficie: #f4eff9;
+  --color-superficie-alta: #ffffff;
+  --color-fondo-neutro: #f0eaf7;
+
+  /* Texto */
+  --color-texto: #3d3545;
+  --color-tenue: #70677a;
+  --color-tenue-fuerte: #5f5769;
+  --color-texto-inverso: #ffffff;
+
+  /* Bordes */
+  --color-borde: #ded3e8;
+  --color-borde-fuerte: #c9bbda;
+
+  /* Mensajes (semántica propia, sin morado para no confundir) */
   --color-error: #b91c1c;
+  --color-error-fondo: #fdecec;
   --color-vacio: #92400e;
+  --color-vacio-fondo: #fdf3e0;
+  --color-exito: #166534;
+  --color-exito-fondo: #e6f6ec;
+
+  /* Sombras */
+  --sombra-tarjeta: 0 1px 2px rgba(61, 53, 69, 0.05),
+    0 6px 18px rgba(112, 103, 122, 0.08);
+  --sombra-suave: 0 1px 2px rgba(61, 53, 69, 0.06);
+
+  /* Radios */
+  --radio-suave: 8px;
+  --radio-medio: 12px;
+  --radio-pill: 999px;
+
+  /* Espaciado */
+  --espaciado-xs: 0.25rem;
+  --espaciado-sm: 0.5rem;
+  --espaciado-md: 0.75rem;
+  --espaciado-lg: 1rem;
+  --espaciado-xl: 1.5rem;
+
+  /* Tipografía */
+  --texto-sm: 0.85rem;
+  --texto-md: 0.95rem;
+  --texto-lg: 1.05rem;
+  --texto-titulo: 1.4rem;
 }
+
+/* ---------- 2. Base y tipografía ---------- */
 
 * {
   box-sizing: border-box;
@@ -19,69 +74,93 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1rem;
+  line-height: 1.55;
   background: var(--color-fondo);
+  color: var(--color-texto);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+::selection {
+  background: var(--color-primario-suave);
   color: var(--color-texto);
 }
 
+/* ---------- 3. Cabecera y navegación ---------- */
+
 .cabecera {
-  background: var(--color-primario);
-  color: #ffffff;
-  padding: 1rem 1.5rem;
+  background: var(--color-superficie-alta);
+  color: var(--color-texto);
+  padding: var(--espaciado-lg) var(--espaciado-xl);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  border-bottom: 1px solid var(--color-borde);
+  box-shadow: var(--sombra-suave);
 }
 
 .cabecera h1 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: var(--texto-titulo);
+  color: var(--color-primario-oscuro);
 }
 
 .cabecera p {
   margin: 0.25rem 0 0;
-  font-size: 0.9rem;
-  opacity: 0.9;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue);
 }
 
 .cabecera-enlaces {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--espaciado-sm);
 }
 
 .enlace-boton {
   display: inline-block;
-  background: #ffffff;
-  color: var(--color-primario);
-  padding: 0.45rem 0.9rem;
-  border-radius: 6px;
+  background: var(--color-primario);
+  color: var(--color-texto-inverso);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radio-suave);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: var(--texto-sm);
   font-weight: 600;
+  transition: background-color 0.15s ease;
 }
 
 .enlace-boton:hover {
-  background: #e5e7eb;
+  background: var(--color-primario-oscuro);
 }
+
+/* ---------- 4. Contenedor principal ---------- */
 
 .contenido {
   max-width: 1100px;
-  margin: 1.5rem auto;
+  margin: 2rem auto;
   padding: 0 1rem;
 }
 
-/* Formulario de búsqueda y filtros */
+/* ---------- 5. Tarjetas (filtros, formularios, secciones) ---------- */
 
 .filtros {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--espaciado-md);
   align-items: flex-end;
   background: var(--color-superficie);
   border: 1px solid var(--color-borde);
-  border-radius: 8px;
-  padding: 1rem;
+  border-radius: var(--radio-medio);
+  padding: var(--espaciado-lg);
+  box-shadow: var(--sombra-tarjeta);
 }
 
 /* Formulario vertical (alta de tickets) reutilizando la tarjeta .filtros */
@@ -90,12 +169,23 @@ body {
   align-items: stretch;
 }
 
+/* ---------- 6. Campos de formulario ---------- */
+
 .campo {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.85rem;
+  gap: var(--espaciado-xs);
+  font-size: var(--texto-sm);
   color: var(--color-tenue);
+}
+
+.campo span {
+  font-weight: 600;
+}
+
+.campo strong {
+  color: var(--color-texto);
+  font-size: var(--texto-md);
 }
 
 .campo-busqueda {
@@ -105,128 +195,210 @@ body {
 .campo input,
 .campo textarea,
 .campo select {
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--color-borde);
-  border-radius: 6px;
-  font-size: 0.95rem;
-  background: #ffffff;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: var(--radio-suave);
+  font-size: var(--texto-md);
+  font-family: inherit;
+  background: var(--color-superficie-alta);
   color: var(--color-texto);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.campo input::placeholder,
+.campo textarea::placeholder {
+  color: var(--color-tenue);
 }
 
 .campo input:focus,
 .campo textarea:focus,
 .campo select:focus {
-  outline: 2px solid var(--color-primario);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--color-primario);
+  box-shadow: 0 0 0 3px var(--color-primario-foco);
+}
+
+.campo input:disabled,
+.campo textarea:disabled,
+.campo select:disabled {
+  background: var(--color-fondo-neutro);
+  color: var(--color-tenue);
+  cursor: not-allowed;
 }
 
 .campo textarea {
   min-height: 130px;
   resize: vertical;
-  font-family: inherit;
 }
+
+/* ---------- 7. Botones ---------- */
 
 .acciones {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: var(--espaciado-sm);
 }
 
 button {
-  padding: 0.55rem 1rem;
-  border: none;
-  border-radius: 6px;
+  padding: 0.6rem 1.15rem;
+  border: 1px solid transparent;
+  border-radius: var(--radio-suave);
   background: var(--color-primario);
-  color: #ffffff;
-  font-size: 0.95rem;
+  color: var(--color-texto-inverso);
+  font-size: var(--texto-md);
+  font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 button:hover {
   background: var(--color-primario-oscuro);
 }
 
+button:active {
+  background: var(--color-primario-oscuro);
+  border-color: var(--color-primario-oscuro);
+}
+
 button.secundario {
-  background: #e5e7eb;
+  background: var(--color-superficie-alta);
   color: var(--color-texto);
+  border-color: var(--color-borde-fuerte);
 }
 
 button.secundario:hover {
-  background: #d1d5db;
+  background: var(--color-primario-tenue);
+  border-color: var(--color-primario-suave);
 }
 
-button:disabled {
-  opacity: 0.6;
+/* Reglas deshabilitadas al final para ganar a las de hover (misma
+   especificidad) y evitar estados contradictorios. */
+button:disabled,
+button:disabled:hover {
+  background: var(--color-primario-suave);
+  border-color: transparent;
+  color: var(--color-texto-inverso);
+  opacity: 0.75;
   cursor: not-allowed;
 }
 
-/* Estados de la interfaz */
-
-.estado {
-  margin: 1rem 0;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  background: #e5e7eb;
-  font-size: 0.95rem;
-}
-
-.estado.cargando {
+button.secundario:disabled,
+button.secundario:disabled:hover {
+  background: var(--color-fondo-neutro);
   color: var(--color-tenue);
 }
 
+/* ---------- 8. Focus visible consistente ---------- */
+
+:focus-visible {
+  outline: 3px solid var(--color-primario);
+  outline-offset: 2px;
+}
+
+/* ---------- 9. Estados de mensaje y notas ---------- */
+
+.estado {
+  margin: var(--espaciado-lg) 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-medio);
+  background: var(--color-fondo-neutro);
+  color: var(--color-tenue-fuerte);
+  font-size: var(--texto-md);
+}
+
 .estado.vacio {
-  background: #fef3c7;
+  background: var(--color-vacio-fondo);
+  border-color: rgba(146, 64, 14, 0.25);
   color: var(--color-vacio);
 }
 
 .estado.error {
-  background: #fee2e2;
+  background: var(--color-error-fondo);
+  border-color: rgba(185, 28, 28, 0.25);
   color: var(--color-error);
 }
 
 .estado.exito {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--color-exito-fondo);
+  border-color: rgba(22, 101, 52, 0.25);
+  color: var(--color-exito);
 }
 
-/* Listado */
+.nota {
+  margin: 0 0 var(--espaciado-md);
+  padding: 0.65rem 0.9rem;
+  background: var(--color-primario-tenue);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-suave);
+  font-size: var(--texto-sm);
+  line-height: 1.5;
+  color: var(--color-tenue-fuerte);
+}
+
+/* ---------- 10. Tablas (listado e historial) ---------- */
 
 .listado {
   width: 100%;
-  border-collapse: collapse;
-  background: var(--color-superficie);
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--color-superficie-alta);
   border: 1px solid var(--color-borde);
-  border-radius: 8px;
-  overflow: hidden;
-  font-size: 0.95rem;
+  border-radius: var(--radio-medio);
+  font-size: var(--texto-md);
 }
 
 .listado th,
 .listado td {
-  padding: 0.65rem 0.75rem;
+  padding: 0.7rem 0.8rem;
   text-align: left;
   border-bottom: 1px solid var(--color-borde);
 }
 
 .listado th {
-  background: #eef2f7;
-  font-size: 0.85rem;
+  background: var(--color-primario-tenue);
+  font-size: var(--texto-sm);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-tenue);
+  letter-spacing: 0.04em;
+  color: var(--color-tenue-fuerte);
+}
+
+.listado thead th:first-child {
+  border-top-left-radius: calc(var(--radio-medio) - 1px);
+}
+
+.listado thead th:last-child {
+  border-top-right-radius: calc(var(--radio-medio) - 1px);
+}
+
+.listado tbody tr {
+  transition: background-color 0.15s ease;
 }
 
 .listado tbody tr:hover {
-  background: #f9fafb;
+  background: var(--color-primario-tenue);
 }
 
 .listado tbody tr:last-child td {
   border-bottom: none;
 }
 
-/* Pantalla de detalle (Tarea 13) */
+.listado tbody tr:last-child td:first-child {
+  border-bottom-left-radius: calc(var(--radio-medio) - 1px);
+}
+
+.listado tbody tr:last-child td:last-child {
+  border-bottom-right-radius: calc(var(--radio-medio) - 1px);
+}
+
+/* ---------- 11. Detalle del ticket ---------- */
 
 .enlace-tabla {
-  color: var(--color-primario);
+  color: var(--color-enlace);
   font-weight: 600;
   text-decoration: none;
 }
@@ -243,15 +415,16 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  font-size: 0.95rem;
+  font-size: var(--texto-md);
   white-space: pre-wrap;
 }
 
 .campo-dato .etiqueta {
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-tenue);
+  color: var(--color-tenue-fuerte);
 }
 
 .campo-dato.ancho {
@@ -263,15 +436,184 @@ button:disabled {
 }
 
 .seccion h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.05rem;
+  margin: 0 0 0.75rem;
+  font-size: var(--texto-lg);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
 }
 
-.nota {
-  margin: 0 0 0.75rem;
-  padding: 0.5rem 0.75rem;
-  background: #eef2f7;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  color: var(--color-tenue);
+/* Detalle de identidad: barrita morada antes de cada título de sección */
+.seccion h2::before {
+  content: "";
+  width: 0.35rem;
+  height: 1.05em;
+  background: var(--color-primario);
+  border-radius: var(--radio-pill);
+  flex: none;
+}
+
+/* ---------- 12. Badges (preparados, sin conectar: T20.2+) ----------
+   Componente reutilizable; estas clases todavía no se usan en HTML
+   ni JavaScript. El texto visible del badge da la información, nunca
+   solo el color. */
+
+.badge,
+.badge-estado,
+.badge-prioridad {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: var(--radio-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* Estados de ticket (Nuevo / En proceso / Resuelto / Cerrado) */
+.estado-nuevo {
+  background: #e9eefc;
+  border-color: #c7d3f5;
+  color: #35477e;
+}
+
+.estado-proceso {
+  background: #fcf1dc;
+  border-color: #f0dcae;
+  color: #7a5312;
+}
+
+.estado-resuelto {
+  background: #e3f5e8;
+  border-color: #bfe5cc;
+  color: #1b6b36;
+}
+
+.estado-cerrado {
+  background: #ece9f1;
+  border-color: #d6d0e0;
+  color: #4f4a59;
+}
+
+/* Prioridades (Baja / Media / Alta / Crítica) */
+.prioridad-baja {
+  background: #edeff2;
+  border-color: #d8dde4;
+  color: #4a5560;
+}
+
+.prioridad-media {
+  background: #e8effb;
+  border-color: #c6d4f0;
+  color: #2f4f8f;
+}
+
+.prioridad-alta {
+  background: #fdebdc;
+  border-color: #f4d5b5;
+  color: #8c3b0e;
+}
+
+.prioridad-critica {
+  background: #fbe4e4;
+  border-color: #f3c4c4;
+  color: #a61b1b;
+}
+
+/* ---------- 13. Responsive base ----------
+   Solo espaciado, tamaños, botones y tarjetas. La tabla, el detalle
+   y el historial responsive completo quedan para tareas posteriores. */
+
+@media (max-width: 768px) {
+  .cabecera {
+    padding: 0.85rem 1rem;
+  }
+
+  .contenido {
+    margin: 1.25rem auto;
+    padding: 0 0.75rem;
+  }
+
+  .filtros {
+    padding: 0.85rem;
+    gap: 0.6rem;
+  }
+
+  .campo,
+  .campo-busqueda {
+    flex: 1 1 100%;
+  }
+
+  .acciones {
+    flex-wrap: wrap;
+  }
+
+  .acciones button {
+    flex: 1 1 auto;
+  }
+
+  .seccion {
+    margin-top: 1.4rem;
+  }
+
+  .estado {
+    padding: 0.65rem 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cabecera h1 {
+    font-size: 1.2rem;
+  }
+
+  .cabecera-enlaces {
+    width: 100%;
+  }
+
+  .enlace-boton {
+    flex: 1;
+    text-align: center;
+  }
+
+  .contenido {
+    margin: 0.85rem auto;
+    padding: 0 0.6rem;
+  }
+
+  .filtros {
+    padding: 0.75rem;
+    gap: 0.55rem;
+  }
+
+  .campo input,
+  .campo textarea,
+  .campo select {
+    padding: 0.7rem 0.8rem;
+  }
+
+  .acciones {
+    flex-direction: column;
+  }
+
+  .acciones button {
+    width: 100%;
+  }
+
+  .seccion h2 {
+    font-size: 1rem;
+  }
+}
+
+/* ---------- 14. Preferencia de movimiento reducido ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }
