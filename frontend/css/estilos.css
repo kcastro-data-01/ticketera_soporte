@@ -274,6 +274,20 @@ button.secundario:hover {
   border-color: var(--color-primario-suave);
 }
 
+/* Teclado: anillo de foco visible solo con focus-visible (Tarea 20.4),
+   para no mostrarlo al hacer clic con el ratón. */
+button:focus-visible {
+  outline: 2px solid var(--color-primario-oscuro);
+  outline-offset: 2px;
+}
+
+/* Barra de acciones principal en la zona superior del detalle: el botón
+   «Editar ticket» (primario) destaca frente a las acciones secundarias
+   de cada sección. En pantallas pequeñas .acciones ya usa flex-wrap. */
+.acciones-principales {
+  margin-bottom: var(--espaciado-md);
+}
+
 /* Reglas deshabilitadas al final para ganar a las de hover (misma
    especificidad) y evitar estados contradictorios. */
 button:disabled,

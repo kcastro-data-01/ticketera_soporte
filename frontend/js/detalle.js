@@ -16,6 +16,10 @@ const TRANSICIONES = {
 };
 
 let ticketId = null;
+/* Último ticket cargado desde la API: es la fuente de verdad para
+   rellenar el formulario de edición y para descartar cambios al
+   cancelar (Tarea 20.4). */
+let ticketActual = null;
 let usersById = new Map();
 let ocupado = false;
 /* false cuando GET /api/users falla: bloquea la asignación para que un
@@ -37,6 +41,9 @@ function getElements() {
       updated: document.getElementById("ver-updated"),
     },
     formEditar: document.getElementById("form-editar"),
+    editar: document.getElementById("editar"),
+    seccionEdicion: document.getElementById("seccion-edicion"),
+    cancelarEdicion: document.getElementById("cancelar-edicion"),
     title: document.getElementById("title"),
     description: document.getElementById("description"),
     category: document.getElementById("category"),
@@ -84,6 +91,8 @@ function hideStatus() {
 function bloquearBotones(bloqueado) {
   const elements = getElements();
   elements.guardar.disabled = bloqueado;
+  elements.editar.disabled = bloqueado;
+  elements.cancelarEdicion.disabled = bloqueado;
   elements.asignar.disabled = bloqueado;
   elements.comentar.disabled = bloqueado;
   elements.historial.disabled = bloqueado;
@@ -140,6 +149,7 @@ async function mensajeDeDetalle(response, mensajePorDefecto) {
 
 function renderTicket(ticket) {
   const elements = getElements();
+  ticketActual = ticket;
   elements.ver.id.textContent = ticket.id;
   elements.ver.title.textContent = ticket.title;
   elements.ver.description.textContent = ticket.description;
@@ -150,10 +160,7 @@ function renderTicket(ticket) {
   elements.ver.created.textContent = formatFecha(ticket.created_at);
   elements.ver.updated.textContent = formatFecha(ticket.updated_at);
 
-  elements.title.value = ticket.title;
-  elements.description.value = ticket.description;
-  elements.category.value = ticket.category;
-  elements.priority.value = ticket.priority;
+  rellenarFormularioEdicion(ticket);
 
   elements.usuario.value =
     ticket.assigned_to_id === null || ticket.assigned_to_id === undefined
@@ -256,6 +263,46 @@ async function cargarTicket({ silencioso = false } = {}) {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Modo edición (Tarea 20.4)
+   El formulario de edición es único (#form-editar): se muestra u oculta,
+   nunca se duplica. «ticketActual» es la fuente de verdad de la API, así
+   que cancelar (o volver a entrar) siempre descarta lo escrito a mano.
+   --------------------------------------------------------------------------- */
+
+function rellenarFormularioEdicion(ticket) {
+  if (!ticket) return;
+  const elements = getElements();
+  elements.title.value = ticket.title;
+  elements.description.value = ticket.description;
+  elements.category.value = ticket.category;
+  elements.priority.value = ticket.priority;
+}
+
+function salirModoEdicion() {
+  const elements = getElements();
+  elements.seccionEdicion.hidden = true;
+  elements.editar.hidden = false;
+}
+
+function activarEdicion() {
+  if (ocupado || ticketId === null || !ticketActual) return;
+  const elements = getElements();
+  rellenarFormularioEdicion(ticketActual);
+  elements.seccionEdicion.hidden = false;
+  elements.editar.hidden = true;
+  /* El foco entra al primer campo para navegar con teclado. */
+  elements.title.focus();
+}
+
+function cancelarEdicion() {
+  if (ocupado) return;
+  rellenarFormularioEdicion(ticketActual);
+  salirModoEdicion();
+  showStatus("Edición cancelada. Los datos del ticket no se modificaron.");
+  getElements().editar.focus();
+}
+
 async function guardarEdicion() {
   if (ocupado || ticketId === null) return;
   const elements = getElements();
@@ -297,6 +344,9 @@ async function guardarEdicion() {
     }
     showStatus("Cambios guardados correctamente.", "exito");
     await cargarTicket({ silencioso: true });
+    /* Guardado correcto: se vuelve al modo consulta (Tarea 20.4). */
+    salirModoEdicion();
+    getElements().editar.focus();
   } catch (error) {
     showStatus("Error al comunicarse con la API.", "error");
   } finally {
@@ -673,6 +723,8 @@ async function init() {
     event.preventDefault();
     guardarEdicion();
   });
+  elements.editar.addEventListener("click", () => activarEdicion());
+  elements.cancelarEdicion.addEventListener("click", () => cancelarEdicion());
   elements.asignar.addEventListener("click", () => guardarAsignacion());
   elements.cambiarEstado.addEventListener("click", () => cambiarEstado());
   elements.formComentario.addEventListener("submit", (event) => {

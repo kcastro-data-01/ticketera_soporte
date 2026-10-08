@@ -21,6 +21,10 @@
   <main class="contenido">
     <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
 
+    <div class="acciones acciones-principales">
+      <button type="button" id="editar">Editar ticket</button>
+    </div>
+
     <section id="panel-ticket" class="filtros detalle" aria-label="Datos del ticket">
       <div class="campo-dato">
         <span class="etiqueta">ID</span>
@@ -60,8 +64,13 @@
       </div>
     </section>
 
-    <section class="seccion" aria-label="Edición del ticket">
+    <section id="seccion-edicion" class="seccion" aria-label="Edición del ticket" hidden>
       <h2>Editar ticket</h2>
+      <p class="nota" id="modo-edicion">
+        <b>Editando ticket.</b> Los cambios solo se aplican al pulsar
+        «Guardar cambios»; «Cancelar» descarta lo escrito y vuelve a la
+        consulta del ticket.
+      </p>
       <form id="form-editar" class="filtros formulario" novalidate>
         <label class="campo">
           <span>Título *</span>
@@ -91,6 +100,7 @@
         </label>
         <div class="acciones">
           <button type="submit" id="guardar">Guardar cambios</button>
+          <button type="button" id="cancelar-edicion" class="secundario">Cancelar</button>
         </div>
       </form>
     </section>

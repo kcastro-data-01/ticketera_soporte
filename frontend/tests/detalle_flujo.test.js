@@ -52,6 +52,10 @@ const ELEMENT_IDS = [
   "ver-created",
   "ver-updated",
   "form-editar",
+  "editar",
+  "seccion-edicion",
+  "modo-edicion",
+  "cancelar-edicion",
   "title",
   "description",
   "category",
@@ -83,10 +87,14 @@ function createNode(id) {
     hidden: false,
     disabled: false,
     value: "",
+    focused: false,
     children: [],
     listeners: {},
     get options() {
       return this.children;
+    },
+    focus() {
+      this.focused = true;
     },
     addEventListener(type, handler) {
       this.listeners[type] = this.listeners[type] || [];
@@ -129,6 +137,9 @@ function makeFetch(overrides = {}) {
     }
     if (url === "/api/tickets/1/assign" && method === "PATCH") {
       return resolve(overrides.assign, jsonResponse(200, TICKET));
+    }
+    if (url === "/api/tickets/1" && method === "PATCH") {
+      return resolve(overrides.edit, jsonResponse(200, TICKET));
     }
     if (url === "/api/tickets/1" && method === "GET") {
       return resolve(overrides.ticket, jsonResponse(200, TICKET));
@@ -488,4 +499,125 @@ test("sin usuarios: nota visible, select deshabilitado y guardado bloqueado", as
     /No hay usuarios disponibles/
   );
   assert.equal(harness.node("estado-carga").className, "estado error");
+});
+
+/* ---------------------------------------------------------------------------
+   Modo edición (Tarea 20.4)
+   --------------------------------------------------------------------------- */
+
+test("HTML: botón Editar ticket, sección de edición oculta y un solo formulario", () => {
+  const html = fs.readFileSync(
+    path.join(__dirname, "..", "detalle.html"),
+    "utf8"
+  );
+
+  assert.ok(html.includes(">Editar ticket</button>"), "botón con texto visible");
+  assert.ok(html.includes('id="editar"'), "id del botón principal");
+  assert.ok(
+    html.includes(
+      'id="seccion-edicion" class="seccion" aria-label="Edición del ticket" hidden'
+    ),
+    "la sección de edición empieza oculta"
+  );
+  assert.equal(
+    html.split('id="form-editar"').length - 1,
+    1,
+    "solo puede existir un formulario de edición"
+  );
+  assert.ok(html.includes('id="cancelar-edicion"'), "acción Cancelar presente");
+  assert.ok(html.includes("Editando ticket."), "indicador de modo edición en texto");
+});
+
+test("activarEdicion muestra el formulario, rellena datos y enfoca el primer campo", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+
+  /* Si quedó texto suelto del intento anterior, al entrar se rellena con
+     los datos reales del ticket. */
+  harness.node("title").value = "";
+  harness.clearCalls();
+
+  await harness.call("activarEdicion");
+
+  assert.equal(harness.node("seccion-edicion").hidden, false, "el formulario se muestra");
+  assert.equal(harness.node("editar").hidden, true, "el botón principal se oculta");
+  assert.equal(harness.node("title").value, TICKET.title);
+  assert.equal(harness.node("description").value, TICKET.description);
+  assert.equal(harness.node("category").value, TICKET.category);
+  assert.equal(harness.node("priority").value, TICKET.priority);
+  assert.equal(harness.node("title").focused, true, "el foco entra al primer campo");
+  assert.deepEqual(harness.urls(), [], "activar el modo no hace peticiones");
+});
+
+test("cancelarEdicion vuelve al modo consulta y descarta lo escrito", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+
+  harness.call("activarEdicion");
+  harness.node("title").value = "Título que no debe guardarse";
+  harness.clearCalls();
+
+  harness.call("cancelarEdicion");
+
+  assert.equal(harness.node("seccion-edicion").hidden, true, "sale del modo edición");
+  assert.equal(harness.node("editar").hidden, false, "vuelve el botón Editar ticket");
+  assert.equal(harness.node("title").value, TICKET.title, "los cambios se descartan");
+  assert.deepEqual(harness.urls(), [], "cancelar no envía peticiones");
+  assert.match(harness.node("estado-carga").textContent, /Edición cancelada/);
+  assert.equal(harness.node("editar").focused, true);
+});
+
+test("guardarEdicion guarda, recarga el ticket y vuelve al modo consulta", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+
+  harness.call("activarEdicion");
+  harness.node("title").value = "Impresora sin conexión (arreglada)";
+  harness.clearCalls();
+
+  await harness.call("guardarEdicion");
+
+  /* PATCH + recarga silenciosa del ticket. */
+  assert.deepEqual(harness.urls(), [
+    "/api/tickets/1",
+    "/api/tickets/1",
+  ]);
+  assert.equal(harness.fetchCalls[0].options.method, "PATCH");
+  /* La recarga silenciosa usa fetch(url) sin opciones (GET plano). */
+  assert.equal(harness.fetchCalls[1].options?.method ?? "GET", "GET");
+  assert.deepEqual(JSON.parse(harness.fetchCalls[0].options.body), {
+    title: "Impresora sin conexión (arreglada)",
+    description: TICKET.description,
+    category: TICKET.category,
+    priority: TICKET.priority,
+  });
+  assert.equal(
+    harness.node("estado-carga").textContent,
+    "Cambios guardados correctamente."
+  );
+  assert.equal(harness.node("seccion-edicion").hidden, true, "vuelve a consulta");
+  assert.equal(harness.node("editar").hidden, false);
+  assert.equal(harness.node("guardar").disabled, false);
+});
+
+test("si guardar falla se mantiene el modo edición con el error visible", async () => {
+  const harness = createHarness(
+    makeFetch({ edit: jsonResponse(500, { detail: "Fallo interno" }) })
+  );
+  await harness.init();
+
+  harness.call("activarEdicion");
+  harness.clearCalls();
+
+  await harness.call("guardarEdicion");
+
+  assert.equal(
+    harness.node("seccion-edicion").hidden,
+    false,
+    "sigue en modo edición"
+  );
+  assert.equal(harness.node("editar").hidden, true);
+  assert.match(harness.node("estado-carga").textContent, /HTTP 500/);
+  assert.equal(harness.node("estado-carga").className, "estado error");
+  assert.equal(harness.node("guardar").disabled, false, "se puede reintentar");
 });

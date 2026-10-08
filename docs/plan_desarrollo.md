@@ -817,6 +817,33 @@ GET    /api/catalogs                (states, categories, priorities)
   `docker compose config` válido y diff limitado a la tarea.
 - **Estado:** ✅ Completada.
 
+### Tarea 20.4 — Flujo de edición de tickets
+- **Objetivo:** que la acción «Editar ticket» sea claramente visible y
+  fácil de encontrar en el detalle, sin tocar backend, datos ni la
+  identidad visual morada pastel.
+- **Estado previo:** el formulario de edición (`#form-editar`) estaba
+  siempre visible, sin botón de entrada ni forma de salir del modo
+  edición.
+- **Solución:** botón principal «Editar ticket» en la zona superior del
+  detalle (barra `.acciones-principales` sobre la vista del ticket); el
+  formulario **único** se muestra/oculta como modo edición con indicador
+  de texto «Editando ticket», foco al primer campo al entrar, botón
+  «Cancelar» (secundario) que descarta lo escrito —la fuente de verdad es
+  el último ticket cargado— y vuelta automática a la consulta tras
+  guardar bien; si guardar falla se permanece en modo edición con el
+  error visible. `button:focus-visible` con tokens existentes; sin
+  duplicar formularios ni cambiar la paleta.
+- **Archivos:** `frontend/detalle.html`, `frontend/js/detalle.js`,
+  `frontend/css/estilos.css` y `frontend/tests/detalle_flujo.test.js`
+  (+5 pruebas: HTML del botón/sección oculta/un solo formulario, entrar
+  en modo edición, cancelar, guardar con éxito y fallo al guardar).
+- **Pruebas:** `pytest -q` → 173 en verde; `node --test` de los tres
+  ficheros del frontend → 43 en verde (20 + 10 + 13);
+  `docker compose config --quiet` → válido.
+- **Criterio de terminado:** pruebas frontend y pytest en verde,
+  `docker compose config` válido y diff limitado a la tarea.
+- **Estado:** ✅ Completada.
+
 ## Estado del avance
 
 | Tarea | Estado |
@@ -843,3 +870,4 @@ GET    /api/catalogs                (states, categories, priorities)
 | 20.1 — Modernización visual base | ✅ Completada |
 | 20.2 — Hora, comentarios y asignación | ✅ Completada |
 | 20.3 — Gestión de usuarios | ✅ Completada |
+| 20.4 — Flujo de edición de tickets | ✅ Completada |
