@@ -1,5 +1,6 @@
 """SQLite database configuration: engine, session factory and table creation."""
 
+import os
 from pathlib import Path
 
 from sqlalchemy import create_engine, event
@@ -8,7 +9,32 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 # The database file lives at the project root and is ignored by Git (*.db).
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_PATH = PROJECT_ROOT / "ticketera.db"
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+
+# Local default: the SQLite file at the project root, exactly as before.
+DEFAULT_DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+
+
+def resolve_database_url(raw_url: str | None = None) -> str:
+    """Return the SQLite URL to use for this process.
+
+    The ``DATABASE_URL`` environment variable wins when set, so Docker can
+    point the app at a file inside a mounted volume
+    (e.g. ``sqlite:////data/ticketera.db`` or simply ``/data/ticketera.db``).
+    An empty/blank value falls back to :data:`DEFAULT_DATABASE_URL`, keeping
+    the local behaviour unchanged.
+    """
+    if raw_url is None:
+        raw_url = os.environ.get("DATABASE_URL")
+    if raw_url is None or not raw_url.strip():
+        return DEFAULT_DATABASE_URL
+    cleaned = raw_url.strip()
+    if cleaned.startswith("sqlite:"):
+        return cleaned
+    # Accept a plain file path (absolute or relative) as a convenience.
+    return f"sqlite:///{cleaned}"
+
+
+DATABASE_URL = resolve_database_url()
 
 engine = create_engine(
     DATABASE_URL,

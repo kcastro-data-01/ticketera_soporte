@@ -520,13 +520,40 @@ GET    /api/catalogs                (states, categories, priorities)
   legible y los errores/vacíos se muestran.
 
 ### Tarea 15 — Docker
-- **Objetivo:** el sistema corre con un solo comando.
-- **Archivos:** `Dockerfile`, `docker-compose.yml`, `.dockerignore`,
-  `README.md`.
-- **Prueba:** `docker compose up --build` y flujo completo desde el navegador;
-  persistencia de la DB tras reiniciar.
-- **Criterio de terminado:** el contenedor levanta, sirve API + frontend y la
-  DB persiste.
+- **Objetivo:** el sistema corre con un solo comando
+  (`docker compose up --build`) y responde en el puerto 8000.
+- **Archivos:** creados `Dockerfile`, `docker-compose.yml`, `.dockerignore` y
+  `backend/tests/test_database_env.py`; modificados `backend/database.py`
+  (configuración por variable de entorno) y `README.md` (sección "Ejecutar
+  con Docker").
+- **Imagen:** `python:3.12-slim`, `pip install -r requirements.txt` en una
+  capa propia (cacheada), copia solo `requirements.txt`, `backend/` (sin
+  tests) y `frontend/`; sin `.venv`, `.git`, cachés ni la SQLite local
+  (excluidos en `.dockerignore`, incluidos `**/__pycache__`); `CMD` de
+  Uvicorn en `0.0.0.0:8000` sirviendo API y frontend desde un solo proceso.
+- **Persistencia:** `backend/database.py` ahora resuelve la URL con
+  `resolve_database_url()` (función pura + variable de entorno
+  `DATABASE_URL`); **el default es idéntico al anterior**
+  (`sqlite:///<raíz>/ticketera.db`), por lo que la ejecución local no cambia
+  y los modelos/BD no se tocaron. Compose define
+  `DATABASE_URL=sqlite:////data/ticketera.db` y el volumen nombrado
+  `ticketera-data` montado en `/data`; los datos sobreviven a `down`,
+  `up --build` y la recreación, y solo `down -v` los borra. El `ticketera.db`
+  del host no se modifica desde el contenedor.
+- **Prueba:** `pytest -q` → **138 en verde** (131 previos + 7 nuevos en
+  `test_database_env.py`: default en la raíz, lectura de `DATABASE_URL`,
+  ruta plana aceptada, blanco/ausente → default, valor explícito gana y URL
+  del módulo coherente); `docker compose config` válido; `docker build`
+  OK (imagen verificada sin `tests`, sin `*.db`, sin `__pycache__`); stack
+  levantado con `docker compose up --build -d`: `GET /health` → `200
+  {"status":"ok"}`, `GET /` → `200 text/html` (frontend), `GET /docs` →
+  `200`, `GET /crear.html` → `200`, `POST /api/tickets` → `201`; ticket
+  presente en `/data/ticketera.db` dentro del volumen; tras `restart` y
+  tras `down` + `up` el ticket sigue existiendo (`200`); `ticketera.db` del
+  host con 0 tickets. Limpieza final: `docker compose down -v` (contenedor,
+  red y volumen borrados).
+- **Criterio de terminado:** `docker compose up --build` levanta API +
+  frontend en `localhost:8000` y la DB persiste al recrear el contenedor.
 
 ### Tarea 16 — Documentación final y revisión
 - **Objetivo:** README completo y cierre.
@@ -573,7 +600,7 @@ GET    /api/catalogs                (states, categories, priorities)
 | 12 — Frontend: crear ticket | ✅ Completada |
 | 13 — Frontend: detalle y gestión | ✅ Completada |
 | 14 — Frontend: historial | ✅ Completada |
-| 15 — Docker | ⬜ Pendiente |
+| 15 — Docker | ✅ Completada |
 | 16 — Documentación final | ⬜ Pendiente |
 | 17 — Push a GitHub | ⬜ Pendiente (requiere autorización) |
 | 18 — Máquina de estados (RF3) | ⬜ Pendiente |

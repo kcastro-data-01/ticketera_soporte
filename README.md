@@ -85,6 +85,43 @@ python3 -m venv .venv
 La API queda disponible en `http://127.0.0.1:8000` y la documentación interactiva
 en `http://127.0.0.1:8000/docs`.
 
+### Ejecutar con Docker
+
+**Requisitos:** Docker con el plugin de Docker Compose (`docker compose
+version` debe responder).
+
+Levantar la aplicación (API + frontend) con un solo comando:
+
+```bash
+docker compose up --build
+```
+
+Una vez iniciada, abre <http://localhost:8000> (frontend), la API en
+<http://localhost:8000/docs> y comprueba el estado con:
+
+```bash
+curl http://localhost:8000/health
+# {"status":"ok"}
+```
+
+Detener los servicios:
+
+```bash
+docker compose down      # detiene y borra el contenedor; los datos se conservan
+docker compose down -v   # igual, pero borra también el volumen con la base de datos
+```
+
+**Persistencia de SQLite en Docker:** el contenedor no usa el `ticketera.db`
+del proyecto (ese archivo sigue siendo la base de desarrollo local y no se
+modifica). `docker-compose.yml` define la variable de entorno
+`DATABASE_URL=sqlite:////data/ticketera.db` y monta el volumen nombrado
+`ticketera-data` en `/data`, por lo que la base del contenedor sobrevive a
+`docker compose down`, a `docker compose up --build` y a la recreación del
+contenedor. Solo `docker compose down -v` (o borrar el volumen con
+`docker volume rm`) elimina esos datos. En ejecución local, al no definir
+`DATABASE_URL`, se usa el valor por defecto: `ticketera.db` en la raíz del
+proyecto.
+
 ### Frontend
 
 Con la API arrancada, abre <http://127.0.0.1:8000/> en el navegador. FastAPI

@@ -1,0 +1,41 @@
+# Version control / CI
+.git
+.github
+
+# Virtual environments
+.venv
+venv
+env
+
+# Python caches (at any depth)
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+
+# Local development database (the container keeps its own in the volume)
+*.db
+*.sqlite3
+
+# Environment files
+.env
+
+# Tests and docs are not needed inside the image
+backend/tests
+pytest.ini
+docs
+README.md
+
+# Docker/Editor files and OS junk
+Dockerfile
+docker-compose.yml
+.dockerignore
+.gitignore
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+*.swp
+*.log

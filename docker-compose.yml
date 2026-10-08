@@ -1,0 +1,14 @@
+services:
+  ticketera:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # SQLite file inside the named volume so the data survives
+      # `docker compose down` / rebuilds (change → new container).
+      DATABASE_URL: sqlite:////data/ticketera.db
+    volumes:
+      - ticketera-data:/data
+
+volumes:
+  ticketera-data:
