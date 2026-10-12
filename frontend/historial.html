@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historial — Ticketera de Soporte</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <div class="contenedor-principal">
+    <!-- Menú sidebar -->
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <span>Ticketera</span>
+      </div>
+      <ul class="sidebar-nav">
+        <li><a href="index.html" class="enlace-boton">Inicio</a></li>
+        <li><a href="index.html" class="enlace-boton">Tickets</a></li>
+        <li><a href="historial.html" class="enlace-boton activo">Historial</a></li>
+        <li><a href="usuarios.html" class="enlace-boton">Usuarios</a></li>
+        <li><a href="configuracion.html" class="enlace-boton">Configuración</a></li>
+      </ul>
+    </nav>
+
+    <header class="cabecera">
+      <div>
+        <h1>Historial de cambios</h1>
+        <p>Registro de todas las acciones registradas en los tickets</p>
+      </div>
+      <nav class="cabecera-enlaces">
+        <a href="index.html" class="enlace-boton">Volver al listado</a>
+        <a href="crear.html" class="enlace-boton">Nuevo ticket</a>
+      </nav>
+    </header>
+
+    <main class="contenido">
+      <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
+
+      <table class="listado">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Ticket</th>
+            <th>Acción</th>
+            <th>Campo</th>
+            <th>Valor anterior</th>
+            <th>Valor nuevo</th>
+            <th>Autor</th>
+          </tr>
+        </thead>
+        <tbody id="lista-historial"></tbody>
+      </table>
+    </main>
+  </div>
+
+  <script src="js/historial.js" defer></script>
+</body>
+</html>

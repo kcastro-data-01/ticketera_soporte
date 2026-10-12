@@ -6,7 +6,13 @@
 const API_USERS_URL = "/api/users";
 
 /* Roles válidos (espejo de backend.constants.UserRole). */
-const ROLES_VALIDOS = ["Soporte", "Administrador"];
+const ROLES_VALIDOS = [
+  "Soporte",
+  "Administrador",
+  "Supervisor",
+  "Técnico",
+  "Solicitante",
+];
 
 /* Mismo patrón de correo que backend.schemas (UserCreate). */
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;

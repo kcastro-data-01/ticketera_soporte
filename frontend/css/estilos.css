@@ -363,6 +363,7 @@ button.secundario:disabled:hover {
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-medio);
   font-size: var(--texto-md);
+  overflow-x: auto;
 }
 
 .listado th,
@@ -677,4 +678,147 @@ button.secundario:disabled:hover {
   margin: 0.35rem 0 0;
   font-size: var(--texto-md);
   white-space: pre-wrap;
+}
+
+
+/* ---------- Sidebar ---------- */
+
+.sidebar {
+  width: 200px;
+  background: var(--color-primario);
+  color: var(--color-texto-inverso);
+  position: relative;
+  height: 100vh;
+  padding: var(--espaciado-xl) var(--espaciado-lg);
+  overflow-y: auto;
+  box-shadow: var(--sombra-tarjeta);
+  flex-shrink: 0;
+}
+
+.sidebar-logo {
+  text-align: center;
+  margin-bottom: var(--espaciado-lg);
+  padding-bottom: var(--espaciado-lg);
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+
+.sidebar-logo span {
+  font-size: var(--texto-lg);
+  font-weight: 700;
+  display: block;
+}
+
+.sidebar-nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-nav li {
+  margin-bottom: var(--espaciado-sm);
+}
+
+.sidebar-nav a {
+  display: block;
+  padding: 0.75rem 0.5rem;
+  border-radius: var(--radio-suave);
+  color: var(--color-texto-inverso);
+  text-decoration: none;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  transition: background-color 0.15s ease;
+}
+
+.sidebar-nav a:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.sidebar-nav a.activo {
+  background: rgba(255,255,255,0.3);
+}
+
+.sidebar-nav a:focus-visible {
+  outline: 2px solid var(--color-texto-inverso);
+  outline-offset: 2px;
+}
+
+/* ---------- Contenedor principal con Grid ---------- */
+
+.contenedor-principal {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 200px 1fr;
+  grid-template-rows: auto 1fr;
+  margin-top: var(--espaciado-lg);
+  padding: 0 var(--espaciado-xl) var(--espaciado-xl) 0;
+}
+
+/* El encabezado ocupa todo el ancho en la primera fila */
+.cabecera {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  background: var(--color-superficie-alta);
+  padding: var(--espaciado-lg) var(--espaciado-xl);
+  border-bottom: 1px solid var(--color-borde);
+}
+
+/* En pantallas grandes, el contenido está en la segunda columna */
+@media (min-width: 769px) {
+  .contenido {
+    grid-column: 2;
+    grid-row: 2;
+    margin-left: 0;
+  }
+}
+
+/* En pantallas pequeñas, apilar todo verticalmente */
+@media (max-width: 768px) {
+  .contenedor-principal {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+    gap: 1rem;
+  }
+
+  .sidebar {
+    position: relative;
+    height: auto;
+    box-shadow: none;
+    order: 1;
+    margin-bottom: var(--espaciado-lg);
+  }
+
+  .cabecera {
+    grid-column: 1;
+    grid-row: 2;
+    order: initial;
+  }
+
+  .contenido {
+    grid-column: 1;
+    grid-row: 3;
+    margin-left: 0;
+    margin-top: 0;
+    order: initial;
+  }
+}
+
+/* ---------- Listas de constantes (Configuración) ---------- */
+
+.lista-constantes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.lista-constantes li {
+  background: var(--color-primario-tenue);
+  color: var(--color-tenue-fuerte);
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radio-pill);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  border: 1px solid var(--color-borde);
 }

@@ -8,6 +8,8 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
 from backend.routers.comentarios import router as comments_router
+from backend.routers.config import router as config_router
+from backend.routers.history import router as history_router
 from backend.routers.tickets import router as tickets_router
 from backend.routers.users import router as users_router
 
@@ -36,6 +38,8 @@ def health_check() -> dict[str, str]:
 app.include_router(tickets_router)
 app.include_router(comments_router)
 app.include_router(users_router)
+app.include_router(history_router)
+app.include_router(config_router)
 
 # Serve the frontend (Task 11) from the same origin as the API, so the
 # browser can call /api/* without CORS. Registered last: every route above

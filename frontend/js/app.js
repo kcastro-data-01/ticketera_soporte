@@ -104,6 +104,7 @@ function renderTickets(tickets) {
     appendCell(row, ticket.state);
     appendCell(row, assignedText(ticket));
     appendCell(row, formatFecha(ticket.created_at));
+    appendActionCell(row, ticket.id);
     elements.tbody.appendChild(row);
   });
 }
@@ -215,3 +216,19 @@ function init() {
 if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", init);
 }
+
+/* Función para crear la celda de acción con botón de editar */
+function appendActionCell(row, ticketId) {
+  const cell = document.createElement("td");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn-accion";
+  button.textContent = "Editar";
+  button.onclick = (e) => {
+    e.preventDefault();
+    window.location.href = `detalle.html?id=${ticketId}`;
+  };
+  cell.appendChild(button);
+  row.appendChild(cell);
+}
+

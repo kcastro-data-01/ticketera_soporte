@@ -7,86 +7,104 @@
   <link rel="stylesheet" href="css/estilos.css">
 </head>
 <body>
-  <header class="cabecera">
-    <div>
-      <h1>Ticketera de Soporte</h1>
-      <p>Consulta de tickets con búsqueda y filtros</p>
-    </div>
-    <nav class="cabecera-enlaces">
-      <a href="crear.html" class="enlace-boton">Nuevo ticket</a>
-      <a href="usuarios.html" class="enlace-boton">Usuarios</a>
-    </nav>
-  </header>
-
-  <main class="contenido">
-    <form id="form-filtros" class="filtros">
-      <label class="campo campo-busqueda">
-        <span>Buscar</span>
-        <input
-          type="search"
-          id="search"
-          name="search"
-          placeholder="Título o descripción"
-          autocomplete="off"
-        >
-      </label>
-
-      <label class="campo">
-        <span>Categoría</span>
-        <select id="category" name="category">
-          <option value="">Todas</option>
-          <option value="Incidente">Incidente</option>
-          <option value="Consulta">Consulta</option>
-          <option value="Solicitud">Solicitud</option>
-          <option value="Mantenimiento">Mantenimiento</option>
-        </select>
-      </label>
-
-      <label class="campo">
-        <span>Prioridad</span>
-        <select id="priority" name="priority">
-          <option value="">Todas</option>
-          <option value="Baja">Baja</option>
-          <option value="Media">Media</option>
-          <option value="Alta">Alta</option>
-          <option value="Crítica">Crítica</option>
-        </select>
-      </label>
-
-      <label class="campo">
-        <span>Estado</span>
-        <select id="state" name="state">
-          <option value="">Todos</option>
-          <option value="Nuevo">Nuevo</option>
-          <option value="En proceso">En proceso</option>
-          <option value="Resuelto">Resuelto</option>
-          <option value="Cerrado">Cerrado</option>
-        </select>
-      </label>
-
-      <div class="acciones">
-        <button type="submit" id="buscar">Buscar</button>
-        <button type="button" id="limpiar" class="secundario">Limpiar filtros</button>
+  <div class="contenedor-principal">
+    <!-- Menú sidebar -->
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <span>Ticketera</span>
       </div>
-    </form>
+      <ul class="sidebar-nav">
+        <li><a href="index.html" class="enlace-boton">Inicio</a></li>
+        <li><a href="index.html" class="enlace-boton activo">Tickets</a></li>
+        <li><a href="historial.html" class="enlace-boton">Historial</a></li>
+        <li><a href="usuarios.html" class="enlace-boton">Usuarios</a></li>
+        <li><a href="configuracion.html" class="enlace-boton">Configuración</a></li>
+      </ul>
+    </nav>
 
-    <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
+    <header class="cabecera">
+      <div>
+        <h1>¡Bienvenido a Ticketera!</h1>
+        <p>Consulta y gestión de tickets de soporte</p>
+      </div>
+      <nav class="cabecera-enlaces">
+        <a href="crear.html" class="enlace-boton">Nuevo ticket</a>
+        <a href="usuarios.html" class="enlace-boton">Usuarios</a>
+      </nav>
+    </header>
 
-    <table class="listado">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Título</th>
-          <th>Categoría</th>
-          <th>Prioridad</th>
-          <th>Estado</th>
-          <th>Asignado a</th>
-          <th>Fecha de creación</th>
-        </tr>
-      </thead>
-      <tbody id="lista-tickets"></tbody>
-    </table>
-  </main>
+    <main class="contenido">
+      <form id="form-filtros" class="filtros">
+        <label class="campo campo-busqueda">
+          <span>Buscar</span>
+          <input
+            type="search"
+            id="search"
+            name="search"
+            placeholder="Título o descripción"
+            autocomplete="off"
+          >
+        </label>
+
+        <label class="campo">
+          <span>Categoría</span>
+          <select id="category" name="category">
+            <option value="">Todas</option>
+            <option value="Incidente">Incidente</option>
+            <option value="Consulta">Consulta</option>
+            <option value="Solicitud">Solicitud</option>
+            <option value="Mantenimiento">Mantenimiento</option>
+          </select>
+        </label>
+
+        <label class="campo">
+          <span>Prioridad</span>
+          <select id="priority" name="priority">
+            <option value="">Todas</option>
+            <option value="Baja">Baja</option>
+            <option value="Media">Media</option>
+            <option value="Alta">Alta</option>
+            <option value="Crítica">Crítica</option>
+          </select>
+        </label>
+
+        <label class="campo">
+          <span>Estado</span>
+          <select id="state" name="state">
+            <option value="">Todos</option>
+            <option value="Nuevo">Nuevo</option>
+            <option value="En proceso">En proceso</option>
+            <option value="Resuelto">Resuelto</option>
+            <option value="Cerrado">Cerrado</option>
+          </select>
+        </label>
+
+        <div class="acciones">
+          <button type="submit" id="buscar">Buscar</button>
+          <button type="button" id="limpiar" class="secundario">Limpiar filtros</button>
+          <button type="submit" id="filtrar" class="primario">Filtrar</button>
+        </div>
+      </form>
+
+      <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
+
+      <table class="listado">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Título</th>
+            <th>Categoría</th>
+            <th>Prioridad</th>
+            <th>Estado</th>
+            <th>Asignado a</th>
+            <th>Fecha de creación</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody id="lista-tickets"></tbody>
+      </table>
+    </main>
+  </div>
 
   <script src="js/app.js" defer></script>
 </body>
