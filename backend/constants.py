@@ -40,6 +40,9 @@ class UserRole(str, Enum):
 
     ADMIN = "Administrador"
     SUPPORT = "Soporte"
+    SUPERVISOR = "Supervisor"
+    TECHNICIAN = "Técnico"
+    REQUESTER = "Solicitante"
 
 
 # Tuples of plain values, handy for validation and SQL CHECK constraints.
@@ -47,3 +50,8 @@ TICKET_STATES: tuple[str, ...] = tuple(state.value for state in TicketState)
 TICKET_PRIORITIES: tuple[str, ...] = tuple(priority.value for priority in TicketPriority)
 TICKET_CATEGORIES: tuple[str, ...] = tuple(category.value for category in TicketCategory)
 USER_ROLES: tuple[str, ...] = tuple(role.value for role in UserRole)
+
+# Roles whose active users take part in the automatic round-robin assignment
+# of new tickets. The remaining roles never receive a ticket automatically,
+# but they can still be assigned manually through ``PATCH .../assign``.
+AUTO_ASSIGN_ROLES: tuple[str, ...] = (UserRole.SUPPORT.value, UserRole.TECHNICIAN.value)

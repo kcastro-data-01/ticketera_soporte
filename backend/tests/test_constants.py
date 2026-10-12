@@ -1,6 +1,7 @@
 """Tests for the domain constants (Task 2)."""
 
 from backend.constants import (
+    AUTO_ASSIGN_ROLES,
     TICKET_CATEGORIES,
     TICKET_PRIORITIES,
     TICKET_STATES,
@@ -37,6 +38,21 @@ def test_priorities_are_the_approved_four():
 
 
 def test_user_roles():
-    assert USER_ROLES == ("Administrador", "Soporte")
+    assert USER_ROLES == (
+        "Administrador",
+        "Soporte",
+        "Supervisor",
+        "Técnico",
+        "Solicitante",
+    )
     assert UserRole.ADMIN.value == "Administrador"
     assert UserRole.SUPPORT.value == "Soporte"
+    assert UserRole.SUPERVISOR.value == "Supervisor"
+    assert UserRole.TECHNICIAN.value == "Técnico"
+    assert UserRole.REQUESTER.value == "Solicitante"
+
+
+def test_auto_assign_roles_are_soporte_and_tecnico():
+    """Only Soporte and Técnico take part in the automatic assignment."""
+    assert AUTO_ASSIGN_ROLES == ("Soporte", "Técnico")
+    assert set(AUTO_ASSIGN_ROLES) <= set(USER_ROLES)
