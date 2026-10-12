@@ -2,6 +2,7 @@
 assignment and comments)."""
 
 from sqlalchemy import or_, select
+from sqlalchemy.orm import joinedload
 
 from backend.constants import TicketCategory, TicketPriority, TicketState
 from backend.models import Comment, History, Ticket, User
@@ -302,12 +303,31 @@ def create_comment(session, ticket_id: int, payload: CommentCreate) -> Comment:
     Raises:
         ``TicketNotFoundError``: the ticket does not exist.
     """
-    if session.get(Ticket, ticket_id) is None:
+    from sqlalchemy.orm import joinedload
+
+    # Usamos joinedload para asegurar que la relación assignee esté cargada,
+    # lo cual es crítico para que el autor sea correcto tanto en sesiones
+    # directas como en el contexto de TestClient.
+    ticket = session.query(Ticket).filter(Ticket.id == ticket_id).options(
+        joinedload(Ticket.assignee)
+    ).first()
+
+    if ticket is None:
         raise TicketNotFoundError(ticket_id)
+
+    # El autor se determina desde la persona asignada al ticket (regla RF3/Task 8).
+    # Si hay una persona asignada, su nombre tiene prioridad sobre cualquier
+    # autor enviado por el frontend. Si no hay persona asignada, usa "Anónimo".
+    # El valor payload.author nunca sobrescribe al assignee ni usa "Anónimo" a
+    # menos que no haya nadie asignado.
+    if ticket and ticket.assignee and ticket.assignee.name:
+        author = ticket.assignee.name
+    else:
+        author = "Anónimo"
 
     comment = Comment(
         ticket_id=ticket_id,
-        author=payload.author,
+        author=author,
         content=payload.content,
     )
     session.add(comment)

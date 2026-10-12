@@ -485,13 +485,21 @@ async function agregarComentario() {
     return;
   }
 
+  // Obtener el nombre de la persona asignada al ticket (fuente de verdad del frontend).
+  // El backend tiene la última palabra para determinar el autor; aquí solo cooperamos
+  // enviando lo que el frontend ya sabe (usuario asignado en la vista actual).
+  let author = "";
+  if (ticketActual && usersById.has(ticketActual.assigned_to_id)) {
+    author = usersById.get(ticketActual.assigned_to_id);
+  }
+
   ocupado = true;
   bloquearBotones(true);
   try {
     const response = await fetch(`/api/tickets/${ticketId}/comments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, author }),
     });
     if (response.status === 404) {
       showStatus(

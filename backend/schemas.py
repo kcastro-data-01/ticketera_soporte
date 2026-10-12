@@ -171,11 +171,12 @@ class CommentCreate(BaseModel):
     """Payload accepted by ``POST /api/tickets/{ticket_id}/comments``.
 
     ``ticket_id`` comes from the URL path, not from the body. ``author`` is
-    optional (no authentication) and defaults to "Anónimo".
+    optional (no authentication). If not supplied, the backend determines the
+    author from the ticket's assigned user; otherwise it defaults to ``"Anónimo"``.
     """
 
     content: str
-    author: str = "Anónimo"
+    author: str | None = None
 
     @field_validator("content")
     @classmethod
