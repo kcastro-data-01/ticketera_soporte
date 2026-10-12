@@ -6,6 +6,7 @@ from sqlalchemy import or_, select
 from backend.constants import TicketCategory, TicketPriority, TicketState
 from backend.models import Comment, History, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate, TicketUpdate
+from backend.services.user_service import get_auto_assignable_users
 
 
 def _like_pattern(term: str) -> str:
@@ -57,12 +58,45 @@ ALLOWED_TRANSITIONS: dict[TicketState, frozenset[TicketState]] = {
 }
 
 
+def pick_next_assignee(session) -> User | None:
+    """Return the eligible user with the fewest assigned tickets.
+
+    Round-robin among the active users whose role is in ``AUTO_ASSIGN_ROLES``
+    (``Soporte`` and ``Técnico``): ties are broken by lowest user id. Returns
+    ``None`` when there are no eligible users, so the caller can leave the
+    ticket unassigned. Read-only: it never modifies the ``users`` table.
+    """
+    eligible_users = get_auto_assignable_users(session)
+    if not eligible_users:
+        return None
+
+    # Count assigned tickets per user (only counting eligible users).
+    eligible_ids = [user.id for user in eligible_users]
+    counts: dict[int, int] = {user_id: 0 for user_id in eligible_ids}
+    assigned = session.scalars(
+        select(Ticket.assigned_to_id).where(Ticket.assigned_to_id.in_(eligible_ids))
+    ).all()
+    for user_id in assigned:
+        if user_id in counts:
+            counts[user_id] += 1
+
+    # Pick the user with fewest assigned tickets (tie: lowest id).
+    best = min(eligible_users, key=lambda user: (counts[user.id], user.id))
+    return best
+
+
 def create_ticket(session, payload: TicketCreate) -> Ticket:
     """Persist a new ticket.
 
     The initial ``state`` is not set here: it comes from the model default
     (``TicketState.NEW.value`` defined in ``backend/constants.py``), keeping a
     single source of truth for the initial state.
+
+    The ticket is auto-assigned to the eligible user (``Soporte`` or
+    ``Técnico``) with the fewest assigned tickets (round-robin, tie: lowest
+    id). When there are no eligible users the ticket is created unassigned,
+    and the manual assignment endpoint (``PATCH .../assign``) remains
+    available.
     """
     ticket = Ticket(
         title=payload.title,
@@ -70,6 +104,12 @@ def create_ticket(session, payload: TicketCreate) -> Ticket:
         category=payload.category.value,
         priority=payload.priority.value,
     )
+
+    # Automatic round-robin assignment among active Support/Technician users.
+    assignee = pick_next_assignee(session)
+    if assignee is not None:
+        ticket.assigned_to_id = assignee.id
+
     session.add(ticket)
     session.commit()
     session.refresh(ticket)
@@ -136,6 +176,20 @@ def get_ticket_history(session, ticket_id: int) -> list[History] | None:
         select(History)
         .where(History.ticket_id == ticket_id)
         .order_by(History.created_at, History.id)
+    ).all()
+    return list(entries)
+
+
+def get_global_history(session) -> list[History]:
+    """Return the audit entries of every ticket, newest first.
+
+    Read-only: it exposes the existing ``history`` rows and never creates
+    them. Ordering is ``created_at`` descending (most recent first) with
+    ``id`` descending as tiebreaker; there is no pagination.
+    """
+    entries = session.scalars(
+        select(History)
+        .order_by(History.created_at.desc(), History.id.desc())
     ).all()
     return list(entries)
 

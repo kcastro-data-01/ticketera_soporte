@@ -187,12 +187,14 @@ def test_assign_does_not_change_other_ticket_fields(client):
 
 
 def test_assign_updates_updated_at(client):
-    user = create_user(client)
+    user = create_user(client, name="Ana", email="ana@test.local")
+    other = create_user(client, name="Luis", email="luis@test.local")
     ticket = create_ticket(client)
 
+    # The ticket is auto-assigned to `user`; reassign to `other` to change it.
     data = client.patch(
         f"/api/tickets/{ticket['id']}/assign",
-        json={"assigned_to_id": user["id"]},
+        json={"assigned_to_id": other["id"]},
     ).json()
 
     assert datetime.fromisoformat(data["updated_at"]) > datetime.fromisoformat(

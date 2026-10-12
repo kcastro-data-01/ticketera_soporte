@@ -2,6 +2,7 @@
 
 from sqlalchemy import select
 
+from backend.constants import AUTO_ASSIGN_ROLES
 from backend.models import User
 from backend.schemas import UserCreate
 
@@ -38,3 +39,20 @@ def list_users(session) -> list[User]:
 def get_user(session, user_id: int) -> User | None:
     """Return a user by id, or ``None`` when it does not exist."""
     return session.get(User, user_id)
+
+
+def get_auto_assignable_users(session) -> list[User]:
+    """Return the active users eligible for automatic assignment, by id.
+
+    Read-only: only rows with ``is_active`` are exposed, and the role must be
+    one of ``AUTO_ASSIGN_ROLES`` (``Soporte`` and ``Técnico``). Used by the
+    automatic ticket assignment (round-robin); the other roles are never
+    picked automatically, though they can be assigned manually.
+    """
+    statement = (
+        select(User)
+        .where(User.is_active.is_(True))
+        .where(User.role.in_(AUTO_ASSIGN_ROLES))
+        .order_by(User.id)
+    )
+    return list(session.scalars(statement).all())

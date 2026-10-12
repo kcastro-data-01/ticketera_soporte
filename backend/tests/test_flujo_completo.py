@@ -164,11 +164,11 @@ def test_user_management_and_assignment_integration(client):
     assert [user["id"] for user in users.json()] == [first_id]
     assert users.json()[0]["name"] == "Ana Pérez"
 
-    # 3. Crear ticket.
+    # 3. Crear ticket: se auto-asigna al primer usuario Soporte activo.
     ticket = create_ticket(client)
-    assert ticket["assigned_to_id"] is None
+    assert ticket["assigned_to_id"] == first_id
 
-    # 4. Asignar el ticket al usuario creado.
+    # 4. Reasignar el ticket al mismo usuario (asignación manual sigue funcionando).
     assigned = client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": first_id},
