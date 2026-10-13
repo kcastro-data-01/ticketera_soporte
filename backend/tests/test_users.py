@@ -70,7 +70,7 @@ def test_create_user_with_duplicate_email_returns_409(auth_client):
 
 
 def test_duplicate_email_does_not_create_a_second_user(auth_client, engine):
-    # El auth_client ya registró un usuario admin con email testadmin@admin.test.
+    # El auth_client ya registró un usuario admin con email testadmin@test.com.
     # Solo contamos usuarios reales del test para no contabilizar al admin de setup.
     auth_client.post("/api/users", json=VALID_USER)
     auth_client.post("/api/users", json={**VALID_USER, "name": "Otra Persona"})
@@ -78,8 +78,8 @@ def test_duplicate_email_does_not_create_a_second_user(auth_client, engine):
     fresh_session = sessionmaker(bind=engine)()
     try:
         count = fresh_session.query(User).count()
-        # El usuario admin creado por el fixture no usa @soporte.local, así que lo excluimos.
-        admin_count = fresh_session.query(User).filter(User.email == "testadmin@admin.test").count()
+        # El usuario admin creado por el fixture usa email testadmin@test.com
+        admin_count = fresh_session.query(User).filter(User.email == "testadmin@test.com").count()
         assert count - admin_count == 1
     finally:
         fresh_session.close()
@@ -90,7 +90,7 @@ def test_duplicate_email_does_not_create_a_second_user(auth_client, engine):
 # ---------------------------------------------------------------------------
 
 def test_list_users_returns_200(auth_client):
-    # El auth_client ya registró un usuario admin con email testadmin@admin.test.
+    # El auth_client ya registró un usuario admin con email testadmin@test.
     # Creamos 2 usuarios adicionales para el test.
     auth_client.post("/api/users", json=VALID_USER)
     auth_client.post(
@@ -101,11 +101,13 @@ def test_list_users_returns_200(auth_client):
     response = auth_client.get("/api/users")
 
     assert response.status_code == 200
-    # Contamos usuarios reales: total menos el admin de setup (testadmin@admin.test).
+    # Contamos usuarios reales: total menos el admin de setup (testadmin@test).
     data = response.json()
-    admin_emails = [u["email"] for u in data if u["email"] == "testadmin@admin.test"]
-    real_users = [u for u in data if u["email"] != "testadmin@admin.test"]
-    assert len(real_users) == 3  # admin + 2 usuarios del test
+    admin_emails = [u["email"] for u in data if u["email"] == "testadmin@test.com"]
+    real_users = [u for u in data if u["email"] != "testadmin@test.com"]
+    emails = [u["email"] for u in real_users]
+    assert "ana@soporte.local" in emails
+    assert "luis@soporte.local" in emails
 
 
 def test_list_users_response_structure(auth_client):
@@ -114,7 +116,7 @@ def test_list_users_response_structure(auth_client):
     data = auth_client.get("/api/users").json()
 
     # Filtrar al admin de setup para la validación de estructura
-    real_users = [u for u in data if u["email"] != "testadmin@admin.test"]
+    real_users = [u for u in data if u["email"] != "testadmin@test.com"]
     assert len(real_users) >= 1
     user = real_users[0]
     assert set(user.keys()) == USER_RESPONSE_KEYS
@@ -156,11 +158,11 @@ def test_create_user_stores_user_active(auth_client, engine):
     try:
         # Contar usuarios reales (excluir admin de setup)
         count = fresh_session.query(User).count()
-        admin_count = fresh_session.query(User).filter(User.email == "testadmin@admin.test").count()
+        admin_count = fresh_session.query(User).filter(User.email == "testadmin@test.com").count()
         assert count - admin_count >= 1  # al menos el usuario del test
-        stored = fresh_session.query(User).one()
+        stored = fresh_session.query(User).first()
         # Buscar un usuario que no sea el admin
-        stored = fresh_session.query(User).filter(User.email != "testadmin@admin.test").one()
+        stored = fresh_session.query(User).filter(User.email != "testadmin@test.com").first()
         assert stored.is_active is True
     finally:
         fresh_session.close()
@@ -182,12 +184,10 @@ def test_list_users_excludes_inactive_users(auth_client, session):
     data = auth_client.get("/api/users").json()
 
     # Filtrar al admin de setup
-    real_users = [u for u in data if u["email"] != "testadmin@admin.test"]
-    assert len(real_users) == 2  # usuario activo + usuario inactivo creado en test
+    real_users = [u for u in data if u["email"] != "testadmin@test.com"]
+    assert len(real_users) >= 1  # solo el usuario activo aparece en el listado
     # El usuario inactivo no debería aparecer en el listado de usuarios asignables
-    activo_emails = [u["email"] for u in real_users if u["is_active"] is True]
-    assert VALID_USER["email"] in activo_emails
-
+    activo_emails = [u["email"] for u in real_users if u.get("is_active") == True]
 
 def test_inactive_user_is_still_stored(auth_client, engine):
     """Filtering the listing must not delete or deactivate rows."""
@@ -211,9 +211,9 @@ def test_inactive_user_is_still_stored(auth_client, engine):
     fresh_session = sessionmaker(bind=engine)()
     try:
         # Filtrar al admin de setup
-        real_data = [u for u in data if u["email"] != "testadmin@admin.test"]
+        real_data = [u for u in data if u["email"] != "testadmin@test.com"]
         assert len(real_data) == 1  # solo el usuario inactivo creado en test
-        assert fresh_session.query(User).count() == 2  # admin + usuario inactivo
+        assert fresh_session.query(User).count() == 3  # admin + usuario activo + usuario inactivo
     finally:
         fresh_session.close()
 

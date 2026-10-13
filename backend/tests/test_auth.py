@@ -54,7 +54,10 @@ def test_register_second_user_forced_to_requester(client):
     assert "access_token" in resp.json()
 
     # Verify the user was created as Solicitante
-    me_resp = client.get(f"/api/auth/me?token={resp.json()['access_token']}")
+    me_resp = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {resp.json()['access_token']}"},
+    )
     assert me_resp.status_code == 200
     assert me_resp.json()["role"] == "Solicitante"
 
@@ -93,7 +96,10 @@ def test_register_without_role_defaults_to_requester(client):
     )
     assert resp.status_code == 201
 
-    me_resp = client.get(f"/api/auth/me?token={resp.json()['access_token']}")
+    me_resp = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {resp.json()['access_token']}"},
+    )
     assert me_resp.status_code == 200
     assert me_resp.json()["role"] == "Solicitante"
 
