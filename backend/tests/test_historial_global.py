@@ -8,7 +8,7 @@ from backend.models import History
 VALID_TICKET = {
     "title": "Ticket para historial global",
     "description": "Descripción del ticket usado en las pruebas de historial global.",
-    "category": TicketCategory.INQUIRY.value,
+    "category": TicketCategory.SOFTWARE.value,
     "priority": TicketPriority.MEDIUM.value,
 }
 HISTORY_KEYS = {
@@ -23,9 +23,9 @@ HISTORY_KEYS = {
 }
 
 
-def create_ticket(client, **overrides) -> dict:
+def create_ticket(auth_client, **overrides) -> dict:
     payload = {**VALID_TICKET, **overrides}
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
     assert response.status_code == 201
     return response.json()
 
@@ -45,15 +45,15 @@ def utc(year, month, day, hour, minute) -> datetime:
     return datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
 
 
-def test_global_history_returns_empty_list_when_no_entries(client):
-    response = client.get("/api/history")
+def test_global_history_returns_empty_list_when_no_entries(auth_client):
+    response = auth_client.get("/api/history")
 
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_global_history_returns_entries_newest_first(client, session):
-    ticket = create_ticket(client)
+def test_global_history_returns_entries_newest_first(auth_client, session):
+    ticket = create_ticket(auth_client)
     # Ticket creation adds a "created" entry. Add an "assigned" entry after.
     add_history(
         session,
@@ -62,7 +62,7 @@ def test_global_history_returns_entries_newest_first(client, session):
         action="assigned",
     )
 
-    response = client.get("/api/history")
+    response = auth_client.get("/api/history")
 
     assert response.status_code == 200
     entries = response.json()
@@ -71,15 +71,15 @@ def test_global_history_returns_entries_newest_first(client, session):
     assert [e["action"] for e in entries] == ["created", "assigned"]
 
 
-def test_global_history_includes_entries_from_multiple_tickets(client, session):
-    ticket_a = create_ticket(client, title="Ticket A")
-    ticket_b = create_ticket(client, title="Ticket B")
+def test_global_history_includes_entries_from_multiple_tickets(auth_client, session):
+    ticket_a = create_ticket(auth_client, title="Ticket A")
+    ticket_b = create_ticket(auth_client, title="Ticket B")
     # Each ticket now has its own creation entry (RF9).
     # Add additional entries if needed.
     add_history(session, ticket_a["id"], utc(2026, 10, 7, 9, 0), action="assigned")
     add_history(session, ticket_b["id"], utc(2026, 10, 7, 11, 0), action="assigned")
 
-    response = client.get("/api/history")
+    response = auth_client.get("/api/history")
 
     assert response.status_code == 200
     entries = response.json()
@@ -90,12 +90,12 @@ def test_global_history_includes_entries_from_multiple_tickets(client, session):
     assert ticket_b["id"] in ticket_ids
 
 
-def test_global_history_exposes_the_model_fields(client, session):
-    ticket = create_ticket(client)
+def test_global_history_exposes_the_model_fields(auth_client, session):
+    ticket = create_ticket(auth_client)
     # Ticket creation adds a "created" entry with author="Anónimo" (RF9).
     # No need to add another entry via add_history.
 
-    response = client.get("/api/history")
+    response = auth_client.get("/api/history")
 
     assert response.status_code == 200
     entry = response.json()[0]
@@ -108,8 +108,8 @@ def test_global_history_exposes_the_model_fields(client, session):
     assert entry["author"] == "Anónimo"
 
 
-def test_global_history_entry_describes_change_when_available(client, session):
-    ticket = create_ticket(client)
+def test_global_history_entry_describes_change_when_available(auth_client, session):
+    ticket = create_ticket(auth_client)
     # Ticket creation adds a "created" entry. Add an "updated" entry after.
     add_history(
         session,
@@ -122,7 +122,7 @@ def test_global_history_entry_describes_change_when_available(client, session):
         author="Ana",
     )
 
-    response = client.get("/api/history")
+    response = auth_client.get("/api/history")
 
     entries = response.json()
     # Entries ordered by created_at desc: creation first (current time),
@@ -137,11 +137,11 @@ def test_global_history_entry_describes_change_when_available(client, session):
     assert "updated" in actions
 
 
-def test_global_history_is_read_only(client):
-    response = client.get("/api/history")
+def test_global_history_is_read_only(auth_client):
+    response = auth_client.get("/api/history")
 
     assert response.status_code == 200
     # The endpoint only accepts GET; other methods should be rejected.
-    assert client.post("/api/history").status_code == 405
-    assert client.patch("/api/history").status_code == 405
-    assert client.delete("/api/history").status_code == 405
+    assert auth_client.post("/api/history").status_code == 405
+    assert auth_client.patch("/api/history").status_code == 405
+    assert auth_client.delete("/api/history").status_code == 405

@@ -10,15 +10,15 @@ from backend.models import Comment, Ticket
 VALID_TICKET = {
     "title": "Ticket con comentarios",
     "description": "Descripción del ticket que recibirá comentarios.",
-    "category": TicketCategory.INQUIRY.value,
+    "category": TicketCategory.SOFTWARE.value,
     "priority": TicketPriority.MEDIUM.value,
 }
 COMMENT_RESPONSE_KEYS = {"id", "ticket_id", "author", "content", "created_at"}
 
 
-def create_ticket(client, **overrides) -> dict:
+def create_ticket(auth_client, **overrides) -> dict:
     payload = {**VALID_TICKET, **overrides}
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
     assert response.status_code == 201
     return response.json()
 
@@ -28,10 +28,10 @@ def create_ticket(client, **overrides) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_create_comment_returns_201(client):
-    ticket = create_ticket(client)
+def test_create_comment_returns_201(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Primer comentario del ticket."},
     )
@@ -39,10 +39,10 @@ def test_create_comment_returns_201(client):
     assert response.status_code == 201
 
 
-def test_create_comment_response_contains_sent_data(client):
-    ticket = create_ticket(client)  # ticket sin asignado de forma explícita
+def test_create_comment_response_contains_sent_data(auth_client):
+    ticket = create_ticket(auth_client)  # ticket sin asignado de forma explícita
 
-    data = client.post(
+    data = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Primer comentario del ticket."},
     ).json()
@@ -55,16 +55,16 @@ def test_create_comment_response_contains_sent_data(client):
     assert data["author"] is not None
 
 
-def test_create_comment_with_explicit_author_overridden_by_assignee(client, session):
+def test_create_comment_with_explicit_author_overridden_by_assignee(auth_client, session):
     """Un autor explícito enviado por el cliente no reemplaza al asignado."""
     from backend.models import User
     from sqlalchemy.orm import sessionmaker
 
-    ticket = create_ticket(client, assigned_to_id=1)  # ticket con Ana asignada
+    ticket = create_ticket(auth_client, assigned_to_id=1)  # ticket con Ana asignada
 
     # Crear usuario diferente para verificar que el explícito no sobrescribe
     # al asignado cuando el backend prioriza al asignado
-    data = client.post(
+    data = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Comentario con autor explícito.", "author": "Carlos Gómez"},
     ).json()
@@ -75,11 +75,11 @@ def test_create_comment_with_explicit_author_overridden_by_assignee(client, sess
     assert data["author"] is not None
 
 
-def test_create_comment_unassigned_ticket_uses_anonimo(client):
+def test_create_comment_unassigned_ticket_uses_anonimo(auth_client):
     """Un ticket sin persona asignada produce autor 'Anónimo'."""
-    ticket = create_ticket(client, assigned_to_id=None)  # ticket sin asignar
+    ticket = create_ticket(auth_client, assigned_to_id=None)  # ticket sin asignar
 
-    data = client.post(
+    data = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Comentario sin ticket asignado."},
     ).json()
@@ -87,11 +87,11 @@ def test_create_comment_unassigned_ticket_uses_anonimo(client):
     assert data["author"] == "Anónimo"
 
 
-def test_create_comment_client_author_when_no_assignee(client):
+def test_create_comment_client_author_when_no_assignee(auth_client):
     """Si no hay persona asignada, el autor venía del cliente pero backend usa 'Anónimo'."""
-    ticket = create_ticket(client, assigned_to_id=None)  # ticket sin asignar
+    ticket = create_ticket(auth_client, assigned_to_id=None)  # ticket sin asignar
 
-    data = client.post(
+    data = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Comentario.", "author": "Ana Pérez"},
     ).json()
@@ -100,10 +100,10 @@ def test_create_comment_client_author_when_no_assignee(client):
     assert data["author"] == "Anónimo"
 
 
-def test_create_comment_with_explicit_author(client):
-    ticket = create_ticket(client)  # ticket sin persona asignada
+def test_create_comment_with_explicit_author(auth_client):
+    ticket = create_ticket(auth_client)  # ticket sin persona asignada
 
-    data = client.post(
+    data = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Respuesta de soporte.", "author": "Ana Pérez"},
     ).json()
@@ -113,11 +113,11 @@ def test_create_comment_with_explicit_author(client):
     assert data["author"] == "Anónimo"
 
 
-def test_comment_is_linked_to_the_correct_ticket(client):
-    first = create_ticket(client, title="Primer ticket")
-    second = create_ticket(client, title="Segundo ticket")
+def test_comment_is_linked_to_the_correct_ticket(auth_client):
+    first = create_ticket(auth_client, title="Primer ticket")
+    second = create_ticket(auth_client, title="Segundo ticket")
 
-    data = client.post(
+    data = auth_client.post(
         f"/api/tickets/{second['id']}/comments",
         json={"content": "Comentario del segundo ticket."},
     ).json()
@@ -126,10 +126,10 @@ def test_comment_is_linked_to_the_correct_ticket(client):
     assert data["ticket_id"] != first["id"]
 
 
-def test_comment_persists_in_sqlite(client, engine):
-    ticket = create_ticket(client)
+def test_comment_persists_in_sqlite(auth_client, engine):
+    ticket = create_ticket(auth_client)
 
-    client.post(
+    auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Comentario que debe persistir."},
     )
@@ -149,8 +149,8 @@ def test_comment_persists_in_sqlite(client, engine):
         fresh_session.close()
 
 
-def test_comment_on_missing_ticket_returns_404(client):
-    response = client.post(
+def test_comment_on_missing_ticket_returns_404(auth_client):
+    response = auth_client.post(
         "/api/tickets/9999/comments",
         json={"content": "Comentario sin ticket."},
     )
@@ -163,10 +163,10 @@ def test_comment_on_missing_ticket_returns_404(client):
 # ---------------------------------------------------------------------------
 
 
-def test_empty_content_returns_422(client):
-    ticket = create_ticket(client)
+def test_empty_content_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": ""},
     )
@@ -174,10 +174,10 @@ def test_empty_content_returns_422(client):
     assert response.status_code == 422
 
 
-def test_blank_content_returns_422(client):
-    ticket = create_ticket(client)
+def test_blank_content_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "     "},
     )
@@ -185,10 +185,10 @@ def test_blank_content_returns_422(client):
     assert response.status_code == 422
 
 
-def test_content_above_max_length_returns_422(client):
-    ticket = create_ticket(client)
+def test_content_above_max_length_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "a" * 2001},
     )
@@ -196,10 +196,10 @@ def test_content_above_max_length_returns_422(client):
     assert response.status_code == 422
 
 
-def test_blank_author_returns_422(client):
-    ticket = create_ticket(client)
+def test_blank_author_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Contenido válido.", "author": "   "},
     )
@@ -207,10 +207,10 @@ def test_blank_author_returns_422(client):
     assert response.status_code == 422
 
 
-def test_comment_without_content_returns_422(client):
-    ticket = create_ticket(client)
+def test_comment_without_content_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"author": "Ana Pérez"},
     )
@@ -223,10 +223,10 @@ def test_comment_without_content_returns_422(client):
 # ---------------------------------------------------------------------------
 
 
-def test_comment_response_structure(client):
-    ticket = create_ticket(client)
+def test_comment_response_structure(auth_client):
+    ticket = create_ticket(auth_client)
 
-    data = client.post(
+    data = auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Comentario para revisar la estructura."},
     ).json()
@@ -237,8 +237,8 @@ def test_comment_response_structure(client):
     assert isinstance(data["content"], str)
 
 
-def test_comment_endpoint_is_exposed_in_openapi(client):
-    schema = client.get("/openapi.json").json()
+def test_comment_endpoint_is_exposed_in_openapi(auth_client):
+    schema = auth_client.get("/openapi.json").json()
 
     path = "/api/tickets/{ticket_id}/comments"
     assert path in schema["paths"]
@@ -251,25 +251,25 @@ def test_comment_endpoint_is_exposed_in_openapi(client):
 # ---------------------------------------------------------------------------
 
 
-def test_list_comments_returns_200(client):
-    ticket = create_ticket(client)
+def test_list_comments_returns_200(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.get(f"/api/tickets/{ticket['id']}/comments")
+    response = auth_client.get(f"/api/tickets/{ticket['id']}/comments")
 
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_list_comments_returns_created_comments_in_order(client):
-    ticket = create_ticket(client)
+def test_list_comments_returns_created_comments_in_order(auth_client):
+    ticket = create_ticket(auth_client)
     for content in ("Primero.", "Segundo.", "Tercero."):
-        created = client.post(
+        created = auth_client.post(
             f"/api/tickets/{ticket['id']}/comments",
             json={"content": content},
         )
         assert created.status_code == 201
 
-    data = client.get(f"/api/tickets/{ticket['id']}/comments").json()
+    data = auth_client.get(f"/api/tickets/{ticket['id']}/comments").json()
 
     assert [comment["content"] for comment in data] == [
         "Primero.",
@@ -281,9 +281,9 @@ def test_list_comments_returns_created_comments_in_order(client):
     )
 
 
-def test_list_comments_orders_by_created_at_not_by_id(client, session):
+def test_list_comments_orders_by_created_at_not_by_id(auth_client, session):
     """Rows are sorted chronologically: id order must not drive the result."""
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
     recent = Comment(
         ticket_id=ticket["id"],
         author="Ana",
@@ -300,46 +300,46 @@ def test_list_comments_orders_by_created_at_not_by_id(client, session):
     session.add(older)
     session.commit()
 
-    data = client.get(f"/api/tickets/{ticket['id']}/comments").json()
+    data = auth_client.get(f"/api/tickets/{ticket['id']}/comments").json()
 
     assert [comment["content"] for comment in data] == ["Más antiguo", "Más reciente"]
 
 
-def test_list_comments_response_structure(client):
-    ticket = create_ticket(client)
-    client.post(
+def test_list_comments_response_structure(auth_client):
+    ticket = create_ticket(auth_client)
+    auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Comentario para revisar la estructura del listado."},
     )
 
-    data = client.get(f"/api/tickets/{ticket['id']}/comments").json()
+    data = auth_client.get(f"/api/tickets/{ticket['id']}/comments").json()
 
     assert isinstance(data, list) and len(data) == 1
     assert set(data[0].keys()) == COMMENT_RESPONSE_KEYS
 
 
-def test_list_comments_on_missing_ticket_returns_404(client):
-    response = client.get("/api/tickets/9999/comments")
+def test_list_comments_on_missing_ticket_returns_404(auth_client):
+    response = auth_client.get("/api/tickets/9999/comments")
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Ticket 9999 no encontrado"
 
 
-def test_list_comments_is_read_only(client, session):
-    ticket = create_ticket(client)
-    client.post(
+def test_list_comments_is_read_only(auth_client, session):
+    ticket = create_ticket(auth_client)
+    auth_client.post(
         f"/api/tickets/{ticket['id']}/comments",
         json={"content": "Comentario que no debe duplicarse."},
     )
 
-    first = client.get(f"/api/tickets/{ticket['id']}/comments").json()
-    second = client.get(f"/api/tickets/{ticket['id']}/comments").json()
+    first = auth_client.get(f"/api/tickets/{ticket['id']}/comments").json()
+    second = auth_client.get(f"/api/tickets/{ticket['id']}/comments").json()
 
     assert first == second
     assert len(session.query(Comment).all()) == 1
 
 
-def test_create_comment_with_assigned_user_via_integration(client, engine):
+def test_create_comment_with_assigned_user_via_integration(auth_client, engine):
     """Integración completa: usuario creado en la BD, ticket asignado, comentario con autor real.
     
     Verifica que:
@@ -369,7 +369,7 @@ def test_create_comment_with_assigned_user_via_integration(client, engine):
         ticket = Ticket(
             title="Ticket test asignado",
             description="Descripción del ticket asignado",
-            category=TicketCategory.INQUIRY.value,
+            category=TicketCategory.SOFTWARE.value,
             priority=TicketPriority.MEDIUM.value,
             assigned_to_id=user.id
         )
@@ -389,7 +389,7 @@ def test_create_comment_with_assigned_user_via_integration(client, engine):
         # 4. Crear comentario mediante TestClient enviando autor "Carlos Gómez"
         # El TestClient usa su propia sesión, pero la BD es compartida
         # El backend debe determinar el autor desde la persona asignada al ticket
-        response = client.post(
+        response = auth_client.post(
             f"/api/tickets/{ticket.id}/comments",
             json={"content": "Comentario de prueba", "author": "Carlos Gómez"}
         )

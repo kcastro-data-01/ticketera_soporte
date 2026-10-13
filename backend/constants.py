@@ -29,10 +29,10 @@ class TicketPriority(str, Enum):
 class TicketCategory(str, Enum):
     """Fixed categories of a ticket (RF2)."""
 
-    INCIDENT = "Incidente"
-    INQUIRY = "Consulta"
-    REQUEST = "Solicitud"
-    MAINTENANCE = "Mantenimiento"
+    HARDWARE = "Hardware"
+    SOFTWARE = "Software"
+    NETWORK = "Red"
+    ACCESS = "Accesos"
 
 
 class UserRole(str, Enum):
@@ -50,6 +50,16 @@ TICKET_STATES: tuple[str, ...] = tuple(state.value for state in TicketState)
 TICKET_PRIORITIES: tuple[str, ...] = tuple(priority.value for priority in TicketPriority)
 TICKET_CATEGORIES: tuple[str, ...] = tuple(category.value for category in TicketCategory)
 USER_ROLES: tuple[str, ...] = tuple(role.value for role in UserRole)
+
+# One-to-one correspondence used by ``backend.migrate_categories`` to bring
+# tickets created before the category change over to the current list. It is
+# only read by the migration: the API never accepts the legacy values.
+LEGACY_CATEGORY_MAP: dict[str, str] = {
+    "Incidente": "Hardware",
+    "Consulta": "Software",
+    "Solicitud": "Accesos",
+    "Mantenimiento": "Red",
+}
 
 # Roles whose active users take part in the automatic round-robin assignment
 # of new tickets. The remaining roles never receive a ticket automatically,

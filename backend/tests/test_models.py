@@ -16,7 +16,7 @@ def _new_ticket(**overrides) -> Ticket:
     fields = {
         "title": "No enciende la impresora",
         "description": "La impresora del piso 2 no responde al iniciar el turno.",
-        "category": TicketCategory.INCIDENT.value,
+        "category": TicketCategory.HARDWARE.value,
         "priority": TicketPriority.HIGH.value,
     }
     fields.update(overrides)

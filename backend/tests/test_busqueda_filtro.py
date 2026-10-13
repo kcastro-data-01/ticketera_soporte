@@ -6,7 +6,7 @@ from backend.models import Ticket
 BASE_PAYLOAD = {
     "title": "Ticket de prueba",
     "description": "Descripción por defecto del ticket de prueba.",
-    "category": TicketCategory.INCIDENT.value,
+    "category": TicketCategory.HARDWARE.value,
     "priority": TicketPriority.MEDIUM.value,
 }
 TICKET_RESPONSE_KEYS = {
@@ -22,9 +22,9 @@ TICKET_RESPONSE_KEYS = {
 }
 
 
-def create_ticket(client, **overrides) -> dict:
+def create_ticket(auth_client, **overrides) -> dict:
     payload = {**BASE_PAYLOAD, **overrides}
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
     assert response.status_code == 201
     return response.json()
 
@@ -40,45 +40,45 @@ def set_state(session, ticket_id: int, value: str) -> None:
     session.commit()
 
 
-def create_sample_tickets(client, session) -> list[dict]:
+def create_sample_tickets(auth_client, session) -> list[dict]:
     """Create five deterministic tickets, returned in creation order."""
     tickets = [
         create_ticket(
-            client,
+            auth_client,
             title="Falla de impresión",
             description=(
                 "El equipo no responde y falla el correo saliente; "
                 "revisar con el servidor de área."
             ),
-            category=TicketCategory.INCIDENT.value,
+            category=TicketCategory.HARDWARE.value,
             priority=TicketPriority.HIGH.value,
         ),
         create_ticket(
-            client,
+            auth_client,
             title="Consulta de reportes",
             description="El cliente solicita un resumen de ventas.",
-            category=TicketCategory.INQUIRY.value,
+            category=TicketCategory.SOFTWARE.value,
             priority=TicketPriority.LOW.value,
         ),
         create_ticket(
-            client,
-            title="Renovación de licencias",
-            description="Mantenimiento programado del servidor de aplicaciones.",
-            category=TicketCategory.MAINTENANCE.value,
+            auth_client,
+            title="Caída de red en el piso 3",
+            description="Mantenimiento programado del servidor de aplicaciones por la caída de red.",
+            category=TicketCategory.NETWORK.value,
             priority=TicketPriority.CRITICAL.value,
         ),
         create_ticket(
-            client,
+            auth_client,
             title="Solicitud de acceso",
             description="Necesito permisos al módulo de facturación.",
-            category=TicketCategory.REQUEST.value,
+            category=TicketCategory.ACCESS.value,
             priority=TicketPriority.MEDIUM.value,
         ),
         create_ticket(
-            client,
-            title="Error al guardar cambios",
-            description="La aplicación cierra sin guardar los cambios.",
-            category=TicketCategory.INCIDENT.value,
+            auth_client,
+            title="Teclado sin respuesta",
+            description="Las teclas del teclado del puesto 12 dejaron de responder.",
+            category=TicketCategory.HARDWARE.value,
             priority=TicketPriority.LOW.value,
         ),
     ]
@@ -95,10 +95,10 @@ def response_ids(response) -> list[int]:
 # ---------------------------------------------------------------------------
 
 
-def test_list_without_filters_keeps_existing_behaviour(client, session):
-    created = create_sample_tickets(client, session)
+def test_list_without_filters_keeps_existing_behaviour(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
 
-    response = client.get("/api/tickets")
+    response = auth_client.get("/api/tickets")
 
     assert response.status_code == 200
     assert len(response.json()) == 5
@@ -112,19 +112,19 @@ def test_list_without_filters_keeps_existing_behaviour(client, session):
 # ---------------------------------------------------------------------------
 
 
-def test_search_matches_title(client, session):
-    created = create_sample_tickets(client, session)
+def test_search_matches_title(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
 
-    response = client.get("/api/tickets", params={"search": "impresión"})
+    response = auth_client.get("/api/tickets", params={"search": "impresión"})
 
     assert response.status_code == 200
     assert response_ids(response) == [created[0]["id"]]
 
 
-def test_search_matches_description(client, session):
-    created = create_sample_tickets(client, session)
+def test_search_matches_description(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
 
-    response = client.get("/api/tickets", params={"search": "servidor"})
+    response = auth_client.get("/api/tickets", params={"search": "servidor"})
 
     # "servidor" only appears inside the descriptions of two tickets.
     assert response.status_code == 200
@@ -132,32 +132,32 @@ def test_search_matches_description(client, session):
     assert created[2]["id"] in response_ids(response)
 
 
-def test_search_is_case_insensitive(client, session):
-    created = create_sample_tickets(client, session)
+def test_search_is_case_insensitive(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
 
-    lowercase = client.get("/api/tickets", params={"search": "falla de impresión"})
-    uppercase = client.get("/api/tickets", params={"search": "FALLA DE IMPRESIÓN"})
-    plain_uppercase = client.get("/api/tickets", params={"search": "CORREO"})
+    lowercase = auth_client.get("/api/tickets", params={"search": "falla de impresión"})
+    uppercase = auth_client.get("/api/tickets", params={"search": "FALLA DE IMPRESIÓN"})
+    plain_uppercase = auth_client.get("/api/tickets", params={"search": "CORREO"})
 
     assert response_ids(lowercase) == [created[0]["id"]]
     assert response_ids(uppercase) == [created[0]["id"]]
     assert response_ids(plain_uppercase) == [created[0]["id"]]
 
 
-def test_search_without_results_returns_200_and_empty_list(client, session):
-    create_sample_tickets(client, session)
+def test_search_without_results_returns_200_and_empty_list(auth_client, session):
+    create_sample_tickets(auth_client, session)
 
-    response = client.get("/api/tickets", params={"search": "xyzzy-no-existe"})
+    response = auth_client.get("/api/tickets", params={"search": "xyzzy-no-existe"})
 
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_blank_search_behaves_as_if_not_sent(client, session):
-    create_sample_tickets(client, session)
+def test_blank_search_behaves_as_if_not_sent(auth_client, session):
+    create_sample_tickets(auth_client, session)
 
-    empty = client.get("/api/tickets", params={"search": ""})
-    spaces = client.get("/api/tickets", params={"search": "   "})
+    empty = auth_client.get("/api/tickets", params={"search": ""})
+    spaces = auth_client.get("/api/tickets", params={"search": "   "})
 
     assert empty.status_code == 200
     assert len(empty.json()) == 5
@@ -165,11 +165,11 @@ def test_blank_search_behaves_as_if_not_sent(client, session):
     assert len(spaces.json()) == 5
 
 
-def test_search_treats_sql_wildcards_literally(client, session):
-    create_sample_tickets(client, session)
+def test_search_treats_sql_wildcards_literally(auth_client, session):
+    create_sample_tickets(auth_client, session)
 
-    percent = client.get("/api/tickets", params={"search": "%"})
-    underscore = client.get("/api/tickets", params={"search": "_"})
+    percent = auth_client.get("/api/tickets", params={"search": "%"})
+    underscore = auth_client.get("/api/tickets", params={"search": "_"})
 
     # No sample ticket contains those characters, so they must not behave
     # as LIKE wildcards (which would return every ticket).
@@ -184,32 +184,32 @@ def test_search_treats_sql_wildcards_literally(client, session):
 # ---------------------------------------------------------------------------
 
 
-def test_filter_by_category(client, session):
-    created = create_sample_tickets(client, session)
+def test_filter_by_category(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
 
-    response = client.get("/api/tickets", params={"category": TicketCategory.INCIDENT.value})
+    response = auth_client.get("/api/tickets", params={"category": TicketCategory.HARDWARE.value})
 
     assert response.status_code == 200
     assert set(response_ids(response)) == {created[0]["id"], created[4]["id"]}
 
 
-def test_filter_by_priority(client, session):
-    created = create_sample_tickets(client, session)
+def test_filter_by_priority(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
 
-    response = client.get("/api/tickets", params={"priority": TicketPriority.LOW.value})
+    response = auth_client.get("/api/tickets", params={"priority": TicketPriority.LOW.value})
 
     assert response.status_code == 200
     assert set(response_ids(response)) == {created[1]["id"], created[4]["id"]}
 
 
-def test_filter_by_state(client, session):
-    created = create_sample_tickets(client, session)
+def test_filter_by_state(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
 
-    in_progress = client.get(
+    in_progress = auth_client.get(
         "/api/tickets", params={"state": TicketState.IN_PROGRESS.value}
     )
-    new = client.get("/api/tickets", params={"state": TicketState.NEW.value})
-    closed = client.get("/api/tickets", params={"state": TicketState.CLOSED.value})
+    new = auth_client.get("/api/tickets", params={"state": TicketState.NEW.value})
+    closed = auth_client.get("/api/tickets", params={"state": TicketState.CLOSED.value})
 
     assert in_progress.status_code == 200
     assert response_ids(in_progress) == [created[2]["id"]]
@@ -228,13 +228,13 @@ def test_filter_by_state(client, session):
 # ---------------------------------------------------------------------------
 
 
-def test_combination_of_two_filters(client, session):
-    created = create_sample_tickets(client, session)
+def test_combination_of_two_filters(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
 
-    response = client.get(
+    response = auth_client.get(
         "/api/tickets",
         params={
-            "category": TicketCategory.INCIDENT.value,
+            "category": TicketCategory.HARDWARE.value,
             "priority": TicketPriority.LOW.value,
         },
     )
@@ -245,10 +245,10 @@ def test_combination_of_two_filters(client, session):
     assert response_ids(response) == [created[4]["id"]]
 
 
-def test_combination_of_search_and_filters(client, session):
-    created = create_sample_tickets(client, session)
+def test_combination_of_search_and_filters(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
 
-    example = client.get(
+    example = auth_client.get(
         "/api/tickets",
         params={
             "search": "correo",
@@ -256,7 +256,7 @@ def test_combination_of_search_and_filters(client, session):
             "state": TicketState.NEW.value,
         },
     )
-    narrowed = client.get(
+    narrowed = auth_client.get(
         "/api/tickets",
         params={"search": "servidor", "priority": TicketPriority.CRITICAL.value},
     )
@@ -272,20 +272,20 @@ def test_combination_of_search_and_filters(client, session):
 # ---------------------------------------------------------------------------
 
 
-def test_invalid_category_returns_422(client):
-    response = client.get("/api/tickets", params={"category": "Categoría inventada"})
+def test_invalid_category_returns_422(auth_client):
+    response = auth_client.get("/api/tickets", params={"category": "Categoría inventada"})
 
     assert response.status_code == 422
 
 
-def test_invalid_priority_returns_422(client):
-    response = client.get("/api/tickets", params={"priority": "Urgentísima"})
+def test_invalid_priority_returns_422(auth_client):
+    response = auth_client.get("/api/tickets", params={"priority": "Urgentísima"})
 
     assert response.status_code == 422
 
 
-def test_invalid_state_returns_422(client):
-    response = client.get("/api/tickets", params={"state": "Bloqueado"})
+def test_invalid_state_returns_422(auth_client):
+    response = auth_client.get("/api/tickets", params={"state": "Bloqueado"})
 
     assert response.status_code == 422
 
@@ -295,11 +295,11 @@ def test_invalid_state_returns_422(client):
 # ---------------------------------------------------------------------------
 
 
-def test_results_keep_newest_first_order(client, session):
-    created = create_sample_tickets(client, session)
+def test_results_keep_newest_first_order(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
 
-    without_filters = client.get("/api/tickets")
-    with_filter = client.get("/api/tickets", params={"state": TicketState.NEW.value})
+    without_filters = auth_client.get("/api/tickets")
+    with_filter = auth_client.get("/api/tickets", params={"state": TicketState.NEW.value})
 
     assert response_ids(without_filters) == [
         created[4]["id"],
@@ -316,21 +316,21 @@ def test_results_keep_newest_first_order(client, session):
     ]
 
 
-def test_search_and_filters_do_not_modify_tickets(client, session):
-    created = create_sample_tickets(client, session)
-    before = client.get("/api/tickets").json()
+def test_search_and_filters_do_not_modify_tickets(auth_client, session):
+    created = create_sample_tickets(auth_client, session)
+    before = auth_client.get("/api/tickets").json()
 
-    client.get("/api/tickets", params={"search": "correo"})
-    client.get("/api/tickets", params={"category": TicketCategory.INCIDENT.value})
-    client.get("/api/tickets", params={"priority": TicketPriority.LOW.value})
-    client.get("/api/tickets", params={"state": TicketState.NEW.value})
-    client.get(
+    auth_client.get("/api/tickets", params={"search": "correo"})
+    auth_client.get("/api/tickets", params={"category": TicketCategory.HARDWARE.value})
+    auth_client.get("/api/tickets", params={"priority": TicketPriority.LOW.value})
+    auth_client.get("/api/tickets", params={"state": TicketState.NEW.value})
+    auth_client.get(
         "/api/tickets",
         params={"search": "servidor", "state": TicketState.IN_PROGRESS.value},
     )
-    client.get("/api/tickets", params={"category": "Invencible"})
+    auth_client.get("/api/tickets", params={"category": "Invencible"})
 
-    after = client.get("/api/tickets").json()
+    after = auth_client.get("/api/tickets").json()
 
     assert before == after
     assert len(after) == len(created)

@@ -8,7 +8,7 @@ from backend.models import History
 VALID_TICKET = {
     "title": "Ticket con historial",
     "description": "Descripción del ticket consultado en su historial.",
-    "category": TicketCategory.INQUIRY.value,
+    "category": TicketCategory.SOFTWARE.value,
     "priority": TicketPriority.MEDIUM.value,
 }
 HISTORY_KEYS = {
@@ -23,9 +23,9 @@ HISTORY_KEYS = {
 }
 
 
-def create_ticket(client, **overrides) -> dict:
+def create_ticket(auth_client, **overrides) -> dict:
     payload = {**VALID_TICKET, **overrides}
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
     assert response.status_code == 201
     return response.json()
 
@@ -52,12 +52,12 @@ def utc(year, month, day, hour, minute) -> datetime:
 # ---------------------------------------------------------------------------
 
 
-def test_history_returns_empty_list_for_ticket_without_entries(client):
+def test_history_returns_empty_list_for_ticket_without_entries(auth_client):
     """After creating a ticket, one history entry (creation) exists by default."""
 
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
 
-    response = client.get(f"/api/tickets/{ticket['id']}/history")
+    response = auth_client.get(f"/api/tickets/{ticket['id']}/history")
 
     assert response.status_code == 200
     entries = response.json()
@@ -65,15 +65,15 @@ def test_history_returns_empty_list_for_ticket_without_entries(client):
     assert entries[0]["action"] == "created"
 
 
-def test_history_returns_404_for_missing_ticket(client):
-    response = client.get("/api/tickets/999/history")
+def test_history_returns_404_for_missing_ticket(auth_client):
+    response = auth_client.get("/api/tickets/999/history")
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Ticket 999 no encontrado"
 
 
-def test_history_returns_entries_oldest_first(client, session):
-    ticket = create_ticket(client)
+def test_history_returns_entries_oldest_first(auth_client, session):
+    ticket = create_ticket(auth_client)
     # The ticket creation adds a "created" entry with current timestamp.
     # Add an "assigned" entry with an earlier timestamp.
     add_history(
@@ -85,7 +85,7 @@ def test_history_returns_entries_oldest_first(client, session):
         new_value="1",
     )
 
-    response = client.get(f"/api/tickets/{ticket['id']}/history")
+    response = auth_client.get(f"/api/tickets/{ticket['id']}/history")
 
     assert response.status_code == 200
     entries = response.json()
@@ -93,11 +93,11 @@ def test_history_returns_entries_oldest_first(client, session):
     assert [entry["action"] for entry in entries] == ["assigned", "created"]
 
 
-def test_history_exposes_the_model_fields_with_null_optionals(client, session):
-    ticket = create_ticket(client)
+def test_history_exposes_the_model_fields_with_null_optionals(auth_client, session):
+    ticket = create_ticket(auth_client)
     # The ticket creation already adds a "created" entry (RF9).
     # No need to add another one here.
-    response = client.get(f"/api/tickets/{ticket['id']}/history")
+    response = auth_client.get(f"/api/tickets/{ticket['id']}/history")
 
     assert response.status_code == 200
     entry = response.json()[0]
@@ -111,8 +111,8 @@ def test_history_exposes_the_model_fields_with_null_optionals(client, session):
     assert entry["created_at"].startswith("2026-")
 
 
-def test_history_entry_describes_the_change_when_available(client, session):
-    ticket = create_ticket(client)
+def test_history_entry_describes_the_change_when_available(auth_client, session):
+    ticket = create_ticket(auth_client)
     add_history(
         session,
         ticket["id"],
@@ -124,7 +124,7 @@ def test_history_entry_describes_the_change_when_available(client, session):
         author="Ana",
     )
 
-    response = client.get(f"/api/tickets/{ticket['id']}/history")
+    response = auth_client.get(f"/api/tickets/{ticket['id']}/history")
 
     entry = response.json()[0]
     assert entry["action"] == "updated"
@@ -134,14 +134,14 @@ def test_history_entry_describes_the_change_when_available(client, session):
     assert entry["author"] == "Ana"
 
 
-def test_history_does_not_include_entries_of_other_tickets(client, session):
-    ticket = create_ticket(client)
-    other_ticket = create_ticket(client, title="Otro ticket sin historial")
+def test_history_does_not_include_entries_of_other_tickets(auth_client, session):
+    ticket = create_ticket(auth_client)
+    other_ticket = create_ticket(auth_client, title="Otro ticket sin historial")
     # Each ticket now has its own creation entry (RF9). Check that entries
     # are per-ticket and don't cross-contaminate.
     add_history(session, other_ticket["id"], utc(2026, 10, 7, 10, 0), action="created")
 
-    response = client.get(f"/api/tickets/{ticket['id']}/history")
+    response = auth_client.get(f"/api/tickets/{ticket['id']}/history")
 
     assert response.status_code == 200
     # This ticket has its own creation entry; the other ticket's entries

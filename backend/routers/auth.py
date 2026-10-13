@@ -195,18 +195,3 @@ def login(payload: LoginRequest, session: Session = Depends(get_session)) -> Tok
         token_type="bearer",
         expires_in=expires_in,
     )
-
-
-@router.get(
-    "/me",
-    response_model=UserResponse,
-    summary="Obtener usuario actual",
-)
-def get_current_user_info(
-    current_user: User = Depends(get_current_user),
-) -> UserResponse:
-    """Return the currently authenticated user's information.
-
-    Requires a valid Bearer token in the Authorization header.
-    """
-    return UserResponse.model_validate(current_user)

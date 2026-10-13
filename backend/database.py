@@ -88,5 +88,7 @@ def init_db(target_engine=None) -> None:
 
     # Run incremental migrations (idempotent)
     from backend.migrate_add_password_hash import migrate_add_password_hash
+    from backend.migrate_categories import migrate_categories
 
     migrate_add_password_hash(db_engine)
+    migrate_categories(db_engine)

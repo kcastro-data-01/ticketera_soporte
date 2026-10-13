@@ -39,8 +39,8 @@ filtrarlos, y consultar su historial de cambios.
   con desplazamiento explícito.
 - Ejecución local y con Docker (`docker compose up --build`), con persistencia
   de SQLite en un volumen.
-- Suite de pruebas con pytest (173 pruebas), pruebas del frontend con
-  `node:test` (38 pruebas en tres ficheros) y documentación en
+- Suite de pruebas con pytest (286 pruebas), pruebas del frontend con
+  `node:test` (43 pruebas en tres ficheros) y documentación en
   [docs/api.md](docs/api.md).
 
 **Pendientes**
@@ -97,7 +97,7 @@ ticketera_soporte/
 
 ## Decisiones de diseño
 
-1. **Categorías fijas:** Incidente, Consulta, Solicitud, Mantenimiento.
+1. **Categorías fijas:** Hardware, Software, Red, Accesos.
 2. **Sin autenticación:** existen usuarios mínimos (solo para asignar tickets y firmar comentarios/historial).
 3. **Idioma:** variables y funciones en inglés; textos visibles de la interfaz en español.
 
@@ -260,13 +260,13 @@ curl -X POST http://127.0.0.1:8000/api/tickets \
   -d '{
     "title": "No enciende la impresora",
     "description": "La impresora del piso 2 no responde desde ayer.",
-    "category": "Incidente",
+    "category": "Hardware",
     "priority": "Alta"
   }'
 ```
 
 Devuelve `201 Created` con el ticket creado (el estado inicial es `Nuevo`).
-Categorías válidas: `Incidente`, `Consulta`, `Solicitud`, `Mantenimiento`.
+Categorías válidas: `Hardware`, `Software`, `Red`, `Accesos`.
 Prioridades válidas: `Baja`, `Media`, `Alta`, `Crítica`. Los datos inválidos
 responden `422 Unprocessable Entity`.
 
@@ -305,7 +305,7 @@ Parámetros de consulta (todos opcionales y combinables entre sí):
 | Parámetro | Valores | Efecto |
 |-----------|---------|--------|
 | `search` | texto libre | coincidencia parcial en `title` o `description`, sin distinguir mayúsculas; vacío o solo espacios equivale a no enviarlo; sin coincidencias → `200` con `[]` |
-| `category` | `Incidente`, `Consulta`, `Solicitud`, `Mantenimiento` | filtra por categoría |
+| `category` | `Hardware`, `Software`, `Red`, `Accesos` | filtra por categoría |
 | `priority` | `Baja`, `Media`, `Alta`, `Crítica` | filtra por prioridad |
 | `state` | `Nuevo`, `En proceso`, `Resuelto`, `Cerrado` | filtra por estado |
 
@@ -394,6 +394,15 @@ al arrancar la API (`init_db()` se ejecuta en el arranque).
 El archivo está excluido de Git (`.gitignore`) y sus tablas son: `users`,
 `tickets`, `comments` y `history`.
 
+Al arrancar también se ejecutan migraciones incrementales e idempotentes.
+La de categorías (`backend/migrate_categories.py`) reconstruye la tabla
+`tickets` —SQLite no permite alterar un `CHECK`— y traduce los valores
+antiguos con la correspondencia aprobada 1 a 1: `Incidente → Hardware`,
+`Consulta → Software`, `Solicitud → Accesos`, `Mantenimiento → Red`. Se
+conservan todos los datos de los tickets (incluidas sus fechas) y sus
+comentarios e historial; los tickets creados después solo aceptan las
+categorías vigentes.
+
 ### Pruebas
 
 ```bash
@@ -407,13 +416,13 @@ node --test frontend/tests/detalle_flujo.test.js
 node --test frontend/tests/usuarios_ui.test.js
 ```
 
-La suite completa (173 pruebas) usa bases de datos temporales por test y no
-modifica `ticketera.db`. Las pruebas del frontend (38 en total) cargan los
+La suite completa (286 pruebas) usa bases de datos temporales por test y no
+modifica `ticketera.db`. Las pruebas del frontend (43 en total) cargan los
 scripts reales en un contexto aislado con `node:test`:
 `frontend/tests/app_errors.test.js` (10) verifica el manejo de errores de
 `fetchTickets()` (conexión, error HTTP, respuesta inválida y casos de
 éxito), comprobando en cada caso que una ejecución realiza exactamente una
-petición HTTP; `frontend/tests/detalle_flujo.test.js` (15) cubre la hora
+petición HTTP; `frontend/tests/detalle_flujo.test.js` (20) cubre la hora
 de Costa Rica en el detalle y el listado, el listado de comentarios
 (carga, vacío, errores y refresco tras agregar) y la asignación de
 usuarios (detalle del backend, desasignación, usuarios no disponibles y

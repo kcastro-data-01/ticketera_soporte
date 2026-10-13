@@ -14,11 +14,23 @@ const vm = require("node:vm");
 
 const APP_PATH = path.join(__dirname, "..", "js", "app.js");
 const appSource = fs.readFileSync(APP_PATH, "utf8");
+const AUTH_PATH = path.join(__dirname, "..", "js", "auth.js");
+const authSource = fs.readFileSync(AUTH_PATH, "utf8");
+
+/* Sesión activa mínima para que fetchWithAuth() (auth.js) adjunte el token. */
+function createLocalStorage() {
+  const store = new Map([["access_token", "token-de-prueba"]]);
+  return {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: (key) => store.delete(key),
+  };
+}
 
 const TICKET = {
   id: 1,
   title: "Sin acceso al correo",
-  category: "Incidente",
+  category: "Hardware",
   priority: "Alta",
   state: "Nuevo",
   assigned_to_id: null,
@@ -85,6 +97,8 @@ function createHarness(fetchImpl) {
       },
       addEventListener() {},
     },
+    window: { location: {} },
+    localStorage: createLocalStorage(),
     fetch: (url, options) => {
       fetchCalls.push(url);
       return fetchImpl(url, options);
@@ -96,6 +110,7 @@ function createHarness(fetchImpl) {
     Map,
   };
 
+  vm.runInNewContext(authSource, sandbox, { filename: "auth.js" });
   vm.runInNewContext(appSource, sandbox, { filename: "app.js" });
 
   return {

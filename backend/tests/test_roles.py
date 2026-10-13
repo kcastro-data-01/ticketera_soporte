@@ -19,7 +19,7 @@ from backend.constants import (
 VALID_TICKET = {
     "title": "Ticket de prueba",
     "description": "Descripción del ticket usado en las pruebas de roles.",
-    "category": TicketCategory.INQUIRY.value,
+    "category": TicketCategory.SOFTWARE.value,
     "priority": TicketPriority.MEDIUM.value,
 }
 
@@ -151,7 +151,7 @@ def test_round_robin_counts_tickets_of_both_eligible_roles(auth_client, session)
         TicketModel(
             title="Ticket existente",
             description="Ya asignado al técnico.",
-            category="Consulta",
+            category="Software",
             priority="Media",
             assigned_to_id=technician["id"],
         )

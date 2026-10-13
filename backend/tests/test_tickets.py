@@ -12,7 +12,7 @@ from backend.models import Ticket
 VALID_PAYLOAD = {
     "title": "No enciende la impresora",
     "description": "La impresora del piso 2 no responde desde ayer.",
-    "category": TicketCategory.INCIDENT.value,
+    "category": TicketCategory.HARDWARE.value,
     "priority": TicketPriority.HIGH.value,
 }
 
@@ -312,11 +312,11 @@ def test_patch_updates_only_category(auth_client):
 
     response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
-        json={"category": TicketCategory.REQUEST.value},
+        json={"category": TicketCategory.ACCESS.value},
     )
     data = response.json()
 
-    assert data["category"] == TicketCategory.REQUEST.value
+    assert data["category"] == TicketCategory.ACCESS.value
     assert data["title"] == ticket["title"]
     assert data["description"] == ticket["description"]
     assert data["priority"] == ticket["priority"]

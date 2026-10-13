@@ -15,8 +15,20 @@ const vm = require("node:vm");
 
 const DETALLE_PATH = path.join(__dirname, "..", "js", "detalle.js");
 const APP_PATH = path.join(__dirname, "..", "js", "app.js");
+const AUTH_PATH = path.join(__dirname, "..", "js", "auth.js");
 const detalleSource = fs.readFileSync(DETALLE_PATH, "utf8");
 const appSource = fs.readFileSync(APP_PATH, "utf8");
+const authSource = fs.readFileSync(AUTH_PATH, "utf8");
+
+/* Sesión activa mínima para que fetchWithAuth() (auth.js) adjunte el token. */
+function createLocalStorage() {
+  const store = new Map([["access_token", "token-de-prueba"]]);
+  return {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: (key) => store.delete(key),
+  };
+}
 
 const USER = { id: 3, name: "Sofía Ruiz", email: "sofia@example.com", role: "Soporte" };
 
@@ -24,7 +36,7 @@ const TICKET = {
   id: 1,
   title: "Impresora sin conexión",
   description: "La impresora del segundo piso no responde.",
-  category: "Incidente",
+  category: "Hardware",
   priority: "Alta",
   state: "Nuevo",
   assigned_to_id: null,
@@ -164,6 +176,7 @@ function createHarness(fetchImpl) {
       addEventListener() {},
     },
     window: { location: { search: "?id=1" } },
+    localStorage: createLocalStorage(),
     fetch: (url, options) => {
       fetchCalls.push({ url, options });
       return fetchImpl(url, options);
@@ -176,6 +189,7 @@ function createHarness(fetchImpl) {
     Map,
   };
 
+  vm.runInNewContext(authSource, sandbox, { filename: "auth.js" });
   vm.runInNewContext(detalleSource, sandbox, { filename: "detalle.js" });
 
   return {
@@ -209,11 +223,14 @@ test("formatFecha del listado muestra la hora de Costa Rica", () => {
       createElement: () => createNode("x"),
       addEventListener() {},
     },
+    window: { location: {} },
+    localStorage: createLocalStorage(),
     fetch: async () => jsonResponse(200, []),
     console: { error() {}, log() {} },
     URLSearchParams,
     Map,
   };
+  vm.runInNewContext(authSource, sandbox, { filename: "auth.js" });
   vm.runInNewContext(appSource, sandbox, { filename: "app.js" });
 
   const formatted = sandbox.formatFecha("2026-10-08T16:00:00Z");

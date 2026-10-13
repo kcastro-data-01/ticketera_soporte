@@ -12,7 +12,7 @@ from backend.models import Ticket
 VALID_TICKET = {
     "title": "Ticket con máquina de estados",
     "description": "Descripción del ticket usado para probar RF3.",
-    "category": TicketCategory.INCIDENT.value,
+    "category": TicketCategory.HARDWARE.value,
     "priority": TicketPriority.HIGH.value,
 }
 WORKFLOW = [
@@ -43,33 +43,33 @@ REJECTED_TRANSITIONS = [
 ]
 
 
-def create_ticket(client, **overrides) -> dict:
+def create_ticket(auth_client, **overrides) -> dict:
     payload = {**VALID_TICKET, **overrides}
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
     assert response.status_code == 201
     return response.json()
 
 
-def change_state(client, ticket_id: int, state: str):
-    return client.patch(f"/api/tickets/{ticket_id}/state", json={"state": state})
+def change_state(auth_client, ticket_id: int, state: str):
+    return auth_client.patch(f"/api/tickets/{ticket_id}/state", json={"state": state})
 
 
-def advance_to(client, ticket_id: int, state: str) -> None:
+def advance_to(auth_client, ticket_id: int, state: str) -> None:
     """Drive a ticket forward through the allowed transitions until it
     reaches ``state`` (used to set up a given starting point)."""
-    current = client.get(f"/api/tickets/{ticket_id}").json()["state"]
+    current = auth_client.get(f"/api/tickets/{ticket_id}").json()["state"]
     while current != state:
         assert WORKFLOW.index(current) < WORKFLOW.index(state), (
             f"cannot advance from {current} to {state}"
         )
         next_state = WORKFLOW[WORKFLOW.index(current) + 1]
-        response = change_state(client, ticket_id, next_state)
+        response = change_state(auth_client, ticket_id, next_state)
         assert response.status_code == 200
         current = next_state
 
 
-def history_of(client, ticket_id: int) -> list[dict]:
-    response = client.get(f"/api/tickets/{ticket_id}/history")
+def history_of(auth_client, ticket_id: int) -> list[dict]:
+    response = auth_client.get(f"/api/tickets/{ticket_id}/history")
     assert response.status_code == 200
     return response.json()
 
@@ -79,12 +79,12 @@ def history_of(client, ticket_id: int) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def test_allowed_transitions_update_the_state(client, session):
+def test_allowed_transitions_update_the_state(auth_client, session):
     for current, target in ALLOWED_TRANSITIONS:
-        ticket = create_ticket(client, title=f"Ticket {current} a {target}")
-        advance_to(client, ticket["id"], current)
+        ticket = create_ticket(auth_client, title=f"Ticket {current} a {target}")
+        advance_to(auth_client, ticket["id"], current)
 
-        response = change_state(client, ticket["id"], target)
+        response = change_state(auth_client, ticket["id"], target)
 
         assert response.status_code == 200
         data = response.json()
@@ -94,10 +94,10 @@ def test_allowed_transitions_update_the_state(client, session):
         assert stored.state == target
 
 
-def test_allowed_transition_returns_the_updated_ticket_shape(client):
-    ticket = create_ticket(client)
+def test_allowed_transition_returns_the_updated_ticket_shape(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = change_state(client, ticket["id"], TicketState.IN_PROGRESS.value)
+    response = change_state(auth_client, ticket["id"], TicketState.IN_PROGRESS.value)
 
     assert response.status_code == 200
     data = response.json()
@@ -120,28 +120,28 @@ def test_allowed_transition_returns_the_updated_ticket_shape(client):
 # ---------------------------------------------------------------------------
 
 
-def test_rejected_transitions_answer_409_and_change_nothing(client):
+def test_rejected_transitions_answer_409_and_change_nothing(auth_client):
     for current, target in REJECTED_TRANSITIONS:
-        ticket = create_ticket(client, title=f"Rechazo de {current} a {target}")
-        advance_to(client, ticket["id"], current)
-        entries_before = len(history_of(client, ticket["id"]))
+        ticket = create_ticket(auth_client, title=f"Rechazo de {current} a {target}")
+        advance_to(auth_client, ticket["id"], current)
+        entries_before = len(history_of(auth_client, ticket["id"]))
 
-        response = change_state(client, ticket["id"], target)
+        response = change_state(auth_client, ticket["id"], target)
 
         assert response.status_code == 409, (current, target)
         detail = response.json()["detail"]
         assert detail == f"Transición de '{current}' a '{target}' no permitida"
-        assert client.get(f"/api/tickets/{ticket['id']}").json()["state"] == current
+        assert auth_client.get(f"/api/tickets/{ticket['id']}").json()["state"] == current
         # A rejected transition never reaches the history table.
-        assert len(history_of(client, ticket["id"])) == entries_before
+        assert len(history_of(auth_client, ticket["id"])) == entries_before
 
 
-def test_cerrado_rejects_every_target_state(client):
-    ticket = create_ticket(client)
-    advance_to(client, ticket["id"], TicketState.CLOSED.value)
+def test_cerrado_rejects_every_target_state(auth_client):
+    ticket = create_ticket(auth_client)
+    advance_to(auth_client, ticket["id"], TicketState.CLOSED.value)
 
     for target in WORKFLOW:
-        response = change_state(client, ticket["id"], target)
+        response = change_state(auth_client, ticket["id"], target)
         assert response.status_code == 409
         assert "no permitida" in response.json()["detail"]
 
@@ -151,27 +151,27 @@ def test_cerrado_rejects_every_target_state(client):
 # ---------------------------------------------------------------------------
 
 
-def test_state_change_on_missing_ticket_returns_404(client):
-    response = change_state(client, 999, TicketState.IN_PROGRESS.value)
+def test_state_change_on_missing_ticket_returns_404(auth_client):
+    response = change_state(auth_client, 999, TicketState.IN_PROGRESS.value)
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Ticket 999 no encontrado"
 
 
-def test_unknown_state_value_returns_422(client):
-    ticket = create_ticket(client)
+def test_unknown_state_value_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = change_state(client, ticket["id"], "Pendiente")
+    response = change_state(auth_client, ticket["id"], "Pendiente")
 
     assert response.status_code == 422
     # The ticket is untouched: FastAPI rejects the payload before the route.
-    assert client.get(f"/api/tickets/{ticket['id']}").json()["state"] == "Nuevo"
+    assert auth_client.get(f"/api/tickets/{ticket['id']}").json()["state"] == "Nuevo"
 
 
-def test_missing_state_field_returns_422(client):
-    ticket = create_ticket(client)
+def test_missing_state_field_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(f"/api/tickets/{ticket['id']}/state", json={})
+    response = auth_client.patch(f"/api/tickets/{ticket['id']}/state", json={})
 
     assert response.status_code == 422
 
@@ -181,23 +181,23 @@ def test_missing_state_field_returns_422(client):
 # ---------------------------------------------------------------------------
 
 
-def test_successful_transition_records_exactly_one_history_entry(client):
-    ticket = create_ticket(client)
+def test_successful_transition_records_exactly_one_history_entry(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = change_state(client, ticket["id"], TicketState.IN_PROGRESS.value)
+    response = change_state(auth_client, ticket["id"], TicketState.IN_PROGRESS.value)
 
     assert response.status_code == 200
-    entries = history_of(client, ticket["id"])
+    entries = history_of(auth_client, ticket["id"])
     # Ticket creation adds one entry, state change adds one more.
     assert len(entries) == 2
 
 
-def test_history_entry_describes_the_state_change(client):
-    ticket = create_ticket(client)
+def test_history_entry_describes_the_state_change(auth_client):
+    ticket = create_ticket(auth_client)
 
-    change_state(client, ticket["id"], TicketState.IN_PROGRESS.value)
+    change_state(auth_client, ticket["id"], TicketState.IN_PROGRESS.value)
 
-    entries = history_of(client, ticket["id"])
+    entries = history_of(auth_client, ticket["id"])
     # Entries are: creation first, then state change.
     assert len(entries) == 2
     # The state change entry should be the second one.
@@ -209,27 +209,27 @@ def test_history_entry_describes_the_state_change(client):
     assert entries[1]["author"] == "Anónimo"
 
 
-def test_full_workflow_records_history_in_chronological_order(client):
-    ticket = create_ticket(client)
+def test_full_workflow_records_history_in_chronological_order(auth_client):
+    ticket = create_ticket(auth_client)
 
     for _, target in ALLOWED_TRANSITIONS:
-        assert change_state(client, ticket["id"], target).status_code == 200
+        assert change_state(auth_client, ticket["id"], target).status_code == 200
 
-    entries = history_of(client, ticket["id"])
+    entries = history_of(auth_client, ticket["id"])
     # Ticket creation adds one entry, 3 state transitions add 3 more: total 4.
     assert len(entries) == 4
     # First entry is creation, rest are state changes in order.
     assert [entry["action"] for entry in entries] == ["created"] + [ "Cambio de estado" ] * 3
 
 
-def test_rejected_transition_records_no_history(client):
-    ticket = create_ticket(client)
+def test_rejected_transition_records_no_history(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = change_state(client, ticket["id"], TicketState.CLOSED.value)
+    response = change_state(auth_client, ticket["id"], TicketState.CLOSED.value)
 
     assert response.status_code == 409
     # Ticket creation adds one entry; rejected transition adds none.
-    entries = history_of(client, ticket["id"])
+    entries = history_of(auth_client, ticket["id"])
     assert len(entries) == 1
     assert entries[0]["action"] == "created"
 
@@ -239,10 +239,10 @@ def test_rejected_transition_records_no_history(client):
 # ---------------------------------------------------------------------------
 
 
-def test_updated_at_changes_after_a_valid_transition(client):
-    ticket = create_ticket(client)
+def test_updated_at_changes_after_a_valid_transition(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = change_state(client, ticket["id"], TicketState.IN_PROGRESS.value)
+    response = change_state(auth_client, ticket["id"], TicketState.IN_PROGRESS.value)
 
     assert response.status_code == 200
     assert datetime.fromisoformat(
@@ -250,12 +250,12 @@ def test_updated_at_changes_after_a_valid_transition(client):
     ) > datetime.fromisoformat(ticket["updated_at"])
 
 
-def test_updated_at_is_untouched_by_a_rejected_transition(client):
-    ticket = create_ticket(client)
+def test_updated_at_is_untouched_by_a_rejected_transition(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = change_state(client, ticket["id"], TicketState.CLOSED.value)
+    response = change_state(auth_client, ticket["id"], TicketState.CLOSED.value)
 
     assert response.status_code == 409
-    assert client.get(f"/api/tickets/{ticket['id']}").json()["updated_at"] == (
+    assert auth_client.get(f"/api/tickets/{ticket['id']}").json()["updated_at"] == (
         ticket["updated_at"]
     )

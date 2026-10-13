@@ -22,11 +22,11 @@ def test_states_are_the_approved_four():
 
 
 def test_categories_are_the_approved_four():
-    assert TICKET_CATEGORIES == ("Incidente", "Consulta", "Solicitud", "Mantenimiento")
-    assert TicketCategory.INCIDENT.value == "Incidente"
-    assert TicketCategory.INQUIRY.value == "Consulta"
-    assert TicketCategory.REQUEST.value == "Solicitud"
-    assert TicketCategory.MAINTENANCE.value == "Mantenimiento"
+    assert TICKET_CATEGORIES == ("Hardware", "Software", "Red", "Accesos")
+    assert TicketCategory.HARDWARE.value == "Hardware"
+    assert TicketCategory.SOFTWARE.value == "Software"
+    assert TicketCategory.NETWORK.value == "Red"
+    assert TicketCategory.ACCESS.value == "Accesos"
 
 
 def test_priorities_are_the_approved_four():

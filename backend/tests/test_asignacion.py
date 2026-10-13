@@ -15,7 +15,7 @@ VALID_USER = {
 VALID_TICKET = {
     "title": "Ticket para asignar",
     "description": "Descripción del ticket que será asignado.",
-    "category": TicketCategory.INCIDENT.value,
+    "category": TicketCategory.HARDWARE.value,
     "priority": TicketPriority.HIGH.value,
 }
 TICKET_RESPONSE_KEYS = {
@@ -31,16 +31,16 @@ TICKET_RESPONSE_KEYS = {
 }
 
 
-def create_user(client, **overrides) -> dict:
+def create_user(auth_client, **overrides) -> dict:
     payload = {**VALID_USER, **overrides}
-    response = client.post("/api/users", json=payload)
+    response = auth_client.post("/api/users", json=payload)
     assert response.status_code == 201
     return response.json()
 
 
-def create_ticket(client, **overrides) -> dict:
+def create_ticket(auth_client, **overrides) -> dict:
     payload = {**VALID_TICKET, **overrides}
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
     assert response.status_code == 201
     return response.json()
 
@@ -49,11 +49,11 @@ def create_ticket(client, **overrides) -> dict:
 # Assignment
 # ---------------------------------------------------------------------------
 
-def test_assign_ticket_returns_200(client):
-    user = create_user(client)
-    ticket = create_ticket(client)
+def test_assign_ticket_returns_200(auth_client):
+    user = create_user(auth_client)
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": user["id"]},
     )
@@ -61,11 +61,11 @@ def test_assign_ticket_returns_200(client):
     assert response.status_code == 200
 
 
-def test_assign_stores_assigned_to_id(client):
-    user = create_user(client)
-    ticket = create_ticket(client)
+def test_assign_stores_assigned_to_id(auth_client):
+    user = create_user(auth_client)
+    ticket = create_ticket(auth_client)
 
-    data = client.patch(
+    data = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": user["id"]},
     ).json()
@@ -73,11 +73,11 @@ def test_assign_stores_assigned_to_id(client):
     assert data["assigned_to_id"] == user["id"]
 
 
-def test_assignment_persists_in_sqlite(client, engine):
-    user = create_user(client)
-    ticket = create_ticket(client)
+def test_assignment_persists_in_sqlite(auth_client, engine):
+    user = create_user(auth_client)
+    ticket = create_ticket(auth_client)
 
-    client.patch(
+    auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": user["id"]},
     )
@@ -92,10 +92,10 @@ def test_assignment_persists_in_sqlite(client, engine):
         fresh_session.close()
 
 
-def test_assign_to_missing_user_returns_404(client):
-    ticket = create_ticket(client)
+def test_assign_to_missing_user_returns_404(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": 9999},
     )
@@ -103,10 +103,10 @@ def test_assign_to_missing_user_returns_404(client):
     assert response.status_code == 404
 
 
-def test_assign_to_missing_ticket_returns_404(client):
-    user = create_user(client)
+def test_assign_to_missing_ticket_returns_404(auth_client):
+    user = create_user(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         "/api/tickets/9999/assign",
         json={"assigned_to_id": user["id"]},
     )
@@ -114,10 +114,10 @@ def test_assign_to_missing_ticket_returns_404(client):
     assert response.status_code == 404
 
 
-def test_assign_without_field_returns_422(client):
-    ticket = create_ticket(client)
+def test_assign_without_field_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(f"/api/tickets/{ticket['id']}/assign", json={})
+    response = auth_client.patch(f"/api/tickets/{ticket['id']}/assign", json={})
 
     assert response.status_code == 422
 
@@ -126,15 +126,15 @@ def test_assign_without_field_returns_422(client):
 # Unassignment
 # ---------------------------------------------------------------------------
 
-def test_unassign_with_null_returns_200(client):
-    user = create_user(client)
-    ticket = create_ticket(client)
-    client.patch(
+def test_unassign_with_null_returns_200(auth_client):
+    user = create_user(auth_client)
+    ticket = create_ticket(auth_client)
+    auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": user["id"]},
     )
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": None},
     )
@@ -144,15 +144,15 @@ def test_unassign_with_null_returns_200(client):
     assert data["assigned_to_id"] is None
 
 
-def test_unassignment_persists_in_sqlite(client, engine):
-    user = create_user(client)
-    ticket = create_ticket(client)
-    client.patch(
+def test_unassignment_persists_in_sqlite(auth_client, engine):
+    user = create_user(auth_client)
+    ticket = create_ticket(auth_client)
+    auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": user["id"]},
     )
 
-    client.patch(
+    auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": None},
     )
@@ -169,11 +169,11 @@ def test_unassignment_persists_in_sqlite(client, engine):
 # Side effects and structure
 # ---------------------------------------------------------------------------
 
-def test_assign_does_not_change_other_ticket_fields(client):
-    user = create_user(client)
-    ticket = create_ticket(client)
+def test_assign_does_not_change_other_ticket_fields(auth_client):
+    user = create_user(auth_client)
+    ticket = create_ticket(auth_client)
 
-    data = client.patch(
+    data = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": user["id"]},
     ).json()
@@ -186,13 +186,13 @@ def test_assign_does_not_change_other_ticket_fields(client):
     assert data["created_at"] == ticket["created_at"]
 
 
-def test_assign_updates_updated_at(client):
-    user = create_user(client, name="Ana", email="ana@test.local")
-    other = create_user(client, name="Luis", email="luis@test.local")
-    ticket = create_ticket(client)
+def test_assign_updates_updated_at(auth_client):
+    user = create_user(auth_client, name="Ana", email="ana@test.local")
+    other = create_user(auth_client, name="Luis", email="luis@test.local")
+    ticket = create_ticket(auth_client)
 
     # The ticket is auto-assigned to `user`; reassign to `other` to change it.
-    data = client.patch(
+    data = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": other["id"]},
     ).json()
@@ -202,11 +202,11 @@ def test_assign_updates_updated_at(client):
     )
 
 
-def test_assign_response_structure(client):
-    user = create_user(client)
-    ticket = create_ticket(client)
+def test_assign_response_structure(auth_client):
+    user = create_user(auth_client)
+    ticket = create_ticket(auth_client)
 
-    data = client.patch(
+    data = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": user["id"]},
     ).json()
@@ -215,8 +215,8 @@ def test_assign_response_structure(client):
     assert isinstance(data["assigned_to_id"], int)
 
 
-def test_assignment_endpoints_are_exposed_in_openapi(client):
-    schema = client.get("/openapi.json").json()
+def test_assignment_endpoints_are_exposed_in_openapi(auth_client):
+    schema = auth_client.get("/openapi.json").json()
 
     assert "/api/users" in schema["paths"]
     assert "/api/tickets/{ticket_id}/assign" in schema["paths"]

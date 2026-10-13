@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from backend.auth import get_current_user
 from backend.database import get_session
 from backend.models import User
-from backend.routers.auth import optional_role_required, ROLES_ADMIN
+from backend.routers.auth import role_required, ROLES_ADMIN
 from backend.constants import UserRole
 from backend.schemas import UserCreate, UserResponse, UserUpdate
 ROLES_ADMIN = {UserRole.ADMIN.value}
@@ -28,8 +28,8 @@ router = APIRouter(prefix="/api/users", tags=["Usuarios"])
 def create_user(
     payload: UserCreate,
     session: Session = Depends(get_session),
-    current_user: User | None = Depends(
-        optional_role_required(ROLES_ADMIN)
+    current_user: User = Depends(
+        role_required(ROLES_ADMIN)
     ),
 ) -> UserResponse:
     """Create a minimal user used to own tickets (name, email, role)."""
@@ -49,8 +49,8 @@ def create_user(
 )
 def list_users(
     session: Session = Depends(get_session),
-    current_user: User | None = Depends(
-        optional_role_required(ROLES_ADMIN | ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_TECNICO | ROLES_SOLICITANTE)
+    current_user: User = Depends(
+        role_required(ROLES_ADMIN | ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_TECNICO | ROLES_SOLICITANTE)
     ),
 ) -> list[UserResponse]:
     """Return the active users available for assignment (read-only)."""
@@ -67,8 +67,8 @@ def update_user(
     user_id: int,
     payload: UserUpdate,
     session: Session = Depends(get_session),
-    current_user: User | None = Depends(
-        optional_role_required(ROLES_ADMIN)
+    current_user: User = Depends(
+        role_required(ROLES_ADMIN)
     ),
 ) -> UserResponse:
     """Update an existing user (partial update)."""

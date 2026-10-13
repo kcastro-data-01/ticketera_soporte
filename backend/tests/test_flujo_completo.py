@@ -13,7 +13,7 @@ from backend.constants import TicketCategory, TicketPriority, UserRole
 VALID_TICKET = {
     "title": "Ticket del flujo integrado",
     "description": "Ticket usado por la prueba de integración de la Tarea 20.2.",
-    "category": TicketCategory.INCIDENT.value,
+    "category": TicketCategory.HARDWARE.value,
     "priority": TicketPriority.HIGH.value,
 }
 

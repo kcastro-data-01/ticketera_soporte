@@ -20,13 +20,13 @@ implementa, se prueba, se documenta y se commitea antes de pasar a la siguiente.
 
 ## Decisiones de diseño aprobadas
 
-1. **Categorías fijas:** Incidente, Consulta, Solicitud, Mantenimiento.
+1. **Categorías fijas:** Hardware, Software, Red, Accesos.
 2. **Sin autenticación.** Usuarios mínimos (tabla `users`) solo para asignar
    tickets y como autor de comentarios/historial.
 3. **Idioma:** variables y funciones en inglés; textos visibles de la interfaz
    en español. En consecuencia, tablas, columnas y campos de la API usan
    identificadores en inglés, mientras que los valores de los enums
-   (`Nuevo`, `Incidente`, `Baja`…) se guardan en español porque se muestran
+   (`Nuevo`, `Hardware`, `Baja`…) se guardan en español porque se muestran
    directamente en la UI.
 4. **Auditoría automática:** el historial se registra desde la capa de servicio,
    nunca desde el frontend.
@@ -426,8 +426,8 @@ GET    /api/catalogs                (states, categories, priorities)
   `button:disabled`, `textarea`) y `frontend/index.html` (enlace **Nuevo
   ticket** en la cabecera).
 - **Formulario:** título, descripción, categoría y prioridad; los selects
-  usan exactamente las opciones del backend (`Incidente`, `Consulta`,
-  `Solicitud`, `Mantenimiento` / `Baja`, `Media`, `Alta`, `Crítica`) sin
+  usan exactamente las opciones del backend (`Hardware`, `Software`,
+  `Red`, `Accesos` / `Baja`, `Media`, `Alta`, `Crítica`) sin
   opción vacía, de modo que siempre hay valor válido.
 - **Comportamiento:** validación en el navegador (`novalidate` + chequeo
   con `trim`: vacíos o solo espacios → mensaje en español sin llamar a la

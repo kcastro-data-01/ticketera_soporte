@@ -14,7 +14,19 @@ const test = require("node:test");
 const vm = require("node:vm");
 
 const USUARIOS_PATH = path.join(__dirname, "..", "js", "usuarios.js");
+const AUTH_PATH = path.join(__dirname, "..", "js", "auth.js");
 const usuariosSource = fs.readFileSync(USUARIOS_PATH, "utf8");
+const authSource = fs.readFileSync(AUTH_PATH, "utf8");
+
+/* Sesión activa mínima para que fetchWithAuth() (auth.js) adjunte el token. */
+function createLocalStorage() {
+  const store = new Map([["access_token", "token-de-prueba"]]);
+  return {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: (key) => store.delete(key),
+  };
+}
 
 const USER_A = {
   id: 1,
@@ -39,6 +51,15 @@ const ELEMENT_IDS = [
   "usuarios-estado",
   "tabla-usuarios",
   "cuerpo-usuarios",
+  "seccion-editar",
+  "form-editar-usuario",
+  "editar-id",
+  "editar-nombre",
+  "editar-email",
+  "editar-rol",
+  "guardar-edicion",
+  "cancelar-edicion",
+  "estado-edicion",
 ];
 
 function createNode(id) {
@@ -108,6 +129,8 @@ function createHarness(fetchImpl) {
       },
       addEventListener() {},
     },
+    window: { location: {} },
+    localStorage: createLocalStorage(),
     fetch: (url, options) => {
       fetchCalls.push({ url, options });
       return fetchImpl(url, options);
@@ -116,8 +139,11 @@ function createHarness(fetchImpl) {
       error: (...args) => consoleErrors.push(args),
       log() {},
     },
+    URLSearchParams,
+    Map,
   };
 
+  vm.runInNewContext(authSource, sandbox, { filename: "auth.js" });
   vm.runInNewContext(usuariosSource, sandbox, { filename: "usuarios.js" });
 
   const fakeEvent = { preventDefault() {} };
@@ -158,10 +184,13 @@ test("init lista los usuarios con nombre, correo, rol y estado", async () => {
     "ana@soporte.local",
     "Soporte",
     "", // la celda de estado contiene el badge
+    "", // la celda de acciones contiene el botón Editar
   ]);
   const badge = rows[0].children[3].children[0];
   assert.equal(badge.className, "badge badge-activo");
   assert.equal(badge.textContent, "Activo");
+  const editButton = rows[0].children[4].children[0];
+  assert.equal(editButton.textContent, "Editar");
   assert.equal(rows[1].children[0].textContent, "Carlos Gómez");
   assert.equal(harness.node("tabla-usuarios").hidden, false);
   assert.equal(harness.node("usuarios-estado").hidden, true);

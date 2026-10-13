@@ -13,7 +13,7 @@ Documentación de los endpoints **realmente implementados** en el código
   cabeceras de autorización; los usuarios solo sirven para asignación y firma
   de comentarios/historial.
 - **Formato:** JSON. Identificadores de campos en inglés; los valores de los
-  enums (`Incidente`, `Nuevo`, `Alta`…) llegan en español tal como los muestra
+  enums (`Hardware`, `Nuevo`, `Alta`…) llegan en español tal como los muestra
   la interfaz.
 - **Fechas:** ISO-8601 en UTC con desplazamiento explícimo (`...Z`, p. ej.
   `2026-10-07T19:29:19.391813Z`) en `created_at`, `updated_at` y
@@ -46,7 +46,7 @@ Documentación de los endpoints **realmente implementados** en el código
   "id": 1,
   "title": "No enciende la impresora",
   "description": "La impresora del piso 2 no responde desde ayer.",
-  "category": "Incidente",
+  "category": "Hardware",
   "priority": "Alta",
   "state": "Nuevo",
   "assigned_to_id": null,
@@ -55,7 +55,7 @@ Documentación de los endpoints **realmente implementados** en el código
 }
 ```
 
-**Enums:** `category` ∈ `Incidente | Consulta | Solicitud | Mantenimiento`;
+**Enums:** `category` ∈ `Hardware | Software | Red | Accesos`;
 `priority` ∈ `Baja | Media | Alta | Crítica`;
 `state` ∈ `Nuevo | En proceso | Resuelto | Cerrado`.
 
@@ -105,7 +105,7 @@ válido.
 ```bash
 curl -X POST http://127.0.0.1:8000/api/tickets \
   -H "Content-Type: application/json" \
-  -d '{"title": "No enciende la impresora", "description": "No responde desde ayer.", "category": "Incidente", "priority": "Alta"}'
+  -d '{"title": "No enciende la impresora", "description": "No responde desde ayer.", "category": "Hardware", "priority": "Alta"}'
 ```
 
 ### `GET /api/tickets`
@@ -120,7 +120,7 @@ responde `200` con `[]`.
 | Parámetro | Valores | Efecto |
 |-----------|---------|--------|
 | `search` | texto libre | coincidencia parcial (case-insensitive) en `title` o `description`; vacío o solo espacios equivale a no enviado; `%` y `_` se tratan como texto literal |
-| `category` | `Incidente`, `Consulta`, `Solicitud`, `Mantenimiento` | filtra por categoría |
+| `category` | `Hardware`, `Software`, `Red`, `Accesos` | filtra por categoría |
 | `priority` | `Baja`, `Media`, `Alta`, `Crítica` | filtra por prioridad |
 | `state` | `Nuevo`, `En proceso`, `Resuelto`, `Cerrado` | filtra por estado |
 
@@ -224,7 +224,7 @@ curl -X PATCH http://127.0.0.1:8000/api/tickets/1/state \
   "id": 1,
   "title": "No enciende la impresora",
   "description": "La impresora del piso 2 no responde desde ayer.",
-  "category": "Incidente",
+  "category": "Hardware",
   "priority": "Alta",
   "state": "En proceso",
   "assigned_to_id": null,

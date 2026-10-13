@@ -5,11 +5,23 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_session
 from backend.models import User
+from backend.routers.auth import (
+    ROLES_SOLICITANTE,
+    ROLES_SUPERVISOR,
+    ROLES_SOPORTE,
+    ROLES_TECNICO,
+    role_required,
+)
 from backend.schemas import CommentCreate, CommentResponse
 from backend.services import ticket_service
 from backend.services.ticket_service import TicketNotFoundError
 
 router = APIRouter(prefix="/api/tickets", tags=["Comentarios"])
+
+# Cualquier usuario autenticado puede comentar y leer comentarios.
+COMMENT_ROLES = (
+    ROLES_SOLICITANTE | ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_TECNICO
+)
 
 
 @router.post(
@@ -22,8 +34,12 @@ def create_comment(
     ticket_id: int,
     payload: CommentCreate,
     session: Session = Depends(get_session),
+    current_user: User = Depends(role_required(COMMENT_ROLES)),
 ) -> CommentResponse:
-    """Create a comment on an existing ticket (RF5)."""
+    """Create a comment on an existing ticket (RF5).
+
+    Requires authentication (401 without token).
+    """
     try:
         comment = ticket_service.create_comment(session, ticket_id, payload)
     except TicketNotFoundError:
@@ -42,12 +58,14 @@ def create_comment(
 def list_comments(
     ticket_id: int,
     session: Session = Depends(get_session),
+    current_user: User = Depends(role_required(COMMENT_ROLES)),
 ) -> list[CommentResponse]:
     """Return the comments stored for a ticket, oldest first (RF5).
 
-    Read-only: it exposes the existing ``comments`` rows and never creates
-    them. A missing ticket is answered with ``404``; an existing ticket
-    without comments returns an empty list.
+    Requires authentication (401 without token). Read-only: it exposes the
+    existing ``comments`` rows and never creates them. A missing ticket is
+    answered with ``404``; an existing ticket without comments returns an
+    empty list.
     """
     comments = ticket_service.get_ticket_comments(session, ticket_id)
     if comments is None:
