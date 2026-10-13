@@ -4,6 +4,10 @@ uvicorn[standard]>=0.32.0
 sqlalchemy>=2.0.36
 pydantic>=2.10.0
 
+# Autenticación
+PyJWT>=2.9.0
+passlib[bcrypt]>=1.7.4
+
 # Pruebas
 pytest>=8.0.0
 httpx>=0.28.0

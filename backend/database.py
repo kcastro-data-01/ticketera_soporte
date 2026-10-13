@@ -75,7 +75,7 @@ def get_session():
 
 
 def init_db(target_engine=None) -> None:
-    """Create every table defined by the models.
+    """Create every table defined by the models and run migrations.
 
     Models are imported here so they register themselves on ``Base.metadata``
     even when this function is called before anything else touched the models.
@@ -83,4 +83,10 @@ def init_db(target_engine=None) -> None:
     """
     from backend import models  # noqa: F401  (import for side effects)
 
-    Base.metadata.create_all(bind=target_engine or engine)
+    db_engine = target_engine or engine
+    Base.metadata.create_all(bind=db_engine)
+
+    # Run incremental migrations (idempotent)
+    from backend.migrate_add_password_hash import migrate_add_password_hash
+
+    migrate_add_password_hash(db_engine)

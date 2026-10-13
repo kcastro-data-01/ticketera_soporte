@@ -62,6 +62,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     role: Mapped[str] = mapped_column(String(30), nullable=False, default=UserRole.SUPPORT.value)
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     tickets: Mapped[list["Ticket"]] = relationship(back_populates="assignee")
 

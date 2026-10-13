@@ -137,6 +137,57 @@ class UserCreate(BaseModel):
         return cleaned
 
 
+class UserUpdate(BaseModel):
+    """Payload accepted by ``PATCH /api/users/{user_id}`` (partial update).
+
+    Only the editable fields exist here: ``id`` and ``is_active`` cannot be
+    modified through this payload. At least one field must be provided.
+    """
+
+    name: str | None = None
+    email: str | None = None
+    role: UserRole | None = None
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("el nombre no puede estar vacío")
+        if len(cleaned) > 120:
+            raise ValueError("el nombre debe tener como máximo 120 caracteres")
+        return cleaned
+
+    @field_validator("email")
+    @classmethod
+    def email_must_be_valid(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip().lower()
+        if not _EMAIL_PATTERN.match(cleaned):
+            raise ValueError("el email no tiene un formato válido")
+        if len(cleaned) > 255:
+            raise ValueError("el email debe tener como máximo 255 caracteres")
+        return cleaned
+
+    @model_validator(mode="after")
+    def at_least_one_modifiable_field(self) -> "UserUpdate":
+        """Reject payloads without any field to update (no empty updates)."""
+        provided = {
+            name
+            for name in self.model_fields_set
+            if getattr(self, name) is not None
+        }
+        if not provided:
+            raise ValueError(
+                "la petición debe incluir al menos un campo a modificar: "
+                "name, email o role"
+            )
+        return self
+
+
 class UserResponse(BaseModel):
     """User returned by the API."""
 
@@ -231,3 +282,74 @@ class HistoryResponse(BaseModel):
     new_value: str | None = None
     author: str | None = None
     created_at: datetime
+
+
+# --- Authentication schemas ---
+
+
+class LoginRequest(BaseModel):
+    """Payload accepted by ``POST /api/auth/login``."""
+
+    email: str
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def email_must_not_be_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("el email no puede estar vacío")
+        return cleaned
+
+    @field_validator("password")
+    @classmethod
+    def password_must_not_be_blank(cls, value: str) -> str:
+        if not value:
+            raise ValueError("la contraseña no puede estar vacía")
+        return value
+
+
+class RegisterRequest(BaseModel):
+    """Payload accepted by ``POST /api/auth/register``."""
+
+    name: str
+    email: str
+    password: str
+    role: UserRole | None = None
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("el nombre no puede estar vacío")
+        if len(cleaned) > 120:
+            raise ValueError("el nombre debe tener como máximo 120 caracteres")
+        return cleaned
+
+    @field_validator("email")
+    @classmethod
+    def email_must_be_valid(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        if not _EMAIL_PATTERN.match(cleaned):
+            raise ValueError("el email no tiene un formato válido")
+        if len(cleaned) > 255:
+            raise ValueError("el email debe tener como máximo 255 caracteres")
+        return cleaned
+
+    @field_validator("password")
+    @classmethod
+    def password_must_be_strong_enough(cls, value: str) -> str:
+        if len(value) < 6:
+            raise ValueError("la contraseña debe tener al menos 6 caracteres")
+        if len(value) > 128:
+            raise ValueError("la contraseña debe tener como máximo 128 caracteres")
+        return value
+
+
+class TokenResponse(BaseModel):
+    """Response returned after successful registration or login."""
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int

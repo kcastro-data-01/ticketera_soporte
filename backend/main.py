@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
+from backend.routers.auth import router as auth_router
 from backend.routers.comentarios import router as comments_router
 from backend.routers.config import router as config_router
 from backend.routers.history import router as history_router
@@ -35,6 +36,7 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
+app.include_router(auth_router)
 app.include_router(tickets_router)
 app.include_router(comments_router)
 app.include_router(users_router)
