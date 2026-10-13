@@ -83,7 +83,9 @@ async function fetchHistorial() {
 
   let response;
   try {
-    response = await fetch(API_HISTORY_URL);
+    /* fetchWithAuth (auth.js) adjunta el Bearer token de la sesión: el
+       endpoint /api/history requiere autenticación (401 sin token). */
+    response = await fetchWithAuth(API_HISTORY_URL);
   } catch (error) {
     console.error("No se pudo conectar con el servidor:", error);
     showStatus(

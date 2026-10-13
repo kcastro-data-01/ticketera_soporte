@@ -2,8 +2,11 @@
 
 from datetime import datetime, timezone
 
-from backend.constants import TicketCategory, TicketPriority
-from backend.models import History
+import pytest
+
+from backend.auth import hash_password
+from backend.constants import TicketCategory, TicketPriority, UserRole
+from backend.models import History, User
 
 VALID_TICKET = {
     "title": "Ticket para historial global",
@@ -145,3 +148,104 @@ def test_global_history_is_read_only(auth_client):
     assert auth_client.post("/api/history").status_code == 405
     assert auth_client.patch("/api/history").status_code == 405
     assert auth_client.delete("/api/history").status_code == 405
+
+
+# ---------------------------------------------------------------------------
+# Authentication: the endpoint rejects anonymous requests and accepts every
+# authenticated role (regression for the 401 shown by the Historial screen).
+# ---------------------------------------------------------------------------
+
+
+def test_global_history_requires_a_valid_token(client):
+    """Sin cabecera Authorization el endpoint responde 401, nunca datos."""
+    response = client.get("/api/history")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "No autenticado"
+
+
+def test_global_history_rejects_an_invalid_token(client):
+    response = client.get(
+        "/api/history", headers={"Authorization": "Bearer token-falso"}
+    )
+
+    assert response.status_code == 401
+
+
+def login_as(client, session, role: str, email: str) -> str:
+    """Create an active user with a password for ``role`` and return a token."""
+    user = User(
+        name=f"Usuario {role}",
+        email=email,
+        role=role,
+        is_active=True,
+        password_hash=hash_password("clave12345"),
+    )
+    session.add(user)
+    session.commit()
+
+    response = client.post(
+        "/api/auth/login", json={"email": email, "password": "clave12345"}
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+@pytest.mark.parametrize("role", list(UserRole), ids=[r.value for r in UserRole])
+def test_every_role_can_read_the_global_history(client, session, role):
+    token = login_as(client, session, role.value, f"historial-{role.value}@test.local")
+
+    response = client.get("/api/history", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_global_history_preserves_the_real_author(client, session):
+    """El autor registrado (nombre del assignee) se devuelve tal cual: la
+    pantalla no debe sustituirlo por "Anónimo" ni inventar autores."""
+    admin_token = login_as(
+        client, session, UserRole.ADMIN.value, "admin-historial@test.local"
+    )
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    support = User(
+        name="Ana Pérez",
+        email="ana-historial@test.local",
+        role=UserRole.SUPPORT.value,
+        is_active=True,
+        password_hash=hash_password("clave12345"),
+    )
+    session.add(support)
+    session.commit()
+    session.refresh(support)
+
+    created = client.post(
+        "/api/tickets",
+        headers=admin_headers,
+        json=VALID_TICKET,
+    )
+    assert created.status_code == 201
+    ticket_id = created.json()["id"]
+
+    assigned = client.patch(
+        f"/api/tickets/{ticket_id}/assign",
+        headers=admin_headers,
+        json={"assigned_to_id": support.id},
+    )
+    assert assigned.status_code == 200
+
+    comment = client.post(
+        f"/api/tickets/{ticket_id}/comments",
+        headers=admin_headers,
+        json={"content": "Comentario firmado por el assignee."},
+    )
+    assert comment.status_code == 201
+
+    response = client.get("/api/history", headers=admin_headers)
+
+    assert response.status_code == 200
+    commented = [e for e in response.json() if e["action"] == "commented"]
+    assert len(commented) == 1
+    assert commented[0]["author"] == "Ana Pérez"
+    assert commented[0]["author"] != "Anónimo"

@@ -39,8 +39,8 @@ filtrarlos, y consultar su historial de cambios.
   con desplazamiento explícito.
 - Ejecución local y con Docker (`docker compose up --build`), con persistencia
   de SQLite en un volumen.
-- Suite de pruebas con pytest (286 pruebas), pruebas del frontend con
-  `node:test` (43 pruebas en tres ficheros) y documentación en
+- Suite de pruebas con pytest (294 pruebas), pruebas del frontend con
+  `node:test` (52 pruebas en cuatro ficheros) y documentación en
   [docs/api.md](docs/api.md).
 
 **Pendientes**
@@ -416,8 +416,8 @@ node --test frontend/tests/detalle_flujo.test.js
 node --test frontend/tests/usuarios_ui.test.js
 ```
 
-La suite completa (286 pruebas) usa bases de datos temporales por test y no
-modifica `ticketera.db`. Las pruebas del frontend (43 en total) cargan los
+La suite completa (294 pruebas) usa bases de datos temporales por test y no
+modifica `ticketera.db`. Las pruebas del frontend (52 en total) cargan los
 scripts reales en un contexto aislado con `node:test`:
 `frontend/tests/app_errors.test.js` (10) verifica el manejo de errores de
 `fetchTickets()` (conexión, error HTTP, respuesta inválida y casos de
@@ -426,10 +426,14 @@ petición HTTP; `frontend/tests/detalle_flujo.test.js` (20) cubre la hora
 de Costa Rica en el detalle y el listado, el listado de comentarios
 (carga, vacío, errores y refresco tras agregar) y la asignación de
 usuarios (detalle del backend, desasignación, usuarios no disponibles y
-lista vacía); y `frontend/tests/usuarios_ui.test.js` (13) cubre el listado
+lista vacía); `frontend/tests/usuarios_ui.test.js` (13) cubre el listado
 de usuarios (éxito, vacío y errores), las validaciones del formulario
 (nombre, correo y rol) y el alta (éxito con recarga, email duplicado y
-datos inválidos).
+datos inválidos); y `frontend/tests/historial_ui.test.js` (9) cubre la
+pantalla de historial global: que la petición se envía con `fetchWithAuth`
+y el Bearer token de la sesión (regresión del 401 sin token), el pintado
+de las siete columnas con el autor real, los estados vacío/error HTTP/
+JSON inválido/sin conexión y la limpieza de sesión ante un 401.
 
 ### Documentación de la API
 
