@@ -132,9 +132,12 @@
 </head>
 <body>
   <div class="auth-container">
-    <h1>Ticketera de Soporte</h1>
-    <p class="subtitulo">Inicia sesión o crea tu cuenta para continuar</p>
+    <div class="login-title">
+      <span class="login-text">Ticketera</span>
+      <span class="login-subtitle">de Soporte</span>
+    </div>
 
+    <!-- Pestañas login / registro -->
     <div class="auth-tabs">
       <button type="button" id="tab-login" class="auth-tab activo">Iniciar sesión</button>
       <button type="button" id="tab-register" class="auth-tab">Crear cuenta</button>
@@ -145,33 +148,35 @@
 
     <!-- Formulario de Login -->
     <form id="form-login" class="auth-form activo">
-      <label class="campo">
-        <span>Correo electrónico</span>
-        <input type="email" id="login-email" name="email" required autocomplete="email" placeholder="tu@correo.com">
-      </label>
-      <label class="campo">
-        <span>Contraseña</span>
-        <input type="password" id="login-password" name="password" required autocomplete="current-password" placeholder="••••••••">
-      </label>
+      <div class="field-wrapper input-icon email-icon">
+        <input type="email" id="login-email" name="email" required autocomplete="email" class="form-input" placeholder="tu@correo.com">
+        <span class="field-icon email-icon"></span>
+      </div>
+      <div class="field-wrapper input-icon password-icon">
+        <input type="password" id="login-password" name="password" required autocomplete="current-password" class="form-input" placeholder="••••••••">
+        <span class="field-icon password-icon"></span>
+        <button type="button" class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña">⊘</button>
+      </div>
+      <div class="remember-me">
+        <input type="checkbox" id="remember-me" name="remember-me">
+        <span>Recordar sesión</span>
+      </div>
       <button type="submit" id="btn-login" class="btn-primario">Entrar</button>
     </form>
 
     <!-- Formulario de Registro -->
     <form id="form-register" class="auth-form">
-      <label class="campo">
-        <span>Nombre completo</span>
-        <input type="text" id="register-name" name="name" required autocomplete="name" placeholder="Ana Pérez">
-      </label>
-      <label class="campo">
-        <span>Correo electrónico</span>
-        <input type="email" id="register-email" name="email" required autocomplete="email" placeholder="tu@correo.com">
-      </label>
-      <label class="campo">
-        <span>Contraseña</span>
-        <input type="password" id="register-password" name="password" required autocomplete="new-password" placeholder="Mínimo 6 caracteres">
-      </label>
-      <label class="campo role-selector" id="role-selector">
-        <span>Rol</span>
+      <div class="field-wrapper input-icon email-icon">
+        <input type="email" id="register-email" name="email" required autocomplete="email" class="form-input" placeholder="tu@correo.com">
+        <span class="field-icon email-icon"></span>
+      </div>
+      <div class="field-wrapper input-icon password-icon">
+        <input type="password" id="register-password" name="password" required autocomplete="new-password" class="form-input" placeholder="Mínimo 6 caracteres">
+        <span class="field-icon password-icon"></span>
+        <button type="button" class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña">⊘</button>
+      </div>
+      <div class="field-wrapper">
+        <span class="field-label"><span>Rol</span></span>
         <select id="register-role" name="role">
           <option value="Administrador">Administrador</option>
           <option value="Soporte">Soporte</option>
@@ -179,12 +184,14 @@
           <option value="Técnico">Técnico</option>
           <option value="Solicitante">Solicitante</option>
         </select>
-      </label>
+      </div>
       <button type="submit" id="btn-register" class="btn-primario">Crear cuenta</button>
     </form>
 
-    <div class="auth-footer">
-      <a href="index.html">← Volver al listado</a>
+    <a href="index.html" class="forgot-link">¿Has olvidado tu contraseña? Contacta al administrador</a>
+
+    <div class="login-footer">
+      <a href="index.html" class="link-register">Regístrate</a>
     </div>
   </div>
 

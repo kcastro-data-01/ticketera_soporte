@@ -41,7 +41,14 @@
   --color-exito: #166534;
   --color-exito-fondo: #e6f6ec;
 
-  /* Sombras */
+  /* ---------- Login ---------- */
+  --login-fondo: #faf7fd;
+  --login-card-borde: #e8e4f0;
+  --login-card-sombra: 0 4px 12px rgba(123, 104, 145, 0.15);
+  --login-icon-color: #7e5fa8;
+  --login-link-color: #6b4f93;
+
+  /* ---------- 2. Base y tipografía ---------- */
   --sombra-tarjeta: 0 1px 2px rgba(61, 53, 69, 0.05),
     0 6px 18px rgba(112, 103, 122, 0.08);
   --sombra-suave: 0 1px 2px rgba(61, 53, 69, 0.06);
@@ -822,3 +829,216 @@ button.secundario:disabled:hover {
   font-weight: 600;
   border: 1px solid var(--color-borde);
 }
+
+/* ---------- Estilos de login ---------- */
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--login-fondo);
+}
+
+.auth-container {
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-superficie-alta);
+  border: 1px solid var(--login-card-borde);
+  border-radius: var(--radio-suave);
+  box-shadow: var(--login-card-sombra);
+  padding: 2rem 1.5rem;
+  position: relative;
+}
+
+.auth-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(var(--login-card-borde), transparent);
+  border-radius: var(--radio-suave) var(--radio-suave) 0 0;
+}
+
+.auth-container h1 {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0;
+  text-align: center;
+  font-size: 1.5rem;
+  color: var(--color-primario-oscuro);
+  font-weight: 700;
+}
+
+.auth-container .subtle-text {
+  text-align: center;
+  margin: 0 0 1.2rem;
+  color: var(--color-tenue);
+  font-size: var(--texto-sm);
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue);
+}
+
+.form-label::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+}
+
+.email-icon::before {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M20 4a16 16 0 1 1-32 0 16 16 0 0 1 32 0zM9.5 18c-.83 0-1.53-.66-1.86-1.5S8.33 9.5 9.5 9.5 11 10.16 11 9.5 10.17 8.5 9.5 8.5zM12 2C6.48 2 2 6.48 2 12s4.48 10 12-10 10-4.48 12-10zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'%3E%3C/path%3E%3C/svg%3E");
+}
+
+.password-icon::before {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12h-6v-2c0-3.07-.78-4.81-2.09-5.9L5.09 7.55c-.7-1.36-1.6-2.19-2.59-2.19L1 5v6L12 1z'%3E%3C/path%3E%3C/svg%3E");
+}
+
+.eye-icon::before {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M1 1h4v23H1V1zm0 2h4v4h22v-4h4V5zm5 13c0 1.66-1.34 3-3 3s-3-1.34-3-3s1.34-3 3-3s3 1.34 3 3zm6.75-8.5c-.91 0-1.63.73-1.84 1.63-.23.9-.3 1.98-.23 3.05s0 2.15.23 3.05c.23.9.3 1.98.3 3.05s0 2.15.23 3.05c.23.9.3 1.98.3 3.05h1.5c0-1.17.45-2.05 1.24-2.53l3.46-3.46c.76-.76.76-2.09.04-2.81l-2.08-2.08c-.73-.73-1.96-.73-2.68 0l-1.06 1.06c-.72.72-1.04 1.72-.73 2.36zm6.95 8.83c.16 0 .32.05.48.08l2.06 1.5c.73.55 1.53.8 2.55.8s1.82-.25 2.55-.8l2.06-1.5c.16-.05.32-.08.48-.08s.32-.05.48-.08h1.5c0-1.17.45-2.05 1.24-2.53l3.46-3.46c.76-.76.76-2.09.04-2.81l-2.08-2.08c-.73-.73-1.96-.73-2.68 0l-1.06 1.06c-.72.72-1.04 1.72-.73 2.36z'%3E%3C/path%3E%3C/svg%3E");
+}
+
+.forgot-icon::before {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 12 10-4.48 10-12-10-4.48-10-12 10zm-2 14l-2-2 1.41-1.41L10 16.17l1.95-1.95L14.41 10l2.45 2.45L16 14.41l-2.45 2.45L14.41 18z'%3E%3C/path%3E%3C/svg%3E");
+}
+
+.login-title {
+  margin: -0.5rem -1.5rem 1rem;
+  padding: 0.5rem 1.5rem;
+  text-align: center;
+  background: var(--login-card-borde);
+  border-radius: var(--radio-suave) var(--radio-suave) 0 0;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.field-wrapper {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.field-wrapper.input-icon .form-input {
+  padding-left: 2.8rem;
+}
+
+.field-wrapper .field-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--login-icon-color);
+  pointer-events: none;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem 0.6rem 2.8rem;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: var(--radio-suave);
+  font-size: var(--texto-md);
+  background: var(--color-superficie-alta);
+  color: var(--color-texto);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primario);
+  box-shadow: 0 0 0 3px var(--login-icon-color);
+}
+
+.form-input::placeholder {
+  color: var(--color-tenue);
+}
+
+.toggle-password {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--login-icon-color);
+  padding: 0;
+  cursor: pointer;
+  font-size: var(--texto-sm);
+}
+
+.toggle-password:hover {
+  color: var(--color-primario);
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue);
+}
+
+.remember-me input {
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.forgot-link {
+  display: block;
+  margin: 1rem 0 0;
+  font-size: var(--texto-sm);
+  color: var(--login-link-color);
+  text-decoration: none;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+}
+
+.login-footer {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-borde);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.login-footer .link-register {
+  font-size: var(--texto-sm);
+  color: var(--login-link-color);
+  text-decoration: none;
+}
+
+.login-footer .link-register:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .auth-container {
+    margin: 1rem;
+    padding: 1.5rem 1rem;
+  }
+
+  .auth-container::before {
+    height: 30px;
+  }
+
+  .login-title {
+    margin: -0.25rem -1.25rem 0.75rem;
+    padding: 0.25rem 1.25rem;
+  }
+}
+*/
