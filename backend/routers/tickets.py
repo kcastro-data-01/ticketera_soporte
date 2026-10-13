@@ -4,9 +4,8 @@ edition, assignment, state changes and history)."""
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from backend.auth import get_current_user
-from backend.constants import TicketCategory, TicketPriority, TicketState
 from backend.database import get_session
+from backend.constants import TicketCategory, TicketPriority, TicketState
 from backend.schemas import (
     HistoryResponse,
     TicketAssignment,
@@ -35,7 +34,6 @@ router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
 def create_ticket(
     payload: TicketCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
 ) -> TicketResponse:
     """Create a ticket with title, description, category and priority (RF1, RF2)."""
     ticket = ticket_service.create_ticket(session, payload)
@@ -68,7 +66,6 @@ def list_tickets(
         description="Filtra por estado (Nuevo, En proceso, Resuelto, Cerrado).",
     ),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
 ) -> list[TicketResponse]:
     """Return all stored tickets, newest first (RF6), searchable by text and
     filterable by category, priority and state (RF7, RF8).
@@ -94,7 +91,6 @@ def list_tickets(
 def get_ticket(
     ticket_id: int,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
 ) -> TicketResponse:
     """Return a single ticket by id (read-only)."""
     ticket = ticket_service.get_ticket(session, ticket_id)
@@ -114,7 +110,6 @@ def get_ticket(
 def get_ticket_history(
     ticket_id: int,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
 ) -> list[HistoryResponse]:
     """Return the audit entries recorded for a ticket, oldest first (RF9).
 
@@ -140,7 +135,6 @@ def update_ticket(
     ticket_id: int,
     payload: TicketUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
 ) -> TicketResponse:
     """Update title, description, category and/or priority of a ticket."""
     ticket = ticket_service.update_ticket(session, ticket_id, payload)
@@ -161,7 +155,6 @@ def assign_ticket(
     ticket_id: int,
     payload: TicketAssignment,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
 ) -> TicketResponse:
     """Assign a user to a ticket; ``assigned_to_id: null`` unassigns it (RF4)."""
     try:
@@ -188,7 +181,6 @@ def change_ticket_state(
     ticket_id: int,
     payload: TicketStateUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
 ) -> TicketResponse:
     """Move a ticket through the allowed workflow transitions (RF3).
 

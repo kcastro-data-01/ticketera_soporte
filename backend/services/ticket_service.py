@@ -98,6 +98,8 @@ def create_ticket(session, payload: TicketCreate) -> Ticket:
     id). When there are no eligible users the ticket is created unassigned,
     and the manual assignment endpoint (``PATCH .../assign``) remains
     available.
+
+    Registra una entrada de historial por la creación del ticket (RF9).
     """
     ticket = Ticket(
         title=payload.title,
@@ -112,6 +114,19 @@ def create_ticket(session, payload: TicketCreate) -> Ticket:
         ticket.assigned_to_id = assignee.id
 
     session.add(ticket)
+    session.commit()
+    session.refresh(ticket)
+    # Registry of creation in history (RF9)
+    session.add(
+        History(
+            ticket_id=ticket.id,
+            action="created",
+            field=None,
+            old_value=None,
+            new_value=None,
+            author="Anónimo",
+        )
+    )
     session.commit()
     session.refresh(ticket)
     return ticket
@@ -221,6 +236,7 @@ def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | No
     Returns ``None`` when the ticket does not exist (the router answers 404).
     Only the fields present in ``TicketUpdate`` are touched; the ORM triggers
     ``updated_at`` through the model's ``onupdate=utc_now``.
+    A history entry is recorded for each changed field (RF9).
     """
     ticket = session.get(Ticket, ticket_id)
     if ticket is None:
@@ -231,6 +247,20 @@ def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | No
         for field, value in payload.model_dump(mode="json", exclude_unset=True).items()
         if value is not None
     }
+    # Build history entries for changed fields
+    for field, new_value in changes.items():
+        old_value = getattr(ticket, field)
+        if old_value != new_value:
+            session.add(
+                History(
+                    ticket_id=ticket.id,
+                    action="updated",
+                    field=field,
+                    old_value=str(old_value) if old_value is not None else None,
+                    new_value=str(new_value) if new_value is not None else None,
+                    author="Anónimo",
+                )
+            )
     for field, value in changes.items():
         setattr(ticket, field, value)
 
@@ -253,7 +283,21 @@ def assign_ticket(session, ticket_id: int, assigned_to_id: int | None) -> Ticket
     if assigned_to_id is not None and session.get(User, assigned_to_id) is None:
         raise UserNotFoundError(assigned_to_id)
 
+    old_assigned_to_id = ticket.assigned_to_id
     ticket.assigned_to_id = assigned_to_id
+    session.commit()
+    session.refresh(ticket)
+    # Registry of assignment/unassignment in history (RF9)
+    session.add(
+        History(
+            ticket_id=ticket.id,
+            action="assigned",
+            field="assigned_to_id",
+            old_value=str(old_assigned_to_id) if old_assigned_to_id is not None else None,
+            new_value=str(assigned_to_id) if assigned_to_id is not None else None,
+            author="Anónimo",
+        )
+    )
     session.commit()
     session.refresh(ticket)
     return ticket
@@ -331,6 +375,19 @@ def create_comment(session, ticket_id: int, payload: CommentCreate) -> Comment:
         content=payload.content,
     )
     session.add(comment)
+    session.commit()
+    session.refresh(comment)
+    # Registry of comment in history (RF9)
+    session.add(
+        History(
+            ticket_id=ticket_id,
+            action="commented",
+            field="comment",
+            old_value=None,
+            new_value=payload.content,
+            author=author,
+        )
+    )
     session.commit()
     session.refresh(comment)
     return comment

@@ -161,7 +161,9 @@ def test_user_management_and_assignment_integration(auth_client):
     # 2. Obtener usuarios: el creado aparece y es listable.
     users = auth_client.get("/api/users")
     assert users.status_code == 200
-    assert [user["id"] for user in users.json()] == [first_id]
+    all_users = users.json()
+    real_users = [u for u in all_users if u["email"] != "testadmin@test.com"]
+    assert [user["id"] for user in real_users] == [first_id]
     assert users.json()[0]["name"] == "Ana Pérez"
 
     # 3. Crear ticket: se auto-asigna al primer usuario Soporte activo.
@@ -188,10 +190,10 @@ def test_user_management_and_assignment_integration(auth_client):
     assert second.status_code == 201
     second_id = second.json()["id"]
     assert second.json()["role"] == "Soporte"
-    assert {user["id"] for user in auth_client.get("/api/users").json()} == {
-        first_id,
-        second_id,
-    }
+    # Filtrar al admin del fixture al comparar sets
+    all_users = auth_client.get("/api/users").json()
+    real_users = [u for u in all_users if u["email"] != "testadmin@test.com"]
+    assert {user["id"] for user in real_users} == {first_id, second_id}
 
     # 8. Cambiar la asignación al segundo usuario.
     changed = auth_client.patch(

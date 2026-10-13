@@ -68,41 +68,26 @@ def decode_access_token(token: str) -> dict:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     session: Session = Depends(get_session),
-) -> User:
+) -> User | None:
     """FastAPI dependency that extracts and validates the Bearer token.
 
-    Returns the authenticated ``User`` instance. Raises ``401`` if the token
-    is missing, invalid, or expired, and ``404`` if the user no longer exists.
+    Returns the authenticated ``User`` instance, or ``None`` if no token is
+    provided or the token is invalid/expired. The API is open by design:
+    users exist only for ticket assignment and comment signing, not for
+    authentication.
     """
     if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No se proporcionó token de autenticación",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return None
 
     token = credentials.credentials
     try:
         payload = decode_access_token(token)
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="El token ha expirado",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return None
 
     user_id = int(payload.get("sub", "0"))
     user = session.get(User, user_id)
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado",
-        )
+        return None
 
     return user

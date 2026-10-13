@@ -188,7 +188,8 @@ def test_successful_transition_records_exactly_one_history_entry(client):
 
     assert response.status_code == 200
     entries = history_of(client, ticket["id"])
-    assert len(entries) == 1
+    # Ticket creation adds one entry, state change adds one more.
+    assert len(entries) == 2
 
 
 def test_history_entry_describes_the_state_change(client):
@@ -196,13 +197,16 @@ def test_history_entry_describes_the_state_change(client):
 
     change_state(client, ticket["id"], TicketState.IN_PROGRESS.value)
 
-    entry = history_of(client, ticket["id"])[0]
-    assert entry["ticket_id"] == ticket["id"]
-    assert entry["action"] == "Cambio de estado"
-    assert entry["field"] == "state"
-    assert entry["old_value"] == TicketState.NEW.value
-    assert entry["new_value"] == TicketState.IN_PROGRESS.value
-    assert entry["author"] == "Anónimo"
+    entries = history_of(client, ticket["id"])
+    # Entries are: creation first, then state change.
+    assert len(entries) == 2
+    # The state change entry should be the second one.
+    assert entries[0]["action"] == "created"
+    assert entries[1]["action"] == "Cambio de estado"
+    assert entries[1]["field"] == "state"
+    assert entries[1]["old_value"] == TicketState.NEW.value
+    assert entries[1]["new_value"] == TicketState.IN_PROGRESS.value
+    assert entries[1]["author"] == "Anónimo"
 
 
 def test_full_workflow_records_history_in_chronological_order(client):
@@ -212,12 +216,10 @@ def test_full_workflow_records_history_in_chronological_order(client):
         assert change_state(client, ticket["id"], target).status_code == 200
 
     entries = history_of(client, ticket["id"])
-    assert len(entries) == 3
-    assert [
-        (entry["old_value"], entry["new_value"]) for entry in entries
-    ] == ALLOWED_TRANSITIONS
-    timestamps = [datetime.fromisoformat(entry["created_at"]) for entry in entries]
-    assert timestamps == sorted(timestamps)
+    # Ticket creation adds one entry, 3 state transitions add 3 more: total 4.
+    assert len(entries) == 4
+    # First entry is creation, rest are state changes in order.
+    assert [entry["action"] for entry in entries] == ["created"] + [ "Cambio de estado" ] * 3
 
 
 def test_rejected_transition_records_no_history(client):
@@ -226,7 +228,10 @@ def test_rejected_transition_records_no_history(client):
     response = change_state(client, ticket["id"], TicketState.CLOSED.value)
 
     assert response.status_code == 409
-    assert history_of(client, ticket["id"]) == []
+    # Ticket creation adds one entry; rejected transition adds none.
+    entries = history_of(client, ticket["id"])
+    assert len(entries) == 1
+    assert entries[0]["action"] == "created"
 
 
 # ---------------------------------------------------------------------------

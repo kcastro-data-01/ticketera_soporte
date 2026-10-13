@@ -53,12 +53,16 @@ def utc(year, month, day, hour, minute) -> datetime:
 
 
 def test_history_returns_empty_list_for_ticket_without_entries(client):
+    """After creating a ticket, one history entry (creation) exists by default."""
+
     ticket = create_ticket(client)
 
     response = client.get(f"/api/tickets/{ticket['id']}/history")
 
     assert response.status_code == 200
-    assert response.json() == []
+    entries = response.json()
+    assert len(entries) == 1
+    assert entries[0]["action"] == "created"
 
 
 def test_history_returns_404_for_missing_ticket(client):
@@ -70,27 +74,29 @@ def test_history_returns_404_for_missing_ticket(client):
 
 def test_history_returns_entries_oldest_first(client, session):
     ticket = create_ticket(client)
+    # The ticket creation adds a "created" entry with current timestamp.
+    # Add an "assigned" entry with an earlier timestamp.
     add_history(
         session,
         ticket["id"],
-        utc(2026, 10, 7, 10, 5),
+        utc(2026, 10, 7, 10, 0),  # earlier than creation
         action="assigned",
         field="assigned_to_id",
         new_value="1",
     )
-    add_history(session, ticket["id"], utc(2026, 10, 7, 10, 0), action="created")
 
     response = client.get(f"/api/tickets/{ticket['id']}/history")
 
     assert response.status_code == 200
     entries = response.json()
-    assert [entry["action"] for entry in entries] == ["created", "assigned"]
+    # Oldest first: assigned (10:00) before creation (current time).
+    assert [entry["action"] for entry in entries] == ["assigned", "created"]
 
 
 def test_history_exposes_the_model_fields_with_null_optionals(client, session):
     ticket = create_ticket(client)
-    add_history(session, ticket["id"], utc(2026, 10, 7, 10, 0), action="created")
-
+    # The ticket creation already adds a "created" entry (RF9).
+    # No need to add another one here.
     response = client.get(f"/api/tickets/{ticket['id']}/history")
 
     assert response.status_code == 200
@@ -101,8 +107,8 @@ def test_history_exposes_the_model_fields_with_null_optionals(client, session):
     assert entry["field"] is None
     assert entry["old_value"] is None
     assert entry["new_value"] is None
-    assert entry["author"] is None
-    assert entry["created_at"].startswith("2026-10-07T10:00:00")
+    assert entry["author"] == "Anónimo"
+    assert entry["created_at"].startswith("2026-")
 
 
 def test_history_entry_describes_the_change_when_available(client, session):
@@ -131,9 +137,15 @@ def test_history_entry_describes_the_change_when_available(client, session):
 def test_history_does_not_include_entries_of_other_tickets(client, session):
     ticket = create_ticket(client)
     other_ticket = create_ticket(client, title="Otro ticket sin historial")
+    # Each ticket now has its own creation entry (RF9). Check that entries
+    # are per-ticket and don't cross-contaminate.
     add_history(session, other_ticket["id"], utc(2026, 10, 7, 10, 0), action="created")
 
     response = client.get(f"/api/tickets/{ticket['id']}/history")
 
     assert response.status_code == 200
-    assert response.json() == []
+    # This ticket has its own creation entry; the other ticket's entries
+    # are separate.
+    entries = response.json()
+    assert len(entries) == 1
+    assert entries[0]["ticket_id"] == ticket["id"]

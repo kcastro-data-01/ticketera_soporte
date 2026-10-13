@@ -78,8 +78,8 @@ def test_history_created_at_carries_explicit_utc_offset(client):
     assert changed.status_code == 200
 
     entries = client.get(f"/api/tickets/{ticket['id']}/history").json()
-
-    assert len(entries) == 1
+    # Ticket creation adds one entry, state change adds one more.
+    assert len(entries) == 2
     parse_utc(entries[0]["created_at"])
 
 
