@@ -1,5 +1,6 @@
 /* Tarea 11 — Listado, búsqueda y filtros de tickets contra la API.
-   JavaScript vanilla, sin frameworks ni librerías externas. */
+   JavaScript vanilla, sin frameworks ni librerías externas.
+   Fase 2: usa fetchWithAuth para incluir el token JWT automáticamente. */
 
 const API_TICKETS_URL = "/api/tickets";
 const API_USERS_URL = "/api/users";
@@ -112,7 +113,7 @@ function renderTickets(tickets) {
 /* Los usuarios solo sirven para mostrar el nombre de quien tiene el ticket. */
 async function loadUsers() {
   try {
-    const response = await fetch(API_USERS_URL);
+    const response = await fetchWithAuth(API_USERS_URL);
     if (!response.ok) return;
     const users = await response.json();
     if (!Array.isArray(users)) return;
@@ -146,7 +147,7 @@ async function fetchTickets() {
 
   let response;
   try {
-    response = await fetch(url);
+    response = await fetchWithAuth(url);
   } catch (error) {
     console.error("No se pudo conectar con el servidor:", error);
     showStatus(

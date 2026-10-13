@@ -194,7 +194,7 @@ def test_me_with_valid_token(client):
     )
     token = reg_resp.json()["access_token"]
 
-    resp = client.get(f"/api/auth/me?token={token}")
+    resp = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["email"] == "me@test.com"
@@ -203,15 +203,17 @@ def test_me_with_valid_token(client):
 
 
 def test_me_without_token_returns_error(client):
-    """GET /me without a token parameter returns an error."""
+    """GET /me without a token returns 401."""
     resp = client.get("/api/auth/me")
-    # FastAPI will return 422 since token is required as a query param
-    assert resp.status_code in (401, 422)
+    assert resp.status_code == 401
 
 
 def test_me_with_invalid_token_returns_401(client):
     """GET /me with an invalid token returns 401."""
-    resp = client.get("/api/auth/me?token=invalidtoken123")
+    resp = client.get(
+        "/api/auth/me",
+        headers={"Authorization": "Bearer invalidtoken123"},
+    )
     assert resp.status_code == 401
 
 
@@ -230,7 +232,10 @@ def test_me_with_expired_token_returns_401(client):
     }
     expired_token = jwt.encode(payload, JWT_SECRET_KEY, algorithm="HS256")
 
-    resp = client.get(f"/api/auth/me?token={expired_token}")
+    resp = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {expired_token}"},
+    )
     assert resp.status_code == 401
 
 

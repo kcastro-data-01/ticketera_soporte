@@ -18,14 +18,14 @@ VALID_TICKET = {
 }
 
 
-def create_ticket(client) -> dict:
-    response = client.post("/api/tickets", json=VALID_TICKET)
+def create_ticket(auth_client) -> dict:
+    response = auth_client.post("/api/tickets", json=VALID_TICKET)
     assert response.status_code == 201
     return response.json()
 
 
-def create_user(client, email: str) -> dict:
-    response = client.post(
+def create_user(auth_client, email: str) -> dict:
+    response = auth_client.post(
         "/api/users",
         json={
             "name": email.split("@")[0].title(),
@@ -45,26 +45,26 @@ def assert_utc_now(value: str) -> datetime:
     return parsed
 
 
-def test_full_flow_create_comment_list_assign(client):
+def test_full_flow_create_comment_list_assign(auth_client):
     # 1. Crear y consultar el ticket, con fecha/hora correcta.
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
     assert_utc_now(ticket["created_at"])
 
-    fetched = client.get(f"/api/tickets/{ticket['id']}")
+    fetched = auth_client.get(f"/api/tickets/{ticket['id']}")
     assert fetched.status_code == 200
     assert fetched.json()["created_at"] == ticket["created_at"]
     assert fetched.json()["state"] == "Nuevo"
 
     # 2. Agregar comentarios y volver a consultarlos (orden cronológico).
     for content in ("Primer comentario.", "Segundo comentario."):
-        posted = client.post(
+        posted = auth_client.post(
             f"/api/tickets/{ticket['id']}/comments",
             json={"content": content},
         )
         assert posted.status_code == 201
         assert_utc_now(posted.json()["created_at"])
 
-    comments = client.get(f"/api/tickets/{ticket['id']}/comments")
+    comments = auth_client.get(f"/api/tickets/{ticket['id']}/comments")
     assert comments.status_code == 200
     listed = comments.json()
     assert [comment["content"] for comment in listed] == [
@@ -73,73 +73,73 @@ def test_full_flow_create_comment_list_assign(client):
     ]
 
     # 3. Asignar, reconsultar (conserva), cambiar y desasignar.
-    first_user = create_user(client, "soporte.uno@example.com")
-    second_user = create_user(client, "soporte.dos@example.com")
+    first_user = create_user(auth_client, "soporte.uno@example.com")
+    second_user = create_user(auth_client, "soporte.dos@example.com")
 
-    assigned = client.patch(
+    assigned = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": first_user["id"]},
     )
     assert assigned.status_code == 200
     assert assigned.json()["assigned_to_id"] == first_user["id"]
 
-    reloaded = client.get(f"/api/tickets/{ticket['id']}").json()
+    reloaded = auth_client.get(f"/api/tickets/{ticket['id']}").json()
     assert reloaded["assigned_to_id"] == first_user["id"]
 
-    changed = client.patch(
+    changed = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": second_user["id"]},
     )
     assert changed.status_code == 200
     assert (
-        client.get(f"/api/tickets/{ticket['id']}").json()["assigned_to_id"]
+        auth_client.get(f"/api/tickets/{ticket['id']}").json()["assigned_to_id"]
         == second_user["id"]
     )
 
-    unassigned = client.patch(
+    unassigned = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": None},
     )
     assert unassigned.status_code == 200
     assert unassigned.json()["assigned_to_id"] is None
     assert (
-        client.get(f"/api/tickets/{ticket['id']}").json()["assigned_to_id"] is None
+        auth_client.get(f"/api/tickets/{ticket['id']}").json()["assigned_to_id"] is None
     )
 
     # 4. La fecha de actualización sigue sin desfase tras los cambios.
     assert_utc_now(
-        client.get(f"/api/tickets/{ticket['id']}").json()["updated_at"]
+        auth_client.get(f"/api/tickets/{ticket['id']}").json()["updated_at"]
     )
 
 
-def test_assignment_errors_are_reported(client):
-    ticket = create_ticket(client)
+def test_assignment_errors_are_reported(auth_client):
+    ticket = create_ticket(auth_client)
 
-    unknown_user = client.patch(
+    unknown_user = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": 9999},
     )
     assert unknown_user.status_code == 404
     assert unknown_user.json()["detail"] == "Usuario 9999 no encontrado"
 
-    missing_ticket = client.patch(
+    missing_ticket = auth_client.patch(
         "/api/tickets/9999/assign",
         json={"assigned_to_id": None},
     )
     assert missing_ticket.status_code == 404
     assert missing_ticket.json()["detail"] == "Ticket 9999 no encontrado"
 
-    invalid_payload = client.patch(
+    invalid_payload = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": "no-numerico"},
     )
     assert invalid_payload.status_code == 422
 
     # El ticket no queda asignado por error.
-    assert client.get(f"/api/tickets/{ticket['id']}").json()["assigned_to_id"] is None
+    assert auth_client.get(f"/api/tickets/{ticket['id']}").json()["assigned_to_id"] is None
 
 
-def test_user_management_and_assignment_integration(client):
+def test_user_management_and_assignment_integration(auth_client):
     """Task 20.3 flow: create/list users and assign a ticket between them.
 
     Steps: create a user, list the users, create a ticket, assign it to the
@@ -147,7 +147,7 @@ def test_user_management_and_assignment_integration(client):
     second user, change the assignment and read it back again.
     """
     # 1. Crear usuario.
-    first = client.post(
+    first = auth_client.post(
         "/api/users",
         json={
             "name": "Ana Pérez",
@@ -159,17 +159,17 @@ def test_user_management_and_assignment_integration(client):
     first_id = first.json()["id"]
 
     # 2. Obtener usuarios: el creado aparece y es listable.
-    users = client.get("/api/users")
+    users = auth_client.get("/api/users")
     assert users.status_code == 200
     assert [user["id"] for user in users.json()] == [first_id]
     assert users.json()[0]["name"] == "Ana Pérez"
 
     # 3. Crear ticket: se auto-asigna al primer usuario Soporte activo.
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
     assert ticket["assigned_to_id"] == first_id
 
     # 4. Reasignar el ticket al mismo usuario (asignación manual sigue funcionando).
-    assigned = client.patch(
+    assigned = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": first_id},
     )
@@ -177,24 +177,24 @@ def test_user_management_and_assignment_integration(client):
     assert assigned.json()["assigned_to_id"] == first_id
 
     # 5-6. Consultar de nuevo: la asignación persiste.
-    reloaded = client.get(f"/api/tickets/{ticket['id']}").json()
+    reloaded = auth_client.get(f"/api/tickets/{ticket['id']}").json()
     assert reloaded["assigned_to_id"] == first_id
 
     # 7. Crear un segundo usuario (rol por defecto: Soporte).
-    second = client.post(
+    second = auth_client.post(
         "/api/users",
         json={"name": "Carlos Gómez", "email": "carlos.gomez@soporte.local"},
     )
     assert second.status_code == 201
     second_id = second.json()["id"]
     assert second.json()["role"] == "Soporte"
-    assert {user["id"] for user in client.get("/api/users").json()} == {
+    assert {user["id"] for user in auth_client.get("/api/users").json()} == {
         first_id,
         second_id,
     }
 
     # 8. Cambiar la asignación al segundo usuario.
-    changed = client.patch(
+    changed = auth_client.patch(
         f"/api/tickets/{ticket['id']}/assign",
         json={"assigned_to_id": second_id},
     )
@@ -202,6 +202,6 @@ def test_user_management_and_assignment_integration(client):
     assert changed.json()["assigned_to_id"] == second_id
 
     # 9. Consultar de nuevo: la nueva asignación persiste.
-    final = client.get(f"/api/tickets/{ticket['id']}").json()
+    final = auth_client.get(f"/api/tickets/{ticket['id']}").json()
     assert final["assigned_to_id"] == second_id
     assert final["created_at"] == ticket["created_at"]

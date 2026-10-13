@@ -35,9 +35,47 @@ def session(engine):
     db.close()
 
 
+class AuthenticatedClient:
+    """Wrapper around TestClient that automatically adds auth headers."""
+
+    def __init__(self, client, token):
+        self._client = client
+        self._token = token
+
+    def _headers(self, kwargs):
+        headers = kwargs.pop("headers", {}) or {}
+        headers["Authorization"] = f"Bearer {self._token}"
+        return headers
+
+    def get(self, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs)
+        return self._client.get(url, **kwargs)
+
+    def post(self, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs)
+        return self._client.post(url, **kwargs)
+
+    def patch(self, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs)
+        return self._client.patch(url, **kwargs)
+
+    def put(self, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs)
+        return self._client.put(url, **kwargs)
+
+    def delete(self, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs)
+        return self._client.delete(url, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._client, name)
+
+
 @pytest.fixture
 def client(session):
-    """FastAPI test client whose requests use the temporary test database."""
+    """FastAPI test client whose requests use the temporary test database
+    WITHOUT authentication. Use for endpoints that are publicly accessible
+    (health check, listing tickets, etc.)."""
     def override_get_session():
         yield session
 
@@ -45,3 +83,54 @@ def client(session):
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client_public(session):
+    """FastAPI test client whose requests use the temporary test database
+    WITHOUT authentication. Alias for ``client`` for clarity in tests
+    that explicitly need a public client."""
+    return client(session)
+
+
+@pytest.fixture
+def auth_client(client, session):
+    """FastAPI test client with automatic authentication.
+
+    Registers a user and wraps the client to include the Bearer token
+    in all requests. Use this for tests that hit protected endpoints.
+    """
+    resp = client.post(
+        "/api/auth/register",
+        json={
+            "name": "Test Admin",
+            "email": "testadmin@test.com",
+            "password": "testpass123",
+            "role": "Administrador",
+        },
+    )
+    assert resp.status_code == 201
+    token = resp.json()["access_token"]
+    return AuthenticatedClient(client, token)
+
+
+@pytest.fixture
+def auth_token(client):
+    """Register a user and return a valid access token for testing."""
+    resp = client.post(
+        "/api/auth/register",
+        json={
+            "name": "Test Admin",
+            "email": "testadmin@test.com",
+            "password": "testpass123",
+            "role": "Administrador",
+        },
+    )
+    assert resp.status_code == 201
+    return resp.json()["access_token"]
+
+
+@pytest.fixture
+def auth_headers(auth_token):
+    """Return headers with the Authorization Bearer token."""
+    return {"Authorization": f"Bearer {auth_token}"}

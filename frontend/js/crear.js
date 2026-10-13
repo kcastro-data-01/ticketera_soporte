@@ -1,5 +1,6 @@
 /* Tarea 12 — Alta de tickets desde el formulario, contra POST /api/tickets.
-   JavaScript vanilla, sin frameworks ni librerías externas. */
+   JavaScript vanilla, sin frameworks ni librerías externas.
+   Fase 2: usa fetchWithAuth para incluir el token JWT automáticamente. */
 
 const API_TICKETS_URL = "/api/tickets";
 const REDIRECT_DELAY_MS = 1500;
@@ -78,7 +79,7 @@ async function createTicket() {
   showStatus("Guardando...", "cargando");
 
   try {
-    const response = await fetch(API_TICKETS_URL, {
+    const response = await fetchWithAuth(API_TICKETS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

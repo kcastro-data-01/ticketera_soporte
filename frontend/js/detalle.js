@@ -233,7 +233,7 @@ function renderUsuariosNoDisponibles() {
 
 async function cargarUsuarios() {
   try {
-    const response = await fetch(API_USERS_URL);
+    const response = await fetchWithAuth(API_USERS_URL);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const users = await response.json();
     if (!Array.isArray(users)) throw new Error("respuesta inválida");
@@ -247,7 +247,7 @@ async function cargarUsuarios() {
 async function cargarTicket({ silencioso = false } = {}) {
   if (!silencioso) showStatus("Cargando...", "cargando");
   try {
-    const response = await fetch(`/api/tickets/${ticketId}`);
+    const response = await fetchWithAuth(`/api/tickets/${ticketId}`);
     if (response.status === 404) {
       showStatus(`No se encontró el ticket #${ticketId}.`, "error");
       return false;
@@ -594,7 +594,7 @@ async function cargarComentarios() {
   elements.listaComentarios.hidden = true;
   mostrarComentariosEstado("Cargando comentarios...", "cargando");
   try {
-    const response = await fetch(`/api/tickets/${ticketId}/comments`);
+    const response = await fetchWithAuth(`/api/tickets/${ticketId}/comments`);
     if (response.status === 404) {
       mostrarComentariosEstado(
         await mensajeDeDetalle(
@@ -696,7 +696,7 @@ async function cargarHistorial() {
   elements.tablaHistorial.hidden = true;
   mostrarHistorialEstado("Cargando...", "cargando");
   try {
-    const response = await fetch(`/api/tickets/${ticketId}/history`);
+    const response = await fetchWithAuth(`/api/tickets/${ticketId}/history`);
     if (response.status === 404) {
       mostrarHistorialEstado(
         await mensajeDeDetalle(

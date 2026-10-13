@@ -1,7 +1,8 @@
 /* Tarea 20.3 — Administración de usuarios desde la interfaz:
    GET /api/users (listado de usuarios activos) y POST /api/users (alta
    con nombre, correo y rol). JavaScript vanilla, sin frameworks ni
-   librerías externas. */
+   librerías externas.
+   Fase 2: usa fetchWithAuth para incluir el token JWT automáticamente. */
 
 const API_USERS_URL = "/api/users";
 
@@ -202,7 +203,7 @@ async function guardarEdicion(event) {
   ocupado = true;
   elements.guardarEdicion.disabled = true;
   try {
-    const response = await fetch(`${API_USERS_URL}/${userId}`, {
+    const response = await fetchWithAuth(`${API_USERS_URL}/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -234,7 +235,7 @@ async function cargarUsuarios() {
   elements.tabla.hidden = true;
   mostrarUsuariosEstado("Cargando usuarios...", "cargando");
   try {
-    const response = await fetch(API_USERS_URL);
+    const response = await fetchWithAuth(API_USERS_URL);
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
       mostrarUsuariosEstado(mensajeDeError(response, payload), "error");
@@ -274,7 +275,7 @@ async function crearUsuario(event) {
   ocupado = true;
   elements.crear.disabled = true;
   try {
-    const response = await fetch(API_USERS_URL, {
+    const response = await fetchWithAuth(API_USERS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

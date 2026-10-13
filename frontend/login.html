@@ -317,7 +317,9 @@
           const data = await resp.json();
 
           // Obtener información del usuario
-          const meResp = await fetch(`${API_BASE}/me?token=${encodeURIComponent(data.access_token)}`);
+          const meResp = await fetch(`${API_BASE}/me`, {
+            headers: { Authorization: `Bearer ${data.access_token}` },
+          });
           if (meResp.ok) {
             const user = await meResp.json();
             saveSession(data.access_token, user);
@@ -397,7 +399,9 @@
           const data = await resp.json();
 
           // Obtener información del usuario
-          const meResp = await fetch(`${API_BASE}/me?token=${encodeURIComponent(data.access_token)}`);
+          const meResp = await fetch(`${API_BASE}/me`, {
+            headers: { Authorization: `Bearer ${data.access_token}` },
+          });
           if (meResp.ok) {
             const user = await meResp.json();
             saveSession(data.access_token, user);

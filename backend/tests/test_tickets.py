@@ -21,14 +21,14 @@ VALID_PAYLOAD = {
 # Successful creation
 # ---------------------------------------------------------------------------
 
-def test_create_ticket_returns_201(client):
-    response = client.post("/api/tickets", json=VALID_PAYLOAD)
+def test_create_ticket_returns_201(auth_client):
+    response = auth_client.post("/api/tickets", json=VALID_PAYLOAD)
 
     assert response.status_code == 201
 
 
-def test_create_ticket_response_contains_sent_data(client):
-    response = client.post("/api/tickets", json=VALID_PAYLOAD)
+def test_create_ticket_response_contains_sent_data(auth_client):
+    response = auth_client.post("/api/tickets", json=VALID_PAYLOAD)
     data = response.json()
 
     assert data["title"] == VALID_PAYLOAD["title"]
@@ -40,8 +40,8 @@ def test_create_ticket_response_contains_sent_data(client):
     assert data["updated_at"] is not None
 
 
-def test_create_ticket_is_persisted_in_sqlite(client, engine):
-    response = client.post("/api/tickets", json=VALID_PAYLOAD)
+def test_create_ticket_is_persisted_in_sqlite(auth_client, engine):
+    response = auth_client.post("/api/tickets", json=VALID_PAYLOAD)
     ticket_id = response.json()["id"]
 
     # Read through a brand new session to prove the row is really stored.
@@ -57,8 +57,8 @@ def test_create_ticket_is_persisted_in_sqlite(client, engine):
         fresh_session.close()
 
 
-def test_initial_state_is_the_new_value_from_constants(client):
-    response = client.post("/api/tickets", json=VALID_PAYLOAD)
+def test_initial_state_is_the_new_value_from_constants(auth_client):
+    response = auth_client.post("/api/tickets", json=VALID_PAYLOAD)
 
     assert response.json()["state"] == TicketState.NEW.value
 
@@ -74,59 +74,59 @@ def test_create_ticket_is_exposed_in_openapi(client):
 # Validation errors
 # ---------------------------------------------------------------------------
 
-def test_create_ticket_without_title_returns_422(client):
+def test_create_ticket_without_title_returns_422(auth_client):
     payload = {key: value for key, value in VALID_PAYLOAD.items() if key != "title"}
 
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
 
     assert response.status_code == 422
 
 
-def test_create_ticket_without_description_returns_422(client):
+def test_create_ticket_without_description_returns_422(auth_client):
     payload = {key: value for key, value in VALID_PAYLOAD.items() if key != "description"}
 
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
 
     assert response.status_code == 422
 
 
 @pytest.mark.parametrize("invalid_title", ["", "  ", "ab"])
-def test_create_ticket_with_invalid_title_returns_422(client, invalid_title):
+def test_create_ticket_with_invalid_title_returns_422(auth_client, invalid_title):
     payload = {**VALID_PAYLOAD, "title": invalid_title}
 
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
 
     assert response.status_code == 422
 
 
-def test_create_ticket_with_blank_description_returns_422(client):
+def test_create_ticket_with_blank_description_returns_422(auth_client):
     payload = {**VALID_PAYLOAD, "description": "   "}
 
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
 
     assert response.status_code == 422
 
 
-def test_create_ticket_with_invalid_category_returns_422(client):
+def test_create_ticket_with_invalid_category_returns_422(auth_client):
     payload = {**VALID_PAYLOAD, "category": "Categoría inventada"}
 
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
 
     assert response.status_code == 422
 
 
-def test_create_ticket_with_invalid_priority_returns_422(client):
+def test_create_ticket_with_invalid_priority_returns_422(auth_client):
     payload = {**VALID_PAYLOAD, "priority": "Urgentísima"}
 
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
 
     assert response.status_code == 422
 
 
-def test_invalid_payload_does_not_persist_anything(client, engine):
+def test_invalid_payload_does_not_persist_anything(auth_client, engine):
     payload = {**VALID_PAYLOAD, "category": "Categoría inventada"}
 
-    client.post("/api/tickets", json=payload)
+    auth_client.post("/api/tickets", json=payload)
 
     fresh_session = sessionmaker(bind=engine)()
     try:
@@ -135,10 +135,10 @@ def test_invalid_payload_does_not_persist_anything(client, engine):
         fresh_session.close()
 
 
-def test_create_ticket_stores_trimmed_title(client):
+def test_create_ticket_stores_trimmed_title(auth_client):
     payload = {**VALID_PAYLOAD, "title": "  No enciende la impresora  "}
 
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
 
     assert response.json()["title"] == "No enciende la impresora"
 
@@ -160,31 +160,31 @@ EXPECTED_TICKET_KEYS = {
 }
 
 
-def test_list_tickets_returns_200_with_empty_list(client):
-    response = client.get("/api/tickets")
+def test_list_tickets_returns_200_with_empty_list(auth_client):
+    response = auth_client.get("/api/tickets")
 
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_list_tickets_returns_created_tickets(client):
-    first = client.post("/api/tickets", json=VALID_PAYLOAD).json()
-    second = client.post(
+def test_list_tickets_returns_created_tickets(auth_client):
+    first = auth_client.post("/api/tickets", json=VALID_PAYLOAD).json()
+    second = auth_client.post(
         "/api/tickets",
         json={**VALID_PAYLOAD, "title": "Segundo ticket de prueba"},
     ).json()
 
-    response = client.get("/api/tickets")
+    response = auth_client.get("/api/tickets")
 
     assert response.status_code == 200
     returned_ids = {ticket["id"] for ticket in response.json()}
     assert returned_ids == {first["id"], second["id"]}
 
 
-def test_list_tickets_data_matches_stored_records(client, engine):
-    created = client.post("/api/tickets", json=VALID_PAYLOAD).json()
+def test_list_tickets_data_matches_stored_records(auth_client, engine):
+    created = auth_client.post("/api/tickets", json=VALID_PAYLOAD).json()
 
-    response = client.get("/api/tickets")
+    response = auth_client.get("/api/tickets")
     data = response.json()
 
     # Compare with a brand new session reading the SQLite file directly.
@@ -203,10 +203,10 @@ def test_list_tickets_data_matches_stored_records(client, engine):
         fresh_session.close()
 
 
-def test_list_tickets_response_structure(client):
-    client.post("/api/tickets", json=VALID_PAYLOAD)
+def test_list_tickets_response_structure(auth_client):
+    auth_client.post("/api/tickets", json=VALID_PAYLOAD)
 
-    data = client.get("/api/tickets").json()
+    data = auth_client.get("/api/tickets").json()
 
     assert len(data) == 1
     ticket = data[0]
@@ -226,8 +226,8 @@ def test_list_tickets_is_exposed_in_openapi(client):
     assert "get" in schema["paths"]["/api/tickets"]
 
 
-def test_list_tickets_does_not_modify_stored_data(client, engine):
-    client.post("/api/tickets", json=VALID_PAYLOAD)
+def test_list_tickets_does_not_modify_stored_data(auth_client, engine):
+    auth_client.post("/api/tickets", json=VALID_PAYLOAD)
 
     def snapshot() -> tuple:
         fresh_session = sessionmaker(bind=engine)()
@@ -247,7 +247,7 @@ def test_list_tickets_does_not_modify_stored_data(client, engine):
             fresh_session.close()
 
     before = snapshot()
-    response = client.get("/api/tickets")
+    response = auth_client.get("/api/tickets")
     after = snapshot()
 
     assert response.status_code == 200
@@ -258,18 +258,18 @@ def test_list_tickets_does_not_modify_stored_data(client, engine):
 # Edition (Task 6: PATCH /api/tickets/{ticket_id})
 # ---------------------------------------------------------------------------
 
-def create_ticket(client, **overrides) -> dict:
+def create_ticket(auth_client, **overrides) -> dict:
     """Helper: create a ticket and return its response body."""
     payload = {**VALID_PAYLOAD, **overrides}
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
     assert response.status_code == 201
     return response.json()
 
 
-def test_patch_existing_ticket_returns_200(client):
-    ticket = create_ticket(client)
+def test_patch_existing_ticket_returns_200(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={"title": "Título actualizado"},
     )
@@ -277,10 +277,10 @@ def test_patch_existing_ticket_returns_200(client):
     assert response.status_code == 200
 
 
-def test_patch_updates_only_title(client):
-    ticket = create_ticket(client)
+def test_patch_updates_only_title(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={"title": "Solo cambia el título"},
     )
@@ -292,10 +292,10 @@ def test_patch_updates_only_title(client):
     assert data["priority"] == ticket["priority"]
 
 
-def test_patch_updates_only_description(client):
-    ticket = create_ticket(client)
+def test_patch_updates_only_description(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={"description": "Solo cambia la descripción."},
     )
@@ -307,10 +307,10 @@ def test_patch_updates_only_description(client):
     assert data["priority"] == ticket["priority"]
 
 
-def test_patch_updates_only_category(client):
-    ticket = create_ticket(client)
+def test_patch_updates_only_category(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={"category": TicketCategory.REQUEST.value},
     )
@@ -322,10 +322,10 @@ def test_patch_updates_only_category(client):
     assert data["priority"] == ticket["priority"]
 
 
-def test_patch_updates_only_priority(client):
-    ticket = create_ticket(client)
+def test_patch_updates_only_priority(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={"priority": TicketPriority.LOW.value},
     )
@@ -337,10 +337,10 @@ def test_patch_updates_only_priority(client):
     assert data["category"] == ticket["category"]
 
 
-def test_patch_updates_multiple_fields_at_once(client):
-    ticket = create_ticket(client)
+def test_patch_updates_multiple_fields_at_once(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={
             "title": "Título y prioridad cambiados",
@@ -355,10 +355,10 @@ def test_patch_updates_multiple_fields_at_once(client):
     assert data["category"] == ticket["category"]
 
 
-def test_patch_persists_changes_in_sqlite(client, engine):
-    ticket = create_ticket(client)
+def test_patch_persists_changes_in_sqlite(auth_client, engine):
+    ticket = create_ticket(auth_client)
 
-    client.patch(f"/api/tickets/{ticket['id']}", json={"title": "Persistido en disco"})
+    auth_client.patch(f"/api/tickets/{ticket['id']}", json={"title": "Persistido en disco"})
 
     fresh_session = sessionmaker(bind=engine, expire_on_commit=False)()
     try:
@@ -369,32 +369,32 @@ def test_patch_persists_changes_in_sqlite(client, engine):
         fresh_session.close()
 
 
-def test_patch_missing_ticket_returns_404(client):
-    response = client.patch("/api/tickets/9999", json={"title": "Este no existe"})
+def test_patch_missing_ticket_returns_404(auth_client):
+    response = auth_client.patch("/api/tickets/9999", json={"title": "Este no existe"})
 
     assert response.status_code == 404
 
 
-def test_patch_invalid_title_returns_422(client):
-    ticket = create_ticket(client)
+def test_patch_invalid_title_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(f"/api/tickets/{ticket['id']}", json={"title": "ab"})
-
-    assert response.status_code == 422
-
-
-def test_patch_blank_description_returns_422(client):
-    ticket = create_ticket(client)
-
-    response = client.patch(f"/api/tickets/{ticket['id']}", json={"description": "   "})
+    response = auth_client.patch(f"/api/tickets/{ticket['id']}", json={"title": "ab"})
 
     assert response.status_code == 422
 
 
-def test_patch_invalid_category_returns_422(client):
-    ticket = create_ticket(client)
+def test_patch_blank_description_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(f"/api/tickets/{ticket['id']}", json={"description": "   "})
+
+    assert response.status_code == 422
+
+
+def test_patch_invalid_category_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
+
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={"category": "Categoría inventada"},
     )
@@ -402,10 +402,10 @@ def test_patch_invalid_category_returns_422(client):
     assert response.status_code == 422
 
 
-def test_patch_invalid_priority_returns_422(client):
-    ticket = create_ticket(client)
+def test_patch_invalid_priority_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={"priority": "Urgentísima"},
     )
@@ -414,18 +414,18 @@ def test_patch_invalid_priority_returns_422(client):
 
 
 @pytest.mark.parametrize("payload", [{}, {"title": None}])
-def test_patch_without_modifiable_fields_returns_422(client, payload):
-    ticket = create_ticket(client)
+def test_patch_without_modifiable_fields_returns_422(auth_client, payload):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(f"/api/tickets/{ticket['id']}", json=payload)
+    response = auth_client.patch(f"/api/tickets/{ticket['id']}", json=payload)
 
     assert response.status_code == 422
 
 
-def test_patch_cannot_modify_protected_fields(client):
-    ticket = create_ticket(client)
+def test_patch_cannot_modify_protected_fields(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={
             "title": "Título nuevo",
@@ -444,10 +444,10 @@ def test_patch_cannot_modify_protected_fields(client):
     assert data["created_at"] == ticket["created_at"]
 
 
-def test_patch_with_only_protected_fields_returns_422(client):
-    ticket = create_ticket(client)
+def test_patch_with_only_protected_fields_returns_422(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={
             "state": TicketState.CLOSED.value,
@@ -460,10 +460,10 @@ def test_patch_with_only_protected_fields_returns_422(client):
     assert response.status_code == 422
 
 
-def test_patch_updates_updated_at(client):
-    ticket = create_ticket(client)
+def test_patch_updates_updated_at(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/tickets/{ticket['id']}",
         json={"title": "El título también cambia updated_at"},
     )
@@ -480,18 +480,18 @@ def test_patch_updates_updated_at(client):
 # Retrieval (Task 7: GET /api/tickets/{ticket_id})
 # ---------------------------------------------------------------------------
 
-def test_get_ticket_returns_200(client):
-    ticket = create_ticket(client)
+def test_get_ticket_returns_200(auth_client):
+    ticket = create_ticket(auth_client)
 
-    response = client.get(f"/api/tickets/{ticket['id']}")
+    response = auth_client.get(f"/api/tickets/{ticket['id']}")
 
     assert response.status_code == 200
 
 
-def test_get_ticket_data_matches_stored_record(client, engine):
-    ticket = create_ticket(client)
+def test_get_ticket_data_matches_stored_record(auth_client, engine):
+    ticket = create_ticket(auth_client)
 
-    response = client.get(f"/api/tickets/{ticket['id']}")
+    response = auth_client.get(f"/api/tickets/{ticket['id']}")
     data = response.json()
 
     # Compare with a brand new session reading the SQLite file directly.
@@ -512,14 +512,14 @@ def test_get_ticket_data_matches_stored_record(client, engine):
         fresh_session.close()
 
 
-def test_get_missing_ticket_returns_404(client):
-    response = client.get("/api/tickets/9999")
+def test_get_missing_ticket_returns_404(auth_client):
+    response = auth_client.get("/api/tickets/9999")
 
     assert response.status_code == 404
 
 
-def test_get_ticket_does_not_modify_the_ticket(client, engine):
-    ticket = create_ticket(client)
+def test_get_ticket_does_not_modify_the_ticket(auth_client, engine):
+    ticket = create_ticket(auth_client)
 
     def snapshot() -> tuple:
         fresh_session = sessionmaker(bind=engine)()
@@ -539,17 +539,17 @@ def test_get_ticket_does_not_modify_the_ticket(client, engine):
             fresh_session.close()
 
     before = snapshot()
-    response = client.get(f"/api/tickets/{ticket['id']}")
+    response = auth_client.get(f"/api/tickets/{ticket['id']}")
     after = snapshot()
 
     assert response.status_code == 200
     assert before == after
 
 
-def test_get_ticket_response_structure(client):
-    ticket = create_ticket(client)
+def test_get_ticket_response_structure(auth_client):
+    ticket = create_ticket(auth_client)
 
-    data = client.get(f"/api/tickets/{ticket['id']}").json()
+    data = auth_client.get(f"/api/tickets/{ticket['id']}").json()
 
     assert set(data.keys()) == EXPECTED_TICKET_KEYS
     assert isinstance(data["id"], int)

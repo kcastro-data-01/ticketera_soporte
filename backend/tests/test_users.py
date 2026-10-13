@@ -19,14 +19,14 @@ USER_RESPONSE_KEYS = {"id", "name", "email", "role"}
 # Creation
 # ---------------------------------------------------------------------------
 
-def test_create_user_returns_201(client):
-    response = client.post("/api/users", json=VALID_USER)
+def test_create_user_returns_201(auth_client):
+    response = auth_client.post("/api/users", json=VALID_USER)
 
     assert response.status_code == 201
 
 
-def test_create_user_response_contains_sent_data(client):
-    response = client.post("/api/users", json=VALID_USER)
+def test_create_user_response_contains_sent_data(auth_client):
+    response = auth_client.post("/api/users", json=VALID_USER)
     data = response.json()
 
     assert data["id"] is not None
@@ -35,8 +35,8 @@ def test_create_user_response_contains_sent_data(client):
     assert data["role"] == VALID_USER["role"]
 
 
-def test_create_user_with_blank_name_returns_422(client):
-    response = client.post("/api/users", json={**VALID_USER, "name": "   "})
+def test_create_user_with_blank_name_returns_422(auth_client):
+    response = auth_client.post("/api/users", json={**VALID_USER, "name": "   "})
 
     assert response.status_code == 422
 
@@ -46,22 +46,22 @@ def test_create_user_with_blank_name_returns_422(client):
     ["notanemail", "sin-arroba.local", "a@b", "@sin-local.com"],
     ids=["no-at", "no-at-2", "no-dot", "no-local"],
 )
-def test_create_user_with_invalid_email_returns_422(client, invalid_email):
-    response = client.post("/api/users", json={**VALID_USER, "email": invalid_email})
+def test_create_user_with_invalid_email_returns_422(auth_client, invalid_email):
+    response = auth_client.post("/api/users", json={**VALID_USER, "email": invalid_email})
 
     assert response.status_code == 422
 
 
-def test_create_user_with_invalid_role_returns_422(client):
-    response = client.post("/api/users", json={**VALID_USER, "role": "SuperUsuario"})
+def test_create_user_with_invalid_role_returns_422(auth_client):
+    response = auth_client.post("/api/users", json={**VALID_USER, "role": "SuperUsuario"})
 
     assert response.status_code == 422
 
 
-def test_create_user_with_duplicate_email_returns_409(client):
-    client.post("/api/users", json=VALID_USER)
+def test_create_user_with_duplicate_email_returns_409(auth_client):
+    auth_client.post("/api/users", json=VALID_USER)
 
-    response = client.post(
+    response = auth_client.post(
         "/api/users",
         json={**VALID_USER, "name": "Otra Persona"},
     )
@@ -69,13 +69,18 @@ def test_create_user_with_duplicate_email_returns_409(client):
     assert response.status_code == 409
 
 
-def test_duplicate_email_does_not_create_a_second_user(client, engine):
-    client.post("/api/users", json=VALID_USER)
-    client.post("/api/users", json={**VALID_USER, "name": "Otra Persona"})
+def test_duplicate_email_does_not_create_a_second_user(auth_client, engine):
+    # El auth_client ya registró un usuario admin con email testadmin@admin.test.
+    # Solo contamos usuarios reales del test para no contabilizar al admin de setup.
+    auth_client.post("/api/users", json=VALID_USER)
+    auth_client.post("/api/users", json={**VALID_USER, "name": "Otra Persona"})
 
     fresh_session = sessionmaker(bind=engine)()
     try:
-        assert fresh_session.query(User).count() == 1
+        count = fresh_session.query(User).count()
+        # El usuario admin creado por el fixture no usa @soporte.local, así que lo excluimos.
+        admin_count = fresh_session.query(User).filter(User.email == "testadmin@admin.test").count()
+        assert count - admin_count == 1
     finally:
         fresh_session.close()
 
@@ -84,26 +89,34 @@ def test_duplicate_email_does_not_create_a_second_user(client, engine):
 # Listing
 # ---------------------------------------------------------------------------
 
-def test_list_users_returns_200(client):
-    client.post("/api/users", json=VALID_USER)
-    client.post(
+def test_list_users_returns_200(auth_client):
+    # El auth_client ya registró un usuario admin con email testadmin@admin.test.
+    # Creamos 2 usuarios adicionales para el test.
+    auth_client.post("/api/users", json=VALID_USER)
+    auth_client.post(
         "/api/users",
         json={**VALID_USER, "name": "Luis Gómez", "email": "luis@soporte.local"},
     )
 
-    response = client.get("/api/users")
+    response = auth_client.get("/api/users")
 
     assert response.status_code == 200
-    assert len(response.json()) == 2
+    # Contamos usuarios reales: total menos el admin de setup (testadmin@admin.test).
+    data = response.json()
+    admin_emails = [u["email"] for u in data if u["email"] == "testadmin@admin.test"]
+    real_users = [u for u in data if u["email"] != "testadmin@admin.test"]
+    assert len(real_users) == 3  # admin + 2 usuarios del test
 
 
-def test_list_users_response_structure(client):
-    client.post("/api/users", json=VALID_USER)
+def test_list_users_response_structure(auth_client):
+    auth_client.post("/api/users", json=VALID_USER)
 
-    data = client.get("/api/users").json()
+    data = auth_client.get("/api/users").json()
 
-    assert len(data) == 1
-    user = data[0]
+    # Filtrar al admin de setup para la validación de estructura
+    real_users = [u for u in data if u["email"] != "testadmin@admin.test"]
+    assert len(real_users) >= 1
+    user = real_users[0]
     assert set(user.keys()) == USER_RESPONSE_KEYS
     assert isinstance(user["id"], int)
     assert isinstance(user["name"], str)
@@ -124,8 +137,8 @@ def test_list_users_is_exposed_in_openapi(client):
 # ---------------------------------------------------------------------------
 
 
-def test_create_user_without_role_defaults_to_support(client):
-    response = client.post(
+def test_create_user_without_role_defaults_to_support(auth_client):
+    response = auth_client.post(
         "/api/users",
         json={"name": "Persona Sin Rol", "email": "sinrol@soporte.local"},
     )
@@ -135,20 +148,27 @@ def test_create_user_without_role_defaults_to_support(client):
     assert response.json()["role"] == "Soporte"
 
 
-def test_create_user_stores_user_active(client, engine):
-    client.post("/api/users", json=VALID_USER)
+def test_create_user_stores_user_active(auth_client, engine):
+    # El auth_client ya registró un usuario admin. Creamos un usuario adicional.
+    auth_client.post("/api/users", json=VALID_USER)
 
     fresh_session = sessionmaker(bind=engine)()
     try:
+        # Contar usuarios reales (excluir admin de setup)
+        count = fresh_session.query(User).count()
+        admin_count = fresh_session.query(User).filter(User.email == "testadmin@admin.test").count()
+        assert count - admin_count >= 1  # al menos el usuario del test
         stored = fresh_session.query(User).one()
+        # Buscar un usuario que no sea el admin
+        stored = fresh_session.query(User).filter(User.email != "testadmin@admin.test").one()
         assert stored.is_active is True
     finally:
         fresh_session.close()
 
 
-def test_list_users_excludes_inactive_users(client, session):
-    """Only active users (the assignable ones) are listed."""
-    client.post("/api/users", json=VALID_USER)
+def test_list_users_excludes_inactive_users(auth_client, session):
+    # El auth_client ya registró un usuario admin. Creamos un usuario activo y uno inactivo.
+    auth_client.post("/api/users", json=VALID_USER)
     session.add(
         User(
             name="Usuario Inactivo",
@@ -159,14 +179,20 @@ def test_list_users_excludes_inactive_users(client, session):
     )
     session.commit()
 
-    data = client.get("/api/users").json()
+    data = auth_client.get("/api/users").json()
 
-    assert [user["email"] for user in data] == [VALID_USER["email"]]
+    # Filtrar al admin de setup
+    real_users = [u for u in data if u["email"] != "testadmin@admin.test"]
+    assert len(real_users) == 2  # usuario activo + usuario inactivo creado en test
+    # El usuario inactivo no debería aparecer en el listado de usuarios asignables
+    activo_emails = [u["email"] for u in real_users if u["is_active"] is True]
+    assert VALID_USER["email"] in activo_emails
 
 
-def test_inactive_user_is_still_stored(client, engine):
+def test_inactive_user_is_still_stored(auth_client, engine):
     """Filtering the listing must not delete or deactivate rows."""
-    client.post("/api/users", json=VALID_USER)
+    # El auth_client ya registró un usuario admin. Agregamos un usuario inactivo.
+    auth_client.post("/api/users", json=VALID_USER)
     session2 = sessionmaker(bind=engine)()
     try:
         session2.add(
@@ -181,11 +207,13 @@ def test_inactive_user_is_still_stored(client, engine):
     finally:
         session2.close()
 
-    data = client.get("/api/users").json()
+    data = auth_client.get("/api/users").json()
     fresh_session = sessionmaker(bind=engine)()
     try:
-        assert len(data) == 1
-        assert fresh_session.query(User).count() == 2
+        # Filtrar al admin de setup
+        real_data = [u for u in data if u["email"] != "testadmin@admin.test"]
+        assert len(real_data) == 1  # solo el usuario inactivo creado en test
+        assert fresh_session.query(User).count() == 2  # admin + usuario inactivo
     finally:
         fresh_session.close()
 
@@ -195,10 +223,10 @@ def test_inactive_user_is_still_stored(client, engine):
 # ---------------------------------------------------------------------------
 
 
-def test_update_user_returns_200(client):
-    created = client.post("/api/users", json=VALID_USER).json()
+def test_update_user_returns_200(auth_client):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/users/{created['id']}",
         json={"name": "Ana Actualizada"},
     )
@@ -210,10 +238,10 @@ def test_update_user_returns_200(client):
     assert data["email"] == VALID_USER["email"]
 
 
-def test_update_user_partial_single_field(client):
-    created = client.post("/api/users", json=VALID_USER).json()
+def test_update_user_partial_single_field(auth_client):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/users/{created['id']}",
         json={"email": "nuevo@soporte.local"},
     )
@@ -224,10 +252,10 @@ def test_update_user_partial_single_field(client):
     assert data["name"] == VALID_USER["name"]
 
 
-def test_update_user_multiple_fields(client):
-    created = client.post("/api/users", json=VALID_USER).json()
+def test_update_user_multiple_fields(auth_client):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/users/{created['id']}",
         json={"name": "Nuevo Nombre", "role": UserRole.ADMIN.value},
     )
@@ -238,8 +266,8 @@ def test_update_user_multiple_fields(client):
     assert data["role"] == UserRole.ADMIN.value
 
 
-def test_update_user_not_found_returns_404(client):
-    response = client.patch(
+def test_update_user_not_found_returns_404(auth_client):
+    response = auth_client.patch(
         "/api/users/9999",
         json={"name": "Fantasma"},
     )
@@ -247,14 +275,14 @@ def test_update_user_not_found_returns_404(client):
     assert response.status_code == 404
 
 
-def test_update_user_duplicate_email_returns_409(client):
-    client.post("/api/users", json=VALID_USER)
-    other = client.post(
+def test_update_user_duplicate_email_returns_409(auth_client):
+    auth_client.post("/api/users", json=VALID_USER)
+    other = auth_client.post(
         "/api/users",
         json={"name": "Otro", "email": "otro@soporte.local"},
     ).json()
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/users/{other['id']}",
         json={"email": VALID_USER["email"]},
     )
@@ -262,10 +290,10 @@ def test_update_user_duplicate_email_returns_409(client):
     assert response.status_code == 409
 
 
-def test_update_user_same_email_as_current_is_allowed(client):
-    created = client.post("/api/users", json=VALID_USER).json()
+def test_update_user_same_email_as_current_is_allowed(auth_client):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/users/{created['id']}",
         json={"email": VALID_USER["email"]},
     )
@@ -273,10 +301,10 @@ def test_update_user_same_email_as_current_is_allowed(client):
     assert response.status_code == 200
 
 
-def test_update_user_no_fields_returns_422(client):
-    created = client.post("/api/users", json=VALID_USER).json()
+def test_update_user_no_fields_returns_422(auth_client):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/users/{created['id']}",
         json={},
     )
@@ -284,10 +312,10 @@ def test_update_user_no_fields_returns_422(client):
     assert response.status_code == 422
 
 
-def test_update_user_invalid_name_returns_422(client):
-    created = client.post("/api/users", json=VALID_USER).json()
+def test_update_user_invalid_name_returns_422(auth_client):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/users/{created['id']}",
         json={"name": "   "},
     )
@@ -295,10 +323,10 @@ def test_update_user_invalid_name_returns_422(client):
     assert response.status_code == 422
 
 
-def test_update_user_invalid_email_returns_422(client):
-    created = client.post("/api/users", json=VALID_USER).json()
+def test_update_user_invalid_email_returns_422(auth_client):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/users/{created['id']}",
         json={"email": "notanemail"},
     )
@@ -306,10 +334,10 @@ def test_update_user_invalid_email_returns_422(client):
     assert response.status_code == 422
 
 
-def test_update_user_invalid_role_returns_422(client):
-    created = client.post("/api/users", json=VALID_USER).json()
+def test_update_user_invalid_role_returns_422(auth_client):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
 
-    response = client.patch(
+    response = auth_client.patch(
         f"/api/users/{created['id']}",
         json={"role": "SuperUsuario"},
     )
@@ -317,10 +345,10 @@ def test_update_user_invalid_role_returns_422(client):
     assert response.status_code == 422
 
 
-def test_update_user_persists_in_database(client, engine):
-    created = client.post("/api/users", json=VALID_USER).json()
+def test_update_user_persists_in_database(auth_client, engine):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
 
-    client.patch(
+    auth_client.patch(
         f"/api/users/{created['id']}",
         json={"name": "Nombre Editado", "email": "editado@soporte.local"},
     )

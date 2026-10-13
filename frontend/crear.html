@@ -15,6 +15,7 @@
     <nav class="cabecera-enlaces">
       <a href="index.html" class="enlace-boton">Volver al listado</a>
       <a href="usuarios.html" class="enlace-boton">Usuarios</a>
+      <button type="button" id="btn-logout" class="enlace-boton" style="border: none; cursor: pointer;">Cerrar sesión</button>
     </nav>
   </header>
 
@@ -70,6 +71,14 @@
     <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
   </main>
 
+  <script src="js/auth.js" defer></script>
   <script src="js/crear.js" defer></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (!requireAuth()) return;
+      var logoutBtn = document.getElementById("btn-logout");
+      if (logoutBtn) logoutBtn.addEventListener("click", logout);
+    });
+  </script>
 </body>
 </html>

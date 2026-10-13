@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.auth import (
     create_access_token,
+    get_current_user,
     hash_password,
     verify_password,
 )
@@ -125,31 +126,10 @@ def login(payload: LoginRequest, session: Session = Depends(get_session)) -> Tok
     summary="Obtener usuario actual",
 )
 def get_current_user_info(
-    token: str,
-    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> UserResponse:
     """Return the currently authenticated user's information.
 
     Requires a valid Bearer token in the Authorization header.
     """
-    from fastapi import HTTPException, status
-    from backend.auth import decode_access_token
-    import jwt
-
-    try:
-        payload = decode_access_token(token)
-        user_id = int(payload.get("sub"))
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, ValueError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido o expirado",
-        )
-
-    user = session.get(User, user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado",
-        )
-
-    return UserResponse.model_validate(user)
+    return UserResponse.model_validate(current_user)

@@ -3,7 +3,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from backend.auth import get_current_user
 from backend.database import get_session
+from backend.models import User
 from backend.schemas import CommentCreate, CommentResponse
 from backend.services import ticket_service
 from backend.services.ticket_service import TicketNotFoundError
@@ -21,6 +23,7 @@ def create_comment(
     ticket_id: int,
     payload: CommentCreate,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> CommentResponse:
     """Create a comment on an existing ticket (RF5)."""
     try:
@@ -41,6 +44,7 @@ def create_comment(
 def list_comments(
     ticket_id: int,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> list[CommentResponse]:
     """Return the comments stored for a ticket, oldest first (RF5).
 

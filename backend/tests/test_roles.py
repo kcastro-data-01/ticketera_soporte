@@ -28,22 +28,22 @@ NON_AUTO_ASSIGN_ROLES = [
 ]
 
 
-def create_user(client, name, email, role=UserRole.SUPPORT.value, **overrides) -> dict:
+def create_user(auth_client, name, email, role=UserRole.SUPPORT.value, **overrides) -> dict:
     payload = {"name": name, "email": email, "role": role, **overrides}
-    response = client.post("/api/users", json=payload)
+    response = auth_client.post("/api/users", json=payload)
     assert response.status_code == 201
     return response.json()
 
 
-def create_ticket(client, **overrides) -> dict:
+def create_ticket(auth_client, **overrides) -> dict:
     payload = {**VALID_TICKET, **overrides}
-    response = client.post("/api/tickets", json=payload)
+    response = auth_client.post("/api/tickets", json=payload)
     assert response.status_code == 201
     return response.json()
 
 
-def assign(client, ticket_id, user_id) -> dict:
-    response = client.patch(
+def assign(auth_client, ticket_id, user_id) -> dict:
+    response = auth_client.patch(
         f"/api/tickets/{ticket_id}/assign",
         json={"assigned_to_id": user_id},
     )
@@ -57,8 +57,8 @@ def assign(client, ticket_id, user_id) -> dict:
 
 
 @pytest.mark.parametrize("role", USER_ROLES, ids=USER_ROLES)
-def test_every_role_can_be_created(client, role):
-    response = client.post(
+def test_every_role_can_be_created(auth_client, role):
+    response = auth_client.post(
         "/api/users",
         json={"name": f"Persona {role}", "email": f"{role}@soporte.local", "role": role},
     )
@@ -68,19 +68,19 @@ def test_every_role_can_be_created(client, role):
 
 
 @pytest.mark.parametrize("role", USER_ROLES, ids=USER_ROLES)
-def test_every_role_round_trips_in_the_listing(client, role):
-    client.post(
+def test_every_role_round_trips_in_the_listing(auth_client, role):
+    auth_client.post(
         "/api/users",
         json={"name": f"Persona {role}", "email": f"{role}@soporte.local", "role": role},
     )
 
-    data = client.get("/api/users").json()
+    data = auth_client.get("/api/users").json()
 
     assert [user["role"] for user in data] == [role]
 
 
-def test_unknown_role_is_still_rejected(client):
-    response = client.post(
+def test_unknown_role_is_still_rejected(auth_client):
+    response = auth_client.post(
         "/api/users",
         json={"name": "Nadie", "email": "nadie@soporte.local", "role": "SuperUsuario"},
     )
@@ -101,48 +101,48 @@ def test_roles_fit_the_model_role_column():
 # ---------------------------------------------------------------------------
 
 
-def test_technician_receives_the_ticket_when_no_support_user_exists(client):
+def test_technician_receives_the_ticket_when_no_support_user_exists(auth_client):
     technician = create_user(
-        client, "Tina", "tina@soporte.local", role=UserRole.TECHNICIAN.value
+        auth_client, "Tina", "tina@soporte.local", role=UserRole.TECHNICIAN.value
     )
 
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
 
     assert ticket["assigned_to_id"] == technician["id"]
 
 
-def test_support_and_technician_share_the_round_robin(client):
-    support = create_user(client, "Ana", "ana@soporte.local")
+def test_support_and_technician_share_the_round_robin(auth_client):
+    support = create_user(auth_client, "Ana", "ana@soporte.local")
     technician = create_user(
-        client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
+        auth_client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
     )
 
-    ticket_a = create_ticket(client, title="Primer ticket")
-    ticket_b = create_ticket(client, title="Segundo ticket")
+    ticket_a = create_ticket(auth_client, title="Primer ticket")
+    ticket_b = create_ticket(auth_client, title="Segundo ticket")
 
     # Both are eligible, so they alternate in id order.
     assert ticket_a["assigned_to_id"] == support["id"]
     assert ticket_b["assigned_to_id"] == technician["id"]
 
 
-def test_tie_between_support_and_technician_breaks_by_lowest_id(client):
+def test_tie_between_support_and_technician_breaks_by_lowest_id(auth_client):
     technician = create_user(
-        client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
+        auth_client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
     )
-    support = create_user(client, "Ana", "ana@soporte.local")
+    support = create_user(auth_client, "Ana", "ana@soporte.local")
 
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
 
     # Both have 0 tickets; the lowest id (the technician) wins.
     assert ticket["assigned_to_id"] == technician["id"]
 
 
-def test_round_robin_counts_tickets_of_both_eligible_roles(client, session):
+def test_round_robin_counts_tickets_of_both_eligible_roles(auth_client, session):
     from backend.models import Ticket as TicketModel
 
-    support = create_user(client, "Ana", "ana@soporte.local")
+    support = create_user(auth_client, "Ana", "ana@soporte.local")
     technician = create_user(
-        client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
+        auth_client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
     )
 
     # One ticket already assigned to the technician (bypassing the API).
@@ -158,33 +158,33 @@ def test_round_robin_counts_tickets_of_both_eligible_roles(client, session):
     session.commit()
 
     # Ana has 0, Tomás has 1 → the new ticket goes to Ana.
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
     assert ticket["assigned_to_id"] == support["id"]
 
     # Now both have 1 → tie, lowest id (Ana) wins again.
-    ticket = create_ticket(client, title="Segundo ticket")
+    ticket = create_ticket(auth_client, title="Segundo ticket")
     assert ticket["assigned_to_id"] == support["id"]
 
     # Ana has 2, Tomás has 1 → Tomás wins.
-    ticket = create_ticket(client, title="Tercer ticket")
+    ticket = create_ticket(auth_client, title="Tercer ticket")
     assert ticket["assigned_to_id"] == technician["id"]
 
 
 @pytest.mark.parametrize("role", NON_AUTO_ASSIGN_ROLES, ids=NON_AUTO_ASSIGN_ROLES)
-def test_other_roles_never_receive_a_ticket_automatically(client, role):
-    create_user(client, "Otra Persona", f"otra-{role}@soporte.local", role=role)
+def test_other_roles_never_receive_a_ticket_automatically(auth_client, role):
+    create_user(auth_client, "Otra Persona", f"otra-{role}@soporte.local", role=role)
 
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
 
     assert ticket["assigned_to_id"] is None
 
 
-def test_inactive_technician_is_skipped(client, session):
+def test_inactive_technician_is_skipped(auth_client, session):
     from backend.models import User as UserModel
 
-    active = create_user(client, "Ana", "ana@soporte.local")
+    active = create_user(auth_client, "Ana", "ana@soporte.local")
     inactive = create_user(
-        client,
+        auth_client,
         "Tomás",
         "tomas@soporte.local",
         role=UserRole.TECHNICIAN.value,
@@ -194,7 +194,7 @@ def test_inactive_technician_is_skipped(client, session):
     db_user.is_active = False
     session.commit()
 
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
 
     assert ticket["assigned_to_id"] == active["id"]
 
@@ -204,51 +204,51 @@ def test_inactive_technician_is_skipped(client, session):
 # ---------------------------------------------------------------------------
 
 
-def test_existing_assignments_survive_new_tickets(client):
+def test_existing_assignments_survive_new_tickets(auth_client):
     requester = create_user(
-        client, "Sara", "sara@soporte.local", role=UserRole.REQUESTER.value
+        auth_client, "Sara", "sara@soporte.local", role=UserRole.REQUESTER.value
     )
-    support = create_user(client, "Ana", "ana@soporte.local")
+    support = create_user(auth_client, "Ana", "ana@soporte.local")
 
-    ticket_a = create_ticket(client, title="Ticket existente")
+    ticket_a = create_ticket(auth_client, title="Ticket existente")
     assert ticket_a["assigned_to_id"] == support["id"]
 
     # Manual assignment to a role outside AUTO_ASSIGN_ROLES.
-    ticket_a = assign(client, ticket_a["id"], requester["id"])
+    ticket_a = assign(auth_client, ticket_a["id"], requester["id"])
     assert ticket_a["assigned_to_id"] == requester["id"]
 
     # A new ticket must not disturb it.
-    ticket_b = create_ticket(client, title="Ticket nuevo")
+    ticket_b = create_ticket(auth_client, title="Ticket nuevo")
     assert ticket_b["assigned_to_id"] == support["id"]
 
-    stored = client.get(f"/api/tickets/{ticket_a['id']}").json()
+    stored = auth_client.get(f"/api/tickets/{ticket_a['id']}").json()
     assert stored["assigned_to_id"] == requester["id"]
 
 
-def test_manual_assignment_can_unassign(client):
-    support = create_user(client, "Ana", "ana@soporte.local")
+def test_manual_assignment_can_unassign(auth_client):
+    support = create_user(auth_client, "Ana", "ana@soporte.local")
 
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
     assert ticket["assigned_to_id"] == support["id"]
 
-    ticket = assign(client, ticket["id"], None)
+    ticket = assign(auth_client, ticket["id"], None)
 
     assert ticket["assigned_to_id"] is None
     # Unassigning does not deactivate or delete the user.
-    assert len(client.get("/api/users").json()) == 1
+    assert len(auth_client.get("/api/users").json()) == 1
 
 
-def test_manual_assignment_to_supervisor_is_accepted(client):
+def test_manual_assignment_to_supervisor_is_accepted(auth_client):
     supervisor = create_user(
-        client, "Sonia", "sonia@soporte.local", role=UserRole.SUPERVISOR.value
+        auth_client, "Sonia", "sonia@soporte.local", role=UserRole.SUPERVISOR.value
     )
     technician = create_user(
-        client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
+        auth_client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
     )
 
-    ticket = create_ticket(client)
+    ticket = create_ticket(auth_client)
     assert ticket["assigned_to_id"] == technician["id"]
 
-    ticket = assign(client, ticket["id"], supervisor["id"])
+    ticket = assign(auth_client, ticket["id"], supervisor["id"])
 
     assert ticket["assigned_to_id"] == supervisor["id"]

@@ -14,6 +14,7 @@
     </div>
     <nav class="cabecera-enlaces">
       <a href="index.html" class="enlace-boton">Tickets</a>
+      <button type="button" id="btn-logout" class="enlace-boton" style="border: none; cursor: pointer;">Cerrar sesión</button>
     </nav>
   </header>
 
@@ -130,6 +131,14 @@
     </section>
   </main>
 
+  <script src="js/auth.js" defer></script>
   <script src="js/usuarios.js" defer></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (!requireAuth()) return;
+      var logoutBtn = document.getElementById("btn-logout");
+      if (logoutBtn) logoutBtn.addEventListener("click", logout);
+    });
+  </script>
 </body>
 </html>

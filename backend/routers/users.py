@@ -3,7 +3,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from backend.auth import get_current_user
 from backend.database import get_session
+from backend.models import User
 from backend.schemas import UserCreate, UserResponse, UserUpdate
 from backend.services import user_service
 
@@ -19,6 +21,7 @@ router = APIRouter(prefix="/api/users", tags=["Usuarios"])
 def create_user(
     payload: UserCreate,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> UserResponse:
     """Create a minimal user used to own tickets (name, email, role)."""
     user = user_service.create_user(session, payload)
@@ -35,7 +38,10 @@ def create_user(
     response_model=list[UserResponse],
     summary="Listar usuarios",
 )
-def list_users(session: Session = Depends(get_session)) -> list[UserResponse]:
+def list_users(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> list[UserResponse]:
     """Return the active users available for assignment (read-only)."""
     users = user_service.list_users(session)
     return [UserResponse.model_validate(user) for user in users]
@@ -50,6 +56,7 @@ def update_user(
     user_id: int,
     payload: UserUpdate,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> UserResponse:
     """Update an existing user (partial update)."""
     try:
