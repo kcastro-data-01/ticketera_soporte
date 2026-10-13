@@ -76,7 +76,8 @@ def test_every_role_round_trips_in_the_listing(auth_client, role):
 
     data = auth_client.get("/api/users").json()
 
-    assert [user["role"] for user in data] == [role]
+    real_data = [u for u in data if u["email"] != "testadmin@test.com"]
+    assert [user["role"] for user in real_data] == [role]
 
 
 def test_unknown_role_is_still_rejected(auth_client):
@@ -235,7 +236,9 @@ def test_manual_assignment_can_unassign(auth_client):
 
     assert ticket["assigned_to_id"] is None
     # Unassigning does not deactivate or delete the user.
-    assert len(auth_client.get("/api/users").json()) == 1
+    users = auth_client.get("/api/users").json()
+    real_users = [u for u in users if u["email"] != "testadmin@test.com"]
+    assert len(real_users) == 1
 
 
 def test_manual_assignment_to_supervisor_is_accepted(auth_client):
