@@ -164,7 +164,9 @@ def test_user_management_and_assignment_integration(auth_client):
     all_users = users.json()
     real_users = [u for u in all_users if u["email"] != "testadmin@test.com"]
     assert [user["id"] for user in real_users] == [first_id]
-    assert users.json()[0]["name"] == "Ana Pérez"
+    # Ana Pérez debe estar en la lista (aunque no necesariamente sea la primera,
+    # ya que el fixture auth_client crea "Test Admin" primero).
+    assert any(u["name"] == "Ana Pérez" for u in all_users)
 
     # 3. Crear ticket: se auto-asigna al primer usuario Soporte activo.
     ticket = create_ticket(auth_client)

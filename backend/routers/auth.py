@@ -17,6 +17,83 @@ from backend.schemas import LoginRequest, RegisterRequest, TokenResponse, UserRe
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
+# Roles permitidos por endpoint
+ROLES_ADMIN = {UserRole.ADMIN.value}
+ROLES_SOPORTE = {UserRole.SUPPORT.value, UserRole.ADMIN.value}
+ROLES_SUPERVISOR = {UserRole.SUPERVISOR.value, UserRole.ADMIN.value}
+ROLES_TECNICO = {UserRole.TECHNICIAN.value, UserRole.ADMIN.value}
+ROLES_SOLICITANTE = {UserRole.REQUESTER.value, UserRole.ADMIN.value}
+
+
+def role_required(allowed_roles: set[str]) -> callable:
+    """Dependency that checks if the current user has one of the allowed roles.
+
+    Raises 403 Forbidden when the user doesn't have the required role.
+    Works with the existing ``get_current_user`` dependency: if the user is
+    ``None`` (no token), the 401 from ``get_current_user`` takes precedence.
+    """
+
+    def dependency(current_user: User | None = Depends(get_current_user)) -> User:
+        if current_user is None:
+            # Dejar que la dependencia original levante 401
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No autenticado",
+            )
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tiene permisos para acceder a este recurso",
+            )
+        return current_user
+
+    return dependency
+
+
+def optional_role_required(allowed_roles: set[str]) -> callable:
+    """Dependency that checks roles only when a user is authenticated.
+
+    If no user is authenticated (``current_user is None``), it returns the
+    user (None) and allows the request to proceed. This preserves the "open
+    by design" API behavior while still restricting authenticated users.
+
+    Raises 403 Forbidden when an authenticated user doesn't have the required
+    role.
+    """
+
+    def dependency(current_user: User | None = Depends(get_current_user)) -> User | None:
+        if current_user is None:
+            # Sin token: permitir el acceso (API abierta por diseño)
+            return None
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tiene permisos para acceder a este recurso",
+            )
+        return current_user
+
+    return dependency
+
+
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Obtener usuario actual",
+)
+def get_current_user_info(
+    current_user: User | None = Depends(get_current_user),
+) -> UserResponse:
+    """Return the currently authenticated user's information.
+
+    Requires a valid Bearer token in the Authorization header.
+    """
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No autenticado",
+        )
+    return UserResponse.model_validate(current_user)
+
 
 def _get_user_by_email(session: Session, email: str) -> User | None:
     """Find a user by email (case-insensitive)."""
