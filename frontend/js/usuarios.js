@@ -30,6 +30,15 @@ function getElements() {
     usuariosEstado: document.getElementById("usuarios-estado"),
     tabla: document.getElementById("tabla-usuarios"),
     cuerpo: document.getElementById("cuerpo-usuarios"),
+    seccionEditar: document.getElementById("seccion-editar"),
+    formEditar: document.getElementById("form-editar-usuario"),
+    editarId: document.getElementById("editar-id"),
+    editarNombre: document.getElementById("editar-nombre"),
+    editarEmail: document.getElementById("editar-email"),
+    editarRol: document.getElementById("editar-rol"),
+    guardarEdicion: document.getElementById("guardar-edicion"),
+    cancelarEdicion: document.getElementById("cancelar-edicion"),
+    estadoEdicion: document.getElementById("estado-edicion"),
   };
 }
 
@@ -124,10 +133,100 @@ function renderUsers(users) {
     stateCell.appendChild(badge);
     row.appendChild(stateCell);
 
+    const actionsCell = document.createElement("td");
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "btn-accion";
+    editBtn.textContent = "Editar";
+    editBtn.addEventListener("click", () => editarUsuario(user));
+    actionsCell.appendChild(editBtn);
+    row.appendChild(actionsCell);
+
     elements.cuerpo.appendChild(row);
   });
   ocultarUsuariosEstado();
   elements.tabla.hidden = false;
+}
+
+function mostrarEdicionEstado(message, type) {
+  const elements = getElements();
+  elements.estadoEdicion.textContent = message;
+  elements.estadoEdicion.className = type ? `estado ${type}` : "estado";
+  elements.estadoEdicion.hidden = false;
+}
+
+function ocultarEdicionEstado() {
+  const elements = getElements();
+  elements.estadoEdicion.textContent = "";
+  elements.estadoEdicion.hidden = true;
+}
+
+function editarUsuario(user) {
+  const elements = getElements();
+  elements.editarId.value = user.id;
+  elements.editarNombre.value = user.name;
+  elements.editarEmail.value = user.email;
+  elements.editarRol.value = user.role;
+  elements.seccionEditar.hidden = false;
+  ocultarEdicionEstado();
+  elements.seccionEditar.scrollIntoView({ behavior: "smooth" });
+}
+
+function cancelarEdicion() {
+  const elements = getElements();
+  elements.seccionEditar.hidden = true;
+  ocultarEdicionEstado();
+}
+
+async function guardarEdicion(event) {
+  event.preventDefault();
+  if (ocupado) return;
+
+  const elements = getElements();
+  const userId = parseInt(elements.editarId.value, 10);
+  const payload = {};
+
+  const nombre = elements.editarNombre.value.trim();
+  const email = elements.editarEmail.value.trim();
+  const rol = elements.editarRol.value;
+
+  if (nombre) payload.name = nombre;
+  if (email) payload.email = email;
+  if (rol) payload.role = rol;
+
+  if (Object.keys(payload).length === 0) {
+    mostrarEdicionEstado("No hay cambios para guardar.", "error");
+    return;
+  }
+
+  ocupado = true;
+  elements.guardarEdicion.disabled = true;
+  try {
+    const response = await fetch(`${API_USERS_URL}/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = response.ok ? null : await response.json().catch(() => null);
+    if (!response.ok) {
+      mostrarEdicionEstado(mensajeDeError(response, body), "error");
+      return;
+    }
+
+    elements.seccionEditar.hidden = true;
+    ocultarEdicionEstado();
+    mostrarEdicionEstado("Usuario actualizado correctamente.", "exito");
+    await cargarUsuarios();
+  } catch (error) {
+    console.error("PATCH /api/users:", error);
+    mostrarEdicionEstado(
+      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "error"
+    );
+  } finally {
+    ocupado = false;
+    elements.guardarEdicion.disabled = false;
+  }
 }
 
 async function cargarUsuarios() {
@@ -207,6 +306,8 @@ async function crearUsuario(event) {
 async function init() {
   const elements = getElements();
   elements.formUsuario.addEventListener("submit", crearUsuario);
+  elements.formEditar.addEventListener("submit", guardarEdicion);
+  elements.cancelarEdicion.addEventListener("click", cancelarEdicion);
   await cargarUsuarios();
 }
 

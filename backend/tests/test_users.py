@@ -188,3 +188,154 @@ def test_inactive_user_is_still_stored(client, engine):
         assert fresh_session.query(User).count() == 2
     finally:
         fresh_session.close()
+
+
+# ---------------------------------------------------------------------------
+# Update (PATCH /api/users/{id})
+# ---------------------------------------------------------------------------
+
+
+def test_update_user_returns_200(client):
+    created = client.post("/api/users", json=VALID_USER).json()
+
+    response = client.patch(
+        f"/api/users/{created['id']}",
+        json={"name": "Ana Actualizada"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == created["id"]
+    assert data["name"] == "Ana Actualizada"
+    assert data["email"] == VALID_USER["email"]
+
+
+def test_update_user_partial_single_field(client):
+    created = client.post("/api/users", json=VALID_USER).json()
+
+    response = client.patch(
+        f"/api/users/{created['id']}",
+        json={"email": "nuevo@soporte.local"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["email"] == "nuevo@soporte.local"
+    assert data["name"] == VALID_USER["name"]
+
+
+def test_update_user_multiple_fields(client):
+    created = client.post("/api/users", json=VALID_USER).json()
+
+    response = client.patch(
+        f"/api/users/{created['id']}",
+        json={"name": "Nuevo Nombre", "role": UserRole.ADMIN.value},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Nuevo Nombre"
+    assert data["role"] == UserRole.ADMIN.value
+
+
+def test_update_user_not_found_returns_404(client):
+    response = client.patch(
+        "/api/users/9999",
+        json={"name": "Fantasma"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_update_user_duplicate_email_returns_409(client):
+    client.post("/api/users", json=VALID_USER)
+    other = client.post(
+        "/api/users",
+        json={"name": "Otro", "email": "otro@soporte.local"},
+    ).json()
+
+    response = client.patch(
+        f"/api/users/{other['id']}",
+        json={"email": VALID_USER["email"]},
+    )
+
+    assert response.status_code == 409
+
+
+def test_update_user_same_email_as_current_is_allowed(client):
+    created = client.post("/api/users", json=VALID_USER).json()
+
+    response = client.patch(
+        f"/api/users/{created['id']}",
+        json={"email": VALID_USER["email"]},
+    )
+
+    assert response.status_code == 200
+
+
+def test_update_user_no_fields_returns_422(client):
+    created = client.post("/api/users", json=VALID_USER).json()
+
+    response = client.patch(
+        f"/api/users/{created['id']}",
+        json={},
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_user_invalid_name_returns_422(client):
+    created = client.post("/api/users", json=VALID_USER).json()
+
+    response = client.patch(
+        f"/api/users/{created['id']}",
+        json={"name": "   "},
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_user_invalid_email_returns_422(client):
+    created = client.post("/api/users", json=VALID_USER).json()
+
+    response = client.patch(
+        f"/api/users/{created['id']}",
+        json={"email": "notanemail"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_user_invalid_role_returns_422(client):
+    created = client.post("/api/users", json=VALID_USER).json()
+
+    response = client.patch(
+        f"/api/users/{created['id']}",
+        json={"role": "SuperUsuario"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_user_persists_in_database(client, engine):
+    created = client.post("/api/users", json=VALID_USER).json()
+
+    client.patch(
+        f"/api/users/{created['id']}",
+        json={"name": "Nombre Editado", "email": "editado@soporte.local"},
+    )
+
+    fresh_session = sessionmaker(bind=engine)()
+    try:
+        stored = fresh_session.get(User, created["id"])
+        assert stored.name == "Nombre Editado"
+        assert stored.email == "editado@soporte.local"
+    finally:
+        fresh_session.close()
+
+
+def test_update_user_is_exposed_in_openapi(client):
+    schema = client.get("/openapi.json").json()
+
+    assert "/api/users/{user_id}" in schema["paths"]
+    assert "patch" in schema["paths"]["/api/users/{user_id}"]

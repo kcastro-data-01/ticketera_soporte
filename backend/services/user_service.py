@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from backend.constants import AUTO_ASSIGN_ROLES
 from backend.models import User
-from backend.schemas import UserCreate
+from backend.schemas import UserCreate, UserUpdate
 
 
 def create_user(session, payload: UserCreate) -> User | None:
@@ -56,3 +56,34 @@ def get_auto_assignable_users(session) -> list[User]:
         .order_by(User.id)
     )
     return list(session.scalars(statement).all())
+
+
+def update_user(session, user_id: int, payload: UserUpdate) -> User | None:
+    """Apply a partial update to an existing user.
+
+    Returns ``None`` when the user does not exist. Raises ``ValueError`` when
+    the new email is already used by another user.
+    """
+    user = session.get(User, user_id)
+    if user is None:
+        return None
+
+    # Check email uniqueness (excluding the current user)
+    if payload.email is not None:
+        existing = session.scalar(
+            select(User).where(User.email == payload.email, User.id != user_id)
+        )
+        if existing is not None:
+            raise ValueError(f"El email '{payload.email}' ya está en uso")
+
+    # Apply changes
+    if payload.name is not None:
+        user.name = payload.name
+    if payload.email is not None:
+        user.email = payload.email
+    if payload.role is not None:
+        user.role = payload.role.value
+
+    session.commit()
+    session.refresh(user)
+    return user

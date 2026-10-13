@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_session
-from backend.schemas import UserCreate, UserResponse
+from backend.schemas import UserCreate, UserResponse, UserUpdate
 from backend.services import user_service
 
 router = APIRouter(prefix="/api/users", tags=["Usuarios"])
@@ -39,3 +39,29 @@ def list_users(session: Session = Depends(get_session)) -> list[UserResponse]:
     """Return the active users available for assignment (read-only)."""
     users = user_service.list_users(session)
     return [UserResponse.model_validate(user) for user in users]
+
+
+@router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    summary="Actualizar un usuario",
+)
+def update_user(
+    user_id: int,
+    payload: UserUpdate,
+    session: Session = Depends(get_session),
+) -> UserResponse:
+    """Update an existing user (partial update)."""
+    try:
+        user = user_service.update_user(session, user_id, payload)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        )
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Usuario {user_id} no encontrado",
+        )
+    return UserResponse.model_validate(user)
