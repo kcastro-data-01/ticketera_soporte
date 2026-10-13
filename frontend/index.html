@@ -23,8 +23,12 @@
 
     <header class="cabecera">
       <div>
-        <h1>¡Bienvenido a Ticketera!</h1>
+        <h1>Ticketera de Soporte</h1>
         <p>Consulta y gestión de tickets de soporte</p>
+        <div id="usuario-bienvenido" class="usuario-bienvenido" hidden>
+          <span id="usuario-nombre" class="usuario-nombre"></span>
+          <span id="usuario-rol" class="usuario-rol"></span>
+        </div>
       </div>
       <nav class="cabecera-enlaces">
         <a href="crear.html" class="enlace-boton">Nuevo ticket</a>
@@ -111,7 +115,23 @@
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       if (!requireAuth()) return;
-      var logoutBtn = document.getElementById("btn-logout");
+      // Mostrar nombre y rol del usuario autenticado
+      const user = getUser();
+      const bienvenido = document.getElementById("usuario-bienvenido");
+      if (user && user.name) {
+        const nombreEl = document.getElementById("usuario-nombre");
+        const rolEl = document.getElementById("usuario-rol");
+        nombreEl.textContent = user.name;
+        // Mostrar rol si existe, ocultar si no
+        if (user.role) {
+          rolEl.textContent = `(${user.role})`;
+          rolEl.hidden = false;
+        } else {
+          rolEl.hidden = true;
+        }
+        bienvenido.hidden = false;
+      }
+      const logoutBtn = document.getElementById("btn-logout");
       if (logoutBtn) logoutBtn.addEventListener("click", logout);
     });
   </script>
