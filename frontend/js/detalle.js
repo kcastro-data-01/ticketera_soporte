@@ -1,7 +1,10 @@
 /* Tarea 13/14/18/20.2 — Detalle y gestión de un ticket con los endpoints
    existentes: GET/PATCH /api/tickets/{id}, PATCH .../assign,
    PATCH .../state, GET /api/users, POST y GET .../comments y
-   GET .../history. JavaScript vanilla, sin frameworks ni librerías. */
+   GET .../history. JavaScript vanilla, sin frameworks ni librerías.
+   Fase 2: TODAS las peticiones usan fetchWithAuth (auth.js) para enviar
+   el Bearer token: los endpoints de escritura exigen autenticación y sin
+   la cabecera Authorization responden 401. */
 
 const API_USERS_URL = "/api/users";
 
@@ -321,7 +324,7 @@ async function guardarEdicion() {
   ocupado = true;
   bloquearBotones(true);
   try {
-    const response = await fetch(`/api/tickets/${ticketId}`, {
+    const response = await fetchWithAuth(`/api/tickets/${ticketId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -378,7 +381,7 @@ async function guardarAsignacion() {
   ocupado = true;
   bloquearBotones(true);
   try {
-    const response = await fetch(`/api/tickets/${ticketId}/assign`, {
+    const response = await fetchWithAuth(`/api/tickets/${ticketId}/assign`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ assigned_to_id: assignedToId }),
@@ -429,7 +432,7 @@ async function cambiarEstado() {
   ocupado = true;
   bloquearBotones(true);
   try {
-    const response = await fetch(`/api/tickets/${ticketId}/state`, {
+    const response = await fetchWithAuth(`/api/tickets/${ticketId}/state`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ state: destino }),
@@ -496,7 +499,7 @@ async function agregarComentario() {
   ocupado = true;
   bloquearBotones(true);
   try {
-    const response = await fetch(`/api/tickets/${ticketId}/comments`, {
+    const response = await fetchWithAuth(`/api/tickets/${ticketId}/comments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content, author }),

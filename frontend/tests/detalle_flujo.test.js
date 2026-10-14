@@ -150,6 +150,9 @@ function makeFetch(overrides = {}) {
     if (url === "/api/tickets/1/assign" && method === "PATCH") {
       return resolve(overrides.assign, jsonResponse(200, TICKET));
     }
+    if (url === "/api/tickets/1/state" && method === "PATCH") {
+      return resolve(overrides.state, jsonResponse(200, TICKET));
+    }
     if (url === "/api/tickets/1" && method === "PATCH") {
       return resolve(overrides.edit, jsonResponse(200, TICKET));
     }
@@ -637,4 +640,66 @@ test("si guardar falla se mantiene el modo edición con el error visible", async
   assert.match(harness.node("estado-carga").textContent, /HTTP 500/);
   assert.equal(harness.node("estado-carga").className, "estado error");
   assert.equal(harness.node("guardar").disabled, false, "se puede reintentar");
+});
+
+/* Regresión (Fase 2): los endpoints de escritura exigen JWT y sin la
+   cabecera Authorization responden 401 ("No se pudo guardar la
+   asignación (HTTP 401)"). Todas las peticiones del detalle deben pasar
+   por fetchWithAuth (auth.js), que adjunta el Bearer token. */
+test("las cuatro escrituras del detalle envían el Bearer token", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  harness.clearCalls();
+
+  /* Editar */
+  harness.call("activarEdicion");
+  await harness.call("guardarEdicion");
+
+  /* Asignar */
+  harness.node("usuario").value = String(USER.id);
+  await harness.call("guardarAsignacion");
+
+  /* Cambiar estado */
+  harness.node("estado-destino").value = "En proceso";
+  await harness.call("cambiarEstado");
+
+  /* Comentar */
+  harness.node("contenido").value = "Comentario con token.";
+  await harness.call("agregarComentario");
+
+  const escrituras = harness.fetchCalls.filter(
+    (call) => (call.options.method || "GET").toUpperCase() !== "GET"
+  );
+  const esperadas = [
+    "/api/tickets/1",
+    "/api/tickets/1/assign",
+    "/api/tickets/1/state",
+    "/api/tickets/1/comments",
+  ];
+  assert.deepEqual(
+    escrituras.map((call) => call.url),
+    esperadas
+  );
+  for (const call of escrituras) {
+    const headers = call.options.headers || {};
+    assert.equal(
+      headers.Authorization,
+      "Bearer token-de-prueba",
+      `${call.options.method} ${call.url} no envía Authorization: respondería 401`
+    );
+  }
+});
+
+/* La cabecera Content-Type debe conservarse junto al Authorization. */
+test("las escrituras envían Content-Type application/json con el token", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  harness.clearCalls();
+
+  harness.node("usuario").value = String(USER.id);
+  await harness.call("guardarAsignacion");
+
+  const headers = harness.fetchCalls[0].options.headers || {};
+  assert.equal(headers.Authorization, "Bearer token-de-prueba");
+  assert.equal(headers["Content-Type"], "application/json");
 });
