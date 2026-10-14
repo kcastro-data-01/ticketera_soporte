@@ -715,6 +715,11 @@ button.secundario:disabled:hover {
   padding-bottom: var(--espaciado-lg);
   border-bottom: 1px solid rgba(255,255,255,0.2);
 }
+  .sidebar-logo img {
+    max-width: 80%;
+    height: auto;
+    margin: 0.2rem 0;
+  }
 
 .sidebar-logo span {
   font-size: var(--texto-lg);
@@ -1053,4 +1058,12 @@ body.pagina-login {
     margin: -0.25rem -1.25rem 0.75rem;
     padding: 0.25rem 1.25rem;
   }
+}
+
+.cabecera-logo {
+  width: 24px;
+  height: 24px;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  filter: brightness(1.1);
 }
