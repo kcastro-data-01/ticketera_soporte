@@ -19,6 +19,7 @@ HISTORY_KEYS = {
     "old_value",
     "new_value",
     "author",
+    "author_id",
     "created_at",
 }
 
@@ -107,7 +108,10 @@ def test_history_exposes_the_model_fields_with_null_optionals(auth_client, sessi
     assert entry["field"] is None
     assert entry["old_value"] is None
     assert entry["new_value"] is None
-    assert entry["author"] == "Anónimo"
+    # The creation entry is signed by the authenticated user (auth_client
+    # registers "Test Admin"), never by "Anónimo".
+    assert entry["author"] == "Test Admin"
+    assert entry["author_id"] is not None
     assert entry["created_at"].startswith("2026-")
 
 
@@ -132,6 +136,76 @@ def test_history_entry_describes_the_change_when_available(auth_client, session)
     assert entry["old_value"] == "Baja"
     assert entry["new_value"] == "Alta"
     assert entry["author"] == "Ana"
+
+
+def test_legacy_history_rows_keep_working_without_author(auth_client, session):
+    """Registros antiguos sin usuario (author NULL, author_id NULL) se
+    devuelven tal cual: la UI los muestra como "Sistema". """
+
+    ticket = create_ticket(auth_client)
+    add_history(
+        session,
+        ticket["id"],
+        utc(2026, 10, 6, 9, 0),
+        action="updated",
+        field="priority",
+        old_value="Baja",
+        new_value="Alta",
+        author=None,
+        author_id=None,
+    )
+
+    response = auth_client.get(f"/api/tickets/{ticket['id']}/history")
+
+    legacy = [e for e in response.json() if e["created_at"].startswith("2026-10-06")]
+    assert len(legacy) == 1
+    assert legacy[0]["author"] is None
+    assert legacy[0]["author_id"] is None
+
+
+def test_every_write_action_records_the_authenticated_author(auth_client):
+    """Creación, edición, asignación, cambio de estado y comentario firman
+    el historial con el usuario autenticado (no "Anónimo")."""
+
+    ticket = create_ticket(auth_client)
+
+    edited = auth_client.patch(
+        f"/api/tickets/{ticket['id']}", json={"priority": "Alta"}
+    )
+    assert edited.status_code == 200
+
+    other_user = auth_client.post(
+        "/api/users",
+        json={"name": "Ana Pérez", "email": "ana-auditoria@test.local"},
+    )
+    assert other_user.status_code == 201
+
+    assigned = auth_client.patch(
+        f"/api/tickets/{ticket['id']}/assign",
+        json={"assigned_to_id": other_user.json()["id"]},
+    )
+    assert assigned.status_code == 200
+
+    changed = auth_client.patch(
+        f"/api/tickets/{ticket['id']}/state",
+        json={"state": "En proceso"},
+    )
+    assert changed.status_code == 200
+
+    commented = auth_client.post(
+        f"/api/tickets/{ticket['id']}/comments",
+        json={"content": "Comentario firmado por el usuario autenticado."},
+    )
+    assert commented.status_code == 201
+
+    response = auth_client.get(f"/api/tickets/{ticket['id']}/history")
+    entries = response.json()
+    actions = [e["action"] for e in entries]
+    assert actions == ["created", "updated", "assigned", "Cambio de estado", "commented"]
+    for entry in entries:
+        assert entry["author"] == "Test Admin"
+        assert entry["author"] != "Anónimo"
+        assert entry["author_id"] is not None
 
 
 def test_history_does_not_include_entries_of_other_tickets(auth_client, session):

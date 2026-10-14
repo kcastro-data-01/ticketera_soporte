@@ -22,6 +22,7 @@ HISTORY_KEYS = {
     "old_value",
     "new_value",
     "author",
+    "author_id",
     "created_at",
 }
 
@@ -95,7 +96,7 @@ def test_global_history_includes_entries_from_multiple_tickets(auth_client, sess
 
 def test_global_history_exposes_the_model_fields(auth_client, session):
     ticket = create_ticket(auth_client)
-    # Ticket creation adds a "created" entry with author="Anónimo" (RF9).
+    # Ticket creation adds a "created" entry signed by the authenticated user.
     # No need to add another entry via add_history.
 
     response = auth_client.get("/api/history")
@@ -108,7 +109,8 @@ def test_global_history_exposes_the_model_fields(auth_client, session):
     assert entry["field"] is None
     assert entry["old_value"] is None
     assert entry["new_value"] is None
-    assert entry["author"] == "Anónimo"
+    assert entry["author"] == "Test Admin"
+    assert entry["author_id"] is not None
 
 
 def test_global_history_entry_describes_change_when_available(auth_client, session):
@@ -201,9 +203,10 @@ def test_every_role_can_read_the_global_history(client, session, role):
     assert response.json() == []
 
 
-def test_global_history_preserves_the_real_author(client, session):
-    """El autor registrado (nombre del assignee) se devuelve tal cual: la
-    pantalla no debe sustituirlo por "Anónimo" ni inventar autores."""
+def test_global_history_records_the_authenticated_user(client, session):
+    """El historial firma cada evento con el usuario autenticado que lo
+    ejecutó: ni "Anónimo" ni el assignee del ticket."""
+
     admin_token = login_as(
         client, session, UserRole.ADMIN.value, "admin-historial@test.local"
     )
@@ -238,14 +241,25 @@ def test_global_history_preserves_the_real_author(client, session):
     comment = client.post(
         f"/api/tickets/{ticket_id}/comments",
         headers=admin_headers,
-        json={"content": "Comentario firmado por el assignee."},
+        json={"content": "Comentario firmado por el usuario autenticado."},
     )
     assert comment.status_code == 201
+    # El comentario conserva su convención de autor (assignee del ticket)...
+    assert comment.json()["author"] == "Ana Pérez"
 
     response = client.get("/api/history", headers=admin_headers)
 
     assert response.status_code == 200
-    commented = [e for e in response.json() if e["action"] == "commented"]
+    entries = response.json()
+    commented = [e for e in entries if e["action"] == "commented"]
     assert len(commented) == 1
-    assert commented[0]["author"] == "Ana Pérez"
+    # ...pero el historial registra al usuario autenticado que ejecutó la
+    # acción (el admin), con su referencia de id.
+    assert commented[0]["author"] == "Usuario Administrador"
+    assert commented[0]["author_id"] is not None
     assert commented[0]["author"] != "Anónimo"
+
+    assigned_entries = [e for e in entries if e["action"] == "assigned"]
+    assert len(assigned_entries) == 1
+    assert assigned_entries[0]["author"] == "Usuario Administrador"
+    assert assigned_entries[0]["author_id"] is not None

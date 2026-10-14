@@ -174,6 +174,31 @@ test("conserva el autor real y usa — solo para campos no registrados", async (
   assert.equal(cells[6].textContent, "Ana Pérez");
 });
 
+/* Registros antiguos (anteriores a la auditoría con usuario) se muestran
+   como "Sistema", nunca como "Anónimo". */
+test("registro legacy con author 'Anónimo' se muestra como Sistema", async () => {
+  const legacy = { ...ENTRY, author: "Anónimo" };
+  const harness = createHarness(async () => jsonResponse(200, [legacy]));
+
+  await harness.init();
+
+  const cells = harness.tbody().children[0].children;
+  assert.equal(cells[6].textContent, "Sistema");
+  assert.notEqual(cells[6].textContent, "Anónimo");
+});
+
+test("registro legacy sin author (null o vacío) se muestra como Sistema", async () => {
+  const sinAutor = { ...ENTRY, author: null };
+  const vacio = { ...ENTRY, id: 14, author: "   " };
+  const harness = createHarness(async () => jsonResponse(200, [sinAutor, vacio]));
+
+  await harness.init();
+
+  const rows = harness.tbody().children;
+  assert.equal(rows[0].children[6].textContent, "Sistema");
+  assert.equal(rows[1].children[6].textContent, "Sistema");
+});
+
 test("lista vacía muestra el mensaje de vacío", async () => {
   const harness = createHarness(async () => jsonResponse(200, []));
 

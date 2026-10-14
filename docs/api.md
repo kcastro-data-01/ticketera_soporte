@@ -184,8 +184,9 @@ aceptan los avances lineales; no hay saltos, retrocesos ni transiciones
 automáticas, y `Cerrado` es un estado final. Cada cambio exitoso registra
 **exactamente una** entrada en `history` (`action` = `"Cambio de estado"`,
 `field` = `"state"`, `old_value`/`new_value` con los estados, `author` =
-`"Anónimo"`) en la misma operación de base de datos que la actualización del
-ticket. Una transición rechazada no toca el ticket ni el historial.
+nombre del usuario autenticado y `author_id` = su id) en la misma operación
+de base de datos que la actualización del ticket. Una transición rechazada no
+toca el ticket ni el historial.
 
 **Transiciones permitidas:**
 
@@ -314,19 +315,26 @@ antigua a más reciente (`created_at` con `id` como desempate), sin paginación
 (RF9, solo lectura).
 
 Cada entrada contiene exactamente los campos del modelo:
-`id`, `ticket_id`, `action`, `field`, `old_value`, `new_value`, `author` y
-`created_at`. Los opcionales (`field`, `old_value`, `new_value`, `author`)
-vienen en `null` cuando el registro no los define.
+`id`, `ticket_id`, `action`, `field`, `old_value`, `new_value`, `author`,
+`author_id` y `created_at`. Los opcionales (`field`, `old_value`,
+`new_value`, `author`, `author_id`) vienen en `null` cuando el registro no
+los define.
+
+**Autoría (auditoría con usuario):** cada evento escrito por la API (creación,
+edición, asignación, cambio de estado y comentarios) firma la entrada con el
+**usuario autenticado** que ejecutó la acción: `author` guarda su nombre y
+`author_id` su id en `users`. Los registros antiguos, escritos antes de esta
+auditoría, tienen `author` = `"Anónimo"` o `null` y `author_id` = `null`; la
+interfaz los muestra como **"Sistema"** (nunca como "Anónimo") y no se
+modifican ni se eliminan.
 
 **Respuestas:** `200` con la lista · `200` con `[]` si el ticket no tiene
 entradas · `404` si el ticket no existe.
 
-> **Alcance de la escritura:** hoy solo el **cambio de estado** (RF3) crea
-> entradas en `history`, desde la capa de servicio y de forma atómica con la
-> actualización del ticket. El resto de acciones (creación, edición,
-> asignación, comentarios) todavía no deja registro; ese registro automático
-> de auditoría sigue pendiente y, por decisión aprobada, se hará siempre
-> desde la capa de servicio, nunca desde el frontend.
+> **Alcance de la escritura:** la escritura en `history` se hace siempre
+> desde la capa de servicio, junto con la operación que origina el cambio
+> (creación, edición, asignación, cambio de estado y comentarios), nunca
+> desde el frontend.
 
 ```bash
 curl http://127.0.0.1:8000/api/tickets/1/history
@@ -346,7 +354,7 @@ curl http://127.0.0.1:8000/api/tickets/1/history
 | RF6 | Listado | `GET /api/tickets` | ✅ Implementado | `test_tickets.py` |
 | RF7 | Buscar | `GET /api/tickets?search=` | ✅ Implementado | `test_busqueda_filtro.py` |
 | RF8 | Filtrar | `GET /api/tickets?category=&priority=&state=` | ✅ Implementado | `test_busqueda_filtro.py` |
-| RF9 | Historial de cambios | `GET .../history` | ✅ Lectura implementada; ✍️ escritura automática solo por cambio de estado (el resto, pendiente) | `test_historial.py`, `test_estados.py` |
+| RF9 | Historial de cambios | `GET .../history` | ✅ Lectura y escritura implementadas; cada evento (creación, edición, asignación, cambio de estado, comentarios) firma con el usuario autenticado | `test_historial.py`, `test_historial_global.py`, `test_estados.py` |
 
 Salud (`GET /health`), usuarios (`POST/GET /api/users`) y la configuración de
 la base de datos también tienen cobertura (`test_smoke.py`,
@@ -356,9 +364,6 @@ la base de datos también tienen cobertura (`test_smoke.py`,
 
 Para no confundir lo documentado arriba con lo que **no existe**:
 
-- **Escritura de historial para acciones distintas al cambio de estado** —
-  creación, edición, asignación y comentarios todavía no crean entradas en
-  `history` (la lectura y el registro de cambios de estado sí existen).
 - **Autenticación / autorización** — excluidas por decisión aprobada; no es
   un defecto pendiente.
 - **Paginación y ordenamiento** — `GET /api/tickets` devuelve todo el

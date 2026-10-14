@@ -41,7 +41,7 @@ def create_ticket(
     ),
 ) -> TicketResponse:
     """Create a ticket with title, description, category and priority (RF1, RF2)."""
-    ticket = ticket_service.create_ticket(session, payload)
+    ticket = ticket_service.create_ticket(session, payload, current_user)
     return TicketResponse.model_validate(ticket)
 
 
@@ -154,7 +154,7 @@ def update_ticket(
     ),
 ) -> TicketResponse:
     """Update title, description, category and/or priority of a ticket."""
-    ticket = ticket_service.update_ticket(session, ticket_id, payload)
+    ticket = ticket_service.update_ticket(session, ticket_id, payload, current_user)
     if ticket is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -178,7 +178,9 @@ def assign_ticket(
 ) -> TicketResponse:
     """Assign a user to a ticket; ``assigned_to_id: null`` unassigns it (RF4)."""
     try:
-        ticket = ticket_service.assign_ticket(session, ticket_id, payload.assigned_to_id)
+        ticket = ticket_service.assign_ticket(
+            session, ticket_id, payload.assigned_to_id, current_user
+        )
     except TicketNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -214,7 +216,9 @@ def change_ticket_state(
     enum, so an unknown value is rejected with ``422``.
     """
     try:
-        ticket = ticket_service.change_ticket_state(session, ticket_id, payload.state)
+        ticket = ticket_service.change_ticket_state(
+            session, ticket_id, payload.state, current_user
+        )
     except TicketNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

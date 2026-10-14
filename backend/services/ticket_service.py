@@ -86,7 +86,21 @@ def pick_next_assignee(session) -> User | None:
     return best
 
 
-def create_ticket(session, payload: TicketCreate) -> Ticket:
+def _audit_author(current_user: User | None) -> tuple[str | None, int | None]:
+    """Return ``(author name, author id)`` for a new history entry.
+
+    The authenticated user is the author of the audited action. Legacy rows
+    (or internal calls without a user) store ``None`` for both values, and
+    the UI renders them as ``Sistema``; new events never use ``"Anónimo"``.
+    """
+    if current_user is None:
+        return None, None
+    return current_user.name, current_user.id
+
+
+def create_ticket(
+    session, payload: TicketCreate, current_user: User | None = None
+) -> Ticket:
     """Persist a new ticket.
 
     The initial ``state`` is not set here: it comes from the model default
@@ -116,7 +130,8 @@ def create_ticket(session, payload: TicketCreate) -> Ticket:
     session.add(ticket)
     session.commit()
     session.refresh(ticket)
-    # Registry of creation in history (RF9)
+    # Registry of creation in history (RF9), signed by the authenticated user
+    author_name, author_id = _audit_author(current_user)
     session.add(
         History(
             ticket_id=ticket.id,
@@ -124,7 +139,8 @@ def create_ticket(session, payload: TicketCreate) -> Ticket:
             field=None,
             old_value=None,
             new_value=None,
-            author="Anónimo",
+            author=author_name,
+            author_id=author_id,
         )
     )
     session.commit()
@@ -230,7 +246,12 @@ def get_ticket_comments(session, ticket_id: int) -> list[Comment] | None:
     return list(comments)
 
 
-def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | None:
+def update_ticket(
+    session,
+    ticket_id: int,
+    payload: TicketUpdate,
+    current_user: User | None = None,
+) -> Ticket | None:
     """Apply a partial update to an existing ticket.
 
     Returns ``None`` when the ticket does not exist (the router answers 404).
@@ -247,7 +268,8 @@ def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | No
         for field, value in payload.model_dump(mode="json", exclude_unset=True).items()
         if value is not None
     }
-    # Build history entries for changed fields
+    # Build history entries for changed fields, signed by the authenticated user
+    author_name, author_id = _audit_author(current_user)
     for field, new_value in changes.items():
         old_value = getattr(ticket, field)
         if old_value != new_value:
@@ -258,7 +280,8 @@ def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | No
                     field=field,
                     old_value=str(old_value) if old_value is not None else None,
                     new_value=str(new_value) if new_value is not None else None,
-                    author="Anónimo",
+                    author=author_name,
+                    author_id=author_id,
                 )
             )
     for field, value in changes.items():
@@ -269,7 +292,12 @@ def update_ticket(session, ticket_id: int, payload: TicketUpdate) -> Ticket | No
     return ticket
 
 
-def assign_ticket(session, ticket_id: int, assigned_to_id: int | None) -> Ticket:
+def assign_ticket(
+    session,
+    ticket_id: int,
+    assigned_to_id: int | None,
+    current_user: User | None = None,
+) -> Ticket:
     """Assign a ticket to a user, or unassign it when ``assigned_to_id`` is None.
 
     Raises:
@@ -287,7 +315,9 @@ def assign_ticket(session, ticket_id: int, assigned_to_id: int | None) -> Ticket
     ticket.assigned_to_id = assigned_to_id
     session.commit()
     session.refresh(ticket)
-    # Registry of assignment/unassignment in history (RF9)
+    # Registry of assignment/unassignment in history (RF9), signed by the
+    # authenticated user that performed the assignment.
+    author_name, author_id = _audit_author(current_user)
     session.add(
         History(
             ticket_id=ticket.id,
@@ -295,7 +325,8 @@ def assign_ticket(session, ticket_id: int, assigned_to_id: int | None) -> Ticket
             field="assigned_to_id",
             old_value=str(old_assigned_to_id) if old_assigned_to_id is not None else None,
             new_value=str(assigned_to_id) if assigned_to_id is not None else None,
-            author="Anónimo",
+            author=author_name,
+            author_id=author_id,
         )
     )
     session.commit()
@@ -303,7 +334,12 @@ def assign_ticket(session, ticket_id: int, assigned_to_id: int | None) -> Ticket
     return ticket
 
 
-def change_ticket_state(session, ticket_id: int, new_state: TicketState) -> Ticket:
+def change_ticket_state(
+    session,
+    ticket_id: int,
+    new_state: TicketState,
+    current_user: User | None = None,
+) -> Ticket:
     """Move a ticket to another state through an allowed transition (RF3).
 
     The state update and its audit entry are both added to the session and
@@ -326,6 +362,7 @@ def change_ticket_state(session, ticket_id: int, new_state: TicketState) -> Tick
         raise InvalidTransitionError(current_state.value, new_state.value)
 
     ticket.state = new_state.value  # ``updated_at`` refreshed by ``onupdate``
+    author_name, author_id = _audit_author(current_user)
     session.add(
         History(
             ticket_id=ticket.id,
@@ -333,7 +370,8 @@ def change_ticket_state(session, ticket_id: int, new_state: TicketState) -> Tick
             field="state",
             old_value=current_state.value,
             new_value=new_state.value,
-            author="Anónimo",  # same convention as comments: no authentication
+            author=author_name,
+            author_id=author_id,
         )
     )
     session.commit()
@@ -341,7 +379,12 @@ def change_ticket_state(session, ticket_id: int, new_state: TicketState) -> Tick
     return ticket
 
 
-def create_comment(session, ticket_id: int, payload: CommentCreate) -> Comment:
+def create_comment(
+    session,
+    ticket_id: int,
+    payload: CommentCreate,
+    current_user: User | None = None,
+) -> Comment:
     """Persist a comment on an existing ticket (RF5).
 
     Raises:
@@ -377,7 +420,10 @@ def create_comment(session, ticket_id: int, payload: CommentCreate) -> Comment:
     session.add(comment)
     session.commit()
     session.refresh(comment)
-    # Registry of comment in history (RF9)
+    # Registry of comment in history (RF9). The comment itself keeps its
+    # author convention (assignee name), but the audit entry records the
+    # authenticated user that actually wrote the comment.
+    author_name, author_id = _audit_author(current_user)
     session.add(
         History(
             ticket_id=ticket_id,
@@ -385,7 +431,8 @@ def create_comment(session, ticket_id: int, payload: CommentCreate) -> Comment:
             field="comment",
             old_value=None,
             new_value=payload.content,
-            author=author,
+            author=author_name,
+            author_id=author_id,
         )
     )
     session.commit()

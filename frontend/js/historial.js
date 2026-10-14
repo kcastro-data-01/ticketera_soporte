@@ -53,6 +53,15 @@ function appendTicketCell(row, ticketId) {
   row.appendChild(cell);
 }
 
+/* Registros antiguos (anteriores a la auditoría con usuario) no tienen
+   autor autenticado: se guardaron como "Anónimo" o sin autor. Se muestran
+   como "Sistema", nunca como "Anónimo". */
+function formatAutor(entry) {
+  const autor = entry.author ? String(entry.author).trim() : "";
+  if (!autor || autor === "Anónimo") return "Sistema";
+  return autor;
+}
+
 function renderHistorial(entries) {
   const elements = getElements();
   clearRows();
@@ -70,7 +79,7 @@ function renderHistorial(entries) {
     appendCell(row, entry.field || "—");
     appendCell(row, entry.old_value || "—");
     appendCell(row, entry.new_value || "—");
-    appendCell(row, entry.author || "—");
+    appendCell(row, formatAutor(entry));
     elements.tbody.appendChild(row);
   });
 

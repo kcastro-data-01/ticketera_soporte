@@ -41,7 +41,9 @@ def create_comment(
     Requires authentication (401 without token).
     """
     try:
-        comment = ticket_service.create_comment(session, ticket_id, payload)
+        comment = ticket_service.create_comment(
+            session, ticket_id, payload, current_user
+        )
     except TicketNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -268,8 +268,10 @@ class HistoryResponse(BaseModel):
     """History entry returned by ``GET /api/tickets/{ticket_id}/history`` (RF9).
 
     Mirrors the ``History`` model as-is: ``field``, ``old_value``,
-    ``new_value`` and ``author`` are optional and come back as ``null``
-    when the record does not provide them.
+    ``new_value``, ``author`` and ``author_id`` are optional and come back
+    as ``null`` when the record does not provide them. ``author`` carries the
+    display name of the authenticated user that performed the action;
+    ``author_id`` is the referenced user (``null`` for legacy rows).
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -281,6 +283,7 @@ class HistoryResponse(BaseModel):
     old_value: str | None = None
     new_value: str | None = None
     author: str | None = None
+    author_id: int | None = None
     created_at: datetime
 
 

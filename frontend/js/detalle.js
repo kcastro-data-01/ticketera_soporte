@@ -663,6 +663,14 @@ function appendCeldaHistorial(row, text) {
   row.appendChild(cell);
 }
 
+/* Registros antiguos sin usuario autenticado (vacíos o "Anónimo") se
+   muestran como "Sistema"; los nuevos traen el nombre real. */
+function formatAutorHistorial(entry) {
+  const autor = entry.author ? String(entry.author).trim() : "";
+  if (!autor || autor === "Anónimo") return "Sistema";
+  return autor;
+}
+
 /* Renderiza con textContent: los datos del backend nunca se interpretan
    como HTML. */
 function renderHistorial(entries) {
@@ -679,7 +687,9 @@ function renderHistorial(entries) {
   entries.forEach((entry) => {
     const row = document.createElement("tr");
     appendCeldaHistorial(row, formatFecha(entry.created_at));
-    appendCeldaHistorial(row, entry.author || "—");
+    /* Registros antiguos sin usuario autenticado (vacíos o "Anónimo")
+       se muestran como "Sistema". */
+    appendCeldaHistorial(row, formatAutorHistorial(entry));
     appendCeldaHistorial(row, entry.action || "—");
     appendCeldaHistorial(row, formatDetalleHistorial(entry));
     elements.historialCuerpo.appendChild(row);

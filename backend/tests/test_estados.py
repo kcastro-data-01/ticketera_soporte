@@ -206,7 +206,10 @@ def test_history_entry_describes_the_state_change(auth_client):
     assert entries[1]["field"] == "state"
     assert entries[1]["old_value"] == TicketState.NEW.value
     assert entries[1]["new_value"] == TicketState.IN_PROGRESS.value
-    assert entries[1]["author"] == "Anónimo"
+    # Signed by the authenticated user that performed the change (auth_client
+    # registers "Test Admin").
+    assert entries[1]["author"] == "Test Admin"
+    assert entries[1]["author_id"] is not None
 
 
 def test_full_workflow_records_history_in_chronological_order(auth_client):

@@ -170,7 +170,13 @@ class History(Base):
 
     ``action`` identifies the kind of change (for example ``created``,
     ``state_changed``, ``assigned``); ``field``, ``old_value`` and ``new_value``
-    describe what changed. ``author`` is free text: there is no authentication.
+    describe what changed.
+
+    ``author_id`` references the authenticated user that performed the action
+    (``None`` for legacy rows or system actions); ``author`` keeps the name
+    snapshot taken at write time so old entries keep rendering even if the
+    user is renamed or deleted. Legacy rows written before the audit users
+    existed have ``author`` free text (``"Anónimo"``) and ``author_id`` NULL.
     """
 
     __tablename__ = "history"
@@ -192,6 +198,11 @@ class History(Base):
     old_value: Mapped[str | None] = mapped_column(Text)
     new_value: Mapped[str | None] = mapped_column(Text)
     author: Mapped[str | None] = mapped_column(String(120))
+    author_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime(),
         nullable=False,
