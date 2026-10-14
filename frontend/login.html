@@ -25,17 +25,42 @@
     }
     .auth-container .login-izq {
       display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 1rem;
+      width: 100%;
+    }
+    .auth-container .login-izq .login-titulo {
+      width: 100%;
+      text-align: center;
+      font-size: 1.4rem;
+      color: var(--color-primario-oscuro);
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .auth-container .login-izq .login-logo-peque {
+      display: none;
+    }
+    .auth-container .login-der {
+      display: flex;
       align-items: center;
       justify-content: center;
+      width: 100%;
     }
-    .auth-container .login-izq .login-logo-grande {
-      width: 120px;
+    .auth-container .login-der .login-imagen-grande {
+      width: 100%;
+      max-width: 400px;
+      max-height: 400px;
+      object-fit: contain;
+      object-position: center;
       height: auto;
     }
     .auth-tabs {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
+      margin-bottom: 1.5rem;
       min-width: 180px;
     }
     .auth-tab {
@@ -157,65 +182,40 @@
 <body class="pagina-login">
   <div class="auth-container">
     <div class="login-izq">
-      <img src="images/logo-twitter-grande.jpg" alt="American Data Networks" class="login-logo-grande">
+      <h2 class="login-titulo">Iniciar sesión</h2>
+      <form id="form-login" class="auth-form activo">
+        <div class="field-wrapper input-icon email-icon">
+          <input type="email" id="login-email" name="email" required autocomplete="email" class="form-input" placeholder="tu@correo.com">
+          <span class="field-icon email-icon"></span>
+        </div>
+        <div class="field-wrapper input-icon password-icon">
+          <input type="password" id="login-password" name="password" required autocomplete="current-password" class="form-input" placeholder="••••••••">
+          <span class="field-icon password-icon"></span>
+          <button type="button" class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña">⊘</button>
+        </div>
+        <div class="remember-me">
+          <input type="checkbox" id="remember-me" name="remember-me">
+          <span>Recordar sesión</span>
+        </div>
+        <button type="submit" id="btn-login" class="btn-primario">Entrar</button>
+      </form>
     </div>
     <div class="login-der">
-
-    <!-- Pestañas login / registro -->
-    <div class="auth-tabs">
-      <button type="button" id="tab-login" class="auth-tab activo">Iniciar sesión</button>
-      <button type="button" id="tab-register" class="auth-tab">Crear cuenta</button>
-    </div>
-
-    <div id="auth-error" class="auth-error" role="alert"></div>
-    <div id="auth-success" class="auth-success" role="status"></div>
-
-    <!-- Formulario de Login -->
-    <form id="form-login" class="auth-form activo">
-      <div class="field-wrapper input-icon email-icon">
-        <input type="email" id="login-email" name="email" required autocomplete="email" class="form-input" placeholder="tu@correo.com">
-        <span class="field-icon email-icon"></span>
+      <img src="images/logo-twitter-grande.jpg" alt="American Data Networks" class="login-imagen-grande">
+      <!-- Pestañas login / registro -->
+      <div class="auth-tabs">
+        <button type="button" id="tab-login" class="auth-tab activo">Iniciar sesión</button>
+        <button type="button" id="tab-register" class="auth-tab">Crear cuenta</button>
       </div>
-      <div class="field-wrapper input-icon password-icon">
-        <input type="password" id="login-password" name="password" required autocomplete="current-password" class="form-input" placeholder="••••••••">
-        <span class="field-icon password-icon"></span>
-        <button type="button" class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña">⊘</button>
-      </div>
-      <div class="remember-me">
-        <input type="checkbox" id="remember-me" name="remember-me">
-        <span>Recordar sesión</span>
-      </div>
-      <button type="submit" id="btn-login" class="btn-primario">Entrar</button>
-    </form>
 
-    <!-- Formulario de Registro -->
-    <form id="form-register" class="auth-form">
-      <div class="field-wrapper input-icon email-icon">
-        <input type="email" id="register-email" name="email" required autocomplete="email" class="form-input" placeholder="tu@correo.com">
-        <span class="field-icon email-icon"></span>
-      </div>
-      <div class="field-wrapper input-icon password-icon">
-        <input type="password" id="register-password" name="password" required autocomplete="new-password" class="form-input" placeholder="Mínimo 6 caracteres">
-        <span class="field-icon password-icon"></span>
-        <button type="button" class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña">⊘</button>
-      </div>
-      <div class="field-wrapper">
-        <span class="field-label"><span>Rol</span></span>
-        <select id="register-role" name="role">
-          <option value="Administrador">Administrador</option>
-          <option value="Soporte">Soporte</option>
-          <option value="Supervisor">Supervisor</option>
-          <option value="Técnico">Técnico</option>
-          <option value="Solicitante">Solicitante</option>
-        </select>
-      </div>
-      <button type="submit" id="btn-register" class="btn-primario">Crear cuenta</button>
-    </form>
+      <div id="auth-error" class="auth-error" role="alert"></div>
+      <div id="auth-success" class="auth-success" role="status"></div>
 
-    <a href="index.html" class="forgot-link">¿Has olvidado tu contraseña? Contacta al administrador</a>
+      <a href="index.html" class="forgot-link">¿Has olvidado tu contraseña? Contacta al administrador</a>
 
-    <div class="login-footer">
-      <a href="index.html" class="link-register">Regístrate</a>
+      <div class="login-footer">
+        <a href="index.html" class="link-register">Regístrate</a>
+      </div>
     </div>
   </div>
 
