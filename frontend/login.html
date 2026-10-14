@@ -42,7 +42,7 @@
       border-radius: 12px 0 0 12px;
       transition: transform 0.3s ease;
     }
-    .auth-container .login-izq:hover .login-imagen {
+    .auth-container .login-izq .login-imagen:hover {
       transform: scale(1.05);
     }
     .auth-container .login-der {
@@ -62,6 +62,7 @@
       margin-bottom: 1.5rem;
     }
     .auth-container .login-der .campo {
+      position: relative;
       width: 100%;
       margin-bottom: 1rem;
     }
@@ -78,7 +79,7 @@
       outline: none;
       border-color: #9b7ebd;
     }
-    .auth-container .login-der .campo .toggle-password {
+    .auth-container .login-der .toggle-password {
       position: absolute;
       right: 1rem;
       top: 50%;
@@ -113,13 +114,15 @@
       color: var(--color-tenue);
     }
     .auth-tabs {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      display: flex;
+      position: static;
+      display: none;
       flex-direction: column;
       gap: 0.5rem;
-      min-width: 140px;
+      margin-bottom: 1.5rem;
+      min-width: 180px;
+    }
+    .auth-tabs.active {
+      display: flex;
     }
     .auth-tab {
       flex: 1;
@@ -261,14 +264,9 @@
       .auth-container .login-der .btn-secundario {
         width: 100%;
       }
-      .auth-tabs {
-        position: static;
-        flex-direction: row;
-        justify-content: center;
+      .auth-tabs.active {
+        display: flex;
         margin: 0.5rem 0 0;
-      }
-      .auth-tab {
-        flex: 1;
       }
     }
   </style>
@@ -279,6 +277,8 @@
       <img src="images/logo-twitter-grande.jpg" alt="American Data Networks" class="login-imagen">
     </div>
     <div class="login-der">
+      <div id="auth-error" class="auth-error" role="alert"></div>
+      <div id="auth-success" class="auth-success" role="status"></div>
       <h2 class="login-titulo">Iniciar sesión</h2>
       <form id="form-login" class="auth-form activo">
         <div class="campo">
@@ -294,13 +294,50 @@
           <span>Recordar sesión</span>
         </div>
         <div class="btn-grp">
-          <button type="submit" class="btn-primario">Entrar</button>
-          <button type="button" class="btn-secundario">Crear cuenta</button>
+          <button type="submit" id="btn-login" class="btn-primario">Entrar</button>
+          <button type="button" id="tab-register" class="btn-secundario">Crear cuenta</button>
         </div>
       </form>
+
+      <form id="form-register" class="auth-form" >
+        <h2 class="login-titulo">Crear cuenta</h2>
+        <div class="campo">
+          <input type="text" id="register-name" name="name" required class="form-input" placeholder="Nombre completo">
+          <span class="field-icon"></span>
+        </div>
+        <div class="campo">
+          <input type="email" id="register-email" name="email" required class="form-input" placeholder="nombre@soporte.local">
+          <span class="field-icon email-icon"></span>
+        </div>
+        <div class="campo">
+          <input type="password" id="register-password" name="password" required class="form-input" placeholder="Mínimo 6 caracteres">
+          <span class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña">⊘</span>
+        </div>
+        <div class="remember-me">
+          <input type="checkbox" id="register-memory" name="remember-memory">
+          <span>Recordar sesión</span>
+        </div>
+        <div class="campo">
+          <select id="register-role" name="role" class="form-input" style="width: 100%; padding: 0.5rem; border: 1px solid #e8e4f0; border-radius: 8px;">
+            <option value="">Selecciona un rol</option>
+            <option value="Solicitante">Solicitante</option>
+            <option value="Técnico">Técnico</option>
+            <option value="Supervisor">Supervisor</option>
+            <option value="Soporte">Soporte</option>
+            <option value="Administrador">Administrador</option>
+          </select>
+          <div id="role-selector" class="role-selector" style="display: none; margin-top: 0.5rem;">
+            <span>Rol obligatorio para el primer usuario</span>
+          </div>
+        </div>
+        <div class="btn-grp">
+          <button type="submit" id="btn-register" class="btn-primario">Crear cuenta</button>
+          <button type="button" id="tab-login" class="btn-secundario">Volver a iniciar sesión</button>
+        </div>
+      </form>
+
       <a href="index.html" class="forgot-link">¿Has olvidado tu contraseña? Contacta al administrador</a>
       <div class="login-footer">
-        <a href="index.html" class="link-register">Regístrate</a>
       </div>
     </div>
   </div>
@@ -370,13 +407,14 @@
           tabRegister.classList.remove("activo");
           formLogin.classList.add("activo");
           formRegister.classList.remove("activo");
+          document.querySelector('.login-titulo').textContent = 'Iniciar sesión';
         } else {
           tabRegister.classList.add("activo");
           tabLogin.classList.remove("activo");
           formRegister.classList.add("activo");
           formLogin.classList.remove("activo");
+          document.querySelector('.login-titulo').textContent = 'Crear cuenta';
         }
-        clearMessages();
       }
 
       tabLogin.addEventListener("click", () => activateTab("login"));
@@ -462,7 +500,7 @@
         const name = document.getElementById("register-name").value.trim();
         const email = document.getElementById("register-email").value.trim();
         const password = document.getElementById("register-password").value;
-        const roleSelector = document.getElementById("register-role");
+        const roleSelector = document.getElementById("role-selector");
 
         if (!name || !email || !password) {
           showError("Todos los campos son obligatorios.");
@@ -478,7 +516,7 @@
 
         // Solo enviar rol si es el primer usuario y el selector está visible
         if (isFirstUser && roleSelector.classList.contains("visible")) {
-          payload.role = roleSelect.value;
+          payload.role = document.getElementById("register-role").value;
         }
 
         setLoading(btnRegister, true);
@@ -535,11 +573,9 @@
         }
       }
 
-      // --- Eventos ---
-
       formLogin.addEventListener("submit", handleLogin);
       formRegister.addEventListener("submit", handleRegister);
-
+      document.querySelectorAll(".toggle-password").forEach(el => el.addEventListener("click", () => { const i = el.parentElement.querySelector("input"); i.type = i.type === "password" ? "text" : "password"; }));
       // --- Inicialización ---
 
       // Verificar si hay usuarios registrados (con contraseña)
