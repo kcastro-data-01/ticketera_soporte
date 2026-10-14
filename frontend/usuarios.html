@@ -68,18 +68,20 @@
     <section class="seccion" aria-label="Usuarios registrados">
       <h2>Usuarios registrados</h2>
       <p id="usuarios-estado" class="estado" role="status" aria-live="polite" hidden></p>
-      <table id="tabla-usuarios" class="listado" hidden>
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Correo</th>
-            <th>Rol</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="cuerpo-usuarios"></tbody>
-      </table>
+      <div class="tabla-scroll">
+        <table id="tabla-usuarios" class="listado" hidden>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Correo</th>
+              <th>Rol</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo-usuarios"></tbody>
+        </table>
+      </div>
     </section>
 
     <section class="seccion" aria-label="Editar usuario" id="seccion-editar" hidden>

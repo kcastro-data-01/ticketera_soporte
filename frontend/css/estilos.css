@@ -370,6 +370,13 @@ button.secundario:disabled:hover {
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-medio);
   font-size: var(--texto-md);
+}
+
+/* Contenedor de scroll horizontal: el overflow-x en el propio <table>
+   no crea contenedor de scroll, así que las tablas anchas en móvil se
+   desbordaban y rompían el diseño. */
+.tabla-scroll {
+  width: 100%;
   overflow-x: auto;
 }
 
@@ -760,8 +767,11 @@ button.secundario:disabled:hover {
   padding: 0 var(--espaciado-xl) var(--espaciado-xl) 0;
 }
 
-/* El encabezado ocupa todo el ancho en la primera fila */
-.cabecera {
+/* El encabezado ocupa todo el ancho en la primera fila. Scopeadas a
+   .contenedor-principal: las páginas sin sidebar (usuarios, crear,
+   detalle) usan .cabecera/.contenido como bloques normales y estas
+   reglas no deben tocarlas. */
+.contenedor-principal > .cabecera {
   grid-column: 1 / -1;
   grid-row: 1;
   background: var(--color-superficie-alta);
@@ -771,7 +781,7 @@ button.secundario:disabled:hover {
 
 /* En pantallas grandes, el contenido está en la segunda columna */
 @media (min-width: 769px) {
-  .contenido {
+  .contenedor-principal > .contenido {
     grid-column: 2;
     grid-row: 2;
     margin-left: 0;
@@ -794,13 +804,13 @@ button.secundario:disabled:hover {
     margin-bottom: var(--espaciado-lg);
   }
 
-  .cabecera {
+  .contenedor-principal > .cabecera {
     grid-column: 1;
     grid-row: 2;
     order: initial;
   }
 
-  .contenido {
+  .contenedor-principal > .contenido {
     grid-column: 1;
     grid-row: 3;
     margin-left: 0;
@@ -830,9 +840,12 @@ button.secundario:disabled:hover {
   border: 1px solid var(--color-borde);
 }
 
-/* ---------- Estilos de login ---------- */
+/* ---------- Estilos de login ----------
+   Scopeados con body.pagina-login: la regla de body anterior a esta
+   sección (font, background) es la base de todas las pantallas y el
+   centrado de la tarjeta solo debe aplicar en el login. */
 
-body {
+body.pagina-login {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -1041,4 +1054,3 @@ body {
     padding: 0.25rem 1.25rem;
   }
 }
-*/
