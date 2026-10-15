@@ -12,7 +12,7 @@ services:
       # cambiar en un archivo .env junto a este archivo (no se sube a Git).
       ASISTENTE_PROVEEDOR: ${ASISTENTE_PROVEEDOR:-qwen}
       OLLAMA_URL: http://ollama:11434
-      QWEN_MODELO: ${QWEN_MODELO:-qwen3:1.7b}
+      QWEN_MODELO: ${QWEN_MODELO:-qwen3:0.6b}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes:
       - ticketera-data:/data
@@ -30,13 +30,13 @@ services:
       timeout: 5s
       retries: 12
 
-  # Descarga el modelo la primera vez (unos 1,4 GB para qwen3:1.7b) y termina.
+  # Descarga el modelo la primera vez (unos 0,5 GB para qwen3:0.6b) y termina.
   # Las siguientes veces ya está en el volumen y no vuelve a descargar.
   ollama-descarga:
     image: ollama/ollama:latest
     environment:
       OLLAMA_HOST: http://ollama:11434
-    entrypoint: ["ollama", "pull", "${QWEN_MODELO:-qwen3:1.7b}"]
+    entrypoint: ["ollama", "pull", "${QWEN_MODELO:-qwen3:0.6b}"]
     depends_on:
       ollama:
         condition: service_healthy

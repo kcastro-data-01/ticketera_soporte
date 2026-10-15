@@ -26,8 +26,9 @@ from backend.models import Ticket, User
 from backend.services import ticket_service
 
 CLAUDE_MODEL = "claude-opus-5-5"
-# Modelo liviano (≈1,4 GB): funciona en computadoras sin GPU y con poca RAM.
-QWEN_MODELO_POR_DEFECTO = "qwen3:1.7b"
+# El modelo más liviano (≈0,5 GB): funciona en computadoras sin GPU y con
+# poca RAM. Con más memoria, QWEN_MODELO=qwen3:1.7b o qwen3:4b responden mejor.
+QWEN_MODELO_POR_DEFECTO = "qwen3:0.6b"
 # Ventana de contexto para Ollama: alcanza para las instrucciones, los datos
 # visibles y la conversación sin reservar más memoria de la necesaria.
 QWEN_CONTEXTO = 8192

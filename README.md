@@ -484,18 +484,23 @@ un modelo abierto y gratuito que corre en tu propia computadora con
 
 - `ticketera`: la aplicación.
 - `ollama`: el servidor de modelos.
-- `ollama-descarga`: descarga `qwen3:1.7b` (unos 1,4 GB) la primera vez y
+- `ollama-descarga`: descarga `qwen3:0.6b` (unos 0,5 GB) la primera vez y
   termina. Mientras descarga, el chat avisa que el modelo aún no está listo;
   el progreso se ve con `docker compose logs -f ollama-descarga`.
 
-Requisitos aproximados para `qwen3:1.7b`: 3-4 GB de RAM libres. En CPU cada
-respuesta tarda varios segundos. Si la computadora se traba o el chat avisa
-que falta memoria, usa `qwen3:0.6b` (más rápido, menos preciso); con más
-memoria o GPU, `qwen3:4b` u `qwen3:8b` responden mejor. Se elige creando un
-archivo `.env` junto a `docker-compose.yml`:
+Por defecto se usa `qwen3:0.6b`, el más liviano (unos 2 GB de RAM libres),
+para que funcione en computadoras modestas sin trabarlas. Sus respuestas son
+más simples. Con más memoria puedes usar uno más capaz creando un archivo
+`.env` junto a `docker-compose.yml`:
+
+| Modelo | Disco | RAM libre aprox. |
+|---|---|---|
+| `qwen3:0.6b` (por defecto) | 0,5 GB | 2 GB |
+| `qwen3:1.7b` | 1,4 GB | 3-4 GB |
+| `qwen3:4b` | 2,5 GB | 6-8 GB |
 
 ```
-QWEN_MODELO=qwen3:0.6b
+QWEN_MODELO=qwen3:1.7b
 ```
 
 y ejecutando `docker compose up -d` (descarga el modelo nuevo). Para borrar

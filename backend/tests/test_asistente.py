@@ -182,7 +182,7 @@ def test_default_provider_is_qwen_with_ollama(monkeypatch):
         monkeypatch.delenv(var, raising=False)
     proveedor = crear_proveedor()
     assert isinstance(proveedor, ProveedorQwen)
-    assert proveedor.modelo == "qwen3:1.7b"
+    assert proveedor.modelo == "qwen3:0.6b"
     assert proveedor.url == "http://localhost:11434"
 
 
