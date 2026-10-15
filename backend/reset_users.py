@@ -32,11 +32,11 @@ DEFAULT_PASSWORD = "Ticketera2026"
 
 # Un usuario de prueba por rol: (nombre, email).
 TEST_USERS: dict[UserRole, tuple[str, str]] = {
-    UserRole.ADMIN: ("Admin Prueba", "admin@ticketera.local"),
-    UserRole.SUPERVISOR: ("Supervisor Prueba", "supervisor@ticketera.local"),
-    UserRole.SUPPORT: ("Soporte Prueba", "soporte@ticketera.local"),
-    UserRole.TECHNICIAN: ("Técnico Prueba", "tecnico@ticketera.local"),
-    UserRole.REQUESTER: ("Solicitante Prueba", "solicitante@ticketera.local"),
+    UserRole.ADMIN: ("Laura Méndez", "laura.mendez@adn.local"),
+    UserRole.SUPERVISOR: ("Carlos Rojas", "carlos.rojas@adn.local"),
+    UserRole.SUPPORT: ("Daniela Vargas", "daniela.vargas@adn.local"),
+    UserRole.TECHNICIAN: ("José Solano", "jose.solano@adn.local"),
+    UserRole.REQUESTER: ("Andrea Castillo", "andrea.castillo@adn.local"),
 }
 
 
@@ -85,6 +85,7 @@ def reset_users(
         if user is None:
             user = User(name=name, email=email)
             session.add(user)
+        user.name = name
         user.role = role.value
         user.is_active = True
         user.password_hash = hash_password(password)

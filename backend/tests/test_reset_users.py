@@ -64,7 +64,7 @@ def test_rerun_resets_password_without_duplicates(session):
     reset_users(session, "soficubero", password="segunda", apply=True)
 
     assert len(emails(session)) == 1 + len(TEST_USERS)
-    admin = session.scalar(select(User).where(User.email == "admin@ticketera.local"))
+    admin = session.scalar(select(User).where(User.email == TEST_USERS[UserRole.ADMIN][1]))
     assert verify_password("segunda", admin.password_hash)
 
 
