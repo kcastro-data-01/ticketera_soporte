@@ -15,8 +15,8 @@
       </div>
       <ul class="sidebar-nav">
         <li><a href="index.html" class="enlace-boton activo">Tickets</a></li>
-        <li><a href="historial.html" class="enlace-boton">Historial</a></li>
-        <li><a href="usuarios.html" class="enlace-boton">Usuarios</a></li>
+        <li data-permiso="historial_global"><a href="historial.html" class="enlace-boton">Historial</a></li>
+        <li data-permiso="usuarios"><a href="usuarios.html" class="enlace-boton">Usuarios</a></li>
         <li><a href="ayuda.html" class="enlace-boton">Ayuda</a></li>
       </ul>
     </nav>
@@ -32,7 +32,7 @@
       </div>
       <nav class="cabecera-enlaces">
         <a href="crear.html" class="enlace-boton">Nuevo ticket</a>
-        <a href="usuarios.html" class="enlace-boton">Usuarios</a>
+        <a href="usuarios.html" class="enlace-boton" data-permiso="usuarios">Usuarios</a>
         <button type="button" id="btn-logout" class="enlace-boton" style="border: none; cursor: pointer;">Cerrar sesión</button>
     </nav>
       <img src="images/logo-corporativo-recortado.png" alt="American Data Networks" class="cabecera-logo derecha">

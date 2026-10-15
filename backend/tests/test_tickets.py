@@ -155,6 +155,7 @@ EXPECTED_TICKET_KEYS = {
     "priority",
     "state",
     "assigned_to_id",
+    "created_by_id",
     "created_at",
     "updated_at",
 }

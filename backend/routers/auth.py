@@ -24,6 +24,18 @@ ROLES_SUPERVISOR = {UserRole.SUPERVISOR.value, UserRole.ADMIN.value}
 ROLES_TECNICO = {UserRole.TECHNICIAN.value, UserRole.ADMIN.value}
 ROLES_SOLICITANTE = {UserRole.REQUESTER.value, UserRole.ADMIN.value}
 
+# Grupos de la tabla de permisos (ver ayuda.html → "Permisos por rol").
+# Todos los roles: ver tickets (el Solicitante solo los suyos), crear y comentar.
+ROLES_TODOS = {role.value for role in UserRole}
+# Todos menos el Solicitante: cambiar estado e historial global.
+ROLES_EQUIPO = ROLES_TODOS - {UserRole.REQUESTER.value}
+# Gestión de tickets: editar y asignar.
+ROLES_GESTION = {
+    UserRole.ADMIN.value,
+    UserRole.SUPERVISOR.value,
+    UserRole.SUPPORT.value,
+}
+
 
 def role_required(allowed_roles: set[str]) -> callable:
     """Dependency that checks if the current user has one of the allowed roles.

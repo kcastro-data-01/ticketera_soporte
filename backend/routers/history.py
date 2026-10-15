@@ -5,22 +5,14 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_session
 from backend.models import User
-from backend.routers.auth import (
-    ROLES_SOLICITANTE,
-    ROLES_SUPERVISOR,
-    ROLES_SOPORTE,
-    ROLES_TECNICO,
-    role_required,
-)
+from backend.routers.auth import ROLES_EQUIPO, role_required
 from backend.schemas import HistoryResponse
 from backend.services import ticket_service
 
 router = APIRouter(prefix="/api", tags=["Historial"])
 
-# Cualquier usuario autenticado puede leer el historial global.
-HISTORY_ROLES = (
-    ROLES_SOLICITANTE | ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_TECNICO
-)
+# Todos los roles menos el Solicitante pueden leer el historial global.
+HISTORY_ROLES = ROLES_EQUIPO
 
 
 @router.get(

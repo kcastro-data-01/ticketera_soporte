@@ -15,8 +15,8 @@
       </div>
       <ul class="sidebar-nav">
         <li><a href="index.html" class="enlace-boton">Tickets</a></li>
-        <li><a href="historial.html" class="enlace-boton">Historial</a></li>
-        <li><a href="usuarios.html" class="enlace-boton">Usuarios</a></li>
+        <li data-permiso="historial_global"><a href="historial.html" class="enlace-boton">Historial</a></li>
+        <li data-permiso="usuarios"><a href="usuarios.html" class="enlace-boton">Usuarios</a></li>
         <li><a href="ayuda.html" class="enlace-boton activo">Ayuda</a></li>
       </ul>
     </nav>
@@ -63,6 +63,32 @@
           <li><strong>Solicitante</strong>: Quien crea el ticket</li>
         </ul>
 
+        <h2>Permisos por rol</h2>
+        <div class="tabla-scroll">
+          <table class="listado">
+            <thead>
+              <tr>
+                <th>Acción</th>
+                <th>Administrador</th>
+                <th>Supervisor</th>
+                <th>Soporte</th>
+                <th>Técnico</th>
+                <th>Solicitante</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Solo los suyos</td></tr>
+              <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+              <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>En los suyos</td></tr>
+              <tr><td>Editar ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
+              <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+              <tr><td>Asignar ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
+              <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+              <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+            </tbody>
+          </table>
+        </div>
+
         <h2>Estados de los tickets</h2>
         <p>Los tickets siguen un flujo lineal:</p>
         <ul>
@@ -75,6 +101,7 @@
     </main>
   </div>
 
+  <script src="js/auth.js" defer></script>
   <script src="js/ayuda.js" defer></script>
 </body>
 </html>

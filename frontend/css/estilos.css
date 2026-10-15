@@ -1093,3 +1093,9 @@ header.cabecera img.cabecera-logo.derecha {
   max-width: none !important;
   max-height: none !important;
 }
+
+/* Los elementos ocultos por permisos (atributo hidden) no deben
+   reaparecer por reglas de display de otras clases. */
+[hidden] {
+  display: none !important;
+}

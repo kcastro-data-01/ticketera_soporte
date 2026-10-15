@@ -15,7 +15,7 @@
     </div>
     <nav class="cabecera-enlaces">
       <a href="index.html" class="enlace-boton">Volver al listado</a>
-      <a href="usuarios.html" class="enlace-boton">Usuarios</a>
+      <a href="usuarios.html" class="enlace-boton" data-permiso="usuarios">Usuarios</a>
       <button type="button" id="btn-logout" class="enlace-boton" style="border: none; cursor: pointer;">Cerrar sesión</button>
     </nav>
   </header>
@@ -23,7 +23,7 @@
   <main class="contenido">
     <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
 
-    <div class="acciones acciones-principales">
+    <div class="acciones acciones-principales" data-permiso="editar">
       <button type="button" id="editar">Editar ticket</button>
     </div>
 
@@ -107,7 +107,7 @@
       </form>
     </section>
 
-    <section class="seccion" aria-label="Asignación del ticket">
+    <section class="seccion" aria-label="Asignación del ticket" data-permiso="asignar">
       <h2>Asignación</h2>
       <div class="filtros formulario">
         <label class="campo">
@@ -126,7 +126,7 @@
       </p>
     </section>
 
-    <section class="seccion" aria-label="Cambio de estado del ticket">
+    <section class="seccion" aria-label="Cambio de estado del ticket" data-permiso="cambiar_estado">
       <h2>Cambio de estado</h2>
       <div class="filtros formulario">
         <div class="campo">
@@ -150,8 +150,7 @@
     <section class="seccion" aria-label="Comentarios del ticket">
       <h2>Comentarios</h2>
       <p class="nota">
-        Los comentarios se muestran de más antiguo a más reciente. Al no haber
-        inicio de sesión, el autor de un comentario nuevo es «Anónimo».
+        Los comentarios se muestran de más antiguo a más reciente.
       </p>
       <p
         id="comentarios-estado"

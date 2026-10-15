@@ -64,7 +64,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    tickets: Mapped[list["Ticket"]] = relationship(back_populates="assignee")
+    tickets: Mapped[list["Ticket"]] = relationship(
+        back_populates="assignee", foreign_keys="Ticket.assigned_to_id"
+    )
 
 
 class Ticket(Base):
@@ -109,6 +111,14 @@ class Ticket(Base):
         nullable=True,
         index=True,
     )
+    # Authenticated user that created the ticket: a ``Solicitante`` only sees
+    # the tickets they created. ``None`` for tickets created before the
+    # column existed.
+    created_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime(),
         nullable=False,
@@ -121,7 +131,9 @@ class Ticket(Base):
         onupdate=utc_now,
     )
 
-    assignee: Mapped[User | None] = relationship(back_populates="tickets")
+    assignee: Mapped[User | None] = relationship(
+        back_populates="tickets", foreign_keys=[assigned_to_id]
+    )
     comments: Mapped[list["Comment"]] = relationship(
         back_populates="ticket",
         cascade="all, delete-orphan",

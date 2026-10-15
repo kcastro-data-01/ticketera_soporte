@@ -101,6 +101,7 @@ class TicketResponse(BaseModel):
     priority: TicketPriority
     state: TicketState
     assigned_to_id: int | None = None
+    created_by_id: int | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -43,6 +43,11 @@ filtrarlos, y consultar su historial de cambios.
   `node:test` (52 pruebas en cuatro ficheros) y documentación en
   [docs/api.md](docs/api.md).
 
+- Permisos por rol: el servidor aplica la tabla de permisos (ver
+  `ayuda.html`) y la interfaz oculta los botones y menús que el rol no puede
+  usar. El Solicitante solo ve, comenta y consulta el historial de los tickets
+  que creó (`tickets.created_by_id`, migración automática al arrancar).
+
 **Pendientes**
 
 - **Registro de historial para el resto de acciones (RF9, escritura)** — la

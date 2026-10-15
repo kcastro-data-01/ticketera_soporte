@@ -5,23 +5,16 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_session
 from backend.models import User
-from backend.routers.auth import (
-    ROLES_SOLICITANTE,
-    ROLES_SUPERVISOR,
-    ROLES_SOPORTE,
-    ROLES_TECNICO,
-    role_required,
-)
+from backend.routers.auth import ROLES_TODOS, role_required
 from backend.schemas import CommentCreate, CommentResponse
 from backend.services import ticket_service
 from backend.services.ticket_service import TicketNotFoundError
 
 router = APIRouter(prefix="/api/tickets", tags=["Comentarios"])
 
-# Cualquier usuario autenticado puede comentar y leer comentarios.
-COMMENT_ROLES = (
-    ROLES_SOLICITANTE | ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_TECNICO
-)
+# Cualquier usuario autenticado puede comentar y leer comentarios; el
+# Solicitante solo en los tickets que creó.
+COMMENT_ROLES = ROLES_TODOS
 
 
 @router.post(
@@ -40,6 +33,11 @@ def create_comment(
 
     Requires authentication (401 without token).
     """
+    if ticket_service.get_visible_ticket(session, ticket_id, current_user) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticket {ticket_id} no encontrado",
+        )
     try:
         comment = ticket_service.create_comment(
             session, ticket_id, payload, current_user
@@ -69,7 +67,10 @@ def list_comments(
     answered with ``404``; an existing ticket without comments returns an
     empty list.
     """
-    comments = ticket_service.get_ticket_comments(session, ticket_id)
+    if ticket_service.get_visible_ticket(session, ticket_id, current_user) is None:
+        comments = None
+    else:
+        comments = ticket_service.get_ticket_comments(session, ticket_id)
     if comments is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

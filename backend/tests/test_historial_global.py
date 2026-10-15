@@ -193,14 +193,27 @@ def login_as(client, session, role: str, email: str) -> str:
     return response.json()["access_token"]
 
 
-@pytest.mark.parametrize("role", list(UserRole), ids=[r.value for r in UserRole])
-def test_every_role_can_read_the_global_history(client, session, role):
+TEAM_ROLES = [role for role in UserRole if role is not UserRole.REQUESTER]
+
+
+@pytest.mark.parametrize("role", TEAM_ROLES, ids=[r.value for r in TEAM_ROLES])
+def test_every_team_role_can_read_the_global_history(client, session, role):
     token = login_as(client, session, role.value, f"historial-{role.value}@test.local")
 
     response = client.get("/api/history", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_requester_cannot_read_the_global_history(client, session):
+    token = login_as(
+        client, session, UserRole.REQUESTER.value, "historial-solicitante@test.local"
+    )
+
+    response = client.get("/api/history", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 403
 
 
 def test_global_history_records_the_authenticated_user(client, session):

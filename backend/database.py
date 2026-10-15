@@ -90,7 +90,9 @@ def init_db(target_engine=None) -> None:
     from backend.migrate_add_password_hash import migrate_add_password_hash
     from backend.migrate_add_history_author_id import migrate_add_history_author_id
     from backend.migrate_categories import migrate_categories
+    from backend.migrate_add_ticket_created_by import migrate_add_ticket_created_by
 
     migrate_add_password_hash(db_engine)
     migrate_add_history_author_id(db_engine)
     migrate_categories(db_engine)
+    migrate_add_ticket_created_by(db_engine)

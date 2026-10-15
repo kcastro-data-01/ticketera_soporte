@@ -3,13 +3,11 @@
 Cubre tres escenarios:
 
 1. Recursos privados sin token → ``401 Unauthorized``.
-2. Rol no autorizado para una operación → ``403 Forbidden``.
-3. Límites del control de propiedad de tickets: el modelo actual NO tiene
-   un campo que identifique al creador/solicitante del ticket, por lo que
-   un Solicitante que conoce el ID puede leer tickets ajenos. Este problema
-   se documenta aquí como prueba conocida (ver ``test_solicitante_puede_leer_ticket_ajeno_limitacion``)
-   y NO se filtra por ``assigned_to_id`` porque ese campo representa al
-   Soporte/Técnico asignado, no al solicitante.
+2. Rol no autorizado para una operación → ``403 Forbidden``, según la tabla
+   de permisos (ver ``ayuda.html``).
+3. Propiedad de tickets: un Solicitante solo ve, comenta y consulta el
+   historial de los tickets que creó (``created_by_id``); los ajenos
+   responden ``404`` para no revelar que existen.
 """
 
 import pytest
@@ -186,14 +184,25 @@ def test_solicitante_cannot_update_user(client, auth_client):
     assert resp.status_code == 403
 
 
-def test_solicitante_can_read_and_comment(client, auth_client):
-    """Un Solicitante autenticado sí puede listar, leer y comentar."""
-    ticket = create_ticket(auth_client)
+def test_solicitante_can_read_and_comment_own_ticket(client):
+    """Un Solicitante autenticado sí puede crear, listar, leer y comentar
+    sus propios tickets."""
     token = register_requester(client)
+    resp = client.post("/api/tickets", json=VALID_TICKET, headers=headers(token))
+    assert resp.status_code == 201
+    ticket = resp.json()
 
-    assert client.get("/api/tickets", headers=headers(token)).status_code == 200
+    listing = client.get("/api/tickets", headers=headers(token))
+    assert listing.status_code == 200
+    assert [t["id"] for t in listing.json()] == [ticket["id"]]
     assert (
         client.get(f"/api/tickets/{ticket['id']}", headers=headers(token)).status_code
+        == 200
+    )
+    assert (
+        client.get(
+            f"/api/tickets/{ticket['id']}/history", headers=headers(token)
+        ).status_code
         == 200
     )
     resp = client.post(
@@ -238,23 +247,24 @@ def test_soporte_can_update_and_assign(client, auth_client, session):
     assert resp.status_code == 200
 
 
-def test_supervisor_cannot_assign_but_can_update(client, auth_client, session):
-    """Un Supervisor actualiza tickets pero no los asigna (regla existente)."""
+def login_role(client, session, role: str, email: str) -> str:
+    """Create a user with ``role`` and return a token obtained via login."""
     from backend.auth import hash_password
 
-    make_role_user(
-        session,
-        UserRole.SUPERVISOR.value,
-        "supervisor.test@correo.local",
-        hash_password("clave12345"),
+    make_role_user(session, role, email, hash_password("clave12345"))
+    login = client.post(
+        "/api/auth/login", json={"email": email, "password": "clave12345"}
+    )
+    assert login.status_code == 200
+    return login.json()["access_token"]
+
+
+def test_supervisor_can_update_and_assign(client, auth_client, session):
+    """Un Supervisor edita y asigna tickets."""
+    token = login_role(
+        client, session, UserRole.SUPERVISOR.value, "supervisor.test@correo.local"
     )
     ticket = create_ticket(auth_client)
-
-    login = client.post(
-        "/api/auth/login",
-        json={"email": "supervisor.test@correo.local", "password": "clave12345"},
-    )
-    token = login.json()["access_token"]
 
     resp = client.patch(
         f"/api/tickets/{ticket['id']}",
@@ -268,7 +278,49 @@ def test_supervisor_cannot_assign_but_can_update(client, auth_client, session):
         json={"assigned_to_id": None},
         headers=headers(token),
     )
+    assert resp.status_code == 200
+
+
+def test_tecnico_changes_state_but_cannot_edit_or_assign(client, auth_client, session):
+    """Un Técnico cambia el estado, pero no edita ni asigna tickets."""
+    token = login_role(
+        client, session, UserRole.TECHNICIAN.value, "tecnico.estado@correo.local"
+    )
+    ticket = create_ticket(auth_client)
+
+    resp = client.patch(
+        f"/api/tickets/{ticket['id']}/state",
+        json={"state": "En proceso"},
+        headers=headers(token),
+    )
+    assert resp.status_code == 200
+
+    resp = client.patch(
+        f"/api/tickets/{ticket['id']}",
+        json={"title": "Editado por técnico"},
+        headers=headers(token),
+    )
     assert resp.status_code == 403
+
+    resp = client.patch(
+        f"/api/tickets/{ticket['id']}/assign",
+        json={"assigned_to_id": None},
+        headers=headers(token),
+    )
+    assert resp.status_code == 403
+
+
+def test_admin_can_comment_and_read_global_history(auth_client):
+    """El Administrador tiene permisos completos: comenta y ve el historial."""
+    ticket = create_ticket(auth_client)
+
+    resp = auth_client.post(
+        f"/api/tickets/{ticket['id']}/comments",
+        json={"content": "Comentario del administrador"},
+    )
+    assert resp.status_code == 201
+    assert auth_client.get(f"/api/tickets/{ticket['id']}/comments").status_code == 200
+    assert auth_client.get("/api/history").status_code == 200
 
 
 def test_tecnico_cannot_manage_users(client, auth_client, session):
@@ -319,44 +371,49 @@ def test_inactive_user_cannot_login(client, auth_client, session):
 
 
 # ---------------------------------------------------------------------------
-# 3. Limitación conocida: el modelo no identifica al creador del ticket
+# 3. Propiedad: el Solicitante solo accede a los tickets que creó
 # ---------------------------------------------------------------------------
 
 
-def test_solicitante_puede_leer_ticket_ajeno_limitacion(client, auth_client, session):
-    """DOCUMENTA UNA LIMITACIÓN CONOCIDA (no es un objetivo de diseño).
+def test_ticket_records_its_creator(auth_client):
+    """``POST /api/tickets`` guarda al usuario autenticado como creador."""
+    me = auth_client.get("/api/auth/me").json()
+    ticket = create_ticket(auth_client)
+    assert ticket["created_by_id"] == me["id"]
 
-    El modelo ``Ticket`` solo tiene ``assigned_to_id`` (la persona de
-    Soporte/Técnico que atiende el ticket). No existe un campo
-    ``created_by_id``/``requested_by_id``, por lo que hoy no es posible
-    distinguir con seguridad al solicitante que creó el ticket.
 
-    Consecuencia: un Solicitante autenticado que conoce el ID puede leer
-    tickets ajenos. Esto NO se filtra por ``assigned_to_id`` porque ese
-    campo no representa al solicitante (sería incorrecto: el ticket de un
-    solicitante está normalmente asignado a un soporte).
-
-    Corrección necesaria (pendiente de decisión): añadir a la tabla
-    ``tickets`` una columna ``created_by_id`` FK a ``users.id`` que se
-    registre en ``POST /api/tickets`` con el usuario autenticado, y filtrar
-    las lecturas de Solicitante por ese campo.
-    """
-    # Otro solicitante creó este ticket vía la API (como Administrador aquí
-    # porque la creación asocia el ticket a quien lo atiende).
+@pytest.mark.parametrize(
+    "method, suffix, body",
+    [
+        ("GET", "", None),
+        ("GET", "/history", None),
+        ("GET", "/comments", None),
+        ("POST", "/comments", {"content": "Intento en ticket ajeno"}),
+    ],
+)
+def test_solicitante_cannot_access_other_tickets(client, auth_client, method, suffix, body):
+    """Un ticket creado por otra persona responde 404 al Solicitante."""
     ticket = create_ticket(auth_client)
     token = register_requester(client)
 
-    resp = client.get(
-        f"/api/tickets/{ticket['id']}", headers=headers(token)
+    resp = client.request(
+        method,
+        f"/api/tickets/{ticket['id']}{suffix}",
+        json=body,
+        headers=headers(token),
     )
-    # Limitación actual: el acceso NO está bloqueado por propiedad.
-    assert resp.status_code == 200
+    assert resp.status_code == 404
 
 
-def test_ticket_model_has_no_creator_field():
-    """Guardia: mientras no exista ``created_by_id`` no se implementa filtro."""
-    from backend.models import Ticket
+def test_solicitante_listing_only_shows_own_tickets(client, auth_client):
+    """El listado del Solicitante excluye los tickets ajenos."""
+    create_ticket(auth_client)
+    token = register_requester(client)
+    own = client.post("/api/tickets", json=VALID_TICKET, headers=headers(token))
+    assert own.status_code == 201
 
-    columns = {column.name for column in Ticket.__table__.columns}
-    assert "created_by_id" not in columns
-    assert "requested_by_id" not in columns
+    listing = client.get("/api/tickets", headers=headers(token)).json()
+    assert [t["id"] for t in listing] == [own.json()["id"]]
+
+    # El resto de roles sigue viendo todos los tickets.
+    assert len(auth_client.get("/api/tickets").json()) == 2

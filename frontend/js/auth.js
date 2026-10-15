@@ -72,3 +72,44 @@ async function fetchWithAuth(url, options = {}) {
 
   return response;
 }
+
+/* Tabla de permisos por rol (espejo de backend/routers/auth.py).
+   El servidor es quien realmente bloquea; aquí solo se ocultan los
+   botones y enlaces que el rol no puede usar. */
+const PERMISOS = {
+  editar: ["Administrador", "Supervisor", "Soporte"],
+  asignar: ["Administrador", "Supervisor", "Soporte"],
+  cambiar_estado: ["Administrador", "Supervisor", "Soporte", "Técnico"],
+  historial_global: ["Administrador", "Supervisor", "Soporte", "Técnico"],
+  usuarios: ["Administrador"],
+};
+
+/* true si el usuario de la sesión tiene el permiso indicado. */
+function puede(permiso) {
+  const user = getUser();
+  const roles = PERMISOS[permiso] || [];
+  return Boolean(user && roles.includes(user.role));
+}
+
+/* Oculta cada elemento con data-permiso="..." que el rol no puede usar. */
+function aplicarPermisos(root = document) {
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  root.querySelectorAll("[data-permiso]").forEach((element) => {
+    if (!puede(element.dataset.permiso)) element.hidden = true;
+  });
+}
+
+/* Para páginas restringidas: sin sesión va a login y sin permiso al
+   listado. Devuelve true si se puede mostrar la página. */
+function requirePermiso(permiso) {
+  if (!requireAuth()) return false;
+  if (!puede(permiso)) {
+    window.location.href = "index.html";
+    return false;
+  }
+  return true;
+}
+
+if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+  document.addEventListener("DOMContentLoaded", () => aplicarPermisos());
+}

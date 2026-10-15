@@ -6,14 +6,8 @@ from sqlalchemy.orm import Session
 from backend.auth import get_current_user
 from backend.database import get_session
 from backend.models import User
-from backend.routers.auth import role_required, ROLES_ADMIN
-from backend.constants import UserRole
+from backend.routers.auth import ROLES_ADMIN, ROLES_TODOS, role_required
 from backend.schemas import UserCreate, UserResponse, UserUpdate
-ROLES_ADMIN = {UserRole.ADMIN.value}
-ROLES_SOPORTE = {UserRole.SUPPORT.value, UserRole.ADMIN.value}
-ROLES_SUPERVISOR = {UserRole.SUPERVISOR.value, UserRole.ADMIN.value}
-ROLES_TECNICO = {UserRole.TECHNICIAN.value, UserRole.ADMIN.value}
-ROLES_SOLICITANTE = {UserRole.REQUESTER.value, UserRole.ADMIN.value}
 from backend.services import user_service
 
 router = APIRouter(prefix="/api/users", tags=["Usuarios"])
@@ -50,7 +44,7 @@ def create_user(
 def list_users(
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_ADMIN | ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_TECNICO | ROLES_SOLICITANTE)
+        role_required(ROLES_TODOS)
     ),
 ) -> list[UserResponse]:
     """Return the active users available for assignment (read-only)."""

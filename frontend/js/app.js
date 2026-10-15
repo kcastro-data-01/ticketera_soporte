@@ -218,13 +218,15 @@ if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", init);
 }
 
-/* Función para crear la celda de acción con botón de editar */
+/* Celda de acción: «Editar» para los roles que pueden editar tickets y
+   «Ver» para el resto; ambos abren el detalle. */
 function appendActionCell(row, ticketId) {
   const cell = document.createElement("td");
   const button = document.createElement("button");
   button.type = "button";
   button.className = "btn-accion";
-  button.textContent = "Editar";
+  const puedeEditar = typeof puede === "function" ? puede("editar") : true;
+  button.textContent = puedeEditar ? "Editar" : "Ver";
   button.onclick = (e) => {
     e.preventDefault();
     window.location.href = `detalle.html?id=${ticketId}`;

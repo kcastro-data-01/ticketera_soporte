@@ -15,8 +15,8 @@
       </div>
       <ul class="sidebar-nav">
         <li><a href="index.html" class="enlace-boton">Tickets</a></li>
-        <li><a href="historial.html" class="enlace-boton activo">Historial</a></li>
-        <li><a href="usuarios.html" class="enlace-boton">Usuarios</a></li>
+        <li data-permiso="historial_global"><a href="historial.html" class="enlace-boton activo">Historial</a></li>
+        <li data-permiso="usuarios"><a href="usuarios.html" class="enlace-boton">Usuarios</a></li>
         <li><a href="ayuda.html" class="enlace-boton">Ayuda</a></li>
       </ul>
     </nav>
@@ -54,6 +54,13 @@
     </main>
   </div>
 
+  <script>
+    /* Se registra antes que los scripts diferidos: sin permiso se redirige
+       y no se ejecuta la inicialización de la página. */
+    document.addEventListener("DOMContentLoaded", function (event) {
+      if (!requirePermiso("historial_global")) event.stopImmediatePropagation();
+    });
+  </script>
   <script src="js/auth.js" defer></script>
   <script src="js/historial.js" defer></script>
 </body>

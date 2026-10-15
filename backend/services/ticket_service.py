@@ -4,7 +4,7 @@ assignment and comments)."""
 from sqlalchemy import or_, select
 from sqlalchemy.orm import joinedload
 
-from backend.constants import TicketCategory, TicketPriority, TicketState
+from backend.constants import TicketCategory, TicketPriority, TicketState, UserRole
 from backend.models import Comment, History, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate, TicketUpdate
 from backend.services.user_service import get_auto_assignable_users
@@ -120,6 +120,7 @@ def create_ticket(
         description=payload.description,
         category=payload.category.value,
         priority=payload.priority.value,
+        created_by_id=current_user.id if current_user is not None else None,
     )
 
     # Automatic round-robin assignment among active Support/Technician users.
@@ -155,6 +156,7 @@ def list_tickets(
     category: TicketCategory | None = None,
     priority: TicketPriority | None = None,
     state: TicketState | None = None,
+    created_by_id: int | None = None,
 ) -> list[Ticket]:
     """Return stored tickets, newest first (RF6), optionally searched and
     filtered (RF7, RF8).
@@ -163,9 +165,13 @@ def list_tickets(
     in ``title`` and ``description`` without distinguishing case; a blank
     ``search`` behaves as if it were not sent. When no criteria are given the
     query is identical to the plain listing. Read-only query: it never
-    modifies the stored rows.
+    modifies the stored rows. ``created_by_id`` restricts the listing to the
+    tickets created by that user (used for the ``Solicitante`` role).
     """
     statement = select(Ticket)
+
+    if created_by_id is not None:
+        statement = statement.where(Ticket.created_by_id == created_by_id)
 
     if category is not None:
         statement = statement.where(Ticket.category == category.value)
@@ -191,6 +197,29 @@ def list_tickets(
 def get_ticket(session, ticket_id: int) -> Ticket | None:
     """Return a ticket by id, or ``None`` when it does not exist."""
     return session.get(Ticket, ticket_id)
+
+
+def can_view_ticket(ticket: Ticket, user: User | None) -> bool:
+    """Whether ``user`` may read ``ticket`` (and its comments and history).
+
+    A ``Solicitante`` only sees the tickets they created; every other role
+    sees all tickets.
+    """
+    if user is None or user.role != UserRole.REQUESTER.value:
+        return True
+    return ticket.created_by_id == user.id
+
+
+def get_visible_ticket(session, ticket_id: int, user: User | None) -> Ticket | None:
+    """Return the ticket when it exists and ``user`` may see it, else ``None``.
+
+    A ticket the user may not see is reported as missing (``None``) so its
+    existence is not revealed.
+    """
+    ticket = session.get(Ticket, ticket_id)
+    if ticket is None or not can_view_ticket(ticket, user):
+        return None
+    return ticket
 
 
 def get_ticket_history(session, ticket_id: int) -> list[History] | None:

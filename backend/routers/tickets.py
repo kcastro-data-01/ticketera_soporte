@@ -21,7 +21,8 @@ from backend.services.ticket_service import (
     UserNotFoundError,
 )
 from backend.models import User
-from backend.routers.auth import role_required, ROLES_SOPORTE, ROLES_SUPERVISOR, ROLES_TECNICO, ROLES_SOLICITANTE, ROLES_ADMIN
+from backend.constants import UserRole
+from backend.routers.auth import ROLES_EQUIPO, ROLES_GESTION, ROLES_TODOS, role_required
 
 
 router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
@@ -37,7 +38,7 @@ def create_ticket(
     payload: TicketCreate,
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_SOLICITANTE | ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_TECNICO | ROLES_ADMIN)
+        role_required(ROLES_TODOS)
     ),
 ) -> TicketResponse:
     """Create a ticket with title, description, category and priority (RF1, RF2)."""
@@ -72,7 +73,7 @@ def list_tickets(
     ),
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_SOLICITANTE | ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_TECNICO | ROLES_ADMIN)
+        role_required(ROLES_TODOS)
     ),
 ) -> list[TicketResponse]:
     """Return all stored tickets, newest first (RF6), searchable by text and
@@ -87,6 +88,11 @@ def list_tickets(
         category=category,
         priority=priority,
         state=state,
+        created_by_id=(
+            current_user.id
+            if current_user.role == UserRole.REQUESTER.value
+            else None
+        ),
     )
     return [TicketResponse.model_validate(ticket) for ticket in tickets]
 
@@ -100,11 +106,11 @@ def get_ticket(
     ticket_id: int,
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_SOLICITANTE | ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_TECNICO | ROLES_ADMIN)
+        role_required(ROLES_TODOS)
     ),
 ) -> TicketResponse:
     """Return a single ticket by id (read-only)."""
-    ticket = ticket_service.get_ticket(session, ticket_id)
+    ticket = ticket_service.get_visible_ticket(session, ticket_id, current_user)
     if ticket is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -122,7 +128,7 @@ def get_ticket_history(
     ticket_id: int,
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_SOLICITANTE | ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_TECNICO | ROLES_ADMIN)
+        role_required(ROLES_TODOS)
     ),
 ) -> list[HistoryResponse]:
     """Return the audit entries recorded for a ticket, oldest first (RF9).
@@ -131,7 +137,10 @@ def get_ticket_history(
     them. Optional model fields (``field``, ``old_value``, ``new_value``,
     ``author``) are returned as ``null`` when unavailable.
     """
-    entries = ticket_service.get_ticket_history(session, ticket_id)
+    if ticket_service.get_visible_ticket(session, ticket_id, current_user) is None:
+        entries = None
+    else:
+        entries = ticket_service.get_ticket_history(session, ticket_id)
     if entries is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -150,7 +159,7 @@ def update_ticket(
     payload: TicketUpdate,
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_ADMIN)
+        role_required(ROLES_GESTION)
     ),
 ) -> TicketResponse:
     """Update title, description, category and/or priority of a ticket."""
@@ -173,7 +182,7 @@ def assign_ticket(
     payload: TicketAssignment,
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_SOPORTE | ROLES_ADMIN)
+        role_required(ROLES_GESTION)
     ),
 ) -> TicketResponse:
     """Assign a user to a ticket; ``assigned_to_id: null`` unassigns it (RF4)."""
@@ -204,7 +213,7 @@ def change_ticket_state(
     payload: TicketStateUpdate,
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_SOPORTE | ROLES_SUPERVISOR | ROLES_ADMIN)
+        role_required(ROLES_EQUIPO)
     ),
 ) -> TicketResponse:
     """Move a ticket through the allowed workflow transitions (RF3).
