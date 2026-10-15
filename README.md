@@ -64,8 +64,9 @@ filtrarlos, y consultar su historial de cambios.
   responde preguntas sobre la app con Claude. El servidor solo le entrega los
   datos que el rol puede ver (el Solicitante, solo sus tickets y nunca la lista
   de usuarios; los correos nunca se envían), así que no puede revelar
-  información interna aunque se la pidan. Requiere la variable
-  `ANTHROPIC_API_KEY` (ver «Asistente de IA» más abajo); sin ella responde 503.
+  información interna aunque se la pidan. Usa Qwen3 con Ollama (gratuito,
+  incluido en `docker-compose.yml`) o, opcionalmente, Claude (ver «Asistente
+  de IA» más abajo).
 
 **Pendientes**
 
@@ -476,15 +477,33 @@ El desarrollo se realiza estrictamente por tareas. El plan completo está en
 
 ## Asistente de IA
 
-El asistente usa la API de Claude (modelo `claude-opus-5-5`, esfuerzo bajo y
-respaldo automático del servidor si una consulta es rechazada). Para
-activarlo, crea un archivo `.env` junto a `docker-compose.yml` (ya está en
-`.gitignore`, no se sube) con tu clave:
+Por defecto el asistente usa **Qwen3** ([QwenLM/Qwen3](https://github.com/QwenLM/Qwen3)),
+un modelo abierto y gratuito que corre en tu propia computadora con
+[Ollama](https://ollama.com): no necesita clave ni cobra por consulta.
+`docker compose up --build -d` levanta tres servicios:
+
+- `ticketera`: la aplicación.
+- `ollama`: el servidor de modelos.
+- `ollama-descarga`: descarga `qwen3:4b` (unos 2,5 GB) la primera vez y
+  termina. Mientras descarga, el chat avisa que el modelo aún no está listo;
+  el progreso se ve con `docker compose logs -f ollama-descarga`.
+
+Requisitos aproximados para `qwen3:4b`: 8 GB de RAM libres. En CPU cada
+respuesta tarda varios segundos; con poca memoria usa un modelo más pequeño
+(`qwen3:1.7b` o `qwen3:0.6b`, más rápidos pero menos precisos) y con GPU uno
+más grande (`qwen3:8b`), creando un archivo `.env` junto a
+`docker-compose.yml`:
 
 ```
+QWEN_MODELO=qwen3:1.7b
+```
+
+Para usar Claude en lugar de Qwen3, en el mismo `.env`:
+
+```
+ASISTENTE_PROVEEDOR=claude
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-y reinicia con `docker compose up --build -d`. Cada pregunta consume tokens de
-la cuenta de esa clave. Sin la clave, el chat muestra «El asistente no está
-configurado».
+En ambos casos la restricción por rol la aplica el servidor: el modelo solo
+recibe los datos que el rol ya puede ver en la aplicación.

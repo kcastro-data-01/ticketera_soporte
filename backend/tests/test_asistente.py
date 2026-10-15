@@ -1,4 +1,4 @@
-"""Pruebas del asistente de IA con un cliente de Claude simulado.
+"""Pruebas del asistente de IA con proveedores simulados (Qwen/Ollama y Claude).
 
 Lo clave: los datos que recibe el modelo están filtrados por rol en el
 servidor (un Solicitante nunca recibe tickets ajenos ni la lista de usuarios).
@@ -7,19 +7,44 @@ servidor (un Solicitante nunca recibe tickets ajenos ni la lista de usuarios).
 from types import SimpleNamespace
 
 import anthropic
-import httpx2 as httpx
+import httpx
+import httpx2
 import pytest
 
 from backend.auth import hash_password
 from backend.main import app
 from backend.models import Ticket, User
-from backend.routers.asistente import get_claude_client
+from backend.routers.asistente import get_proveedor
+from backend.services.asistente_service import (
+    AsistenteNoDisponible,
+    ProveedorClaude,
+    ProveedorQwen,
+    crear_proveedor,
+)
+
+
+class FakeProveedor:
+    """Records the system prompt and messages of each question."""
+
+    def __init__(self, text="Respuesta del asistente", error=None):
+        self.calls = []
+        self.text = text
+        self.error = error
+
+    def responder(self, system, messages):
+        self.calls.append({"system": system, "messages": messages})
+        if self.error is not None:
+            raise self.error
+        return self.text
+
+    def system_text(self):
+        return self.calls[-1]["system"]
 
 
 class FakeClaude:
-    """Records each request and answers with a fixed text."""
+    """Minimal stand-in for ``anthropic.Anthropic`` (beta.messages.create)."""
 
-    def __init__(self, text="Respuesta del asistente", stop_reason="end_turn", error=None):
+    def __init__(self, text="Respuesta de Claude", stop_reason="end_turn", error=None):
         self.calls = []
         self.text = text
         self.stop_reason = stop_reason
@@ -35,16 +60,14 @@ class FakeClaude:
             content=[SimpleNamespace(type="text", text=self.text)],
         )
 
-    def system_text(self):
-        return "\n".join(block["text"] for block in self.calls[-1]["system"])
-
 
 @pytest.fixture
 def fake_claude():
-    fake = FakeClaude()
-    app.dependency_overrides[get_claude_client] = lambda: fake
+    """Fake provider plugged into the endpoint (name kept for the tests)."""
+    fake = FakeProveedor()
+    app.dependency_overrides[get_proveedor] = lambda: fake
     yield fake
-    app.dependency_overrides.pop(get_claude_client, None)
+    app.dependency_overrides.pop(get_proveedor, None)
 
 
 def login_as(client, session, role, email, name):
@@ -114,25 +137,6 @@ def test_technician_sees_tickets_but_not_the_team(client, session, fake_claude):
     assert "Usuarios del sistema" not in system
 
 
-def test_request_uses_the_expected_model_settings(client, session, fake_claude):
-    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
-    ask(client, headers)
-    call = fake_claude.calls[-1]
-    assert call["model"] == "claude-opus-5-5"
-    assert call["fallbacks"] == "default"
-    assert call["betas"] == ["server-side-fallback-2026-07-01"]
-    assert call["messages"] == [{"role": "user", "content": "¿Qué tickets hay?"}]
-
-
-def test_refusal_returns_a_safe_message(client, session, fake_claude):
-    fake_claude.stop_reason = "refusal"
-    fake_claude.text = ""
-    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
-    resp = ask(client, headers)
-    assert resp.status_code == 200
-    assert resp.json()["respuesta"].startswith("No puedo ayudarte")
-
-
 @pytest.mark.parametrize(
     "messages",
     [
@@ -156,7 +160,34 @@ def test_requires_login(client, fake_claude):
     assert client.post("/api/asistente", json={"messages": [{"role": "user", "content": "hola"}]}).status_code == 401
 
 
-def test_without_api_key_answers_503(client, session, monkeypatch):
+def test_endpoint_sends_the_conversation(client, session, fake_claude):
+    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
+    assert ask(client, headers).status_code == 200
+    assert fake_claude.calls[-1]["messages"] == [{"role": "user", "content": "¿Qué tickets hay?"}]
+
+
+def test_provider_errors_become_502(client, session, fake_claude):
+    fake_claude.error = AsistenteNoDisponible("No se pudo conectar con Ollama")
+    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
+    resp = ask(client, headers)
+    assert resp.status_code == 502
+    assert "Ollama" in resp.json()["detail"]
+
+
+# --- Selección de proveedor ---
+
+
+def test_default_provider_is_qwen_with_ollama(monkeypatch):
+    for var in ("ASISTENTE_PROVEEDOR", "OLLAMA_URL", "QWEN_MODELO"):
+        monkeypatch.delenv(var, raising=False)
+    proveedor = crear_proveedor()
+    assert isinstance(proveedor, ProveedorQwen)
+    assert proveedor.modelo == "qwen3:4b"
+    assert proveedor.url == "http://localhost:11434"
+
+
+def test_claude_provider_without_key_answers_503(client, session, monkeypatch):
+    monkeypatch.setenv("ASISTENTE_PROVEEDOR", "claude")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
     resp = ask(client, headers)
@@ -164,13 +195,76 @@ def test_without_api_key_answers_503(client, session, monkeypatch):
     assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
 
 
-def test_api_errors_are_translated(client, session, fake_claude):
-    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
-    fake_claude.error = anthropic.RateLimitError(
-        "rate limited", response=httpx.Response(429, request=request), body=None
-    )
+def test_unknown_provider_answers_503(client, session, monkeypatch):
+    monkeypatch.setenv("ASISTENTE_PROVEEDOR", "otro")
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
-    assert ask(client, headers).status_code == 429
+    assert ask(client, headers).status_code == 503
 
-    fake_claude.error = anthropic.APIConnectionError(request=request)
-    assert ask(client, headers).status_code == 502
+
+# --- Qwen3 con Ollama ---
+
+
+def qwen_con(handler):
+    return ProveedorQwen(
+        "http://ollama:11434/", "qwen3:4b", http=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+
+
+def test_qwen_calls_ollama_chat_with_system_and_no_thinking():
+    enviados = []
+
+    def handler(request):
+        enviados.append((request.url, __import__("json").loads(request.content)))
+        return httpx.Response(200, json={"message": {"role": "assistant", "content": "<think>\nx\n</think>\nHola"}})
+
+    texto = qwen_con(handler).responder("SISTEMA", [{"role": "user", "content": "hola"}])
+
+    assert texto == "Hola"
+    url, body = enviados[0]
+    assert str(url) == "http://ollama:11434/api/chat"
+    assert body["model"] == "qwen3:4b"
+    assert body["stream"] is False and body["think"] is False
+    assert body["messages"] == [
+        {"role": "system", "content": "SISTEMA"},
+        {"role": "user", "content": "hola"},
+    ]
+
+
+def test_qwen_missing_model_explains_download():
+    proveedor = qwen_con(lambda request: httpx.Response(404, json={"error": "model not found"}))
+    with pytest.raises(AsistenteNoDisponible, match="no está descargado"):
+        proveedor.responder("S", [{"role": "user", "content": "hola"}])
+
+
+def test_qwen_connection_error_mentions_ollama():
+    def handler(request):
+        raise httpx.ConnectError("refused", request=request)
+
+    with pytest.raises(AsistenteNoDisponible, match="Ollama"):
+        qwen_con(handler).responder("S", [{"role": "user", "content": "hola"}])
+
+
+# --- Claude ---
+
+
+def test_claude_uses_expected_settings():
+    fake = FakeClaude()
+    assert ProveedorClaude(fake).responder("S", [{"role": "user", "content": "hola"}]) == "Respuesta de Claude"
+    call = fake.calls[-1]
+    assert call["model"] == "claude-opus-5-5"
+    assert call["fallbacks"] == "default"
+    assert call["betas"] == ["server-side-fallback-2026-07-01"]
+    assert call["system"] == "S"
+
+
+def test_claude_refusal_returns_a_safe_message():
+    fake = FakeClaude(text="", stop_reason="refusal")
+    assert ProveedorClaude(fake).responder("S", [{"role": "user", "content": "x"}]).startswith("No puedo ayudarte")
+
+
+def test_claude_api_errors_are_translated():
+    request = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+    fake = FakeClaude(error=anthropic.APIConnectionError(request=request))
+    with pytest.raises(AsistenteNoDisponible):
+        ProveedorClaude(fake).responder("S", [{"role": "user", "content": "x"}])
+
