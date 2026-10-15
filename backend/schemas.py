@@ -377,7 +377,6 @@ class TicketSummary(BaseModel):
     resueltos: int
     cerrados: int
     criticos_abiertos: int
-    mios: int
     mios_abiertos: int
 
 

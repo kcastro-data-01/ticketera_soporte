@@ -270,7 +270,7 @@ async function cargarResumen() {
     "res-en-proceso": "en_proceso",
     "res-resueltos": "resueltos",
     "res-criticos": "criticos_abiertos",
-    "res-mios": "mios",
+    "res-mios": "mios_abiertos",
   };
   try {
     const response = await fetchWithAuth(API_SUMMARY_URL);
@@ -280,11 +280,6 @@ async function cargarResumen() {
       const nodo = document.getElementById(id);
       if (nodo) nodo.textContent = String(resumen[campo] ?? "—");
     });
-    const abiertos = document.getElementById("res-mios-abiertos");
-    if (abiertos && typeof resumen.mios_abiertos === "number") {
-      abiertos.textContent =
-        resumen.mios_abiertos === 1 ? "1 sin resolver" : `${resumen.mios_abiertos} sin resolver`;
-    }
   } catch (error) {
     console.error("No se pudo cargar el resumen:", error);
   }
