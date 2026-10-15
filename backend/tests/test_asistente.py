@@ -224,7 +224,8 @@ def test_qwen_calls_ollama_chat_with_system_and_no_thinking():
     assert str(url) == "http://ollama:11434/api/chat"
     assert body["model"] == "qwen3:4b"
     assert body["stream"] is False and body["think"] is False
-    assert body["options"]["num_ctx"] == 8192
+    assert body["options"]["num_ctx"] == 4096
+    assert body["keep_alive"] == "30m"
     assert body["messages"] == [
         {"role": "system", "content": "SISTEMA"},
         {"role": "user", "content": "hola"},
@@ -287,3 +288,26 @@ def test_qwen_out_of_memory_suggests_a_smaller_model():
     )
     with pytest.raises(AsistenteNoDisponible, match="memoria suficiente"):
         proveedor.responder("S", [{"role": "user", "content": "hola"}])
+
+
+def test_qwen_receives_fewer_tickets(session):
+    from backend.services.asistente_service import QWEN_MAX_TICKETS, responder
+
+    admin = User(name="Laura", email="l@adn.local", role="Administrador")
+    session.add(admin)
+    session.commit()
+    for n in range(QWEN_MAX_TICKETS + 5):
+        add_ticket(session, f"Ticket numero {n}")
+
+    class Grabador:
+        max_tickets = QWEN_MAX_TICKETS
+
+        def responder(self, system, messages):
+            self.system = system
+            return "ok"
+
+    grabador = Grabador()
+    responder(grabador, session, admin, [{"role": "user", "content": "hola"}])
+    lineas = [l for l in grabador.system.splitlines() if l.startswith("- #")]
+    assert len(lineas) == QWEN_MAX_TICKETS
+    assert f"los {QWEN_MAX_TICKETS} más recientes de {QWEN_MAX_TICKETS + 5}" in grabador.system

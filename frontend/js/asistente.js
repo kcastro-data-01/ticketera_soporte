@@ -97,6 +97,12 @@ async function enviarPregunta(texto) {
   const escribiendo = crearElemento("div", "chat-mensaje asistente escribiendo", "Escribiendo…");
   lista.appendChild(escribiendo);
   lista.scrollTop = lista.scrollHeight;
+  /* Un modelo local puede tardar en cargarse: se avisa para que no parezca
+     colgado. */
+  const aviso = setTimeout(() => {
+    escribiendo.textContent =
+      "Pensando… la primera respuesta puede tardar hasta un minuto mientras se carga el modelo.";
+  }, 8000);
 
   let respuesta;
   try {
@@ -124,6 +130,7 @@ async function enviarPregunta(texto) {
     };
   }
 
+  clearTimeout(aviso);
   /* Si falló, la pregunta se quita del historial para poder reintentarla. */
   const actualizado = respuesta.error ? historial.slice(0, -1) : historial;
   guardarChat([...actualizado, respuesta]);

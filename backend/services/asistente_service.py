@@ -29,11 +29,15 @@ CLAUDE_MODEL = "claude-opus-5-5"
 # El modelo más liviano (≈0,5 GB): funciona en computadoras sin GPU y con
 # poca RAM. Con más memoria, QWEN_MODELO=qwen3:1.7b o qwen3:4b responden mejor.
 QWEN_MODELO_POR_DEFECTO = "qwen3:0.6b"
-# Ventana de contexto para Ollama: alcanza para las instrucciones, los datos
-# visibles y la conversación sin reservar más memoria de la necesaria.
-QWEN_CONTEXTO = 8192
+# Ventana de contexto para Ollama: la misma que usa por defecto, así el modelo
+# no se recarga y no reserva memoria de más en equipos modestos.
+QWEN_CONTEXTO = 4096
+# Mantiene el modelo cargado entre preguntas (cargarlo puede tardar ~1 minuto).
+QWEN_MANTENER_CARGADO = "30m"
 OLLAMA_URL_POR_DEFECTO = "http://localhost:11434"
 MAX_TICKETS_IN_CONTEXT = 30
+# Un modelo local en CPU lee el prompt despacio: se le envían menos tickets.
+QWEN_MAX_TICKETS = 10
 
 # Qué puede hacer cada rol (espejo de la tabla de permisos de ayuda.html).
 PERMISOS_POR_ROL = {
@@ -116,7 +120,7 @@ def _ticket_line(ticket: Ticket) -> str:
     )
 
 
-def build_context(session, user: User) -> str:
+def build_context(session, user: User, max_tickets: int = MAX_TICKETS_IN_CONTEXT) -> str:
     """Data the user is allowed to see, scoped by role on the server."""
     lines = [f"Usuario: {user.name} · rol {user.role}"]
     lines.append(f"Permisos de su rol: {PERMISOS_POR_ROL.get(user.role, '—')}")
@@ -133,7 +137,7 @@ def build_context(session, user: User) -> str:
     tickets, total = ticket_service.list_tickets(
         session,
         created_by_id=user.id if user.role == UserRole.REQUESTER.value else None,
-        limit=MAX_TICKETS_IN_CONTEXT,
+        limit=max_tickets,
     )
     if tickets:
         titulo = "Sus tickets" if user.role == UserRole.REQUESTER.value else "Tickets"
@@ -155,13 +159,13 @@ def build_context(session, user: User) -> str:
     return "\n".join(lines)
 
 
-def build_system(session, user: User) -> str:
+def build_system(session, user: User, max_tickets: int = MAX_TICKETS_IN_CONTEXT) -> str:
     """Stable instructions first, per-user data after."""
     return (
         INSTRUCCIONES
         + "\n"
         + GUIA_APP
-        + f"\n<datos_visibles>\n{build_context(session, user)}\n</datos_visibles>"
+        + f"\n<datos_visibles>\n{build_context(session, user, max_tickets)}\n</datos_visibles>"
     )
 
 
@@ -172,6 +176,7 @@ class ProveedorQwen:
     """Qwen3 servido por Ollama (``POST /api/chat``)."""
 
     nombre = "qwen"
+    max_tickets = QWEN_MAX_TICKETS
 
     def __init__(self, url: str, modelo: str, http: httpx.Client | None = None):
         self.url = url.rstrip("/")
@@ -190,6 +195,7 @@ class ProveedorQwen:
                     # Sin modo de razonamiento: respuestas de chat más rápidas.
                     "think": False,
                     "options": {"temperature": 0.3, "num_ctx": QWEN_CONTEXTO},
+                    "keep_alive": QWEN_MANTENER_CARGADO,
                 },
             )
         except httpx.TimeoutException:
@@ -297,4 +303,5 @@ def responder(proveedor, session, user: User, messages: list[dict]) -> str:
     ``messages`` is the conversation (alternating ``user``/``assistant``,
     ending in ``user``) already validated by the router.
     """
-    return proveedor.responder(build_system(session, user), messages)
+    max_tickets = getattr(proveedor, "max_tickets", MAX_TICKETS_IN_CONTEXT)
+    return proveedor.responder(build_system(session, user, max_tickets), messages)
