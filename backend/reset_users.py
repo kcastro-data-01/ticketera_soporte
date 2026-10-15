@@ -28,7 +28,7 @@ from backend.constants import UserRole
 from backend.database import SessionLocal, init_db
 from backend.models import User
 
-DEFAULT_PASSWORD = "2026"
+DEFAULT_PASSWORD = "482026"
 
 # Un usuario de prueba por rol: (nombre, email).
 TEST_USERS: dict[UserRole, tuple[str, str]] = {
