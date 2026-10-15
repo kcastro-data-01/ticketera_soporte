@@ -73,3 +73,12 @@ def test_aborts_when_nobody_matches(session):
     with pytest.raises(ValueError):
         reset_users(session, "soficubero", apply=True)
     assert emails(session) == {"viejo@correo.com"}
+
+
+def test_without_keep_only_test_users_remain(session):
+    add_user(session, "Sofía Cubero", "soficubero@correo.com", UserRole.ADMIN.value)
+    add_user(session, "Viejo", "viejo@correo.com")
+
+    reset_users(session, apply=True)
+
+    assert emails(session) == {email for _, email in TEST_USERS.values()}
