@@ -421,27 +421,13 @@ def create_comment(
     Raises:
         ``TicketNotFoundError``: the ticket does not exist.
     """
-    from sqlalchemy.orm import joinedload
-
-    # Usamos joinedload para asegurar que la relación assignee esté cargada,
-    # lo cual es crítico para que el autor sea correcto tanto en sesiones
-    # directas como en el contexto de TestClient.
-    ticket = session.query(Ticket).filter(Ticket.id == ticket_id).options(
-        joinedload(Ticket.assignee)
-    ).first()
-
-    if ticket is None:
+    if session.get(Ticket, ticket_id) is None:
         raise TicketNotFoundError(ticket_id)
 
-    # El autor se determina desde la persona asignada al ticket (regla RF3/Task 8).
-    # Si hay una persona asignada, su nombre tiene prioridad sobre cualquier
-    # autor enviado por el frontend. Si no hay persona asignada, usa "Anónimo".
-    # El valor payload.author nunca sobrescribe al assignee ni usa "Anónimo" a
-    # menos que no haya nadie asignado.
-    if ticket and ticket.assignee and ticket.assignee.name:
-        author = ticket.assignee.name
-    else:
-        author = "Anónimo"
+    # El autor es el usuario autenticado que escribe el comentario; el
+    # ``author`` que envíe el cliente se ignora. "Anónimo" solo queda para
+    # llamadas internas sin usuario.
+    author = current_user.name if current_user is not None else "Anónimo"
 
     comment = Comment(
         ticket_id=ticket_id,
@@ -451,9 +437,7 @@ def create_comment(
     session.add(comment)
     session.commit()
     session.refresh(comment)
-    # Registry of comment in history (RF9). The comment itself keeps its
-    # author convention (assignee name), but the audit entry records the
-    # authenticated user that actually wrote the comment.
+    # Registry of comment in history (RF9), signed by the same user.
     author_name, author_id = _audit_author(current_user)
     session.add(
         History(

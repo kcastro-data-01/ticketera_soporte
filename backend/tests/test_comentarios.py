@@ -50,67 +50,8 @@ def test_create_comment_response_contains_sent_data(auth_client):
     assert data["id"] is not None
     assert data["ticket_id"] == ticket["id"]
     assert data["content"] == "Primer comentario del ticket."
-    # El autor debe ser determinado por el backend; si el ticket no tiene persona
-    # asignada, usa "Anónimo". Si tiene asignado, muestra su nombre.
-    assert data["author"] is not None
-
-
-def test_create_comment_with_explicit_author_overridden_by_assignee(auth_client, session):
-    """Un autor explícito enviado por el cliente no reemplaza al asignado."""
-    from backend.models import User
-    from sqlalchemy.orm import sessionmaker
-
-    ticket = create_ticket(auth_client, assigned_to_id=1)  # ticket con Ana asignada
-
-    # Crear usuario diferente para verificar que el explícito no sobrescribe
-    # al asignado cuando el backend prioriza al asignado
-    data = auth_client.post(
-        f"/api/tickets/{ticket['id']}/comments",
-        json={"content": "Comentario con autor explícito.", "author": "Carlos Gómez"},
-    ).json()
-
-    # Según la regla: el nombre de la persona asignada tiene prioridad
-    assert data["author"] != "Carlos Gómez"
-    # Y no debería ser "Anónimo" si hay alguien asignado
-    assert data["author"] is not None
-
-
-def test_create_comment_unassigned_ticket_uses_anonimo(auth_client):
-    """Un ticket sin persona asignada produce autor 'Anónimo'."""
-    ticket = create_ticket(auth_client, assigned_to_id=None)  # ticket sin asignar
-
-    data = auth_client.post(
-        f"/api/tickets/{ticket['id']}/comments",
-        json={"content": "Comentario sin ticket asignado."},
-    ).json()
-
-    assert data["author"] == "Anónimo"
-
-
-def test_create_comment_client_author_when_no_assignee(auth_client):
-    """Si no hay persona asignada, el autor venía del cliente pero backend usa 'Anónimo'."""
-    ticket = create_ticket(auth_client, assigned_to_id=None)  # ticket sin asignar
-
-    data = auth_client.post(
-        f"/api/tickets/{ticket['id']}/comments",
-        json={"content": "Comentario.", "author": "Ana Pérez"},
-    ).json()
-
-    # Aunque el cliente envíe autor, al no haber asignado en ticket, usa "Anónimo"
-    assert data["author"] == "Anónimo"
-
-
-def test_create_comment_with_explicit_author(auth_client):
-    ticket = create_ticket(auth_client)  # ticket sin persona asignada
-
-    data = auth_client.post(
-        f"/api/tickets/{ticket['id']}/comments",
-        json={"content": "Respuesta de soporte.", "author": "Ana Pérez"},
-    ).json()
-
-    # Cuando no hay persona asignada en el ticket, el backend usa "Anónimo"
-    # aunque el cliente envíe autor explícito (regla 2 del usuario).
-    assert data["author"] == "Anónimo"
+    # El autor es el usuario que inició sesión (fixture auth_client).
+    assert data["author"] == "Test Admin"
 
 
 def test_comment_is_linked_to_the_correct_ticket(auth_client):
@@ -339,82 +280,35 @@ def test_list_comments_is_read_only(auth_client, session):
     assert len(session.query(Comment).all()) == 1
 
 
-def test_create_comment_with_assigned_user_via_integration(auth_client, engine):
-    """Integración completa: usuario creado en la BD, ticket asignado, comentario con autor real.
-    
-    Verifica que:
-    - El usuario "María Gómez" se crea en la BD temporal
-    - El ticket está asignado al usuario creado
-    - El comentario creado mediante TestClient muestra el nombre real del asignado
-    - El autor enviado por el cliente no sustituye al asignado
-    - El comentario se guarda con el autor correcto
-    """
-    from sqlalchemy.orm import sessionmaker
-    from backend.models import User, Ticket, Comment
-    
-    # 1. Crear usuario "María Gómez" en la base de datos temporal
-    testing_engine = engine
-    testing_session = sessionmaker(bind=testing_engine, autoflush=False, expire_on_commit=False)
-    db = testing_session()
-    
-    try:
-        user = User(name="María Gómez", email="maria@test.local", role="Técnico")
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        print(f"Usuario creado: id={user.id}, name={user.name}")
-        
-        # 2. Crear ticket asignado al usuario creado
-        from backend.constants import TicketCategory, TicketPriority
-        ticket = Ticket(
-            title="Ticket test asignado",
-            description="Descripción del ticket asignado",
-            category=TicketCategory.SOFTWARE.value,
-            priority=TicketPriority.MEDIUM.value,
-            assigned_to_id=user.id
-        )
-        from backend.main import app
-        from backend.database import Base, enable_sqlite_foreign_keys, get_session
-        from backend.database import Base
-        Base.metadata.create_all(bind=testing_engine)
-        
-        db.add(ticket)
-        db.commit()
-        db.refresh(ticket)
-        print(f"Ticket creado: id={ticket.id}, assigned_to_id={ticket.assigned_to_id}")
-        
-        # 3. Verificar que el ticket tiene el assigned_to_id correcto
-        assert ticket.assigned_to_id == user.id, f"Expected assigned_to_id={user.id}, got {ticket.assigned_to_id}"
-        
-        # 4. Crear comentario mediante TestClient enviando autor "Carlos Gómez"
-        # El TestClient usa su propia sesión, pero la BD es compartida
-        # El backend debe determinar el autor desde la persona asignada al ticket
-        response = auth_client.post(
-            f"/api/tickets/{ticket.id}/comments",
-            json={"content": "Comentario de prueba", "author": "Carlos Gómez"}
-        )
-        print(f"Response status: {response.status_code}")
-        data = response.json()
-        print(f"Data author: {data['author']}")
-        print(f"Data ticket_id: {data['ticket_id']}")
-        
-        # 5. Comprobar exactamente data["author"] == "María Gómez"
-        # Según la regla: el nombre de la persona asignada tiene prioridad sobre el enviado por el cliente
-        # Como el ticket tiene María Gómez asignada, el autor debería ser "María Gómez"
-        # a pesar de que enviamos "Carlos Gómez"
-        assert data["author"] == "María Gómez", f"Expected 'María Gómez', got '{data['author']}'"
-        print(f"✓ author is 'María Gómez' as expected")
-        
-        # 6. Verificar que el comentario quedó guardado con ese mismo autor
-        # Usando la sesión de testing para verificar la persistencia
-        fresh_db = testing_session()
-        try:
-            stored_comment = fresh_db.query(Comment).filter_by(ticket_id=ticket.id).first()
-            print(f"Stored comment author: {stored_comment.author}")
-            assert stored_comment.author == "María Gómez", f"Expected 'María Gómez', got '{stored_comment.author}'"
-            print("✓ Comment saved with correct author")
-        finally:
-            fresh_db.close()
-        
-    finally:
-        db.close()
+def test_comment_author_is_the_logged_in_user_not_the_assignee(auth_client, client):
+    """El comentario se firma con quien lo escribe, aunque el ticket esté
+    asignado a otra persona y aunque el cliente envíe otro autor."""
+    tecnico = auth_client.post(
+        "/api/users",
+        json={"name": "José Solano", "email": "jose.coment@tec.local", "password": "clave12345"},
+    ).json()
+    ticket = create_ticket(auth_client)
+    assert ticket["assigned_to_id"] == tecnico["id"]  # asignación automática
+
+    data = auth_client.post(
+        f"/api/tickets/{ticket['id']}/comments",
+        json={"content": "Pendiente", "author": "Otra Persona"},
+    ).json()
+    assert data["author"] == "Test Admin"
+
+    history = auth_client.get(f"/api/tickets/{ticket['id']}/history").json()
+    commented = [e for e in history if e["action"] == "commented"]
+    assert commented[-1]["author"] == "Test Admin"
+
+    # El técnico asignado comenta con su propia sesión y queda con su nombre.
+    login = client.post(
+        "/api/auth/login", json={"email": "jose.coment@tec.local", "password": "clave12345"}
+    )
+    token = login.json()["access_token"]
+    data = client.post(
+        f"/api/tickets/{ticket['id']}/comments",
+        json={"content": "Ya lo revisé"},
+        headers={"Authorization": f"Bearer {token}"},
+    ).json()
+    assert data["author"] == "José Solano"
+

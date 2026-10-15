@@ -258,8 +258,9 @@ def test_global_history_records_the_authenticated_user(client, session):
         json={"content": "Comentario firmado por el usuario autenticado."},
     )
     assert comment.status_code == 201
-    # El comentario conserva su convención de autor (assignee del ticket)...
-    assert comment.json()["author"] == "Ana Pérez"
+    # El comentario se firma con quien lo escribe (el admin), no con el
+    # assignee del ticket: coincide con el autor del historial.
+    assert comment.json()["author"] == "Usuario Administrador"
 
     response = client.get("/api/history", headers=admin_headers)
 
