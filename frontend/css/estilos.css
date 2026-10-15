@@ -131,6 +131,7 @@ h2 {
 .cabecera-enlaces {
   display: flex;
   gap: var(--espaciado-sm);
+  margin-left: auto;
 }
 
 .enlace-boton {
@@ -1070,12 +1071,13 @@ body.pagina-login {
   filter: brightness(1.1);
 
 .cabecera-logo.derecha {
-  position: absolute;
-  right: 1rem;
-  top: 1rem;
+  position: static;
+  float: none;
+  margin: 0 0 0 1.5rem;
   width: 28px;
   height: 28px;
-  filter: brightness(1.1);
+  flex-shrink: 0;
+  align-self: center;
 }
 .login-logo {
   width: 63px;
@@ -1084,4 +1086,10 @@ body.pagina-login {
   display: block;
   filter: brightness(1.1);
 }
+}
+header.cabecera img.cabecera-logo.derecha {
+  width: 110px !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
 }

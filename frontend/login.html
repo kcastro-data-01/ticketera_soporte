@@ -31,13 +31,25 @@
     .auth-container .login-izq {
       display: block;
       height: auto;
+      position: relative;
+      overflow: hidden;
+      background: #1a2466;
+    }
+    .auth-container .login-izq::before {
+      content: "";
+      position: absolute;
+      inset: -30px;
+      background: url("images/logo-twitter-grande.jpg") center / cover no-repeat;
+      filter: blur(28px);
     }
     .auth-container .login-izq .login-imagen {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
       border-radius: 0;
+      position: relative;
+      z-index: 1;
     }
     .auth-container .login-der {
       display: flex;
