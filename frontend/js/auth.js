@@ -27,6 +27,11 @@ function saveSession(token, user) {
 function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  try {
+    sessionStorage.removeItem("asistente_chat");
+  } catch {
+    /* Sin sessionStorage no hay conversación que borrar. */
+  }
 }
 
 function isAuthenticated() {

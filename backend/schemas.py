@@ -2,6 +2,7 @@
 
 import re
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -348,6 +349,55 @@ class LoginRequest(BaseModel):
         if not value:
             raise ValueError("la contraseña no puede estar vacía")
         return value
+
+
+ASISTENTE_MAX_MENSAJES = 20
+ASISTENTE_MAX_CARACTERES = 2000
+
+
+class AsistenteMensaje(BaseModel):
+    """One turn of the assistant chat (only ``user``/``assistant``)."""
+
+    role: Literal["user", "assistant"]
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def content_must_be_valid(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("el mensaje no puede estar vacío")
+        if len(cleaned) > ASISTENTE_MAX_CARACTERES:
+            raise ValueError(
+                f"el mensaje debe tener como máximo {ASISTENTE_MAX_CARACTERES} caracteres"
+            )
+        return cleaned
+
+
+class AsistenteRequest(BaseModel):
+    """Conversation sent by the chat: alternating turns ending in ``user``."""
+
+    messages: list[AsistenteMensaje]
+
+    @model_validator(mode="after")
+    def conversation_must_be_valid(self) -> "AsistenteRequest":
+        if not self.messages:
+            raise ValueError("la conversación no puede estar vacía")
+        if len(self.messages) > ASISTENTE_MAX_MENSAJES:
+            raise ValueError(
+                f"la conversación admite como máximo {ASISTENTE_MAX_MENSAJES} mensajes"
+            )
+        for index, message in enumerate(self.messages):
+            expected = "user" if index % 2 == 0 else "assistant"
+            if message.role != expected:
+                raise ValueError("los mensajes deben alternar user/assistant empezando por user")
+        if self.messages[-1].role != "user":
+            raise ValueError("el último mensaje debe ser del usuario")
+        return self
+
+
+class AsistenteResponse(BaseModel):
+    respuesta: str
 
 
 class ChangePasswordRequest(BaseModel):

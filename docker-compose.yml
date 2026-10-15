@@ -7,6 +7,9 @@ services:
       # SQLite file inside the named volume so the data survives
       # `docker compose down` / rebuilds (change → new container).
       DATABASE_URL: sqlite:////data/ticketera.db
+      # Clave de la API de Claude para el asistente de IA. Se lee del entorno
+      # o de un archivo .env junto a este docker-compose.yml (no se sube a Git).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes:
       - ticketera-data:/data
 

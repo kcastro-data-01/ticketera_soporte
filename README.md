@@ -60,6 +60,13 @@ filtrarlos, y consultar su historial de cambios.
 - El registro público solo existe para crear el primer Administrador
   (`GET /api/auth/setup`); las demás cuentas las crea un Administrador.
 
+- Asistente de IA (botón «Asistente» abajo a la derecha, `POST /api/asistente`):
+  responde preguntas sobre la app con Claude. El servidor solo le entrega los
+  datos que el rol puede ver (el Solicitante, solo sus tickets y nunca la lista
+  de usuarios; los correos nunca se envían), así que no puede revelar
+  información interna aunque se la pidan. Requiere la variable
+  `ANTHROPIC_API_KEY` (ver «Asistente de IA» más abajo); sin ella responde 503.
+
 **Pendientes**
 
 - **Registro de historial para el resto de acciones (RF9, escritura)** — la
@@ -465,3 +472,19 @@ está en [docs/api.md](docs/api.md). La documentación interactiva se sirve en
 
 El desarrollo se realiza estrictamente por tareas. El plan completo está en
 [docs/plan_desarrollo.md](docs/plan_desarrollo.md).
+
+
+## Asistente de IA
+
+El asistente usa la API de Claude (modelo `claude-opus-5-5`, esfuerzo bajo y
+respaldo automático del servidor si una consulta es rechazada). Para
+activarlo, crea un archivo `.env` junto a `docker-compose.yml` (ya está en
+`.gitignore`, no se sube) con tu clave:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+y reinicia con `docker compose up --build -d`. Cada pregunta consume tokens de
+la cuenta de esa clave. Sin la clave, el chat muestra «El asistente no está
+configurado».

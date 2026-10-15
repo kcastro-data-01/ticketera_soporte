@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
+from backend.routers.asistente import router as asistente_router
 from backend.routers.auth import router as auth_router
 from backend.routers.comentarios import router as comments_router
 from backend.routers.config import router as config_router
@@ -42,6 +43,7 @@ app.include_router(comments_router)
 app.include_router(users_router)
 app.include_router(history_router)
 app.include_router(config_router)
+app.include_router(asistente_router)
 
 # Serve the frontend (Task 11) from the same origin as the API, so the
 # browser can call /api/* without CORS. Registered last: every route above
