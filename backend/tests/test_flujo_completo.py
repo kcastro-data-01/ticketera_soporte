@@ -30,7 +30,7 @@ def create_user(auth_client, email: str) -> dict:
         json={
             "name": email.split("@")[0].title(),
             "email": email,
-            "role": UserRole.SUPPORT.value,
+            "role": UserRole.TECHNICIAN.value,
         },
     )
     assert response.status_code == 201
@@ -152,7 +152,7 @@ def test_user_management_and_assignment_integration(auth_client):
         json={
             "name": "Ana Pérez",
             "email": "ana.perez@soporte.local",
-            "role": "Soporte",
+            "role": "Técnico",
         },
     )
     assert first.status_code == 201
@@ -191,7 +191,7 @@ def test_user_management_and_assignment_integration(auth_client):
     )
     assert second.status_code == 201
     second_id = second.json()["id"]
-    assert second.json()["role"] == "Soporte"
+    assert second.json()["role"] == "Técnico"
     # Filtrar al admin del fixture al comparar sets
     all_users = auth_client.get("/api/users").json()
     real_users = [u for u in all_users if u["email"] != "testadmin@test.com"]

@@ -9,7 +9,7 @@ from backend.models import User
 VALID_USER = {
     "name": "Ana Pérez",
     "email": "ana@soporte.local",
-    "role": UserRole.SUPPORT.value,
+    "role": UserRole.TECHNICIAN.value,
 }
 
 USER_RESPONSE_KEYS = {"id", "name", "email", "role"}
@@ -123,7 +123,7 @@ def test_list_users_response_structure(auth_client):
     assert isinstance(user["id"], int)
     assert isinstance(user["name"], str)
     assert isinstance(user["email"], str)
-    assert user["role"] == UserRole.SUPPORT.value
+    assert user["role"] == UserRole.TECHNICIAN.value
 
 
 def test_list_users_is_exposed_in_openapi(client):
@@ -146,8 +146,8 @@ def test_create_user_without_role_defaults_to_support(auth_client):
     )
 
     assert response.status_code == 201
-    assert response.json()["role"] == UserRole.SUPPORT.value
-    assert response.json()["role"] == "Soporte"
+    assert response.json()["role"] == UserRole.TECHNICIAN.value
+    assert response.json()["role"] == "Técnico"
 
 
 def test_create_user_stores_user_active(auth_client, engine):
@@ -175,7 +175,7 @@ def test_list_users_excludes_inactive_users(auth_client, session):
         User(
             name="Usuario Inactivo",
             email="inactivo@soporte.local",
-            role=UserRole.SUPPORT.value,
+            role=UserRole.TECHNICIAN.value,
             is_active=False,
         )
     )

@@ -10,7 +10,7 @@ from backend.models import Ticket, User
 VALID_USER = {
     "name": "Ana Pérez",
     "email": "ana@soporte.local",
-    "role": UserRole.SUPPORT.value,
+    "role": UserRole.TECHNICIAN.value,
 }
 VALID_TICKET = {
     "title": "Ticket para asignar",

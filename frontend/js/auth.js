@@ -77,10 +77,10 @@ async function fetchWithAuth(url, options = {}) {
    El servidor es quien realmente bloquea; aquí solo se ocultan los
    botones y enlaces que el rol no puede usar. */
 const PERMISOS = {
-  editar: ["Administrador", "Supervisor", "Soporte"],
-  asignar: ["Administrador", "Supervisor", "Soporte"],
-  cambiar_estado: ["Administrador", "Supervisor", "Soporte", "Técnico"],
-  historial_global: ["Administrador", "Supervisor", "Soporte", "Técnico"],
+  editar: ["Administrador", "Supervisor"],
+  asignar: ["Administrador", "Supervisor"],
+  cambiar_estado: ["Administrador", "Supervisor", "Técnico"],
+  historial_global: ["Administrador", "Supervisor", "Técnico"],
   usuarios: ["Administrador"],
 };
 

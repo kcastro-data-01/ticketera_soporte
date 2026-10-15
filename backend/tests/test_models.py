@@ -56,7 +56,7 @@ def test_create_and_read_user(session):
     stored = session.get(User, user.id)
     assert stored.name == "Ana Pérez"
     assert stored.email == "ana@soporte.local"
-    assert stored.role == UserRole.SUPPORT.value
+    assert stored.role == UserRole.TECHNICIAN.value
     assert stored.is_active is True
 
 

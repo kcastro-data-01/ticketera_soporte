@@ -213,40 +213,6 @@ def test_solicitante_can_read_and_comment_own_ticket(client):
     assert resp.status_code == 201
 
 
-def test_soporte_can_update_and_assign(client, auth_client, session):
-    """Un usuario Soporte (con login) puede editar y asignar tickets."""
-    from backend.auth import hash_password
-
-    make_role_user(
-        session,
-        UserRole.SUPPORT.value,
-        "soporte.test@correo.local",
-        hash_password("clave12345"),
-    )
-    ticket = create_ticket(auth_client)
-
-    login = client.post(
-        "/api/auth/login",
-        json={"email": "soporte.test@correo.local", "password": "clave12345"},
-    )
-    assert login.status_code == 200
-    token = login.json()["access_token"]
-
-    resp = client.patch(
-        f"/api/tickets/{ticket['id']}",
-        json={"title": "Editado por soporte"},
-        headers=headers(token),
-    )
-    assert resp.status_code == 200
-
-    resp = client.patch(
-        f"/api/tickets/{ticket['id']}/assign",
-        json={"assigned_to_id": None},
-        headers=headers(token),
-    )
-    assert resp.status_code == 200
-
-
 def login_role(client, session, role: str, email: str) -> str:
     """Create a user with ``role`` and return a token obtained via login."""
     from backend.auth import hash_password
@@ -355,7 +321,7 @@ def test_inactive_user_cannot_login(client, auth_client, session):
 
     user_id = make_role_user(
         session,
-        UserRole.SUPPORT.value,
+        UserRole.TECHNICIAN.value,
         "inactivo.test@correo.local",
         hash_password("clave12345"),
     )

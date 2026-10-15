@@ -8,10 +8,9 @@ const API_USERS_URL = "/api/users";
 
 /* Roles válidos (espejo de backend.constants.UserRole). */
 const ROLES_VALIDOS = [
-  "Soporte",
+  "Técnico",
   "Administrador",
   "Supervisor",
-  "Técnico",
   "Solicitante",
 ];
 
@@ -288,7 +287,7 @@ async function crearUsuario(event) {
 
     elements.nombre.value = "";
     elements.email.value = "";
-    elements.rol.value = "Soporte";
+    elements.rol.value = "Técnico";
     showStatus("Usuario agregado correctamente.", "exito");
     /* El usuario nuevo aparece en la lista sin recargar la página. */
     await cargarUsuarios();

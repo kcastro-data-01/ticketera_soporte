@@ -45,7 +45,7 @@ def get_auto_assignable_users(session) -> list[User]:
     """Return the active users eligible for automatic assignment, by id.
 
     Read-only: only rows with ``is_active`` are exposed, and the role must be
-    one of ``AUTO_ASSIGN_ROLES`` (``Soporte`` and ``Técnico``). Used by the
+    one of ``AUTO_ASSIGN_ROLES`` (``Técnico``). Used by the
     automatic ticket assignment (round-robin); the other roles are never
     picked automatically, though they can be assigned manually.
     """

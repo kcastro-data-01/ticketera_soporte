@@ -248,7 +248,7 @@ Crea el usuario mínimo usado para asignación y firma (sin autenticación).
 |-------|------|--------|
 | `name` | string | obligatorio, no vacío, máx. 120 |
 | `email` | string | formato de email válido, máx. 255, **único** |
-| `role` | enum | `Administrador` \| `Soporte`; opcional, por defecto `Soporte` |
+| `role` | enum | `Administrador` \| `Supervisor` \| `Técnico` \| `Solicitante`; opcional, por defecto `Técnico` |
 
 **Respuestas:** `201` con `{id, name, email, role}` · `422` si `name` está
 vacío, el email no cumple el formato o el rol no es válido · `409 Conflict` si

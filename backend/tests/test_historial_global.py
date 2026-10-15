@@ -228,7 +228,7 @@ def test_global_history_records_the_authenticated_user(client, session):
     support = User(
         name="Ana Pérez",
         email="ana-historial@test.local",
-        role=UserRole.SUPPORT.value,
+        role=UserRole.TECHNICIAN.value,
         is_active=True,
         password_hash=hash_password("clave12345"),
     )

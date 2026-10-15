@@ -34,7 +34,6 @@ DEFAULT_PASSWORD = "482026"
 TEST_USERS: dict[UserRole, tuple[str, str]] = {
     UserRole.ADMIN: ("Laura Méndez", "laura.mendez@adn.local"),
     UserRole.SUPERVISOR: ("Carlos Rojas", "carlos.rojas@sup.local"),
-    UserRole.SUPPORT: ("Daniela Vargas", "daniela.vargas@sop.local"),
     UserRole.TECHNICIAN: ("José Solano", "jose.solano@tec.local"),
     UserRole.REQUESTER: ("Andrea Castillo", "andrea.castillo@soli.local"),
 }

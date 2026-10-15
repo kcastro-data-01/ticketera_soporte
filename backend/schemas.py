@@ -109,13 +109,13 @@ class TicketResponse(BaseModel):
 class UserCreate(BaseModel):
     """Payload accepted by ``POST /api/users`` (minimal user data).
 
-    ``role`` is optional and defaults to ``Soporte`` (the same default the
+    ``role`` is optional and defaults to ``Técnico`` (the same default the
     database applies); an explicit value must still be a valid role.
     """
 
     name: str
     email: str
-    role: UserRole = UserRole.SUPPORT
+    role: UserRole = UserRole.TECHNICIAN
 
     @field_validator("name")
     @classmethod

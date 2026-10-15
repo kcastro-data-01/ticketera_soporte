@@ -30,7 +30,7 @@ function createLocalStorage() {
   };
 }
 
-const USER = { id: 3, name: "Sofía Ruiz", email: "sofia@example.com", role: "Soporte" };
+const USER = { id: 3, name: "Sofía Ruiz", email: "sofia@example.com", role: "Técnico" };
 
 const TICKET = {
   id: 1,

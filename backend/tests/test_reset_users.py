@@ -9,7 +9,7 @@ from backend.models import History, Ticket, User
 from backend.reset_users import TEST_USERS, reset_users
 
 
-def add_user(session, name, email, role=UserRole.SUPPORT.value):
+def add_user(session, name, email, role=UserRole.TECHNICIAN.value):
     user = User(name=name, email=email, role=role, password_hash="x")
     session.add(user)
     session.commit()

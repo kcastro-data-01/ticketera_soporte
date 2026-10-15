@@ -40,19 +40,18 @@ def test_priorities_are_the_approved_four():
 def test_user_roles():
     assert USER_ROLES == (
         "Administrador",
-        "Soporte",
         "Supervisor",
         "Técnico",
         "Solicitante",
     )
     assert UserRole.ADMIN.value == "Administrador"
-    assert UserRole.SUPPORT.value == "Soporte"
+    assert not hasattr(UserRole, "SUPPORT")
     assert UserRole.SUPERVISOR.value == "Supervisor"
     assert UserRole.TECHNICIAN.value == "Técnico"
     assert UserRole.REQUESTER.value == "Solicitante"
 
 
-def test_auto_assign_roles_are_soporte_and_tecnico():
-    """Only Soporte and Técnico take part in the automatic assignment."""
-    assert AUTO_ASSIGN_ROLES == ("Soporte", "Técnico")
+def test_auto_assign_roles_are_tecnico():
+    """Only Técnico takes part in the automatic assignment."""
+    assert AUTO_ASSIGN_ROLES == ("Técnico",)
     assert set(AUTO_ASSIGN_ROLES) <= set(USER_ROLES)

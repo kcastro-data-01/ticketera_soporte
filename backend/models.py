@@ -60,7 +60,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
-    role: Mapped[str] = mapped_column(String(30), nullable=False, default=UserRole.SUPPORT.value)
+    role: Mapped[str] = mapped_column(String(30), nullable=False, default=UserRole.TECHNICIAN.value)
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 

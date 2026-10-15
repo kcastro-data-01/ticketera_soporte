@@ -63,7 +63,7 @@ def pick_next_assignee(session) -> User | None:
     """Return the eligible user with the fewest assigned tickets.
 
     Round-robin among the active users whose role is in ``AUTO_ASSIGN_ROLES``
-    (``Soporte`` and ``Técnico``): ties are broken by lowest user id. Returns
+    (``Técnico``): ties are broken by lowest user id. Returns
     ``None`` when there are no eligible users, so the caller can leave the
     ticket unassigned. Read-only: it never modifies the ``users`` table.
     """
@@ -107,8 +107,8 @@ def create_ticket(
     (``TicketState.NEW.value`` defined in ``backend/constants.py``), keeping a
     single source of truth for the initial state.
 
-    The ticket is auto-assigned to the eligible user (``Soporte`` or
-    ``Técnico``) with the fewest assigned tickets (round-robin, tie: lowest
+    The ticket is auto-assigned to the eligible user (``Técnico``) with the
+    fewest assigned tickets (round-robin, tie: lowest
     id). When there are no eligible users the ticket is created unassigned,
     and the manual assignment endpoint (``PATCH .../assign``) remains
     available.

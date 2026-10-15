@@ -47,7 +47,7 @@ def test_register_second_user_forced_to_requester(client):
             "name": "Second User",
             "email": "second@test.com",
             "password": "pass123456",
-            "role": "Soporte",
+            "role": "Técnico",
         },
     )
     assert resp.status_code == 201

@@ -19,10 +19,6 @@ router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
 # Roles permitidos por endpoint
 ROLES_ADMIN = {UserRole.ADMIN.value}
-ROLES_SOPORTE = {UserRole.SUPPORT.value, UserRole.ADMIN.value}
-ROLES_SUPERVISOR = {UserRole.SUPERVISOR.value, UserRole.ADMIN.value}
-ROLES_TECNICO = {UserRole.TECHNICIAN.value, UserRole.ADMIN.value}
-ROLES_SOLICITANTE = {UserRole.REQUESTER.value, UserRole.ADMIN.value}
 
 # Grupos de la tabla de permisos (ver ayuda.html → "Permisos por rol").
 # Todos los roles: ver tickets (el Solicitante solo los suyos), crear y comentar.
@@ -30,11 +26,7 @@ ROLES_TODOS = {role.value for role in UserRole}
 # Todos menos el Solicitante: cambiar estado e historial global.
 ROLES_EQUIPO = ROLES_TODOS - {UserRole.REQUESTER.value}
 # Gestión de tickets: editar y asignar.
-ROLES_GESTION = {
-    UserRole.ADMIN.value,
-    UserRole.SUPERVISOR.value,
-    UserRole.SUPPORT.value,
-}
+ROLES_GESTION = {UserRole.ADMIN.value, UserRole.SUPERVISOR.value}
 
 
 def role_required(allowed_roles: set[str]) -> callable:

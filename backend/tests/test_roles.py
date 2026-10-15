@@ -1,8 +1,8 @@
-"""Tests for the five user roles (Task 22).
+"""Tests for the user roles (Task 22).
 
-The system accepts ``Administrador``, ``Soporte``, ``Supervisor``, ``Técnico``
-and ``Solicitante``. Only the active users with the ``Soporte`` or ``Técnico``
-role take part in the automatic round-robin assignment of new tickets; every
+The system accepts ``Administrador``, ``Supervisor``, ``Técnico`` and
+``Solicitante`` (``Soporte`` was removed). Only the active users with the
+``Técnico`` role take part in the automatic round-robin assignment of new tickets; every
 role can still be assigned manually, and no row is ever deleted.
 """
 
@@ -28,7 +28,7 @@ NON_AUTO_ASSIGN_ROLES = [
 ]
 
 
-def create_user(auth_client, name, email, role=UserRole.SUPPORT.value, **overrides) -> dict:
+def create_user(auth_client, name, email, role=UserRole.TECHNICIAN.value, **overrides) -> dict:
     payload = {"name": name, "email": email, "role": role, **overrides}
     response = auth_client.post("/api/users", json=payload)
     assert response.status_code == 201
@@ -52,7 +52,7 @@ def assign(auth_client, ticket_id, user_id) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# The five roles are accepted
+# Every role is accepted
 # ---------------------------------------------------------------------------
 
 
@@ -98,11 +98,11 @@ def test_roles_fit_the_model_role_column():
 
 
 # ---------------------------------------------------------------------------
-# Automatic assignment: Soporte and Técnico only
+# Automatic assignment: Técnico only
 # ---------------------------------------------------------------------------
 
 
-def test_technician_receives_the_ticket_when_no_support_user_exists(auth_client):
+def test_technician_receives_the_ticket(auth_client):
     technician = create_user(
         auth_client, "Tina", "tina@soporte.local", role=UserRole.TECHNICIAN.value
     )
@@ -112,7 +112,7 @@ def test_technician_receives_the_ticket_when_no_support_user_exists(auth_client)
     assert ticket["assigned_to_id"] == technician["id"]
 
 
-def test_support_and_technician_share_the_round_robin(auth_client):
+def test_technicians_share_the_round_robin(auth_client):
     support = create_user(auth_client, "Ana", "ana@soporte.local")
     technician = create_user(
         auth_client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
@@ -126,7 +126,7 @@ def test_support_and_technician_share_the_round_robin(auth_client):
     assert ticket_b["assigned_to_id"] == technician["id"]
 
 
-def test_tie_between_support_and_technician_breaks_by_lowest_id(auth_client):
+def test_tie_between_technicians_breaks_by_lowest_id(auth_client):
     technician = create_user(
         auth_client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
     )
@@ -138,7 +138,7 @@ def test_tie_between_support_and_technician_breaks_by_lowest_id(auth_client):
     assert ticket["assigned_to_id"] == technician["id"]
 
 
-def test_round_robin_counts_tickets_of_both_eligible_roles(auth_client, session):
+def test_round_robin_counts_tickets_of_each_technician(auth_client, session):
     from backend.models import Ticket as TicketModel
 
     support = create_user(auth_client, "Ana", "ana@soporte.local")
@@ -255,3 +255,11 @@ def test_manual_assignment_to_supervisor_is_accepted(auth_client):
     ticket = assign(auth_client, ticket["id"], supervisor["id"])
 
     assert ticket["assigned_to_id"] == supervisor["id"]
+
+
+def test_removed_support_role_is_rejected(auth_client):
+    response = auth_client.post(
+        "/api/users",
+        json={"name": "Ana", "email": "ana-soporte@soporte.local", "role": "Soporte"},
+    )
+    assert response.status_code == 422

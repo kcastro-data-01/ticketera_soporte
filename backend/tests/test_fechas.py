@@ -146,9 +146,9 @@ def test_user_role_values_still_spanish(auth_client):
         json={
             "name": "Persona de prueba",
             "email": "persona.prueba@example.com",
-            "role": UserRole.SUPPORT.value,
+            "role": UserRole.TECHNICIAN.value,
         },
     )
 
     assert response.status_code == 201
-    assert response.json()["role"] == "Soporte"
+    assert response.json()["role"] == "Técnico"

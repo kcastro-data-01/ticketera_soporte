@@ -31,7 +31,6 @@ function loadAuth(role) {
 const TABLA = {
   Administrador: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: true },
   Supervisor: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: false },
-  Soporte: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: false },
   Técnico: { editar: false, asignar: false, cambiar_estado: true, historial_global: true, usuarios: false },
   Solicitante: { editar: false, asignar: false, cambiar_estado: false, historial_global: false, usuarios: false },
 };

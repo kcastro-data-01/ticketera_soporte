@@ -32,7 +32,7 @@ const USER_A = {
   id: 1,
   name: "Ana Pérez",
   email: "ana@soporte.local",
-  role: "Soporte",
+  role: "Técnico",
 };
 const USER_B = {
   id: 2,
@@ -114,8 +114,8 @@ function makeFetch(overrides = {}) {
 
 function createHarness(fetchImpl) {
   const nodes = new Map(ELEMENT_IDS.map((id) => [id, createNode(id)]));
-  /* Refleja <option value="Soporte" selected> del HTML real. */
-  nodes.get("rol").value = "Soporte";
+  /* Refleja <option value="Técnico" selected> del HTML real. */
+  nodes.get("rol").value = "Técnico";
   const fetchCalls = [];
   const consoleErrors = [];
 
@@ -182,7 +182,7 @@ test("init lista los usuarios con nombre, correo, rol y estado", async () => {
   assert.deepEqual(rows[0].children.map((cell) => cell.textContent), [
     "Ana Pérez",
     "ana@soporte.local",
-    "Soporte",
+    "Técnico",
     "", // la celda de estado contiene el badge
     "", // la celda de acciones contiene el botón Editar
   ]);
@@ -369,7 +369,7 @@ test("crear usuario envía los datos, recarga la lista y limpia el formulario", 
   assert.equal(rows[1].children[0].textContent, "Carlos Gómez");
   assert.equal(harness.node("nombre").value, "");
   assert.equal(harness.node("email").value, "");
-  assert.equal(harness.node("rol").value, "Soporte");
+  assert.equal(harness.node("rol").value, "Técnico");
   assert.equal(
     harness.node("estado-usuario").textContent,
     "Usuario agregado correctamente."

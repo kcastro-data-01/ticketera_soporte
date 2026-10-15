@@ -358,7 +358,7 @@ def test_create_comment_with_assigned_user_via_integration(auth_client, engine):
     db = testing_session()
     
     try:
-        user = User(name="María Gómez", email="maria@test.local", role="Soporte")
+        user = User(name="María Gómez", email="maria@test.local", role="Técnico")
         db.add(user)
         db.commit()
         db.refresh(user)

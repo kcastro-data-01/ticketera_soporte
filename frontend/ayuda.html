@@ -49,7 +49,7 @@
       <ul>
         <li><strong>Creación de tickets</strong>: Altas de nuevos tickets con título, descripción, categoría y prioridad</li>
         <li><strong>Gestión de estados</strong>: Flujo de estados <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
-        <li><strong>Asignación de tickets</strong>: Asignación a usuarios con roles <code>Administrador</code>, <code>Soporte</code>, <code>Supervisor</code>, <code>Técnico</code> y <code>Solicitante</code></li>
+        <li><strong>Asignación de tickets</strong>: Asignación a usuarios con roles <code>Administrador</code>, <code>Supervisor</code>, <code>Técnico</code> y <code>Solicitante</code></li>
         <li><strong>Comentarios</strong>: Comentarios en los tickets con autoría automática basándose en la persona asignada</li>
         <li><strong>Búsqueda y filtros</strong>: Búsqueda por título/descripción y filtros por categoría, prioridad y estado</li>
       </ul>
@@ -63,12 +63,11 @@
       </ol>
 
       <h2>Roles del sistema</h2>
-      <p>El sistema cuenta con 5 roles de usuario:</p>
+      <p>El sistema cuenta con 4 roles de usuario:</p>
       <ul>
         <li><strong>Administrador</strong>: Tiene permisos completos</li>
-        <li><strong>Soporte</strong>: Agentes de soporte</li>
         <li><strong>Supervisor</strong>: Supervisa el trabajo del equipo</li>
-        <li><strong>Técnico</strong>: Técnicos de soporte</li>
+        <li><strong>Técnico</strong>: Atiende los tickets (recibe las asignaciones automáticas)</li>
         <li><strong>Solicitante</strong>: Quien crea el ticket</li>
       </ul>
 
@@ -80,20 +79,19 @@
               <th>Acción</th>
               <th>Administrador</th>
               <th>Supervisor</th>
-              <th>Soporte</th>
               <th>Técnico</th>
               <th>Solicitante</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Solo los suyos</td></tr>
-            <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
-            <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>En los suyos</td></tr>
-            <tr><td>Editar ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-            <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
-            <tr><td>Asignar ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-            <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
-            <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+            <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Solo los suyos</td></tr>
+            <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+            <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>Sí</td><td>En los suyos</td></tr>
+            <tr><td>Editar ticket</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
+            <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+            <tr><td>Asignar ticket</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
+            <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+            <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td><td>No</td></tr>
           </tbody>
         </table>
       </div>

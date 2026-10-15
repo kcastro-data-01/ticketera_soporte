@@ -338,9 +338,9 @@ curl http://127.0.0.1:8000/api/users
 ```
 
 `POST /api/users` devuelve `201` con `{id, name, email, role}` (si `role`
-se omite, se guarda `Soporte`). Errores:
+se omite, se guarda `Técnico`). Errores:
 `422` si `name` está vacío, el `email` no tiene formato válido o el `role` no
-es `Administrador`/`Soporte`; `409 Conflict` si el email ya está registrado.
+es `Administrador`/`Supervisor`/`Técnico`/`Solicitante`; `409 Conflict` si el email ya está registrado.
 `GET /api/users` devuelve `200` con los usuarios **activos** disponibles
 para asignar (solo lectura, orden por id).
 
