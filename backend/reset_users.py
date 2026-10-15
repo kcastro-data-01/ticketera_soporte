@@ -33,10 +33,10 @@ DEFAULT_PASSWORD = "Ticketera2026"
 # Un usuario de prueba por rol: (nombre, email).
 TEST_USERS: dict[UserRole, tuple[str, str]] = {
     UserRole.ADMIN: ("Laura Méndez", "laura.mendez@adn.local"),
-    UserRole.SUPERVISOR: ("Carlos Rojas", "carlos.rojas@adn.local"),
-    UserRole.SUPPORT: ("Daniela Vargas", "daniela.vargas@adn.local"),
-    UserRole.TECHNICIAN: ("José Solano", "jose.solano@adn.local"),
-    UserRole.REQUESTER: ("Andrea Castillo", "andrea.castillo@adn.local"),
+    UserRole.SUPERVISOR: ("Carlos Rojas", "carlos.rojas@sup.local"),
+    UserRole.SUPPORT: ("Daniela Vargas", "daniela.vargas@sop.local"),
+    UserRole.TECHNICIAN: ("José Solano", "jose.solano@tec.local"),
+    UserRole.REQUESTER: ("Andrea Castillo", "andrea.castillo@soli.local"),
 }
 
 
