@@ -1212,6 +1212,11 @@ body.app {
   color: var(--color-tenue);
 }
 
+.tarjeta-detalle {
+  font-size: 0.75rem;
+  color: var(--color-tenue);
+}
+
 .vista-tabs {
   display: inline-flex;
   gap: 0.25rem;

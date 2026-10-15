@@ -233,6 +233,7 @@ def ticket_summary(session, user: User) -> dict[str, int]:
             Ticket.priority == TicketPriority.CRITICAL.value,
             Ticket.state.in_(OPEN_STATES),
         ),
+        "mios": count(Ticket.assigned_to_id == user.id),
         "mios_abiertos": count(
             Ticket.assigned_to_id == user.id,
             Ticket.state.in_(OPEN_STATES),

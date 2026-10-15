@@ -391,6 +391,12 @@ def test_summary_counts_visible_tickets(auth_client):
         auth_client.patch(f"/api/tickets/{c['id']}/state", json={"state": state})
 
     summary = auth_client.get("/api/tickets/summary").json()
+    # Cerrar el ticket asignado: sigue contando en «mios», no en abiertos.
+    for state in ("En proceso", "Resuelto", "Cerrado"):
+        auth_client.patch(f"/api/tickets/{a['id']}/state", json={"state": state})
+    after = auth_client.get("/api/tickets/summary").json()
+    assert (after["mios"], after["mios_abiertos"]) == (1, 0)
+
     assert summary == {
         "total": 3,
         "nuevos": 1,
@@ -398,5 +404,6 @@ def test_summary_counts_visible_tickets(auth_client):
         "resueltos": 1,
         "cerrados": 0,
         "criticos_abiertos": 1,
+        "mios": 1,
         "mios_abiertos": 1,
     }
