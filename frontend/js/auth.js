@@ -110,6 +110,51 @@ function requirePermiso(permiso) {
   return true;
 }
 
+/* Muestra en el menú lateral el nombre, el rol y las iniciales del
+   usuario de la sesión y conecta el botón «Cerrar sesión». */
+function pintarUsuario(doc = document) {
+  if (!doc || typeof doc.getElementById !== "function") return;
+  const user = getUser();
+  const nombre = doc.getElementById("usuario-nombre");
+  const rol = doc.getElementById("usuario-rol");
+  const iniciales = doc.getElementById("usuario-iniciales");
+  if (user && nombre) nombre.textContent = user.name || user.email || "";
+  if (user && rol) rol.textContent = user.role || "";
+  if (user && iniciales) {
+    const base = (user.name || user.email || "?").trim();
+    iniciales.textContent = base
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((parte) => parte.charAt(0).toUpperCase())
+      .join("");
+  }
+  const salir = doc.getElementById("btn-logout");
+  if (salir && typeof salir.addEventListener === "function") {
+    salir.addEventListener("click", logout);
+  }
+}
+
+/* Clase CSS de la etiqueta de color para un estado o una prioridad
+   («En proceso» → "badge estado-proceso", «Crítica» → "badge prioridad-critica"). */
+const CLASES_BADGE = {
+  Nuevo: "estado-nuevo",
+  "En proceso": "estado-proceso",
+  Resuelto: "estado-resuelto",
+  Cerrado: "estado-cerrado",
+  Baja: "prioridad-baja",
+  Media: "prioridad-media",
+  Alta: "prioridad-alta",
+  Crítica: "prioridad-critica",
+};
+
+function claseBadge(valor) {
+  const clase = CLASES_BADGE[valor];
+  return clase ? `badge ${clase}` : "badge";
+}
+
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
-  document.addEventListener("DOMContentLoaded", () => aplicarPermisos());
+  document.addEventListener("DOMContentLoaded", () => {
+    aplicarPermisos();
+    pintarUsuario();
+  });
 }

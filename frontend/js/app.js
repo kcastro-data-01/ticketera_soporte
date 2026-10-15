@@ -76,13 +76,24 @@ function assignedText(ticket) {
   return name || `Usuario #${ticket.assigned_to_id}`;
 }
 
-function appendCell(row, text) {
+function appendCell(row, text, className) {
   const cell = document.createElement("td");
+  if (className) cell.className = className;
   cell.textContent = text;
   row.appendChild(cell);
 }
 
 /* El ID del listado abre la pantalla de detalle (Tarea 13). */
+/* Celda con etiqueta de color para prioridad o estado. */
+function appendBadgeCell(row, text) {
+  const cell = document.createElement("td");
+  const badge = document.createElement("span");
+  badge.className = claseBadge(text);
+  badge.textContent = text;
+  cell.appendChild(badge);
+  row.appendChild(cell);
+}
+
 function appendIdCell(row, ticketId) {
   const cell = document.createElement("td");
   const link = document.createElement("a");
@@ -101,10 +112,10 @@ function renderTickets(tickets) {
     appendIdCell(row, ticket.id);
     appendCell(row, ticket.title);
     appendCell(row, ticket.category);
-    appendCell(row, ticket.priority);
-    appendCell(row, ticket.state);
+    appendBadgeCell(row, ticket.priority);
+    appendBadgeCell(row, ticket.state);
     appendCell(row, assignedText(ticket));
-    appendCell(row, formatFecha(ticket.created_at));
+    appendCell(row, formatFecha(ticket.created_at), "celda-fecha");
     appendActionCell(row, ticket.id);
     elements.tbody.appendChild(row);
   });

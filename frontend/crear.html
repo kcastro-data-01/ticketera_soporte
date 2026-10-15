@@ -3,82 +3,106 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nuevo ticket — Ticketera de Soporte</title>
+  <title>Nuevo ticket · American Data Networks</title>
   <link rel="stylesheet" href="css/estilos.css">
 </head>
-<body>
-  <header class="cabecera">
-    <div>
-      <img src="images/logo-corporativo-recortado.png" alt="American Data Networks" class="cabecera-logo derecha">
-      <h1>Ticketera de Soporte</h1>
-      <p>Alta de un nuevo ticket</p>
-    </div>
-    <nav class="cabecera-enlaces">
-      <a href="index.html" class="enlace-boton">Volver al listado</a>
-      <a href="usuarios.html" class="enlace-boton" data-permiso="usuarios">Usuarios</a>
-      <button type="button" id="btn-logout" class="enlace-boton" style="border: none; cursor: pointer;">Cerrar sesión</button>
+<body class="app">
+  <aside class="barra-lateral">
+    <a href="index.html" class="marca">
+      <img src="images/logo-circular.jpg" alt="" class="marca-logo">
+      <span class="marca-texto">
+        <span class="marca-nombre">American Data Networks</span>
+        <span class="marca-sub">Sistema de tickets</span>
+      </span>
+    </a>
+    <nav class="menu" aria-label="Menú principal">
+      <a href="index.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M13 5v2M13 11v2M13 17v2"/></svg><span>Tickets</span></a>
+      <a href="crear.html" class="menu-enlace activo" aria-current="page"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Nuevo ticket</span></a>
+      <a href="historial.html" class="menu-enlace" data-permiso="historial_global"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg><span>Historial</span></a>
+      <a href="usuarios.html" class="menu-enlace" data-permiso="usuarios"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span>Usuarios</span></a>
+      <a href="ayuda.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg><span>Ayuda</span></a>
     </nav>
-  </header>
+    <div class="barra-usuario">
+      <span class="usuario-avatar" id="usuario-iniciales" aria-hidden="true"></span>
+      <span class="usuario-datos">
+        <span id="usuario-nombre" class="usuario-nombre"></span>
+        <span id="usuario-rol" class="usuario-rol"></span>
+      </span>
+      <button type="button" id="btn-logout" class="boton-salir" title="Cerrar sesión" aria-label="Cerrar sesión"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg></button>
+    </div>
+  </aside>
 
-  <main class="contenido">
-    <form id="form-crear" class="filtros formulario" novalidate>
-      <label class="campo">
-        <span>Título *</span>
-        <input
-          type="text"
-          id="title"
-          name="title"
-          required
-          maxlength="200"
-          placeholder="Resumen breve del ticket"
-        >
-      </label>
-
-      <label class="campo">
-        <span>Descripción *</span>
-        <textarea
-          id="description"
-          name="description"
-          required
-          placeholder="Detalle del problema o de la solicitud"
-        ></textarea>
-      </label>
-
-      <label class="campo">
-        <span>Categoría</span>
-        <select id="category" name="category">
-          <option value="Hardware">Hardware</option>
-          <option value="Software">Software</option>
-          <option value="Red">Red</option>
-          <option value="Accesos">Accesos</option>
-        </select>
-      </label>
-
-      <label class="campo">
-        <span>Prioridad</span>
-        <select id="priority" name="priority">
-          <option value="Baja">Baja</option>
-          <option value="Media">Media</option>
-          <option value="Alta">Alta</option>
-          <option value="Crítica">Crítica</option>
-        </select>
-      </label>
-
-      <div class="acciones">
-        <button type="submit" id="guardar">Crear ticket</button>
+  <div class="app-principal">
+    <header class="cabecera">
+      <div>
+        <h1>Nuevo ticket</h1>
+        <p>Registra una nueva solicitud de soporte</p>
       </div>
-    </form>
+      <div class="cabecera-acciones">
+        <a href="index.html" class="enlace-boton secundario">Volver al listado</a>
+      </div>
+    </header>
 
-    <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
-  </main>
+    <main class="contenido">
+      <form id="form-crear" class="filtros formulario" novalidate>
+        <label class="campo">
+          <span>Título *</span>
+          <input
+            type="text"
+            id="title"
+            name="title"
+            required
+            maxlength="200"
+            placeholder="Resumen breve del ticket"
+          >
+        </label>
+  
+        <label class="campo">
+          <span>Descripción *</span>
+          <textarea
+            id="description"
+            name="description"
+            required
+            placeholder="Detalle del problema o de la solicitud"
+          ></textarea>
+        </label>
+  
+        <label class="campo">
+          <span>Categoría</span>
+          <select id="category" name="category">
+            <option value="Hardware">Hardware</option>
+            <option value="Software">Software</option>
+            <option value="Red">Red</option>
+            <option value="Accesos">Accesos</option>
+          </select>
+        </label>
+  
+        <label class="campo">
+          <span>Prioridad</span>
+          <select id="priority" name="priority">
+            <option value="Baja">Baja</option>
+            <option value="Media">Media</option>
+            <option value="Alta">Alta</option>
+            <option value="Crítica">Crítica</option>
+          </select>
+        </label>
+  
+        <div class="acciones">
+          <button type="submit" id="guardar">Crear ticket</button>
+        </div>
+      </form>
+  
+      <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
+    </main>
+
+    <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
+  </div>
 
   <script src="js/auth.js" defer></script>
   <script src="js/crear.js" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
-      if (!requireAuth()) return;
-      var logoutBtn = document.getElementById("btn-logout");
-      if (logoutBtn) logoutBtn.addEventListener("click", logout);
+      requireAuth();
     });
   </script>
 </body>

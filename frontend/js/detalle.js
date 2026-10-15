@@ -158,7 +158,9 @@ function renderTicket(ticket) {
   elements.ver.description.textContent = ticket.description;
   elements.ver.category.textContent = ticket.category;
   elements.ver.priority.textContent = ticket.priority;
+  elements.ver.priority.className = claseBadge(ticket.priority);
   elements.ver.state.textContent = ticket.state;
+  elements.ver.state.className = claseBadge(ticket.state);
   elements.ver.assigned.textContent = nombreAsignado(ticket);
   elements.ver.created.textContent = formatFecha(ticket.created_at);
   elements.ver.updated.textContent = formatFecha(ticket.updated_at);

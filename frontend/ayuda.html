@@ -3,105 +3,121 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ayuda — Ticketera de Soporte</title>
+  <title>Ayuda · American Data Networks</title>
   <link rel="stylesheet" href="css/estilos.css">
 </head>
-<body>
-  <div class="contenedor-principal">
-    <!-- Menú sidebar -->
-    <nav class="sidebar">
-      <div class="sidebar-logo">
-        <span>Ticketera</span>
-      </div>
-      <ul class="sidebar-nav">
-        <li><a href="index.html" class="enlace-boton">Tickets</a></li>
-        <li data-permiso="historial_global"><a href="historial.html" class="enlace-boton">Historial</a></li>
-        <li data-permiso="usuarios"><a href="usuarios.html" class="enlace-boton">Usuarios</a></li>
-        <li><a href="ayuda.html" class="enlace-boton activo">Ayuda</a></li>
-      </ul>
+<body class="app">
+  <aside class="barra-lateral">
+    <a href="index.html" class="marca">
+      <img src="images/logo-circular.jpg" alt="" class="marca-logo">
+      <span class="marca-texto">
+        <span class="marca-nombre">American Data Networks</span>
+        <span class="marca-sub">Sistema de tickets</span>
+      </span>
+    </a>
+    <nav class="menu" aria-label="Menú principal">
+      <a href="index.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M13 5v2M13 11v2M13 17v2"/></svg><span>Tickets</span></a>
+      <a href="crear.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Nuevo ticket</span></a>
+      <a href="historial.html" class="menu-enlace" data-permiso="historial_global"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg><span>Historial</span></a>
+      <a href="usuarios.html" class="menu-enlace" data-permiso="usuarios"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span>Usuarios</span></a>
+      <a href="ayuda.html" class="menu-enlace activo" aria-current="page"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg><span>Ayuda</span></a>
     </nav>
+    <div class="barra-usuario">
+      <span class="usuario-avatar" id="usuario-iniciales" aria-hidden="true"></span>
+      <span class="usuario-datos">
+        <span id="usuario-nombre" class="usuario-nombre"></span>
+        <span id="usuario-rol" class="usuario-rol"></span>
+      </span>
+      <button type="button" id="btn-logout" class="boton-salir" title="Cerrar sesión" aria-label="Cerrar sesión"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg></button>
+    </div>
+  </aside>
 
+  <div class="app-principal">
     <header class="cabecera">
       <div>
-        <img src="images/logo-corporativo-recortado.png" alt="American Data Networks" class="cabecera-logo derecha"><h1>Ayuda — Ticketera de Soporte</h1>
+        <h1>Ayuda</h1>
         <p>Resumen rápido del sistema de gestión de tickets</p>
       </div>
-      <nav class="cabecera-enlaces">
-        <a href="index.html" class="enlace-boton">Volver al inicio</a>
-      </nav>
     </header>
 
     <main class="contenido">
-      <section class="ayuda-contenido">
-        <h2>¿Qué es Ticketera?</h2>
-        <p>Ticketera es un sistema de gestión de tickets de soporte diseñado para equipos pequeños y medianos. Permite crear, organizar y dar seguimiento a los tickets de soporte desde la creación hasta el cierre.</p>
+    <section class="ayuda-contenido">
+      <h2>¿Qué es Ticketera?</h2>
+      <p>Ticketera es un sistema de gestión de tickets de soporte diseñado para equipos pequeños y medianos. Permite crear, organizar y dar seguimiento a los tickets de soporte desde la creación hasta el cierre.</p>
 
-        <h2>Funcionalidades principales</h2>
-        <ul>
-          <li><strong>Creación de tickets</strong>: Altas de nuevos tickets con título, descripción, categoría y prioridad</li>
-          <li><strong>Gestión de estados</strong>: Flujo de estados <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
-          <li><strong>Asignación de tickets</strong>: Asignación a usuarios con roles <code>Administrador</code>, <code>Soporte</code>, <code>Supervisor</code>, <code>Técnico</code> y <code>Solicitante</code></li>
-          <li><strong>Comentarios</strong>: Comentarios en los tickets con autoría automática basándose en la persona asignada</li>
-          <li><strong>Búsqueda y filtros</strong>: Búsqueda por título/descripción y filtros por categoría, prioridad y estado</li>
-        </ul>
+      <h2>Funcionalidades principales</h2>
+      <ul>
+        <li><strong>Creación de tickets</strong>: Altas de nuevos tickets con título, descripción, categoría y prioridad</li>
+        <li><strong>Gestión de estados</strong>: Flujo de estados <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
+        <li><strong>Asignación de tickets</strong>: Asignación a usuarios con roles <code>Administrador</code>, <code>Soporte</code>, <code>Supervisor</code>, <code>Técnico</code> y <code>Solicitante</code></li>
+        <li><strong>Comentarios</strong>: Comentarios en los tickets con autoría automática basándose en la persona asignada</li>
+        <li><strong>Búsqueda y filtros</strong>: Búsqueda por título/descripción y filtros por categoría, prioridad y estado</li>
+      </ul>
 
-        <h2>Flujos principales</h2>
-        <ol>
-          <li><strong>Crear un ticket</strong>: Desde el formulario en <code>index.html</code> o <code>crear.html</code></li>
-          <li><strong>Asignar un ticket</strong>: Asignar a un usuario mediante la sección de usuarios</li>
-          <li><strong>Comentar un ticket</strong>: Agregar comentarios que llevan el nombre del usuario asignado automáticamente</li>
-          <li><strong>Cambiar estado</strong>: Flujos <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
-        </ol>
+      <h2>Flujos principales</h2>
+      <ol>
+        <li><strong>Crear un ticket</strong>: Desde el formulario en <code>index.html</code> o <code>crear.html</code></li>
+        <li><strong>Asignar un ticket</strong>: Asignar a un usuario mediante la sección de usuarios</li>
+        <li><strong>Comentar un ticket</strong>: Agregar comentarios que llevan el nombre del usuario asignado automáticamente</li>
+        <li><strong>Cambiar estado</strong>: Flujos <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
+      </ol>
 
-        <h2>Roles del sistema</h2>
-        <p>El sistema cuenta con 5 roles de usuario:</p>
-        <ul>
-          <li><strong>Administrador</strong>: Tiene permisos completos</li>
-          <li><strong>Soporte</strong>: Agentes de soporte</li>
-          <li><strong>Supervisor</strong>: Supervisa el trabajo del equipo</li>
-          <li><strong>Técnico</strong>: Técnicos de soporte</li>
-          <li><strong>Solicitante</strong>: Quien crea el ticket</li>
-        </ul>
+      <h2>Roles del sistema</h2>
+      <p>El sistema cuenta con 5 roles de usuario:</p>
+      <ul>
+        <li><strong>Administrador</strong>: Tiene permisos completos</li>
+        <li><strong>Soporte</strong>: Agentes de soporte</li>
+        <li><strong>Supervisor</strong>: Supervisa el trabajo del equipo</li>
+        <li><strong>Técnico</strong>: Técnicos de soporte</li>
+        <li><strong>Solicitante</strong>: Quien crea el ticket</li>
+      </ul>
 
-        <h2>Permisos por rol</h2>
-        <div class="tabla-scroll">
-          <table class="listado">
-            <thead>
-              <tr>
-                <th>Acción</th>
-                <th>Administrador</th>
-                <th>Supervisor</th>
-                <th>Soporte</th>
-                <th>Técnico</th>
-                <th>Solicitante</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Solo los suyos</td></tr>
-              <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
-              <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>En los suyos</td></tr>
-              <tr><td>Editar ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-              <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
-              <tr><td>Asignar ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-              <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
-              <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <h2>Permisos por rol</h2>
+      <div class="tabla-scroll">
+        <table class="listado">
+          <thead>
+            <tr>
+              <th>Acción</th>
+              <th>Administrador</th>
+              <th>Supervisor</th>
+              <th>Soporte</th>
+              <th>Técnico</th>
+              <th>Solicitante</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Solo los suyos</td></tr>
+            <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+            <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>En los suyos</td></tr>
+            <tr><td>Editar ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
+            <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+            <tr><td>Asignar ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
+            <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+            <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-        <h2>Estados de los tickets</h2>
-        <p>Los tickets siguen un flujo lineal:</p>
-        <ul>
-          <li><code>Nuevo</code>: Ticket recién creado</li>
-          <li><code>En proceso</code>: Están trabajando en él</li>
-          <li><code>Resuelto</code>: Se ha dado solución</li>
-          <li><code>Cerrado</code>: Ticket cerrado definitivamente</li>
-        </ul>
-      </section>
+      <h2>Estados de los tickets</h2>
+      <p>Los tickets siguen un flujo lineal:</p>
+      <ul>
+        <li><code>Nuevo</code>: Ticket recién creado</li>
+        <li><code>En proceso</code>: Están trabajando en él</li>
+        <li><code>Resuelto</code>: Se ha dado solución</li>
+        <li><code>Cerrado</code>: Ticket cerrado definitivamente</li>
+      </ul>
+    </section>
     </main>
+
+    <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
   <script src="js/auth.js" defer></script>
   <script src="js/ayuda.js" defer></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      requireAuth();
+    });
+  </script>
 </body>
 </html>

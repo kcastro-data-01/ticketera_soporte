@@ -3,136 +3,160 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Usuarios — Ticketera de Soporte</title>
+  <title>Usuarios · American Data Networks</title>
   <link rel="stylesheet" href="css/estilos.css">
 </head>
-<body>
-  <header class="cabecera">
-    <div>
-      <img src="images/logo-corporativo-recortado.png" alt="American Data Networks" class="cabecera-logo derecha">
-      <h1>Ticketera de Soporte</h1>
-      <p>Administración de usuarios</p>
-    </div>
-    <nav class="cabecera-enlaces">
-      <a href="index.html" class="enlace-boton">Tickets</a>
-      <button type="button" id="btn-logout" class="enlace-boton" style="border: none; cursor: pointer;">Cerrar sesión</button>
+<body class="app">
+  <aside class="barra-lateral">
+    <a href="index.html" class="marca">
+      <img src="images/logo-circular.jpg" alt="" class="marca-logo">
+      <span class="marca-texto">
+        <span class="marca-nombre">American Data Networks</span>
+        <span class="marca-sub">Sistema de tickets</span>
+      </span>
+    </a>
+    <nav class="menu" aria-label="Menú principal">
+      <a href="index.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M13 5v2M13 11v2M13 17v2"/></svg><span>Tickets</span></a>
+      <a href="crear.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Nuevo ticket</span></a>
+      <a href="historial.html" class="menu-enlace" data-permiso="historial_global"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg><span>Historial</span></a>
+      <a href="usuarios.html" class="menu-enlace activo" aria-current="page" data-permiso="usuarios"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span>Usuarios</span></a>
+      <a href="ayuda.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg><span>Ayuda</span></a>
     </nav>
-  </header>
+    <div class="barra-usuario">
+      <span class="usuario-avatar" id="usuario-iniciales" aria-hidden="true"></span>
+      <span class="usuario-datos">
+        <span id="usuario-nombre" class="usuario-nombre"></span>
+        <span id="usuario-rol" class="usuario-rol"></span>
+      </span>
+      <button type="button" id="btn-logout" class="boton-salir" title="Cerrar sesión" aria-label="Cerrar sesión"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg></button>
+    </div>
+  </aside>
 
-  <main class="contenido">
-    <section class="seccion" aria-label="Agregar usuario">
-      <h2>Agregar usuario</h2>
-      <form id="form-usuario" class="filtros formulario" novalidate>
-        <label class="campo">
-          <span>Nombre *</span>
-          <input
-            type="text"
-            id="nombre"
-            name="nombre"
-            required
-            maxlength="120"
-            placeholder="Nombre completo"
-          >
-        </label>
-
-        <label class="campo">
-          <span>Correo electrónico *</span>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            required
-            maxlength="255"
-            placeholder="nombre@soporte.local"
-          >
-        </label>
-
-        <label class="campo">
-          <span>Rol *</span>
-          <select id="rol" name="rol">
-            <option value="Soporte" selected>Soporte</option>
-            <option value="Administrador">Administrador</option>
-            <option value="Supervisor">Supervisor</option>
-            <option value="Técnico">Técnico</option>
-            <option value="Solicitante">Solicitante</option>
-          </select>
-        </label>
-
-        <div class="acciones">
-          <button type="submit" id="crear">Agregar usuario</button>
-        </div>
-      </form>
-
-      <p id="estado-usuario" class="estado" role="status" aria-live="polite" hidden></p>
-    </section>
-
-    <section class="seccion" aria-label="Usuarios registrados">
-      <h2>Usuarios registrados</h2>
-      <p id="usuarios-estado" class="estado" role="status" aria-live="polite" hidden></p>
-      <div class="tabla-scroll">
-        <table id="tabla-usuarios" class="listado" hidden>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Correo</th>
-              <th>Rol</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="cuerpo-usuarios"></tbody>
-        </table>
+  <div class="app-principal">
+    <header class="cabecera">
+      <div>
+        <h1>Usuarios</h1>
+        <p>Administración de los usuarios del sistema</p>
       </div>
-    </section>
+    </header>
 
-    <section class="seccion" aria-label="Editar usuario" id="seccion-editar" hidden>
-      <h2>Editar usuario</h2>
-      <form id="form-editar-usuario" class="filtros formulario" novalidate>
-        <input type="hidden" id="editar-id" name="id">
-        <label class="campo">
-          <span>Nombre *</span>
-          <input
-            type="text"
-            id="editar-nombre"
-            name="nombre"
-            required
-            maxlength="120"
-            placeholder="Nombre completo"
-          >
-        </label>
-
-        <label class="campo">
-          <span>Correo electrónico *</span>
-          <input
-            type="email"
-            id="editar-email"
-            name="email"
-            required
-            maxlength="255"
-            placeholder="nombre@soporte.local"
-          >
-        </label>
-
-        <label class="campo">
-          <span>Rol *</span>
-          <select id="editar-rol" name="rol">
-            <option value="Soporte">Soporte</option>
-            <option value="Administrador">Administrador</option>
-            <option value="Supervisor">Supervisor</option>
-            <option value="Técnico">Técnico</option>
-            <option value="Solicitante">Solicitante</option>
-          </select>
-        </label>
-
-        <div class="acciones">
-          <button type="submit" id="guardar-edicion">Guardar cambios</button>
-          <button type="button" id="cancelar-edicion" class="secundario">Cancelar</button>
+    <main class="contenido">
+      <section class="seccion" aria-label="Agregar usuario">
+        <h2>Agregar usuario</h2>
+        <form id="form-usuario" class="filtros formulario" novalidate>
+          <label class="campo">
+            <span>Nombre *</span>
+            <input
+              type="text"
+              id="nombre"
+              name="nombre"
+              required
+              maxlength="120"
+              placeholder="Nombre completo"
+            >
+          </label>
+  
+          <label class="campo">
+            <span>Correo electrónico *</span>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              required
+              maxlength="255"
+              placeholder="nombre@soporte.local"
+            >
+          </label>
+  
+          <label class="campo">
+            <span>Rol *</span>
+            <select id="rol" name="rol">
+              <option value="Soporte" selected>Soporte</option>
+              <option value="Administrador">Administrador</option>
+              <option value="Supervisor">Supervisor</option>
+              <option value="Técnico">Técnico</option>
+              <option value="Solicitante">Solicitante</option>
+            </select>
+          </label>
+  
+          <div class="acciones">
+            <button type="submit" id="crear">Agregar usuario</button>
+          </div>
+        </form>
+  
+        <p id="estado-usuario" class="estado" role="status" aria-live="polite" hidden></p>
+      </section>
+  
+      <section class="seccion" aria-label="Usuarios registrados">
+        <h2>Usuarios registrados</h2>
+        <p id="usuarios-estado" class="estado" role="status" aria-live="polite" hidden></p>
+        <div class="tabla-scroll">
+          <table id="tabla-usuarios" class="listado" hidden>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Correo</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="cuerpo-usuarios"></tbody>
+          </table>
         </div>
-      </form>
+      </section>
+  
+      <section class="seccion" aria-label="Editar usuario" id="seccion-editar" hidden>
+        <h2>Editar usuario</h2>
+        <form id="form-editar-usuario" class="filtros formulario" novalidate>
+          <input type="hidden" id="editar-id" name="id">
+          <label class="campo">
+            <span>Nombre *</span>
+            <input
+              type="text"
+              id="editar-nombre"
+              name="nombre"
+              required
+              maxlength="120"
+              placeholder="Nombre completo"
+            >
+          </label>
+  
+          <label class="campo">
+            <span>Correo electrónico *</span>
+            <input
+              type="email"
+              id="editar-email"
+              name="email"
+              required
+              maxlength="255"
+              placeholder="nombre@soporte.local"
+            >
+          </label>
+  
+          <label class="campo">
+            <span>Rol *</span>
+            <select id="editar-rol" name="rol">
+              <option value="Soporte">Soporte</option>
+              <option value="Administrador">Administrador</option>
+              <option value="Supervisor">Supervisor</option>
+              <option value="Técnico">Técnico</option>
+              <option value="Solicitante">Solicitante</option>
+            </select>
+          </label>
+  
+          <div class="acciones">
+            <button type="submit" id="guardar-edicion">Guardar cambios</button>
+            <button type="button" id="cancelar-edicion" class="secundario">Cancelar</button>
+          </div>
+        </form>
+  
+        <p id="estado-edicion" class="estado" role="status" aria-live="polite" hidden></p>
+      </section>
+    </main>
 
-      <p id="estado-edicion" class="estado" role="status" aria-live="polite" hidden></p>
-    </section>
-  </main>
+    <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
+  </div>
 
   <script>
     /* Se registra antes que los scripts diferidos: sin permiso se redirige
@@ -145,9 +169,7 @@
   <script src="js/usuarios.js" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
-      if (!requireAuth()) return;
-      var logoutBtn = document.getElementById("btn-logout");
-      if (logoutBtn) logoutBtn.addEventListener("click", logout);
+      requireAuth();
     });
   </script>
 </body>
