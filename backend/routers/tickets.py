@@ -1,7 +1,7 @@
 """Ticket endpoints (creation, listing with search and filters, retrieval,
 edition, assignment, state changes and history)."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_session
@@ -12,6 +12,7 @@ from backend.schemas import (
     TicketCreate,
     TicketResponse,
     TicketStateUpdate,
+    TicketSummary,
     TicketUpdate,
 )
 from backend.services import ticket_service
@@ -52,6 +53,7 @@ def create_ticket(
     summary="Listar, buscar y filtrar tickets",
 )
 def list_tickets(
+    response: Response,
     search: str | None = Query(
         None,
         description=(
@@ -71,6 +73,14 @@ def list_tickets(
         None,
         description="Filtra por estado (Nuevo, En proceso, Resuelto, Cerrado).",
     ),
+    mios: bool = Query(
+        False,
+        description="Solo los tickets asignados al usuario que consulta.",
+    ),
+    limit: int | None = Query(
+        None, ge=1, le=100, description="Tamaño de página (sin él, todos)."
+    ),
+    offset: int = Query(0, ge=0, description="Tickets a saltar (paginación)."),
     session: Session = Depends(get_session),
     current_user: User = Depends(
         role_required(ROLES_TODOS)
@@ -80,9 +90,11 @@ def list_tickets(
     filterable by category, priority and state (RF7, RF8).
 
     The criteria are optional and combined with AND; without parameters the
-    response is the plain listing.
+    response is the plain listing. ``mios`` keeps the tickets assigned to the
+    caller; ``limit``/``offset`` paginate and the ``X-Total-Count`` header
+    carries the number of matching tickets.
     """
-    tickets = ticket_service.list_tickets(
+    tickets, total = ticket_service.list_tickets(
         session,
         search=search,
         category=category,
@@ -93,8 +105,26 @@ def list_tickets(
             if current_user.role == UserRole.REQUESTER.value
             else None
         ),
+        assigned_to_id=current_user.id if mios else None,
+        limit=limit,
+        offset=offset,
     )
+    response.headers["X-Total-Count"] = str(total)
     return [TicketResponse.model_validate(ticket) for ticket in tickets]
+
+
+@router.get(
+    "/summary",
+    response_model=TicketSummary,
+    summary="Resumen de tickets para el panel de inicio",
+)
+def get_ticket_summary(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(role_required(ROLES_TODOS)),
+) -> TicketSummary:
+    """Counters over the tickets the caller can see (the Solicitante only
+    counts the tickets they created)."""
+    return TicketSummary(**ticket_service.ticket_summary(session, current_user))
 
 
 @router.get(

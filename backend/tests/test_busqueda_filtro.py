@@ -335,3 +335,68 @@ def test_search_and_filters_do_not_modify_tickets(auth_client, session):
 
     assert before == after
     assert len(after) == len(created)
+
+
+# --- Mis tickets, paginación y resumen ---
+
+
+def _ticket(auth_client, **overrides):
+    payload = {
+        "title": "Ticket del panel",
+        "description": "Descripción.",
+        "category": "Red",
+        "priority": "Media",
+        **overrides,
+    }
+    resp = auth_client.post("/api/tickets", json=payload)
+    assert resp.status_code == 201
+    return resp.json()
+
+
+def test_mios_returns_only_tickets_assigned_to_the_caller(auth_client):
+    me = auth_client.get("/api/auth/me").json()
+    mine = _ticket(auth_client, title="Mío")
+    other = _ticket(auth_client, title="Ajeno")
+    auth_client.patch(f"/api/tickets/{mine['id']}/assign", json={"assigned_to_id": me["id"]})
+
+    ids = [t["id"] for t in auth_client.get("/api/tickets?mios=true").json()]
+    assert ids == [mine["id"]]
+    assert other["id"] not in ids
+
+
+def test_pagination_with_total_count_header(auth_client):
+    created = [_ticket(auth_client, title=f"Ticket {n}") for n in range(5)]
+
+    first = auth_client.get("/api/tickets?limit=2&offset=0")
+    second = auth_client.get("/api/tickets?limit=2&offset=2")
+    last = auth_client.get("/api/tickets?limit=2&offset=4")
+
+    assert first.headers["X-Total-Count"] == "5"
+    newest_first = [t["id"] for t in reversed(created)]
+    assert [t["id"] for t in first.json()] == newest_first[0:2]
+    assert [t["id"] for t in second.json()] == newest_first[2:4]
+    assert [t["id"] for t in last.json()] == newest_first[4:5]
+    # Sin limit se mantiene el listado completo.
+    assert len(auth_client.get("/api/tickets").json()) == 5
+
+
+def test_summary_counts_visible_tickets(auth_client):
+    me = auth_client.get("/api/auth/me").json()
+    a = _ticket(auth_client, priority="Crítica")
+    b = _ticket(auth_client)
+    c = _ticket(auth_client, priority="Crítica")
+    auth_client.patch(f"/api/tickets/{a['id']}/assign", json={"assigned_to_id": me["id"]})
+    auth_client.patch(f"/api/tickets/{b['id']}/state", json={"state": "En proceso"})
+    for state in ("En proceso", "Resuelto"):
+        auth_client.patch(f"/api/tickets/{c['id']}/state", json={"state": state})
+
+    summary = auth_client.get("/api/tickets/summary").json()
+    assert summary == {
+        "total": 3,
+        "nuevos": 1,
+        "en_proceso": 1,
+        "resueltos": 1,
+        "cerrados": 0,
+        "criticos_abiertos": 1,
+        "mios_abiertos": 1,
+    }

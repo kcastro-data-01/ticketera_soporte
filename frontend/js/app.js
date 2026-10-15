@@ -4,8 +4,15 @@
 
 const API_TICKETS_URL = "/api/tickets";
 const API_USERS_URL = "/api/users";
+const API_SUMMARY_URL = "/api/tickets/summary";
+
+/* Tickets por página del listado. */
+const PAGE_SIZE = 20;
 
 let usersById = new Map();
+/* Página actual (empieza en 0) y vista «Mis tickets». */
+let paginaActual = 0;
+let soloMios = false;
 
 function getElements() {
   return {
@@ -17,6 +24,12 @@ function getElements() {
     limpiar: document.getElementById("limpiar"),
     estado: document.getElementById("estado-carga"),
     tbody: document.getElementById("lista-tickets"),
+    paginacion: document.getElementById("paginacion"),
+    paginaAnterior: document.getElementById("pagina-anterior"),
+    paginaSiguiente: document.getElementById("pagina-siguiente"),
+    paginaInfo: document.getElementById("pagina-info"),
+    vistaTodos: document.getElementById("vista-todos"),
+    vistaMios: document.getElementById("vista-mios"),
   };
 }
 
@@ -28,15 +41,20 @@ function getFilters() {
     category: elements.category.value,
     priority: elements.priority.value,
     state: elements.state.value,
+    mios: soloMios,
   };
 }
 
-function buildTicketsUrl(filters) {
+/* La página se pide con limit/offset; el total llega en X-Total-Count. */
+function buildTicketsUrl(filters, pagina = 0) {
   const params = new URLSearchParams();
   if (filters.search) params.set("search", filters.search);
   if (filters.category) params.set("category", filters.category);
   if (filters.priority) params.set("priority", filters.priority);
   if (filters.state) params.set("state", filters.state);
+  if (filters.mios) params.set("mios", "true");
+  params.set("limit", String(PAGE_SIZE));
+  if (pagina > 0) params.set("offset", String(pagina * PAGE_SIZE));
   const query = params.toString();
   return query ? `${API_TICKETS_URL}?${query}` : API_TICKETS_URL;
 }
@@ -154,7 +172,7 @@ async function fetchTickets() {
 
   /* 1) La URL se construye una sola vez. 2) Una única petición HTTP por
      ejecución de fetchTickets(). */
-  const url = buildTicketsUrl(getFilters());
+  const url = buildTicketsUrl(getFilters(), paginaActual);
 
   let response;
   try {
@@ -195,6 +213,13 @@ async function fetchTickets() {
     return;
   }
 
+  const totalCabecera = Number(
+    response.headers && typeof response.headers.get === "function"
+      ? response.headers.get("X-Total-Count")
+      : NaN
+  );
+  renderPaginacion(Number.isFinite(totalCabecera) ? totalCabecera : tickets.length);
+
   if (tickets.length === 0) {
     showStatus("No hay tickets para mostrar.", "vacio");
     return;
@@ -209,19 +234,93 @@ async function fetchTickets() {
   }
 }
 
+/* Controles «← Anterior · Página X de Y · Siguiente →». */
+function renderPaginacion(total) {
+  const elements = getElements();
+  if (!elements.paginacion) return;
+  const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  elements.paginacion.hidden = total <= PAGE_SIZE;
+  elements.paginaInfo.textContent = `Página ${paginaActual + 1} de ${paginas} · ${total} tickets`;
+  elements.paginaAnterior.disabled = paginaActual === 0;
+  elements.paginaSiguiente.disabled = paginaActual + 1 >= paginas;
+}
+
+function irAPagina(pagina) {
+  paginaActual = Math.max(0, pagina);
+  fetchTickets();
+}
+
+/* Cambia entre «Todos» y «Mis tickets» y vuelve a la primera página. */
+function mostrarSoloMios(valor) {
+  const elements = getElements();
+  soloMios = valor;
+  if (elements.vistaTodos && elements.vistaMios) {
+    elements.vistaTodos.classList.toggle("activa", !valor);
+    elements.vistaMios.classList.toggle("activa", valor);
+    elements.vistaTodos.setAttribute("aria-pressed", String(!valor));
+    elements.vistaMios.setAttribute("aria-pressed", String(valor));
+  }
+  irAPagina(0);
+}
+
+/* Tarjetas del panel: números del resumen y, al pulsarlas, el filtro. */
+async function cargarResumen() {
+  const campos = {
+    "res-nuevos": "nuevos",
+    "res-en-proceso": "en_proceso",
+    "res-resueltos": "resueltos",
+    "res-criticos": "criticos_abiertos",
+    "res-mios": "mios_abiertos",
+  };
+  try {
+    const response = await fetchWithAuth(API_SUMMARY_URL);
+    if (!response.ok) return;
+    const resumen = await response.json();
+    Object.entries(campos).forEach(([id, campo]) => {
+      const nodo = document.getElementById(id);
+      if (nodo) nodo.textContent = String(resumen[campo] ?? "—");
+    });
+  } catch (error) {
+    console.error("No se pudo cargar el resumen:", error);
+  }
+}
+
+function aplicarTarjeta(tarjeta) {
+  const elements = getElements();
+  elements.form.reset();
+  if (tarjeta.dataset.estado) elements.state.value = tarjeta.dataset.estado;
+  if (tarjeta.dataset.prioridad) elements.priority.value = tarjeta.dataset.prioridad;
+  mostrarSoloMios(tarjeta.dataset.mios === "true");
+}
+
 function init() {
   const elements = getElements();
 
   elements.form.addEventListener("submit", (event) => {
     event.preventDefault();
-    fetchTickets();
+    irAPagina(0);
   });
 
   elements.limpiar.addEventListener("click", () => {
     elements.form.reset();
-    fetchTickets();
+    mostrarSoloMios(false);
   });
 
+  if (elements.paginaAnterior) {
+    elements.paginaAnterior.addEventListener("click", () => irAPagina(paginaActual - 1));
+    elements.paginaSiguiente.addEventListener("click", () => irAPagina(paginaActual + 1));
+  }
+  if (elements.vistaTodos) {
+    elements.vistaTodos.addEventListener("click", () => mostrarSoloMios(false));
+    elements.vistaMios.addEventListener("click", () => mostrarSoloMios(true));
+  }
+  if (typeof document.querySelectorAll === "function") {
+    document.querySelectorAll(".tarjeta-resumen").forEach((tarjeta) => {
+      tarjeta.addEventListener("click", () => aplicarTarjeta(tarjeta));
+    });
+  }
+
+  cargarResumen();
   loadUsers().then(fetchTickets);
 }
 

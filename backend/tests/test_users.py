@@ -13,7 +13,7 @@ VALID_USER = {
     "role": UserRole.TECHNICIAN.value,
 }
 
-USER_RESPONSE_KEYS = {"id", "name", "email", "role"}
+USER_RESPONSE_KEYS = {"id", "name", "email", "role", "is_active"}
 
 
 # ---------------------------------------------------------------------------
@@ -368,3 +368,72 @@ def test_update_user_is_exposed_in_openapi(client):
 
     assert "/api/users/{user_id}" in schema["paths"]
     assert "patch" in schema["paths"]["/api/users/{user_id}"]
+
+
+# --- Desactivar / reactivar ---
+
+
+def test_admin_deactivates_and_reactivates_a_user(auth_client, client):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
+
+    resp = auth_client.patch(f"/api/users/{created['id']}", json={"is_active": False})
+    assert resp.status_code == 200
+    assert resp.json()["is_active"] is False
+
+    # Sale de la lista normal y de la asignación, pero el admin lo ve con todos=true.
+    activos = [u["id"] for u in auth_client.get("/api/users").json()]
+    todos = {u["id"]: u for u in auth_client.get("/api/users?todos=true").json()}
+    assert created["id"] not in activos
+    assert todos[created["id"]]["is_active"] is False
+
+    login = client.post(
+        "/api/auth/login",
+        json={"email": VALID_USER["email"], "password": VALID_USER["password"]},
+    )
+    assert login.status_code == 403
+
+    resp = auth_client.patch(f"/api/users/{created['id']}", json={"is_active": True})
+    assert resp.json()["is_active"] is True
+    login = client.post(
+        "/api/auth/login",
+        json={"email": VALID_USER["email"], "password": VALID_USER["password"]},
+    )
+    assert login.status_code == 200
+
+
+def test_deactivated_user_loses_an_open_session(auth_client, client):
+    auth_client.post("/api/users", json=VALID_USER)
+    token = client.post(
+        "/api/auth/login",
+        json={"email": VALID_USER["email"], "password": VALID_USER["password"]},
+    ).json()["access_token"]
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
+
+    auth_client.patch(f"/api/users/{me['id']}", json={"is_active": False})
+
+    resp = client.get("/api/tickets", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+def test_admin_cannot_deactivate_themselves(auth_client):
+    me = auth_client.get("/api/auth/me").json()
+    resp = auth_client.patch(f"/api/users/{me['id']}", json={"is_active": False})
+    assert resp.status_code == 400
+
+
+def test_non_admin_cannot_list_inactive_users(auth_client, client):
+    created = auth_client.post("/api/users", json=VALID_USER).json()
+    auth_client.post(
+        "/api/users",
+        json={**VALID_USER, "name": "Otro", "email": "otro.inactivo@tec.local"},
+    )
+    otro = [u for u in auth_client.get("/api/users").json() if u["email"] == "otro.inactivo@tec.local"][0]
+    auth_client.patch(f"/api/users/{otro['id']}", json={"is_active": False})
+    token = client.post(
+        "/api/auth/login",
+        json={"email": VALID_USER["email"], "password": VALID_USER["password"]},
+    ).json()["access_token"]
+
+    users = client.get("/api/users?todos=true", headers={"Authorization": f"Bearer {token}"}).json()
+    assert otro["id"] not in [u["id"] for u in users]
+    assert created["id"] in [u["id"] for u in users]

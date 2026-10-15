@@ -230,6 +230,11 @@
     .auth-footer a:hover {
       text-decoration: underline;
     }
+    .nota-registro {
+      margin: 0 0 1rem;
+      font-size: 0.85rem;
+      color: #5d6880;
+    }
     .role-selector {
       display: none;
     }
@@ -301,7 +306,8 @@
         </div>
         <div class="btn-grp">
           <button type="submit" id="btn-login" class="btn-primario">Entrar</button>
-          <button type="button" id="tab-register" class="btn-secundario">Crear cuenta</button>
+          <!-- Solo aparece la primera vez, cuando aún no existe ningún usuario. -->
+          <button type="button" id="tab-register" class="btn-secundario" hidden>Crear administrador</button>
         </div>
       </form>
 
@@ -323,20 +329,12 @@
           <input type="checkbox" id="register-memory" name="remember-memory">
           <span>Recordar sesión</span>
         </div>
-        <div class="campo">
-          <select id="register-role" name="role" class="form-input" style="width: 100%; padding: 0.5rem; border: 1px solid #dde3ee; border-radius: 8px;">
-            <option value="">Selecciona un rol</option>
-            <option value="Solicitante">Solicitante</option>
-            <option value="Técnico">Técnico</option>
-            <option value="Supervisor">Supervisor</option>
-            <option value="Administrador">Administrador</option>
-          </select>
-          <div id="role-selector" class="role-selector" style="display: none; margin-top: 0.5rem;">
-            <span>Rol obligatorio para el primer usuario</span>
-          </div>
-        </div>
+        <p class="nota-registro">
+          Primera vez: esta cuenta será el <b>Administrador</b>. Después, las
+          demás cuentas se crean desde <b>Usuarios</b>.
+        </p>
         <div class="btn-grp">
-          <button type="submit" id="btn-register" class="btn-primario">Crear cuenta</button>
+          <button type="submit" id="btn-register" class="btn-primario">Crear administrador</button>
           <button type="button" id="tab-login" class="btn-secundario">Volver a iniciar sesión</button>
         </div>
       </form>
@@ -358,7 +356,6 @@
       const formRegister = document.getElementById("form-register");
       const errorDiv = document.getElementById("auth-error");
       const successDiv = document.getElementById("auth-success");
-      const roleSelector = document.getElementById("role-selector");
       const btnLogin = document.getElementById("btn-login");
       const btnRegister = document.getElementById("btn-register");
 
@@ -418,7 +415,7 @@
           tabLogin.classList.remove("activo");
           formRegister.classList.add("activo");
           formLogin.classList.remove("activo");
-          document.querySelector('.login-titulo').textContent = 'Crear cuenta';
+          document.querySelector('.login-titulo').textContent = 'Crear administrador';
         }
       }
 
@@ -505,8 +502,6 @@
         const name = document.getElementById("register-name").value.trim();
         const email = document.getElementById("register-email").value.trim();
         const password = document.getElementById("register-password").value;
-        const roleSelector = document.getElementById("role-selector");
-
         if (!name || !email || !password) {
           showError("Todos los campos son obligatorios.");
           return;
@@ -517,12 +512,9 @@
           return;
         }
 
-        const payload = { name, email, password };
-
-        // Solo enviar rol si es el primer usuario y el selector está visible
-        if (isFirstUser && roleSelector.classList.contains("visible")) {
-          payload.role = document.getElementById("register-role").value;
-        }
+        /* El registro solo existe para el primer usuario: el servidor lo
+           crea como Administrador. */
+        const payload = { name, email, password, role: "Administrador" };
 
         setLoading(btnRegister, true);
 
@@ -583,21 +575,20 @@
       document.querySelectorAll(".toggle-password").forEach(el => el.addEventListener("click", () => { const i = el.parentElement.querySelector("input"); i.type = i.type === "password" ? "text" : "password"; }));
       // --- Inicialización ---
 
-      // Verificar si hay usuarios registrados (con contraseña)
+      // Primera vez (ningún usuario puede iniciar sesión): se ofrece crear
+      // el Administrador. Después el registro queda cerrado.
       async function initCheck() {
         try {
-          // Intentamos obtener la lista de usuarios para ver si hay alguno
-          const resp = await fetch("/api/users");
+          const resp = await fetch(`${API_BASE}/setup`);
           if (resp.ok) {
-            const users = await resp.json();
-            // Si no hay usuarios, mostrar el selector de rol (primer usuario = admin)
-            if (users.length === 0) {
+            const data = await resp.json();
+            if (data.needs_setup) {
               isFirstUser = true;
-              roleSelector.classList.add("visible");
+              tabRegister.hidden = false;
+              activateTab("register");
             }
           }
         } catch (e) {
-          // Si no se puede verificar, ocultamos el selector por seguridad
           isFirstUser = false;
         }
       }

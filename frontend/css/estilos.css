@@ -560,6 +560,19 @@ button.secundario:disabled:hover {
   color: #a61b1b;
 }
 
+/* Usuario desactivado */
+.badge-inactivo {
+  background: var(--color-fondo-neutro);
+  border-color: var(--color-borde-fuerte);
+  color: var(--color-tenue-fuerte);
+}
+
+.celda-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 /* Usuario activo (listado de usuarios, Tarea 20.3) */
 .badge-activo {
   background: var(--color-exito-fondo);
@@ -1143,6 +1156,140 @@ body.app {
 .app .contenido {
   width: 100%;
   padding: 0 2rem;
+}
+
+/* ---------- Panel de resumen, vistas y paginación (listado) ---------- */
+
+.resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--espaciado-md);
+  margin-bottom: var(--espaciado-lg);
+}
+
+.tarjeta-resumen {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-borde);
+  border-left: 4px solid var(--color-primario);
+  border-radius: var(--radio-medio);
+  background: var(--color-superficie-alta);
+  color: var(--color-texto);
+  box-shadow: var(--sombra-suave);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.tarjeta-resumen:hover {
+  background: var(--color-superficie-alta);
+  box-shadow: var(--sombra-tarjeta);
+  transform: translateY(-1px);
+}
+
+.tarjeta-resumen.alerta {
+  border-left-color: #c62828;
+}
+
+.tarjeta-resumen.destacada {
+  border-left-color: var(--color-marca);
+  background: var(--color-primario-tenue);
+}
+
+.tarjeta-numero {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-marino);
+}
+
+.tarjeta-etiqueta {
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  color: var(--color-tenue);
+}
+
+.vista-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin-bottom: var(--espaciado-md);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-suave);
+  background: var(--color-superficie-alta);
+}
+
+.vista-tabs .vista-tab {
+  padding: 0.4rem 1rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-tenue-fuerte);
+  font-weight: 600;
+}
+
+.vista-tabs .vista-tab:hover {
+  background: var(--color-primario-tenue);
+}
+
+.vista-tabs .vista-tab.activa {
+  background: var(--color-primario);
+  color: var(--color-texto-inverso);
+}
+
+.paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaciado-lg);
+  margin-top: var(--espaciado-lg);
+  font-size: var(--texto-sm);
+  color: var(--color-tenue-fuerte);
+}
+
+.btn-accion.secundario {
+  background: var(--color-superficie-alta);
+  color: var(--color-primario);
+  border-color: var(--color-borde-fuerte);
+}
+
+/* ---------- Detalle del ticket en dos columnas ---------- */
+
+.detalle-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.detalle-lateral {
+  position: sticky;
+  top: 1rem;
+}
+
+.detalle-lateral > .seccion:first-child {
+  margin-top: 0;
+}
+
+/* Sin acciones visibles (Solicitante) la columna lateral desaparece. */
+.detalle-layout:not(:has(.detalle-lateral > .seccion:not([hidden]))) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.detalle-lateral:not(:has(> .seccion:not([hidden]))) {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .detalle-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detalle-lateral {
+    position: static;
+  }
 }
 
 .texto-secundario {

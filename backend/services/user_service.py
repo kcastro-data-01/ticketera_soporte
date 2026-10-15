@@ -26,15 +26,16 @@ def create_user(session, payload: UserCreate) -> User | None:
     return user
 
 
-def list_users(session) -> list[User]:
-    """Return the active users available to assign tickets, ordered by id.
+def list_users(session, include_inactive: bool = False) -> list[User]:
+    """Return the users ordered by id; only the active ones by default.
 
-    Read-only: only rows with ``is_active`` are exposed, so the frontend
-    selector never offers an inactive user.
+    Read-only. Without ``include_inactive`` only rows with ``is_active`` are
+    exposed, so the assignment selector never offers an inactive user; the
+    administration page asks for all of them to reactivate accounts.
     """
-    statement = (
-        select(User).where(User.is_active.is_(True)).order_by(User.id)
-    )
+    statement = select(User).order_by(User.id)
+    if not include_inactive:
+        statement = statement.where(User.is_active.is_(True))
     return list(session.scalars(statement).all())
 
 
@@ -87,6 +88,8 @@ def update_user(session, user_id: int, payload: UserUpdate) -> User | None:
         user.role = payload.role.value
     if payload.password is not None:
         user.password_hash = hash_password(payload.password)
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
 
     session.commit()
     session.refresh(user)

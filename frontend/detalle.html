@@ -21,6 +21,7 @@
       <a href="historial.html" class="menu-enlace" data-permiso="historial_global"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg><span>Historial</span></a>
       <a href="usuarios.html" class="menu-enlace" data-permiso="usuarios"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span>Usuarios</span></a>
       <a href="ayuda.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg><span>Ayuda</span></a>
+      <a href="cuenta.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Mi cuenta</span></a>
     </nav>
     <div class="barra-usuario">
       <span class="usuario-avatar" id="usuario-iniciales" aria-hidden="true"></span>
@@ -45,186 +46,193 @@
 
     <main class="contenido">
       <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
+
+      <div class="detalle-layout">
+        <div class="detalle-principal">
   
-      <div class="acciones acciones-principales" data-permiso="editar">
-        <button type="button" id="editar">Editar ticket</button>
+          <div class="acciones acciones-principales" data-permiso="editar">
+            <button type="button" id="editar">Editar ticket</button>
+          </div>
+  
+          <section id="panel-ticket" class="filtros detalle" aria-label="Datos del ticket">
+            <div class="campo-dato">
+              <span class="etiqueta">ID</span>
+              <span id="ver-id">—</span>
+            </div>
+            <div class="campo-dato ancho">
+              <span class="etiqueta">Título</span>
+              <span id="ver-title">—</span>
+            </div>
+            <div class="campo-dato ancho">
+              <span class="etiqueta">Descripción</span>
+              <span id="ver-description">—</span>
+            </div>
+            <div class="campo-dato">
+              <span class="etiqueta">Categoría</span>
+              <span id="ver-category">—</span>
+            </div>
+            <div class="campo-dato">
+              <span class="etiqueta">Prioridad</span>
+              <span id="ver-priority">—</span>
+            </div>
+            <div class="campo-dato">
+              <span class="etiqueta">Estado</span>
+              <span id="ver-state">—</span>
+            </div>
+            <div class="campo-dato">
+              <span class="etiqueta">Asignado a</span>
+              <span id="ver-assigned">—</span>
+            </div>
+            <div class="campo-dato">
+              <span class="etiqueta">Fecha de creación</span>
+              <span id="ver-created">—</span>
+            </div>
+            <div class="campo-dato">
+              <span class="etiqueta">Fecha de actualización</span>
+              <span id="ver-updated">—</span>
+            </div>
+          </section>
+  
+          <section id="seccion-edicion" class="seccion" aria-label="Edición del ticket" hidden>
+            <h2>Editar ticket</h2>
+            <p class="nota" id="modo-edicion">
+              <b>Editando ticket.</b> Los cambios solo se aplican al pulsar
+              «Guardar cambios»; «Cancelar» descarta lo escrito y vuelve a la
+              consulta del ticket.
+            </p>
+            <form id="form-editar" class="filtros formulario" novalidate>
+              <label class="campo">
+                <span>Título *</span>
+                <input type="text" id="title" name="title" required maxlength="200">
+              </label>
+              <label class="campo">
+                <span>Descripción *</span>
+                <textarea id="description" name="description" required></textarea>
+              </label>
+              <label class="campo">
+                <span>Categoría</span>
+                <select id="category" name="category">
+                  <option value="Hardware">Hardware</option>
+                  <option value="Software">Software</option>
+                  <option value="Red">Red</option>
+                  <option value="Accesos">Accesos</option>
+                </select>
+              </label>
+              <label class="campo">
+                <span>Prioridad</span>
+                <select id="priority" name="priority">
+                  <option value="Baja">Baja</option>
+                  <option value="Media">Media</option>
+                  <option value="Alta">Alta</option>
+                  <option value="Crítica">Crítica</option>
+                </select>
+              </label>
+              <div class="acciones">
+                <button type="submit" id="guardar">Guardar cambios</button>
+                <button type="button" id="cancelar-edicion" class="secundario">Cancelar</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="seccion" aria-label="Comentarios del ticket">
+            <h2>Comentarios</h2>
+            <p class="nota">
+              Los comentarios se muestran de más antiguo a más reciente.
+            </p>
+            <p
+              id="comentarios-estado"
+              class="estado"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></p>
+            <div id="lista-comentarios" class="comentarios" hidden></div>
+            <form id="form-comentario" class="filtros formulario" novalidate>
+              <label class="campo">
+                <span>Nuevo comentario</span>
+                <textarea
+                  id="contenido"
+                  name="content"
+                  maxlength="2000"
+                  placeholder="Escribe aquí el comentario"
+                ></textarea>
+              </label>
+              <div class="acciones">
+                <button type="submit" id="comentar">Agregar comentario</button>
+              </div>
+            </form>
+          </section>
+  
+          <section class="seccion" aria-label="Historial del ticket">
+            <h2>Historial de cambios</h2>
+            <div class="filtros formulario">
+              <div class="acciones">
+                <button type="button" id="historial">Ver historial</button>
+              </div>
+            </div>
+            <p
+              id="historial-estado"
+              class="estado"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></p>
+            <table class="listado" id="tabla-historial" hidden>
+              <thead>
+                <tr>
+                  <th>Fecha y hora</th>
+                  <th>Persona</th>
+                  <th>Acción</th>
+                  <th>Detalle</th>
+                </tr>
+              </thead>
+              <tbody id="historial-cuerpo"></tbody>
+            </table>
+          </section>
+        </div>
+
+        <aside class="detalle-lateral" aria-label="Acciones del ticket">
+          <section class="seccion" aria-label="Asignación del ticket" data-permiso="asignar">
+            <h2>Asignación</h2>
+            <div class="filtros formulario">
+              <label class="campo">
+                <span>Persona asignada</span>
+                <select id="usuario">
+                  <option value="">Sin asignar</option>
+                </select>
+              </label>
+              <div class="acciones">
+                <button type="button" id="asignar">Guardar asignación</button>
+              </div>
+            </div>
+            <p id="usuarios-nota" class="nota" hidden>
+              No hay usuarios disponibles. Puedes crear uno desde
+              <a href="usuarios.html">Usuarios</a>.
+            </p>
+          </section>
+
+          <section class="seccion" aria-label="Cambio de estado del ticket" data-permiso="cambiar_estado">
+            <h2>Cambio de estado</h2>
+            <div class="filtros formulario">
+              <div class="campo">
+                <span>Estado actual</span>
+                <strong id="estado-actual">—</strong>
+              </div>
+              <label class="campo">
+                <span>Pasar a</span>
+                <select id="estado-destino"></select>
+              </label>
+              <div class="acciones">
+                <button type="button" id="cambiar-estado">Cambiar estado</button>
+              </div>
+            </div>
+            <p class="nota" id="estado-final" hidden>
+              Este ticket está <b>Cerrado</b>: es un estado final y no admite más
+              cambios de estado.
+            </p>
+          </section>
+        </aside>
       </div>
-  
-      <section id="panel-ticket" class="filtros detalle" aria-label="Datos del ticket">
-        <div class="campo-dato">
-          <span class="etiqueta">ID</span>
-          <span id="ver-id">—</span>
-        </div>
-        <div class="campo-dato ancho">
-          <span class="etiqueta">Título</span>
-          <span id="ver-title">—</span>
-        </div>
-        <div class="campo-dato ancho">
-          <span class="etiqueta">Descripción</span>
-          <span id="ver-description">—</span>
-        </div>
-        <div class="campo-dato">
-          <span class="etiqueta">Categoría</span>
-          <span id="ver-category">—</span>
-        </div>
-        <div class="campo-dato">
-          <span class="etiqueta">Prioridad</span>
-          <span id="ver-priority">—</span>
-        </div>
-        <div class="campo-dato">
-          <span class="etiqueta">Estado</span>
-          <span id="ver-state">—</span>
-        </div>
-        <div class="campo-dato">
-          <span class="etiqueta">Asignado a</span>
-          <span id="ver-assigned">—</span>
-        </div>
-        <div class="campo-dato">
-          <span class="etiqueta">Fecha de creación</span>
-          <span id="ver-created">—</span>
-        </div>
-        <div class="campo-dato">
-          <span class="etiqueta">Fecha de actualización</span>
-          <span id="ver-updated">—</span>
-        </div>
-      </section>
-  
-      <section id="seccion-edicion" class="seccion" aria-label="Edición del ticket" hidden>
-        <h2>Editar ticket</h2>
-        <p class="nota" id="modo-edicion">
-          <b>Editando ticket.</b> Los cambios solo se aplican al pulsar
-          «Guardar cambios»; «Cancelar» descarta lo escrito y vuelve a la
-          consulta del ticket.
-        </p>
-        <form id="form-editar" class="filtros formulario" novalidate>
-          <label class="campo">
-            <span>Título *</span>
-            <input type="text" id="title" name="title" required maxlength="200">
-          </label>
-          <label class="campo">
-            <span>Descripción *</span>
-            <textarea id="description" name="description" required></textarea>
-          </label>
-          <label class="campo">
-            <span>Categoría</span>
-            <select id="category" name="category">
-              <option value="Hardware">Hardware</option>
-              <option value="Software">Software</option>
-              <option value="Red">Red</option>
-              <option value="Accesos">Accesos</option>
-            </select>
-          </label>
-          <label class="campo">
-            <span>Prioridad</span>
-            <select id="priority" name="priority">
-              <option value="Baja">Baja</option>
-              <option value="Media">Media</option>
-              <option value="Alta">Alta</option>
-              <option value="Crítica">Crítica</option>
-            </select>
-          </label>
-          <div class="acciones">
-            <button type="submit" id="guardar">Guardar cambios</button>
-            <button type="button" id="cancelar-edicion" class="secundario">Cancelar</button>
-          </div>
-        </form>
-      </section>
-  
-      <section class="seccion" aria-label="Asignación del ticket" data-permiso="asignar">
-        <h2>Asignación</h2>
-        <div class="filtros formulario">
-          <label class="campo">
-            <span>Persona asignada</span>
-            <select id="usuario">
-              <option value="">Sin asignar</option>
-            </select>
-          </label>
-          <div class="acciones">
-            <button type="button" id="asignar">Guardar asignación</button>
-          </div>
-        </div>
-        <p id="usuarios-nota" class="nota" hidden>
-          No hay usuarios disponibles. Puedes crear uno desde
-          <a href="usuarios.html">Usuarios</a>.
-        </p>
-      </section>
-  
-      <section class="seccion" aria-label="Cambio de estado del ticket" data-permiso="cambiar_estado">
-        <h2>Cambio de estado</h2>
-        <div class="filtros formulario">
-          <div class="campo">
-            <span>Estado actual</span>
-            <strong id="estado-actual">—</strong>
-          </div>
-          <label class="campo">
-            <span>Pasar a</span>
-            <select id="estado-destino"></select>
-          </label>
-          <div class="acciones">
-            <button type="button" id="cambiar-estado">Cambiar estado</button>
-          </div>
-        </div>
-        <p class="nota" id="estado-final" hidden>
-          Este ticket está <b>Cerrado</b>: es un estado final y no admite más
-          cambios de estado.
-        </p>
-      </section>
-  
-      <section class="seccion" aria-label="Comentarios del ticket">
-        <h2>Comentarios</h2>
-        <p class="nota">
-          Los comentarios se muestran de más antiguo a más reciente.
-        </p>
-        <p
-          id="comentarios-estado"
-          class="estado"
-          role="status"
-          aria-live="polite"
-          hidden
-        ></p>
-        <div id="lista-comentarios" class="comentarios" hidden></div>
-        <form id="form-comentario" class="filtros formulario" novalidate>
-          <label class="campo">
-            <span>Nuevo comentario</span>
-            <textarea
-              id="contenido"
-              name="content"
-              maxlength="2000"
-              placeholder="Escribe aquí el comentario"
-            ></textarea>
-          </label>
-          <div class="acciones">
-            <button type="submit" id="comentar">Agregar comentario</button>
-          </div>
-        </form>
-      </section>
-  
-      <section class="seccion" aria-label="Historial del ticket">
-        <h2>Historial de cambios</h2>
-        <div class="filtros formulario">
-          <div class="acciones">
-            <button type="button" id="historial">Ver historial</button>
-          </div>
-        </div>
-        <p
-          id="historial-estado"
-          class="estado"
-          role="status"
-          aria-live="polite"
-          hidden
-        ></p>
-        <table class="listado" id="tabla-historial" hidden>
-          <thead>
-            <tr>
-              <th>Fecha y hora</th>
-              <th>Persona</th>
-              <th>Acción</th>
-              <th>Detalle</th>
-            </tr>
-          </thead>
-          <tbody id="historial-cuerpo"></tbody>
-        </table>
-      </section>
     </main>
 
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>

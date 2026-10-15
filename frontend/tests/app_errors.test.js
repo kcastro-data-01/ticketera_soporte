@@ -122,6 +122,7 @@ function createHarness(fetchImpl) {
     },
     fetchCalls,
     consoleErrors,
+    sandbox,
   };
 }
 
@@ -140,7 +141,7 @@ test("respuesta 200 con tickets: se pinta la lista y se oculta el estado", async
   await harness.fetchTickets();
 
   assertFetchCount(harness, 1);
-  assert.equal(harness.fetchCalls[0], "/api/tickets");
+  assert.equal(harness.fetchCalls[0], "/api/tickets?limit=20");
   assert.equal(harness.estado().hidden, true);
   assert.equal(harness.tbody().children.length, 1);
   assert.equal(harness.consoleErrors.length, 0);
@@ -157,7 +158,7 @@ test("respuesta 200 vacía: se muestra el mensaje de vacío", async () => {
   assert.equal(harness.estado().hidden, false);
 });
 
-test("con filtros la URL conserva los parámetros y sin filtros usa /api/tickets", async () => {
+test("con filtros la URL conserva los parámetros y siempre pide una página de 20", async () => {
   const harness = createHarness(async () => jsonResponse(200, []));
 
   await harness.fetchTickets();
@@ -169,10 +170,18 @@ test("con filtros la URL conserva los parámetros y sin filtros usa /api/tickets
 
   /* Cada ejecución añade exactamente UNA petición. */
   assertFetchCount(harness, 2);
-  assert.equal(harness.fetchCalls[0], "/api/tickets");
+  assert.equal(harness.fetchCalls[0], "/api/tickets?limit=20");
   assert.equal(
     harness.fetchCalls[1],
-    "/api/tickets?search=correo&state=En+proceso"
+    "/api/tickets?search=correo&state=En+proceso&limit=20"
+  );
+});
+
+test("buildTicketsUrl: mios y offset de la página", () => {
+  const harness = createHarness(async () => jsonResponse(200, []));
+  assert.equal(
+    harness.sandbox.buildTicketsUrl({ mios: true }, 2),
+    "/api/tickets?mios=true&limit=20&offset=40"
   );
 });
 

@@ -102,7 +102,9 @@ function jsonResponse(status, body) {
 function makeFetch(overrides = {}) {
   const resolve = (value, fallback) =>
     typeof value === "function" ? value() : value !== undefined ? value : fallback;
-  return async (url, options = {}) => {
+  return async (rawUrl, options = {}) => {
+    /* La lista se pide con ?todos=true (incluye desactivados). */
+    const url = rawUrl.split("?")[0];
     const method = (options.method || "GET").toUpperCase();
     if (url === "/api/users" && method === "POST") {
       return resolve(overrides.create, jsonResponse(201, USER_A));
@@ -180,7 +182,7 @@ test("init lista los usuarios con nombre, correo, rol y estado", async () => {
 
   await harness.init();
 
-  assert.deepEqual(harness.urls(), ["/api/users"]);
+  assert.deepEqual(harness.urls(), ["/api/users?todos=true"]);
   const rows = harness.node("cuerpo-usuarios").children;
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[0].children.map((cell) => cell.textContent), [
@@ -375,7 +377,7 @@ test("crear usuario envía los datos, recarga la lista y limpia el formulario", 
 
   await harness.crear();
 
-  assert.deepEqual(harness.urls(), ["/api/users", "/api/users"]);
+  assert.deepEqual(harness.urls(), ["/api/users", "/api/users?todos=true"]);
   assert.equal(harness.fetchCalls[0].options.method, "POST");
   assert.deepEqual(JSON.parse(harness.fetchCalls[0].options.body), {
     name: "Carlos Gómez",

@@ -48,6 +48,18 @@ filtrarlos, y consultar su historial de cambios.
   usar. El Solicitante solo ve, comenta y consulta el historial de los tickets
   que creó (`tickets.created_by_id`, migración automática al arrancar).
 
+- Panel de inicio con resumen (Nuevos, En proceso, Resueltos, Críticos sin
+  resolver, Asignados a mí; `GET /api/tickets/summary`), vista «Mis tickets»
+  (`?mios=true`) y paginación de 20 en 20 (`limit`/`offset`, total en la
+  cabecera `X-Total-Count`).
+- «Mi cuenta»: cada usuario cambia su contraseña
+  (`POST /api/auth/change-password`).
+- Desactivar/reactivar usuarios desde Usuarios (`is_active` en
+  `PATCH /api/users/{id}`; `GET /api/users?todos=true` para el admin). Un
+  usuario desactivado no inicia sesión y pierde la sesión abierta.
+- El registro público solo existe para crear el primer Administrador
+  (`GET /api/auth/setup`); las demás cuentas las crea un Administrador.
+
 **Pendientes**
 
 - **Registro de historial para el resto de acciones (RF9, escritura)** — la

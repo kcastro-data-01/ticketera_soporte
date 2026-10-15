@@ -21,6 +21,7 @@
       <a href="historial.html" class="menu-enlace" data-permiso="historial_global"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg><span>Historial</span></a>
       <a href="usuarios.html" class="menu-enlace" data-permiso="usuarios"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span>Usuarios</span></a>
       <a href="ayuda.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg><span>Ayuda</span></a>
+      <a href="cuenta.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Mi cuenta</span></a>
     </nav>
     <div class="barra-usuario">
       <span class="usuario-avatar" id="usuario-iniciales" aria-hidden="true"></span>
@@ -44,6 +45,34 @@
     </header>
 
     <main class="contenido">
+    <section class="resumen" aria-label="Resumen de tickets">
+      <button type="button" class="tarjeta-resumen" data-estado="Nuevo">
+        <span class="tarjeta-numero" id="res-nuevos">—</span>
+        <span class="tarjeta-etiqueta">Nuevos</span>
+      </button>
+      <button type="button" class="tarjeta-resumen" data-estado="En proceso">
+        <span class="tarjeta-numero" id="res-en-proceso">—</span>
+        <span class="tarjeta-etiqueta">En proceso</span>
+      </button>
+      <button type="button" class="tarjeta-resumen" data-estado="Resuelto">
+        <span class="tarjeta-numero" id="res-resueltos">—</span>
+        <span class="tarjeta-etiqueta">Resueltos</span>
+      </button>
+      <button type="button" class="tarjeta-resumen alerta" data-prioridad="Crítica">
+        <span class="tarjeta-numero" id="res-criticos">—</span>
+        <span class="tarjeta-etiqueta">Críticos sin resolver</span>
+      </button>
+      <button type="button" class="tarjeta-resumen destacada" data-mios="true" data-permiso="cambiar_estado">
+        <span class="tarjeta-numero" id="res-mios">—</span>
+        <span class="tarjeta-etiqueta">Asignados a mí</span>
+      </button>
+    </section>
+
+    <div class="vista-tabs" role="group" aria-label="Qué tickets ver" data-permiso="cambiar_estado">
+      <button type="button" id="vista-todos" class="vista-tab activa" aria-pressed="true">Todos</button>
+      <button type="button" id="vista-mios" class="vista-tab" aria-pressed="false">Mis tickets</button>
+    </div>
+
     <form id="form-filtros" class="filtros">
       <label class="campo campo-busqueda">
         <span>Buscar</span>
@@ -114,6 +143,12 @@
         <tbody id="lista-tickets"></tbody>
       </table>
     </div>
+
+    <nav class="paginacion" id="paginacion" aria-label="Páginas del listado" hidden>
+      <button type="button" id="pagina-anterior" class="secundario">← Anterior</button>
+      <span id="pagina-info"></span>
+      <button type="button" id="pagina-siguiente" class="secundario">Siguiente →</button>
+    </nav>
     </main>
 
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>

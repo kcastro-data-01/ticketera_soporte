@@ -145,26 +145,81 @@ function renderUsers(users) {
     appendCell(row, user.email);
     appendCell(row, user.role);
 
+    const activo = user.is_active !== false;
     const stateCell = document.createElement("td");
     const badge = document.createElement("span");
-    badge.className = "badge badge-activo";
-    badge.textContent = "Activo";
+    badge.className = activo ? "badge badge-activo" : "badge badge-inactivo";
+    badge.textContent = activo ? "Activo" : "Inactivo";
     stateCell.appendChild(badge);
     row.appendChild(stateCell);
 
     const actionsCell = document.createElement("td");
+    actionsCell.className = "celda-acciones";
     const editBtn = document.createElement("button");
     editBtn.type = "button";
     editBtn.className = "btn-accion";
     editBtn.textContent = "Editar";
     editBtn.addEventListener("click", () => editarUsuario(user));
     actionsCell.appendChild(editBtn);
+
+    /* Nadie se desactiva a sí mismo: el botón no aparece en su fila. */
+    const sesion = getUser();
+    if (!sesion || sesion.id !== user.id) {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.type = "button";
+      toggleBtn.className = activo ? "btn-accion secundario" : "btn-accion";
+      toggleBtn.textContent = activo ? "Desactivar" : "Reactivar";
+      toggleBtn.addEventListener("click", () => cambiarActivo(user, !activo));
+      actionsCell.appendChild(toggleBtn);
+    }
     row.appendChild(actionsCell);
 
     elements.cuerpo.appendChild(row);
   });
   ocultarUsuariosEstado();
   elements.tabla.hidden = false;
+}
+
+/* Desactiva o reactiva un usuario. Desactivado no puede iniciar sesión ni
+   recibe tickets, pero conserva su historial. */
+async function cambiarActivo(user, activar) {
+  if (ocupado) return;
+  if (
+    !activar &&
+    typeof window.confirm === "function" &&
+    !window.confirm(
+      `¿Desactivar a ${user.name}? No podrá iniciar sesión ni recibir tickets.`
+    )
+  ) {
+    return;
+  }
+  ocupado = true;
+  try {
+    const response = await fetchWithAuth(`${API_USERS_URL}/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: activar }),
+    });
+    const body = response.ok ? null : await response.json().catch(() => null);
+    if (!response.ok) {
+      showStatus(mensajeDeError(response, body), "error");
+      return;
+    }
+    showStatus(
+      activar ? `${user.name} fue reactivado.` : `${user.name} fue desactivado.`,
+      "exito"
+    );
+    ocupado = false;
+    await cargarUsuarios();
+  } catch (error) {
+    console.error("PATCH /api/users (is_active):", error);
+    showStatus(
+      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "error"
+    );
+  } finally {
+    ocupado = false;
+  }
 }
 
 function mostrarEdicionEstado(message, type) {
@@ -265,7 +320,8 @@ async function cargarUsuarios() {
   elements.tabla.hidden = true;
   mostrarUsuariosEstado("Cargando usuarios...", "cargando");
   try {
-    const response = await fetchWithAuth(API_USERS_URL);
+    /* todos=true: el administrador también ve los usuarios desactivados. */
+    const response = await fetchWithAuth(`${API_USERS_URL}?todos=true`);
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
       mostrarUsuariosEstado(mensajeDeError(response, payload), "error");

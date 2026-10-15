@@ -13,7 +13,14 @@ from backend.auth import (
 from backend.constants import UserRole
 from backend.database import get_session
 from backend.models import User
-from backend.schemas import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from backend.schemas import (
+    ChangePasswordRequest,
+    LoginRequest,
+    RegisterRequest,
+    SetupResponse,
+    TokenResponse,
+    UserResponse,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
@@ -113,6 +120,43 @@ def _count_users_with_password(session: Session) -> int:
     )
 
 
+@router.get(
+    "/setup",
+    response_model=SetupResponse,
+    summary="¿Falta crear el primer usuario?",
+)
+def setup_status(session: Session = Depends(get_session)) -> SetupResponse:
+    """Public: tells the login page whether to offer the first registration."""
+    return SetupResponse(needs_setup=_count_users_with_password(session) == 0)
+
+
+@router.post(
+    "/change-password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Cambiar mi contraseña",
+)
+def change_password(
+    payload: ChangePasswordRequest,
+    session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user),
+) -> None:
+    """Let the logged-in user change their own password."""
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No autenticado",
+        )
+    if current_user.password_hash is None or not verify_password(
+        payload.current_password, current_user.password_hash
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña actual no es correcta",
+        )
+    current_user.password_hash = hash_password(payload.new_password)
+    session.commit()
+
+
 @router.post(
     "/register",
     response_model=TokenResponse,
@@ -122,9 +166,17 @@ def _count_users_with_password(session: Session) -> int:
 def register(payload: RegisterRequest, session: Session = Depends(get_session)) -> TokenResponse:
     """Register a new user and return an access token.
 
-    The first user to register can choose their role (typically Administrador).
-    Subsequent registrations are always forced to the Solicitante role.
+    Only available while no user can log in yet: the first user chooses their
+    role (``Administrador`` by default). Afterwards it answers ``403``.
     """
+    # Registration is only open to create the first user (the administrator);
+    # afterwards accounts are created by an administrator from Usuarios.
+    if _count_users_with_password(session) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El registro está cerrado: pide a un administrador que cree tu cuenta",
+        )
+
     # Check if email already exists
     existing = _get_user_by_email(session, payload.email)
     if existing is not None:
@@ -132,15 +184,7 @@ def register(payload: RegisterRequest, session: Session = Depends(get_session)) 
             status_code=status.HTTP_409_CONFLICT,
             detail=f"El email {payload.email} ya está registrado",
         )
-
-    # Determine role: first user can choose, rest are forced to Solicitante
-    user_count = _count_users_with_password(session)
-    if user_count == 0:
-        # First registration: allow the requested role (default to Solicitante if not provided)
-        role = payload.role if payload.role else UserRole.REQUESTER
-    else:
-        # Subsequent registrations: always Solicitante
-        role = UserRole.REQUESTER
+    role = payload.role if payload.role else UserRole.ADMIN
 
     # Create the user with hashed password
     user = User(

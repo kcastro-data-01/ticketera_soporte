@@ -23,16 +23,28 @@ VALID_TICKET = {
 
 
 def register_requester(client, email="solicitante.test@correo.local") -> dict:
-    """Register a user via /api/auth/register and return the token.
+    """Create a ``Solicitante`` with login and return its token.
 
-    Subsequent registrations are forced to the ``Solicitante`` role by the
-    existing business rule, so this returns a Solicitante token.
+    Self-registration is closed after the first user, so the user is
+    inserted directly (as an administrator would create it) and logs in.
     """
-    resp = client.post(
-        "/api/auth/register",
-        json={"name": "Solicitante Test", "email": email, "password": "clave12345"},
+    from backend.auth import hash_password
+    from backend.database import get_session
+    from backend.main import app
+    from backend.models import User
+
+    session = next(app.dependency_overrides[get_session]())
+    session.add(
+        User(
+            name="Solicitante Test",
+            email=email,
+            role=UserRole.REQUESTER.value,
+            password_hash=hash_password("clave12345"),
+        )
     )
-    assert resp.status_code == 201
+    session.commit()
+    resp = client.post("/api/auth/login", json={"email": email, "password": "clave12345"})
+    assert resp.status_code == 200
     return resp.json()["access_token"]
 
 

@@ -166,14 +166,16 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     """Payload accepted by ``PATCH /api/users/{user_id}`` (partial update).
 
-    Only the editable fields exist here: ``id`` and ``is_active`` cannot be
-    modified through this payload. At least one field must be provided.
+    Only the editable fields exist here: ``id`` cannot be modified.
+    ``is_active`` deactivates (``false``) or reactivates (``true``) the user.
+    At least one field must be provided.
     """
 
     name: str | None = None
     email: str | None = None
     role: UserRole | None = None
     password: str | None = None
+    is_active: bool | None = None
 
     @field_validator("password")
     @classmethod
@@ -217,7 +219,7 @@ class UserUpdate(BaseModel):
         if not provided:
             raise ValueError(
                 "la petición debe incluir al menos un campo a modificar: "
-                "name, email, role o password"
+                "name, email, role, password o is_active"
             )
         return self
 
@@ -231,6 +233,7 @@ class UserResponse(BaseModel):
     name: str
     email: str
     role: UserRole
+    is_active: bool = True
 
 
 class TicketAssignment(BaseModel):
@@ -345,6 +348,36 @@ class LoginRequest(BaseModel):
         if not value:
             raise ValueError("la contraseña no puede estar vacía")
         return value
+
+
+class ChangePasswordRequest(BaseModel):
+    """Payload accepted by ``POST /api/auth/change-password``."""
+
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_must_be_valid(cls, value: str) -> str:
+        return _validate_password(value)
+
+
+class SetupResponse(BaseModel):
+    """``needs_setup`` is true while no user can log in yet (first run)."""
+
+    needs_setup: bool
+
+
+class TicketSummary(BaseModel):
+    """Ticket counters for the dashboard, limited to the visible tickets."""
+
+    total: int
+    nuevos: int
+    en_proceso: int
+    resueltos: int
+    cerrados: int
+    criticos_abiertos: int
+    mios_abiertos: int
 
 
 class RegisterRequest(BaseModel):

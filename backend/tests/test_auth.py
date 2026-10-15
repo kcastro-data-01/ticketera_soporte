@@ -27,10 +27,9 @@ def test_register_first_user_can_be_admin(client):
     assert data["expires_in"] > 0
 
 
-def test_register_second_user_forced_to_requester(client):
-    """Second registration is forced to Solicitante role regardless of what they send."""
-    # Create first user
-    client.post(
+def test_register_is_closed_after_the_first_user(client):
+    """Once a user can log in, self-registration answers 403."""
+    first = client.post(
         "/api/auth/register",
         json={
             "name": "First User",
@@ -39,53 +38,32 @@ def test_register_second_user_forced_to_requester(client):
             "role": "Administrador",
         },
     )
+    assert first.status_code == 201
 
-    # Second user tries to be Soporte
     resp = client.post(
         "/api/auth/register",
-        json={
-            "name": "Second User",
-            "email": "second@test.com",
-            "password": "pass123456",
-            "role": "Técnico",
-        },
+        json={"name": "Second User", "email": "second@test.com", "password": "pass123456"},
     )
-    assert resp.status_code == 201
-    assert "access_token" in resp.json()
-
-    # Verify the user was created as Solicitante
-    me_resp = client.get(
-        "/api/auth/me",
-        headers={"Authorization": f"Bearer {resp.json()['access_token']}"},
+    assert resp.status_code == 403
+    # Even reusing an email it never reveals whether it exists.
+    resp = client.post(
+        "/api/auth/register",
+        json={"name": "Dup", "email": "first@test.com", "password": "pass123456"},
     )
-    assert me_resp.status_code == 200
-    assert me_resp.json()["role"] == "Solicitante"
+    assert resp.status_code == 403
 
 
-def test_register_duplicate_email_returns_409(client):
-    """Registering with an already-used email returns 409 Conflict."""
+def test_setup_status_reports_first_run(client):
+    assert client.get("/api/auth/setup").json() == {"needs_setup": True}
     client.post(
         "/api/auth/register",
-        json={
-            "name": "User One",
-            "email": "dup@test.com",
-            "password": "pass123456",
-        },
+        json={"name": "Admin", "email": "admin@test.com", "password": "pass123456"},
     )
-
-    resp = client.post(
-        "/api/auth/register",
-        json={
-            "name": "User Two",
-            "email": "dup@test.com",
-            "password": "pass123456",
-        },
-    )
-    assert resp.status_code == 409
+    assert client.get("/api/auth/setup").json() == {"needs_setup": False}
 
 
-def test_register_without_role_defaults_to_requester(client):
-    """If no role is provided, default to Solicitante."""
+def test_register_without_role_defaults_to_admin(client):
+    """The first user without an explicit role becomes Administrador."""
     resp = client.post(
         "/api/auth/register",
         json={
@@ -101,7 +79,7 @@ def test_register_without_role_defaults_to_requester(client):
         headers={"Authorization": f"Bearer {resp.json()['access_token']}"},
     )
     assert me_resp.status_code == 200
-    assert me_resp.json()["role"] == "Solicitante"
+    assert me_resp.json()["role"] == "Administrador"
 
 
 def test_register_weak_password_returns_422(client):
@@ -325,3 +303,43 @@ def test_migration_adds_password_hash_column(engine):
     inspector = inspect(engine)
     columns = [col["name"] for col in inspector.get_columns("users")]
     assert "password_hash" in columns
+
+
+# --- Change password ---
+
+
+def test_user_can_change_own_password(auth_client, client):
+    resp = auth_client.post(
+        "/api/auth/change-password",
+        json={"current_password": "testpass123", "new_password": "otraclave1"},
+    )
+    assert resp.status_code == 204
+
+    old = client.post("/api/auth/login", json={"email": "testadmin@test.com", "password": "testpass123"})
+    new = client.post("/api/auth/login", json={"email": "testadmin@test.com", "password": "otraclave1"})
+    assert old.status_code == 401
+    assert new.status_code == 200
+
+
+def test_change_password_rejects_wrong_current_password(auth_client):
+    resp = auth_client.post(
+        "/api/auth/change-password",
+        json={"current_password": "incorrecta", "new_password": "otraclave1"},
+    )
+    assert resp.status_code == 400
+
+
+def test_change_password_validates_new_password(auth_client):
+    resp = auth_client.post(
+        "/api/auth/change-password",
+        json={"current_password": "testpass123", "new_password": "123"},
+    )
+    assert resp.status_code == 422
+
+
+def test_change_password_requires_login(client):
+    resp = client.post(
+        "/api/auth/change-password",
+        json={"current_password": "x", "new_password": "otraclave1"},
+    )
+    assert resp.status_code == 401

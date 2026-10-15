@@ -1,7 +1,7 @@
 """Business logic for tickets (creation, listing, edition, retrieval,
 assignment and comments)."""
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import joinedload
 
 from backend.constants import TicketCategory, TicketPriority, TicketState, UserRole
@@ -158,7 +158,10 @@ def list_tickets(
     priority: TicketPriority | None = None,
     state: TicketState | None = None,
     created_by_id: int | None = None,
-) -> list[Ticket]:
+    assigned_to_id: int | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> tuple[list[Ticket], int]:
     """Return stored tickets, newest first (RF6), optionally searched and
     filtered (RF7, RF8).
 
@@ -167,12 +170,19 @@ def list_tickets(
     ``search`` behaves as if it were not sent. When no criteria are given the
     query is identical to the plain listing. Read-only query: it never
     modifies the stored rows. ``created_by_id`` restricts the listing to the
-    tickets created by that user (used for the ``Solicitante`` role).
+    tickets created by that user (used for the ``Solicitante`` role) and
+    ``assigned_to_id`` to the tickets assigned to that user ("Mis tickets").
+
+    Returns ``(page, total)``: ``total`` counts every matching ticket and
+    ``page`` holds at most ``limit`` of them starting at ``offset`` (all of
+    them when ``limit`` is ``None``).
     """
     statement = select(Ticket)
 
     if created_by_id is not None:
         statement = statement.where(Ticket.created_by_id == created_by_id)
+    if assigned_to_id is not None:
+        statement = statement.where(Ticket.assigned_to_id == assigned_to_id)
 
     if category is not None:
         statement = statement.where(Ticket.category == category.value)
@@ -191,8 +201,43 @@ def list_tickets(
                 )
             )
 
+    total = session.scalar(select(func.count()).select_from(statement.subquery()))
     statement = statement.order_by(Ticket.created_at.desc(), Ticket.id.desc())
-    return list(session.scalars(statement).all())
+    if offset:
+        statement = statement.offset(offset)
+    if limit is not None:
+        statement = statement.limit(limit)
+    return list(session.scalars(statement).all()), total
+
+
+OPEN_STATES = (TicketState.NEW.value, TicketState.IN_PROGRESS.value)
+
+
+def ticket_summary(session, user: User) -> dict[str, int]:
+    """Counters for the dashboard over the tickets ``user`` can see."""
+    base = select(Ticket)
+    if user.role == UserRole.REQUESTER.value:
+        base = base.where(Ticket.created_by_id == user.id)
+
+    def count(*conditions) -> int:
+        statement = base.where(*conditions) if conditions else base
+        return session.scalar(select(func.count()).select_from(statement.subquery()))
+
+    return {
+        "total": count(),
+        "nuevos": count(Ticket.state == TicketState.NEW.value),
+        "en_proceso": count(Ticket.state == TicketState.IN_PROGRESS.value),
+        "resueltos": count(Ticket.state == TicketState.RESOLVED.value),
+        "cerrados": count(Ticket.state == TicketState.CLOSED.value),
+        "criticos_abiertos": count(
+            Ticket.priority == TicketPriority.CRITICAL.value,
+            Ticket.state.in_(OPEN_STATES),
+        ),
+        "mios_abiertos": count(
+            Ticket.assigned_to_id == user.id,
+            Ticket.state.in_(OPEN_STATES),
+        ),
+    }
 
 
 def get_ticket(session, ticket_id: int) -> Ticket | None:

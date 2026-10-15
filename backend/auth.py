@@ -87,7 +87,8 @@ def get_current_user(
 
     user_id = int(payload.get("sub", "0"))
     user = session.get(User, user_id)
-    if user is None:
+    # A deactivated user loses access immediately, even with a valid token.
+    if user is None or not user.is_active:
         return None
 
     return user
