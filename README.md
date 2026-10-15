@@ -484,19 +484,24 @@ un modelo abierto y gratuito que corre en tu propia computadora con
 
 - `ticketera`: la aplicación.
 - `ollama`: el servidor de modelos.
-- `ollama-descarga`: descarga `qwen3:4b` (unos 2,5 GB) la primera vez y
+- `ollama-descarga`: descarga `qwen3:1.7b` (unos 1,4 GB) la primera vez y
   termina. Mientras descarga, el chat avisa que el modelo aún no está listo;
   el progreso se ve con `docker compose logs -f ollama-descarga`.
 
-Requisitos aproximados para `qwen3:4b`: 8 GB de RAM libres. En CPU cada
-respuesta tarda varios segundos; con poca memoria usa un modelo más pequeño
-(`qwen3:1.7b` o `qwen3:0.6b`, más rápidos pero menos precisos) y con GPU uno
-más grande (`qwen3:8b`), creando un archivo `.env` junto a
-`docker-compose.yml`:
+Requisitos aproximados para `qwen3:1.7b`: 3-4 GB de RAM libres. En CPU cada
+respuesta tarda varios segundos. Si la computadora se traba o el chat avisa
+que falta memoria, usa `qwen3:0.6b` (más rápido, menos preciso); con más
+memoria o GPU, `qwen3:4b` u `qwen3:8b` responden mejor. Se elige creando un
+archivo `.env` junto a `docker-compose.yml`:
 
 ```
-QWEN_MODELO=qwen3:1.7b
+QWEN_MODELO=qwen3:0.6b
 ```
+
+y ejecutando `docker compose up -d` (descarga el modelo nuevo). Para borrar
+un modelo que ya no uses: `docker compose exec ollama ollama rm qwen3:4b`.
+Si usas Docker Desktop en Windows, la memoria disponible para Docker se
+ajusta en Settings → Resources.
 
 Para usar Claude en lugar de Qwen3, en el mismo `.env`:
 

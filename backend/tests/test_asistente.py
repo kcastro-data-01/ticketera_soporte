@@ -182,7 +182,7 @@ def test_default_provider_is_qwen_with_ollama(monkeypatch):
         monkeypatch.delenv(var, raising=False)
     proveedor = crear_proveedor()
     assert isinstance(proveedor, ProveedorQwen)
-    assert proveedor.modelo == "qwen3:4b"
+    assert proveedor.modelo == "qwen3:1.7b"
     assert proveedor.url == "http://localhost:11434"
 
 
@@ -224,6 +224,7 @@ def test_qwen_calls_ollama_chat_with_system_and_no_thinking():
     assert str(url) == "http://ollama:11434/api/chat"
     assert body["model"] == "qwen3:4b"
     assert body["stream"] is False and body["think"] is False
+    assert body["options"]["num_ctx"] == 8192
     assert body["messages"] == [
         {"role": "system", "content": "SISTEMA"},
         {"role": "user", "content": "hola"},
@@ -268,3 +269,21 @@ def test_claude_api_errors_are_translated():
     with pytest.raises(AsistenteNoDisponible):
         ProveedorClaude(fake).responder("S", [{"role": "user", "content": "x"}])
 
+
+
+def test_qwen_timeout_suggests_a_smaller_model():
+    def handler(request):
+        raise httpx.ReadTimeout("timeout", request=request)
+
+    with pytest.raises(AsistenteNoDisponible, match="tardó demasiado"):
+        qwen_con(handler).responder("S", [{"role": "user", "content": "hola"}])
+
+
+def test_qwen_out_of_memory_suggests_a_smaller_model():
+    proveedor = qwen_con(
+        lambda request: httpx.Response(
+            500, json={"error": "model requires more system memory (5.1 GiB) than is available (3.2 GiB)"}
+        )
+    )
+    with pytest.raises(AsistenteNoDisponible, match="memoria suficiente"):
+        proveedor.responder("S", [{"role": "user", "content": "hola"}])

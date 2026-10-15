@@ -26,9 +26,13 @@ from backend.models import Ticket, User
 from backend.services import ticket_service
 
 CLAUDE_MODEL = "claude-opus-5-5"
-QWEN_MODELO_POR_DEFECTO = "qwen3:4b"
+# Modelo liviano (≈1,4 GB): funciona en computadoras sin GPU y con poca RAM.
+QWEN_MODELO_POR_DEFECTO = "qwen3:1.7b"
+# Ventana de contexto para Ollama: alcanza para las instrucciones, los datos
+# visibles y la conversación sin reservar más memoria de la necesaria.
+QWEN_CONTEXTO = 8192
 OLLAMA_URL_POR_DEFECTO = "http://localhost:11434"
-MAX_TICKETS_IN_CONTEXT = 50
+MAX_TICKETS_IN_CONTEXT = 30
 
 # Qué puede hacer cada rol (espejo de la tabla de permisos de ayuda.html).
 PERMISOS_POR_ROL = {
@@ -184,8 +188,13 @@ class ProveedorQwen:
                     "stream": False,
                     # Sin modo de razonamiento: respuestas de chat más rápidas.
                     "think": False,
-                    "options": {"temperature": 0.3},
+                    "options": {"temperature": 0.3, "num_ctx": QWEN_CONTEXTO},
                 },
+            )
+        except httpx.TimeoutException:
+            raise AsistenteNoDisponible(
+                "El modelo tardó demasiado en responder; si tu computadora tiene poca "
+                "memoria, usa un modelo más pequeño (QWEN_MODELO=qwen3:0.6b)"
             )
         except httpx.HTTPError:
             raise AsistenteNoDisponible(
@@ -197,8 +206,19 @@ class ProveedorQwen:
                 "espera a que termine la descarga e inténtalo de nuevo"
             )
         if response.status_code >= 400:
+            detalle = ""
+            try:
+                detalle = str(response.json().get("error", ""))
+            except ValueError:
+                pass
+            if "memory" in detalle.lower():
+                raise AsistenteNoDisponible(
+                    f"No hay memoria suficiente para el modelo {self.modelo}; "
+                    "usa uno más pequeño (QWEN_MODELO=qwen3:0.6b)"
+                )
             raise AsistenteNoDisponible(
                 f"Ollama respondió con un error ({response.status_code})"
+                + (f": {detalle}" if detalle else "")
             )
         try:
             texto = response.json()["message"]["content"]
