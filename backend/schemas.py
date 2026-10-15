@@ -312,6 +312,7 @@ class HistoryResponse(BaseModel):
 
     id: int
     ticket_id: int
+    ticket_title: str | None = None
     action: str
     field: str | None = None
     old_value: str | None = None

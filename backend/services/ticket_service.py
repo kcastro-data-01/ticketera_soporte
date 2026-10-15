@@ -137,9 +137,10 @@ def create_ticket(
         History(
             ticket_id=ticket.id,
             action="created",
-            field=None,
+            # Automatic assignee (if any), so the history explains who got it.
+            field="assigned_to_id" if assignee is not None else None,
             old_value=None,
-            new_value=None,
+            new_value=assignee.name if assignee is not None else None,
             author=author_name,
             author_id=author_id,
         )
@@ -340,7 +341,7 @@ def assign_ticket(
     if assigned_to_id is not None and session.get(User, assigned_to_id) is None:
         raise UserNotFoundError(assigned_to_id)
 
-    old_assigned_to_id = ticket.assigned_to_id
+    old_assignee_name = ticket.assignee.name if ticket.assignee is not None else None
     ticket.assigned_to_id = assigned_to_id
     session.commit()
     session.refresh(ticket)
@@ -352,8 +353,9 @@ def assign_ticket(
             ticket_id=ticket.id,
             action="assigned",
             field="assigned_to_id",
-            old_value=str(old_assigned_to_id) if old_assigned_to_id is not None else None,
-            new_value=str(assigned_to_id) if assigned_to_id is not None else None,
+            # Names, not ids, so the history reads on its own ("Ana → Luis").
+            old_value=old_assignee_name,
+            new_value=ticket.assignee.name if ticket.assignee is not None else None,
             author=author_name,
             author_id=author_id,
         )

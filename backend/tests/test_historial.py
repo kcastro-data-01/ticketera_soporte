@@ -21,6 +21,7 @@ HISTORY_KEYS = {
     "author",
     "author_id",
     "created_at",
+    "ticket_title",
 }
 
 
@@ -223,3 +224,49 @@ def test_history_does_not_include_entries_of_other_tickets(auth_client, session)
     entries = response.json()
     assert len(entries) == 1
     assert entries[0]["ticket_id"] == ticket["id"]
+
+
+def test_assignment_history_records_names_and_ticket_title(auth_client):
+    """El historial de asignación guarda nombres, no ids, e incluye el título."""
+    # El ticket se crea antes que los técnicos: así no se asigna solo.
+    ticket = auth_client.post(
+        "/api/tickets",
+        json={
+            "title": "Ticket con nombres",
+            "description": "Historial legible.",
+            "category": "Red",
+            "priority": "Alta",
+        },
+    ).json()
+    ana = auth_client.post(
+        "/api/users",
+        json={"name": "Ana Pérez", "email": "ana.nombres@tec.local", "password": "clave12345"},
+    ).json()
+    luis = auth_client.post(
+        "/api/users",
+        json={"name": "Luis Mora", "email": "luis.nombres@tec.local", "password": "clave12345"},
+    ).json()
+    auth_client.patch(f"/api/tickets/{ticket['id']}/assign", json={"assigned_to_id": ana["id"]})
+    auth_client.patch(f"/api/tickets/{ticket['id']}/assign", json={"assigned_to_id": luis["id"]})
+    auth_client.patch(f"/api/tickets/{ticket['id']}/assign", json={"assigned_to_id": None})
+
+    entries = auth_client.get(f"/api/tickets/{ticket['id']}/history").json()
+    assigned = [(e["old_value"], e["new_value"]) for e in entries if e["action"] == "assigned"]
+    assert assigned == [(None, "Ana Pérez"), ("Ana Pérez", "Luis Mora"), ("Luis Mora", None)]
+    assert all(e["ticket_title"] == "Ticket con nombres" for e in entries)
+
+
+def test_creation_history_records_the_automatic_assignee(auth_client):
+    tecnico = auth_client.post(
+        "/api/users",
+        json={"name": "José Solano", "email": "jose.auto@tec.local", "password": "clave12345"},
+    ).json()
+    ticket = auth_client.post(
+        "/api/tickets",
+        json={"title": "Auto asignado", "description": "x", "category": "Red", "priority": "Baja"},
+    ).json()
+    assert ticket["assigned_to_id"] == tecnico["id"]
+
+    created = auth_client.get(f"/api/tickets/{ticket['id']}/history").json()[0]
+    assert created["action"] == "created"
+    assert created["new_value"] == "José Solano"

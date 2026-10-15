@@ -1145,6 +1145,13 @@ body.app {
   padding: 0 2rem;
 }
 
+.texto-secundario {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue);
+}
+
 .celda-fecha {
   white-space: nowrap;
 }

@@ -71,6 +71,25 @@
         <li><strong>Solicitante</strong>: Quien crea el ticket</li>
       </ul>
 
+      <h2>Cómo leer el historial</h2>
+      <p>Cada fila del historial es una acción hecha sobre un ticket: cuándo pasó, quién la hizo, qué hizo y el detalle del cambio (valor anterior → valor nuevo).</p>
+      <div class="tabla-scroll">
+        <table class="listado">
+          <thead>
+            <tr><th>Acción</th><th>Cuándo aparece</th><th>Ejemplo de detalle</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Creó el ticket</td><td>Alguien registra un ticket nuevo. Si se asignó solo a un Técnico, se indica a quién.</td><td>Asignado automáticamente a José Solano</td></tr>
+            <tr><td>Editó el ticket</td><td>Se cambia el título, la descripción, la categoría o la prioridad (una fila por cada dato).</td><td>Prioridad: «Media» → «Alta»</td></tr>
+            <tr><td>Asignó el ticket</td><td>Se cambia la persona responsable.</td><td>José Solano → Carlos Rojas</td></tr>
+            <tr><td>Quitó la asignación</td><td>El ticket queda sin responsable.</td><td>Carlos Rojas → Sin asignar</td></tr>
+            <tr><td>Cambió el estado</td><td>El ticket avanza en el flujo.</td><td>Nuevo → En proceso</td></tr>
+            <tr><td>Comentó</td><td>Alguien agrega un comentario.</td><td>«Ya revisé el cable de red»</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>«Sistema» en la columna Quién indica registros antiguos, guardados antes de que el sistema identificara a cada usuario.</p>
+
       <h2>Permisos por rol</h2>
       <div class="tabla-scroll">
         <table class="listado">

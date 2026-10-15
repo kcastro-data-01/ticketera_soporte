@@ -42,14 +42,20 @@ function appendCell(row, text) {
   row.appendChild(cell);
 }
 
-/* El ID del ticket enlaza a su pantalla de detalle. */
-function appendTicketCell(row, ticketId) {
+/* El ticket enlaza a su pantalla de detalle; debajo se muestra su título. */
+function appendTicketCell(row, ticketId, ticketTitle) {
   const cell = document.createElement("td");
   const link = document.createElement("a");
   link.className = "enlace-tabla";
   link.href = `detalle.html?id=${ticketId}`;
   link.textContent = `#${ticketId}`;
   cell.appendChild(link);
+  if (ticketTitle) {
+    const titulo = document.createElement("span");
+    titulo.className = "texto-secundario";
+    titulo.textContent = ticketTitle;
+    cell.appendChild(titulo);
+  }
   row.appendChild(cell);
 }
 
@@ -73,13 +79,12 @@ function renderHistorial(entries) {
 
   entries.forEach((entry) => {
     const row = document.createElement("tr");
+    const { accion, detalle } = describirHistorial(entry);
     appendCell(row, formatFecha(entry.created_at));
-    appendTicketCell(row, entry.ticket_id);
-    appendCell(row, entry.action || "—");
-    appendCell(row, entry.field || "—");
-    appendCell(row, entry.old_value || "—");
-    appendCell(row, entry.new_value || "—");
+    appendTicketCell(row, entry.ticket_id, entry.ticket_title);
     appendCell(row, formatAutor(entry));
+    appendCell(row, accion);
+    appendCell(row, detalle);
     elements.tbody.appendChild(row);
   });
 

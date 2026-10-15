@@ -139,40 +139,77 @@ test("el historial se pide con fetchWithAuth y envía el Bearer token", async ()
   );
 });
 
-test("con sesión válida pinta las siete columnas del registro", async () => {
-  const harness = createHarness(async () => jsonResponse(200, [ENTRY]));
+test("con sesión válida pinta fecha, ticket, quién, acción y detalle en español", async () => {
+  const entry = { ...ENTRY, ticket_title: "Impresora sin conexión" };
+  const harness = createHarness(async () => jsonResponse(200, [entry]));
 
   await harness.init();
 
   const rows = harness.tbody().children;
   assert.equal(rows.length, 1);
-  assert.equal(rows[0].children.length, 7);
+  assert.equal(rows[0].children.length, 5);
 
-  const [fecha, ticket, accion, campo, anterior, nuevo, autor] =
-    rows[0].children;
+  const [fecha, ticket, quien, accion, detalle] = rows[0].children;
   assert.match(fecha.textContent, /12:27:20/); // 18:27Z son las 12:27 de Costa Rica
   assert.equal(ticket.children[0].href, "detalle.html?id=7");
   assert.equal(ticket.children[0].textContent, "#7");
-  assert.equal(accion.textContent, "Cambio de estado");
-  assert.equal(campo.textContent, "state");
-  assert.equal(anterior.textContent, "Nuevo");
-  assert.equal(nuevo.textContent, "En proceso");
-  assert.equal(autor.textContent, "Ana Pérez");
+  assert.equal(ticket.children[1].textContent, "Impresora sin conexión");
+  assert.equal(quien.textContent, "Ana Pérez");
+  assert.equal(accion.textContent, "Cambió el estado");
+  assert.equal(detalle.textContent, "Nuevo → En proceso");
   assert.equal(harness.estado().hidden, true);
 });
 
-test("conserva el autor real y usa — solo para campos no registrados", async () => {
-  const sinDetalle = { ...ENTRY, field: null, old_value: null, new_value: null };
-  const harness = createHarness(async () => jsonResponse(200, [sinDetalle]));
+const CASOS = [
+  [{ action: "created", field: null, old_value: null, new_value: null }, "Creó el ticket", "—"],
+  [
+    { action: "created", field: "assigned_to_id", old_value: null, new_value: "José Solano" },
+    "Creó el ticket",
+    "Asignado automáticamente a José Solano",
+  ],
+  [
+    { action: "updated", field: "title", old_value: "Impresora", new_value: "Impresora del 2do piso" },
+    "Editó el ticket",
+    "Título: «Impresora» → «Impresora del 2do piso»",
+  ],
+  [
+    { action: "updated", field: "priority", old_value: "Media", new_value: "Alta" },
+    "Editó el ticket",
+    "Prioridad: «Media» → «Alta»",
+  ],
+  [
+    { action: "assigned", field: "assigned_to_id", old_value: null, new_value: "José Solano" },
+    "Asignó el ticket",
+    "Sin asignar → José Solano",
+  ],
+  [
+    { action: "assigned", field: "assigned_to_id", old_value: "José Solano", new_value: null },
+    "Quitó la asignación",
+    "José Solano → Sin asignar",
+  ],
+  [
+    { action: "assigned", field: "assigned_to_id", old_value: "3", new_value: "5" },
+    "Asignó el ticket",
+    "Usuario #3 → Usuario #5",
+  ],
+  [
+    { action: "commented", field: "comment", old_value: null, new_value: "Ya revisé el cable" },
+    "Comentó",
+    "«Ya revisé el cable»",
+  ],
+];
 
-  await harness.init();
+for (const [cambios, accionEsperada, detalleEsperado] of CASOS) {
+  test(`registro ${cambios.action}/${cambios.field}: ${accionEsperada}`, async () => {
+    const harness = createHarness(async () => jsonResponse(200, [{ ...ENTRY, ...cambios }]));
 
-  const cells = harness.tbody().children[0].children;
-  assert.equal(cells[3].textContent, "—");
-  assert.equal(cells[4].textContent, "—");
-  assert.equal(cells[5].textContent, "—");
-  assert.equal(cells[6].textContent, "Ana Pérez");
-});
+    await harness.init();
+
+    const cells = harness.tbody().children[0].children;
+    assert.equal(cells[3].textContent, accionEsperada);
+    assert.equal(cells[4].textContent, detalleEsperado);
+  });
+}
 
 /* Registros antiguos (anteriores a la auditoría con usuario) se muestran
    como "Sistema", nunca como "Anónimo". */
@@ -183,8 +220,7 @@ test("registro legacy con author 'Anónimo' se muestra como Sistema", async () =
   await harness.init();
 
   const cells = harness.tbody().children[0].children;
-  assert.equal(cells[6].textContent, "Sistema");
-  assert.notEqual(cells[6].textContent, "Anónimo");
+  assert.equal(cells[2].textContent, "Sistema");
 });
 
 test("registro legacy sin author (null o vacío) se muestra como Sistema", async () => {
@@ -195,8 +231,8 @@ test("registro legacy sin author (null o vacío) se muestra como Sistema", async
   await harness.init();
 
   const rows = harness.tbody().children;
-  assert.equal(rows[0].children[6].textContent, "Sistema");
-  assert.equal(rows[1].children[6].textContent, "Sistema");
+  assert.equal(rows[0].children[2].textContent, "Sistema");
+  assert.equal(rows[1].children[2].textContent, "Sistema");
 });
 
 test("lista vacía muestra el mensaje de vacío", async () => {

@@ -650,18 +650,6 @@ function ocultarHistorialEstado() {
   elements.historialEstado.hidden = true;
 }
 
-/* Describe el cambio con los campos que realmente trae el registro:
-   campo modificado y valores anterior → nuevo; "—" si no hay detalle. */
-function formatDetalleHistorial(entry) {
-  const partes = [];
-  if (entry.field) partes.push(entry.field);
-  const hayValores = entry.old_value !== null || entry.new_value !== null;
-  if (hayValores) {
-    partes.push(`${entry.old_value ?? "—"} → ${entry.new_value ?? "—"}`);
-  }
-  return partes.length > 0 ? partes.join(": ") : "—";
-}
-
 function appendCeldaHistorial(row, text) {
   const cell = document.createElement("td");
   cell.textContent = text;
@@ -695,8 +683,9 @@ function renderHistorial(entries) {
     /* Registros antiguos sin usuario autenticado (vacíos o "Anónimo")
        se muestran como "Sistema". */
     appendCeldaHistorial(row, formatAutorHistorial(entry));
-    appendCeldaHistorial(row, entry.action || "—");
-    appendCeldaHistorial(row, formatDetalleHistorial(entry));
+    const { accion, detalle } = describirHistorial(entry);
+    appendCeldaHistorial(row, accion);
+    appendCeldaHistorial(row, detalle);
     elements.historialCuerpo.appendChild(row);
   });
   ocultarHistorialEstado();

@@ -24,6 +24,7 @@ HISTORY_KEYS = {
     "author",
     "author_id",
     "created_at",
+    "ticket_title",
 }
 
 

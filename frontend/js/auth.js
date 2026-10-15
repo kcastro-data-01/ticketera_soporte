@@ -152,6 +152,64 @@ function claseBadge(valor) {
   return clase ? `badge ${clase}` : "badge";
 }
 
+/* ---------- Historial legible ----------
+   Traduce un registro de historial (acción, campo, valores) a una acción
+   y un detalle en español. Los registros antiguos de asignación guardaban
+   ids de usuario: se muestran como «Usuario #id». */
+const CAMPOS_HISTORIAL = {
+  title: "Título",
+  description: "Descripción",
+  category: "Categoría",
+  priority: "Prioridad",
+  state: "Estado",
+};
+
+function recortar(texto, maximo = 120) {
+  const limpio = String(texto).replace(/\s+/g, " ").trim();
+  return limpio.length > maximo ? `${limpio.slice(0, maximo - 1)}…` : limpio;
+}
+
+function nombreAsignacion(valor) {
+  if (valor === null || valor === undefined || valor === "") return "Sin asignar";
+  return /^\d+$/.test(String(valor)) ? `Usuario #${valor}` : String(valor);
+}
+
+function describirHistorial(entry) {
+  const antes = entry.old_value;
+  const despues = entry.new_value;
+  switch (entry.action) {
+    case "created":
+      return {
+        accion: "Creó el ticket",
+        detalle: despues ? `Asignado automáticamente a ${despues}` : "—",
+      };
+    case "updated": {
+      const campo = CAMPOS_HISTORIAL[entry.field] || entry.field || "Dato";
+      return {
+        accion: "Editó el ticket",
+        detalle: `${campo}: «${recortar(antes ?? "")}» → «${recortar(despues ?? "")}»`,
+      };
+    }
+    case "assigned":
+      return {
+        accion: despues ? "Asignó el ticket" : "Quitó la asignación",
+        detalle: `${nombreAsignacion(antes)} → ${nombreAsignacion(despues)}`,
+      };
+    case "Cambio de estado":
+    case "state_changed":
+      return { accion: "Cambió el estado", detalle: `${antes ?? "—"} → ${despues ?? "—"}` };
+    case "commented":
+      return { accion: "Comentó", detalle: despues ? `«${recortar(despues)}»` : "—" };
+    default: {
+      const hayValores = (antes ?? null) !== null || (despues ?? null) !== null;
+      return {
+        accion: entry.action || "—",
+        detalle: hayValores ? `${antes ?? "—"} → ${despues ?? "—"}` : "—",
+      };
+    }
+  }
+}
+
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
   document.addEventListener("DOMContentLoaded", () => {
     aplicarPermisos();

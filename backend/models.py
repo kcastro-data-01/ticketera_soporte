@@ -222,3 +222,8 @@ class History(Base):
     )
 
     ticket: Mapped[Ticket] = relationship(back_populates="history")
+
+    @property
+    def ticket_title(self) -> str | None:
+        """Title of the audited ticket, so history lists read on their own."""
+        return self.ticket.title if self.ticket is not None else None
