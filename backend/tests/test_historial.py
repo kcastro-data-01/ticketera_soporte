@@ -176,7 +176,7 @@ def test_every_write_action_records_the_authenticated_author(auth_client):
 
     other_user = auth_client.post(
         "/api/users",
-        json={"name": "Ana Pérez", "email": "ana-auditoria@test.local"},
+        json={"password": "clave12345", "name": "Ana Pérez", "email": "ana-auditoria@test.local"},
     )
     assert other_user.status_code == 201
 

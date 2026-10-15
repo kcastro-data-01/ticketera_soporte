@@ -166,7 +166,7 @@ def test_solicitante_cannot_create_user(client):
 
     resp = client.post(
         "/api/users",
-        json={"name": "Nuevo", "email": "nuevo@correo.local"},
+        json={"password": "clave12345", "name": "Nuevo", "email": "nuevo@correo.local"},
         headers=headers(token),
     )
     assert resp.status_code == 403
@@ -308,7 +308,7 @@ def test_tecnico_cannot_manage_users(client, auth_client, session):
 
     resp = client.post(
         "/api/users",
-        json={"name": "Nuevo", "email": "nuevo.tecnico@correo.local"},
+        json={"password": "clave12345", "name": "Nuevo", "email": "nuevo.tecnico@correo.local"},
         headers=headers(token),
     )
     assert resp.status_code == 403

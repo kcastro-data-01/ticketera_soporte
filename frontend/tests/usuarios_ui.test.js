@@ -46,6 +46,7 @@ const ELEMENT_IDS = [
   "form-usuario",
   "nombre",
   "email",
+  "password",
   "rol",
   "crear",
   "usuarios-estado",
@@ -56,6 +57,7 @@ const ELEMENT_IDS = [
   "editar-id",
   "editar-nombre",
   "editar-email",
+  "editar-password",
   "editar-rol",
   "guardar-edicion",
   "cancelar-edicion",
@@ -116,6 +118,8 @@ function createHarness(fetchImpl) {
   const nodes = new Map(ELEMENT_IDS.map((id) => [id, createNode(id)]));
   /* Refleja <option value="Técnico" selected> del HTML real. */
   nodes.get("rol").value = "Técnico";
+  /* Contraseña válida por defecto: cada prueba cambia solo lo que valida. */
+  nodes.get("password").value = "clave2026";
   const fetchCalls = [];
   const consoleErrors = [];
 
@@ -318,6 +322,21 @@ test("email inválido devuelve error sin enviar", async () => {
   );
 });
 
+test("contraseña corta devuelve error sin enviar", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+
+  await assertValidation(
+    harness,
+    (h) => {
+      h.node("nombre").value = "Ana Pérez";
+      h.node("email").value = "ana@soporte.local";
+      h.node("password").value = "12345";
+    },
+    "La contraseña debe tener al menos 6 caracteres."
+  );
+});
+
 test("rol inválido devuelve error sin enviar", async () => {
   const harness = createHarness(makeFetch());
   await harness.init();
@@ -361,6 +380,7 @@ test("crear usuario envía los datos, recarga la lista y limpia el formulario", 
   assert.deepEqual(JSON.parse(harness.fetchCalls[0].options.body), {
     name: "Carlos Gómez",
     email: "carlos@soporte.local",
+    password: "clave2026",
     role: "Administrador",
   });
   /* La lista se recarga sola: el usuario nuevo aparece sin recargar. */
@@ -369,6 +389,7 @@ test("crear usuario envía los datos, recarga la lista y limpia el formulario", 
   assert.equal(rows[1].children[0].textContent, "Carlos Gómez");
   assert.equal(harness.node("nombre").value, "");
   assert.equal(harness.node("email").value, "");
+  assert.equal(harness.node("password").value, "", "no deja la contraseña escrita");
   assert.equal(harness.node("rol").value, "Técnico");
   assert.equal(
     harness.node("estado-usuario").textContent,

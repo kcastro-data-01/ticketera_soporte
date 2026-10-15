@@ -2,6 +2,7 @@
 
 from sqlalchemy import select
 
+from backend.auth import hash_password
 from backend.constants import AUTO_ASSIGN_ROLES
 from backend.models import User
 from backend.schemas import UserCreate, UserUpdate
@@ -17,6 +18,7 @@ def create_user(session, payload: UserCreate) -> User | None:
         name=payload.name,
         email=payload.email,
         role=payload.role.value,
+        password_hash=hash_password(payload.password),
     )
     session.add(user)
     session.commit()
@@ -83,6 +85,8 @@ def update_user(session, user_id: int, payload: UserUpdate) -> User | None:
         user.email = payload.email
     if payload.role is not None:
         user.role = payload.role.value
+    if payload.password is not None:
+        user.password_hash = hash_password(payload.password)
 
     session.commit()
     session.refresh(user)

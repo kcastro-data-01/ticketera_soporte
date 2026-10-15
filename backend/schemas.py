@@ -9,6 +9,24 @@ from backend.constants import TicketCategory, TicketPriority, TicketState, UserR
 
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# Password length accepted when an administrator creates or edits a user.
+# bcrypt only uses the first 72 bytes, so longer values are rejected.
+PASSWORD_MIN_LENGTH = 6
+PASSWORD_MAX_LENGTH = 72
+
+
+def _validate_password(value: str) -> str:
+    if len(value) < PASSWORD_MIN_LENGTH:
+        raise ValueError(
+            f"la contraseña debe tener al menos {PASSWORD_MIN_LENGTH} caracteres"
+        )
+    if len(value.encode("utf-8")) > PASSWORD_MAX_LENGTH:
+        raise ValueError(
+            f"la contraseña debe tener como máximo {PASSWORD_MAX_LENGTH} caracteres"
+        )
+    return value
+
+
 # Maximum length of a comment body, validated at the API layer (Task 9).
 COMMENT_MAX_LENGTH = 2000
 
@@ -111,11 +129,18 @@ class UserCreate(BaseModel):
 
     ``role`` is optional and defaults to ``Técnico`` (the same default the
     database applies); an explicit value must still be a valid role.
+    ``password`` is required so the new user can log in.
     """
 
     name: str
     email: str
+    password: str
     role: UserRole = UserRole.TECHNICIAN
+
+    @field_validator("password")
+    @classmethod
+    def password_must_be_valid(cls, value: str) -> str:
+        return _validate_password(value)
 
     @field_validator("name")
     @classmethod
@@ -148,6 +173,14 @@ class UserUpdate(BaseModel):
     name: str | None = None
     email: str | None = None
     role: UserRole | None = None
+    password: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def password_must_be_valid(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _validate_password(value)
 
     @field_validator("name")
     @classmethod
@@ -184,7 +217,7 @@ class UserUpdate(BaseModel):
         if not provided:
             raise ValueError(
                 "la petición debe incluir al menos un campo a modificar: "
-                "name, email o role"
+                "name, email, role o password"
             )
         return self
 

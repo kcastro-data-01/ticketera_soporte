@@ -143,8 +143,7 @@ def test_user_role_values_still_spanish(auth_client):
     """Guard: the timezone work must not alter the Spanish enums."""
     response = auth_client.post(
         "/api/users",
-        json={
-            "name": "Persona de prueba",
+        json={"password": "clave12345", "name": "Persona de prueba",
             "email": "persona.prueba@example.com",
             "role": UserRole.TECHNICIAN.value,
         },

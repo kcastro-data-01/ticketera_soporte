@@ -248,16 +248,19 @@ Crea el usuario mínimo usado para asignación y firma (sin autenticación).
 |-------|------|--------|
 | `name` | string | obligatorio, no vacío, máx. 120 |
 | `email` | string | formato de email válido, máx. 255, **único** |
+| `password` | string | obligatorio, entre 6 y 72 caracteres; se guarda cifrada y nunca se devuelve |
 | `role` | enum | `Administrador` \| `Supervisor` \| `Técnico` \| `Solicitante`; opcional, por defecto `Técnico` |
 
 **Respuestas:** `201` con `{id, name, email, role}` · `422` si `name` está
-vacío, el email no cumple el formato o el rol no es válido · `409 Conflict` si
+vacío, el email no cumple el formato, la contraseña falta o no cumple el largo,
+o el rol no es válido · `409 Conflict` si
 el email ya está registrado.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/users \
   -H "Content-Type: application/json" \
-  -d '{"name": "Ana Pérez", "email": "ana@soporte.local", "role": "Soporte"}'
+  -H "Authorization: Bearer <token de un Administrador>" \
+  -d '{"name": "Ana Pérez", "email": "ana.perez@tec.local", "password": "clave2026", "role": "Técnico"}'
 ```
 
 ### `GET /api/users`

@@ -27,8 +27,7 @@ def create_ticket(auth_client) -> dict:
 def create_user(auth_client, email: str) -> dict:
     response = auth_client.post(
         "/api/users",
-        json={
-            "name": email.split("@")[0].title(),
+        json={"password": "clave12345", "name": email.split("@")[0].title(),
             "email": email,
             "role": UserRole.TECHNICIAN.value,
         },
@@ -149,8 +148,7 @@ def test_user_management_and_assignment_integration(auth_client):
     # 1. Crear usuario.
     first = auth_client.post(
         "/api/users",
-        json={
-            "name": "Ana Pérez",
+        json={"password": "clave12345", "name": "Ana Pérez",
             "email": "ana.perez@soporte.local",
             "role": "Técnico",
         },
@@ -187,7 +185,7 @@ def test_user_management_and_assignment_integration(auth_client):
     # 7. Crear un segundo usuario (rol por defecto: Soporte).
     second = auth_client.post(
         "/api/users",
-        json={"name": "Carlos Gómez", "email": "carlos.gomez@soporte.local"},
+        json={"password": "clave12345", "name": "Carlos Gómez", "email": "carlos.gomez@soporte.local"},
     )
     assert second.status_code == 201
     second_id = second.json()["id"]

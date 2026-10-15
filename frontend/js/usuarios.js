@@ -17,6 +17,21 @@ const ROLES_VALIDOS = [
 /* Mismo patrón de correo que backend.schemas (UserCreate). */
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+/* Largo de contraseña aceptado (espejo de backend.schemas). */
+const PASSWORD_MIN = 6;
+const PASSWORD_MAX = 72;
+
+/* Mensaje de error de una contraseña, o "" si es válida. */
+function validarPassword(password) {
+  if (password.length < PASSWORD_MIN) {
+    return `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres.`;
+  }
+  if (password.length > PASSWORD_MAX) {
+    return `La contraseña debe tener como máximo ${PASSWORD_MAX} caracteres.`;
+  }
+  return "";
+}
+
 let ocupado = false;
 
 function getElements() {
@@ -25,6 +40,7 @@ function getElements() {
     formUsuario: document.getElementById("form-usuario"),
     nombre: document.getElementById("nombre"),
     email: document.getElementById("email"),
+    password: document.getElementById("password"),
     rol: document.getElementById("rol"),
     crear: document.getElementById("crear"),
     usuariosEstado: document.getElementById("usuarios-estado"),
@@ -35,6 +51,7 @@ function getElements() {
     editarId: document.getElementById("editar-id"),
     editarNombre: document.getElementById("editar-nombre"),
     editarEmail: document.getElementById("editar-email"),
+    editarPassword: document.getElementById("editar-password"),
     editarRol: document.getElementById("editar-rol"),
     guardarEdicion: document.getElementById("guardar-edicion"),
     cancelarEdicion: document.getElementById("cancelar-edicion"),
@@ -59,6 +76,8 @@ function validarUsuario() {
   if (!EMAIL_PATTERN.test(email)) {
     return "El correo electrónico no tiene un formato válido.";
   }
+  const errorPassword = validarPassword(elements.password ? elements.password.value : "");
+  if (errorPassword) return errorPassword;
   if (!ROLES_VALIDOS.includes(elements.rol.value)) {
     return "Selecciona un rol válido.";
   }
@@ -167,6 +186,7 @@ function editarUsuario(user) {
   elements.editarNombre.value = user.name;
   elements.editarEmail.value = user.email;
   elements.editarRol.value = user.role;
+  if (elements.editarPassword) elements.editarPassword.value = "";
   elements.seccionEditar.hidden = false;
   ocultarEdicionEstado();
   elements.seccionEditar.scrollIntoView({ behavior: "smooth" });
@@ -193,6 +213,17 @@ async function guardarEdicion(event) {
   if (nombre) payload.name = nombre;
   if (email) payload.email = email;
   if (rol) payload.role = rol;
+
+  /* La contraseña solo se envía si se escribió una nueva. */
+  const nuevaPassword = elements.editarPassword ? elements.editarPassword.value : "";
+  if (nuevaPassword) {
+    const errorPassword = validarPassword(nuevaPassword);
+    if (errorPassword) {
+      mostrarEdicionEstado(errorPassword, "error");
+      return;
+    }
+    payload.password = nuevaPassword;
+  }
 
   if (Object.keys(payload).length === 0) {
     mostrarEdicionEstado("No hay cambios para guardar.", "error");
@@ -268,6 +299,7 @@ async function crearUsuario(event) {
   const payload = {
     name: elements.nombre.value.trim(),
     email: elements.email.value.trim(),
+    password: elements.password.value,
     role: elements.rol.value,
   };
 
@@ -287,6 +319,7 @@ async function crearUsuario(event) {
 
     elements.nombre.value = "";
     elements.email.value = "";
+    elements.password.value = "";
     elements.rol.value = "Técnico";
     showStatus("Usuario agregado correctamente.", "exito");
     /* El usuario nuevo aparece en la lista sin recargar la página. */

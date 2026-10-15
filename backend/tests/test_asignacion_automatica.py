@@ -16,7 +16,7 @@ VALID_TICKET = {
 
 
 def create_user(auth_client, name, email, role=UserRole.TECHNICIAN.value, **overrides) -> dict:
-    payload = {"name": name, "email": email, "role": role, **overrides}
+    payload = {"name": name, "email": email, "role": role, "password": "clave12345", **overrides}
     response = auth_client.post("/api/users", json=payload)
     assert response.status_code == 201
     return response.json()

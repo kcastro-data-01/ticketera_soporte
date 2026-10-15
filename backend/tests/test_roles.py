@@ -29,7 +29,7 @@ NON_AUTO_ASSIGN_ROLES = [
 
 
 def create_user(auth_client, name, email, role=UserRole.TECHNICIAN.value, **overrides) -> dict:
-    payload = {"name": name, "email": email, "role": role, **overrides}
+    payload = {"name": name, "email": email, "role": role, "password": "clave12345", **overrides}
     response = auth_client.post("/api/users", json=payload)
     assert response.status_code == 201
     return response.json()
@@ -60,7 +60,7 @@ def assign(auth_client, ticket_id, user_id) -> dict:
 def test_every_role_can_be_created(auth_client, role):
     response = auth_client.post(
         "/api/users",
-        json={"name": f"Persona {role}", "email": f"{role}@soporte.local", "role": role},
+        json={"password": "clave12345", "name": f"Persona {role}", "email": f"{role}@soporte.local", "role": role},
     )
 
     assert response.status_code == 201
@@ -71,7 +71,7 @@ def test_every_role_can_be_created(auth_client, role):
 def test_every_role_round_trips_in_the_listing(auth_client, role):
     auth_client.post(
         "/api/users",
-        json={"name": f"Persona {role}", "email": f"{role}@soporte.local", "role": role},
+        json={"password": "clave12345", "name": f"Persona {role}", "email": f"{role}@soporte.local", "role": role},
     )
 
     data = auth_client.get("/api/users").json()
@@ -83,7 +83,7 @@ def test_every_role_round_trips_in_the_listing(auth_client, role):
 def test_unknown_role_is_still_rejected(auth_client):
     response = auth_client.post(
         "/api/users",
-        json={"name": "Nadie", "email": "nadie@soporte.local", "role": "SuperUsuario"},
+        json={"password": "clave12345", "name": "Nadie", "email": "nadie@soporte.local", "role": "SuperUsuario"},
     )
 
     assert response.status_code == 422
@@ -260,6 +260,6 @@ def test_manual_assignment_to_supervisor_is_accepted(auth_client):
 def test_removed_support_role_is_rejected(auth_client):
     response = auth_client.post(
         "/api/users",
-        json={"name": "Ana", "email": "ana-soporte@soporte.local", "role": "Soporte"},
+        json={"password": "clave12345", "name": "Ana", "email": "ana-soporte@soporte.local", "role": "Soporte"},
     )
     assert response.status_code == 422

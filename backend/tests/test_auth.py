@@ -169,19 +169,68 @@ def test_login_nonexistent_email_returns_401(client):
     assert resp.status_code == 401
 
 
-def test_login_user_without_password_returns_401(client):
-    """A user created via /api/users (no password) cannot login."""
-    # Create user via the old endpoint (no password)
-    client.post(
-        "/api/users",
-        json={"name": "No Pass User", "email": "nopass@test.com"},
-    )
+def test_login_user_without_password_returns_401(client, session):
+    """A legacy user stored without password cannot login."""
+    from backend.models import User
+
+    session.add(User(name="No Pass User", email="nopass@test.com", role="Técnico"))
+    session.commit()
 
     resp = client.post(
         "/api/auth/login",
         json={"email": "nopass@test.com", "password": "anypass"},
     )
     assert resp.status_code == 401
+
+
+def test_user_created_by_admin_can_login(auth_client, client):
+    """POST /api/users stores the password so the new user can log in."""
+    created = auth_client.post(
+        "/api/users",
+        json={
+            "name": "Nueva Persona",
+            "email": "nueva@tec.local",
+            "role": "Técnico",
+            "password": "clave2026",
+        },
+    )
+    assert created.status_code == 201
+    assert "password" not in created.json()
+
+    resp = client.post(
+        "/api/auth/login",
+        json={"email": "nueva@tec.local", "password": "clave2026"},
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [{}, {"password": "12345"}, {"password": "x" * 73}],
+    ids=["sin-contrasena", "muy-corta", "muy-larga"],
+)
+def test_create_user_requires_a_valid_password(auth_client, extra):
+    resp = auth_client.post(
+        "/api/users",
+        json={"name": "Sin Clave", "email": "sinclave@tec.local", **extra},
+    )
+    assert resp.status_code == 422
+
+
+def test_admin_can_reset_a_user_password(auth_client, client):
+    """PATCH /api/users/{id} with ``password`` replaces the login password."""
+    created = auth_client.post(
+        "/api/users",
+        json={"name": "Olvido", "email": "olvido@tec.local", "password": "vieja123"},
+    ).json()
+
+    resp = auth_client.patch(f"/api/users/{created['id']}", json={"password": "nueva456"})
+    assert resp.status_code == 200
+
+    old = client.post("/api/auth/login", json={"email": "olvido@tec.local", "password": "vieja123"})
+    new = client.post("/api/auth/login", json={"email": "olvido@tec.local", "password": "nueva456"})
+    assert old.status_code == 401
+    assert new.status_code == 200
 
 
 # --- Me ---

@@ -9,6 +9,7 @@ from backend.models import User
 VALID_USER = {
     "name": "Ana Pérez",
     "email": "ana@soporte.local",
+    "password": "clave12345",
     "role": UserRole.TECHNICIAN.value,
 }
 
@@ -142,7 +143,7 @@ def test_list_users_is_exposed_in_openapi(client):
 def test_create_user_without_role_defaults_to_support(auth_client):
     response = auth_client.post(
         "/api/users",
-        json={"name": "Persona Sin Rol", "email": "sinrol@soporte.local"},
+        json={"password": "clave12345", "name": "Persona Sin Rol", "email": "sinrol@soporte.local"},
     )
 
     assert response.status_code == 201
@@ -279,7 +280,7 @@ def test_update_user_duplicate_email_returns_409(auth_client):
     auth_client.post("/api/users", json=VALID_USER)
     other = auth_client.post(
         "/api/users",
-        json={"name": "Otro", "email": "otro@soporte.local"},
+        json={"password": "clave12345", "name": "Otro", "email": "otro@soporte.local"},
     ).json()
 
     response = auth_client.patch(
