@@ -21,7 +21,7 @@ import re
 import httpx
 from sqlalchemy import func, select
 
-from backend.constants import TICKET_STATES, TicketPriority, UserRole
+from backend.constants import TicketPriority, TicketState, UserRole
 from backend.models import Ticket, User
 from backend.services import ticket_service
 
@@ -159,10 +159,17 @@ def build_context(session, user: User, max_tickets: int = MAX_TICKETS_IN_CONTEXT
     )
 
     abiertos = Ticket.state.in_(ticket_service.OPEN_STATES)
-    for estado in TICKET_STATES:
+    for estado in (TicketState.NEW.value, TicketState.IN_PROGRESS.value):
         lines.extend(
             _grupo(session, base, f"Tickets en estado {estado}", max_tickets, Ticket.state == estado)
         )
+    # Un ticket Cerrado ya pasó por Resuelto: los dos cuentan como resueltos.
+    lines.extend(
+        _grupo(
+            session, base, "Tickets resueltos (estado Resuelto o Cerrado)", max_tickets,
+            Ticket.state.in_((TicketState.RESOLVED.value, TicketState.CLOSED.value)),
+        )
+    )
     lines.extend(
         _grupo(
             session, base, "Tickets críticos sin resolver", max_tickets,

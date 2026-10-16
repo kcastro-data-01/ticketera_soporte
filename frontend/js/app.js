@@ -51,7 +51,10 @@ function buildTicketsUrl(filters, pagina = 0) {
   if (filters.search) params.set("search", filters.search);
   if (filters.category) params.set("category", filters.category);
   if (filters.priority) params.set("priority", filters.priority);
-  if (filters.state) params.set("state", filters.state);
+  /* «Resuelto,Cerrado» pide varios estados: ?state=Resuelto&state=Cerrado. */
+  if (filters.state) {
+    filters.state.split(",").forEach((estado) => params.append("state", estado));
+  }
   if (filters.mios) params.set("mios", "true");
   params.set("limit", String(PAGE_SIZE));
   if (pagina > 0) params.set("offset", String(pagina * PAGE_SIZE));

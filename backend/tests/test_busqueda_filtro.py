@@ -400,3 +400,21 @@ def test_summary_counts_visible_tickets(auth_client):
         "criticos_abiertos": 1,
         "mios_abiertos": 1,
     }
+
+
+def test_closed_tickets_count_as_resolved_and_filter_by_several_states(auth_client):
+    resuelto = _ticket(auth_client, title="Resuelto")
+    cerrado = _ticket(auth_client, title="Cerrado")
+    nuevo = _ticket(auth_client, title="Nuevo")
+    for state in ("En proceso", "Resuelto"):
+        auth_client.patch(f"/api/tickets/{resuelto['id']}/state", json={"state": state})
+    for state in ("En proceso", "Resuelto", "Cerrado"):
+        auth_client.patch(f"/api/tickets/{cerrado['id']}/state", json={"state": state})
+
+    summary = auth_client.get("/api/tickets/summary").json()
+    assert summary["resueltos"] == 2
+    assert summary["cerrados"] == 1
+
+    ids = {t["id"] for t in auth_client.get("/api/tickets?state=Resuelto&state=Cerrado").json()}
+    assert ids == {resuelto["id"], cerrado["id"]}
+    assert nuevo["id"] not in ids

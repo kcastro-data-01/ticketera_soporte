@@ -156,7 +156,7 @@ def list_tickets(
     search: str | None = None,
     category: TicketCategory | None = None,
     priority: TicketPriority | None = None,
-    state: TicketState | None = None,
+    state: TicketState | list[TicketState] | None = None,
     created_by_id: int | None = None,
     assigned_to_id: int | None = None,
     limit: int | None = None,
@@ -188,8 +188,9 @@ def list_tickets(
         statement = statement.where(Ticket.category == category.value)
     if priority is not None:
         statement = statement.where(Ticket.priority == priority.value)
-    if state is not None:
-        statement = statement.where(Ticket.state == state.value)
+    if state:
+        states = state if isinstance(state, (list, tuple)) else [state]
+        statement = statement.where(Ticket.state.in_([s.value for s in states]))
 
     if search is not None:
         term = search.strip().lower()
@@ -227,7 +228,10 @@ def ticket_summary(session, user: User) -> dict[str, int]:
         "total": count(),
         "nuevos": count(Ticket.state == TicketState.NEW.value),
         "en_proceso": count(Ticket.state == TicketState.IN_PROGRESS.value),
-        "resueltos": count(Ticket.state == TicketState.RESOLVED.value),
+        # Un ticket Cerrado ya pasó por Resuelto: cuenta como resuelto.
+        "resueltos": count(
+            Ticket.state.in_((TicketState.RESOLVED.value, TicketState.CLOSED.value))
+        ),
         "cerrados": count(Ticket.state == TicketState.CLOSED.value),
         "criticos_abiertos": count(
             Ticket.priority == TicketPriority.CRITICAL.value,

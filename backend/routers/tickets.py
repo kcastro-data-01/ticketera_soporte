@@ -69,9 +69,12 @@ def list_tickets(
         None,
         description="Filtra por prioridad (Baja, Media, Alta, Crítica).",
     ),
-    state: TicketState | None = Query(
+    state: list[TicketState] | None = Query(
         None,
-        description="Filtra por estado (Nuevo, En proceso, Resuelto, Cerrado).",
+        description=(
+            "Filtra por estado (Nuevo, En proceso, Resuelto, Cerrado). Se puede "
+            "repetir para varios estados: ?state=Resuelto&state=Cerrado."
+        ),
     ),
     mios: bool = Query(
         False,

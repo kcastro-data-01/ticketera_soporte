@@ -331,7 +331,7 @@ def test_context_groups_and_counts_tickets_for_the_model(client, session, fake_c
     ask(client, headers, "¿Hay tickets en proceso?")
     system = fake_claude.system_text()
     assert "Tickets en estado En proceso (1):\n- #%d «Problemas»" % en_proceso.id in system
-    assert "Tickets en estado Resuelto (0): ninguno." in system
+    assert "Tickets resueltos (estado Resuelto o Cerrado) (0): ninguno." in system
     assert "Tickets críticos sin resolver (1):\n- #%d «Servidor caído»" % critico.id in system
     assert "Tickets sin asignar sin resolver (1):" in system
     assert "Tickets asignados a José Solano sin resolver (1):" in system

@@ -185,6 +185,14 @@ test("buildTicketsUrl: mios y offset de la página", () => {
   );
 });
 
+test("buildTicketsUrl: «Resuelto,Cerrado» pide los dos estados", () => {
+  const harness = createHarness(async () => jsonResponse(200, []));
+  assert.equal(
+    harness.sandbox.buildTicketsUrl({ state: "Resuelto,Cerrado" }),
+    "/api/tickets?state=Resuelto&state=Cerrado&limit=20"
+  );
+});
+
 test("error HTTP con detail de texto: se muestra el código y el detalle", async () => {
   const harness = createHarness(async () =>
     jsonResponse(404, { detail: "Ticket no encontrado" })
