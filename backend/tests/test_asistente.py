@@ -308,6 +308,31 @@ def test_qwen_receives_fewer_tickets(session):
 
     grabador = Grabador()
     responder(grabador, session, admin, [{"role": "user", "content": "hola"}])
-    lineas = [l for l in grabador.system.splitlines() if l.startswith("- #")]
-    assert len(lineas) == QWEN_MAX_TICKETS
-    assert f"los {QWEN_MAX_TICKETS} más recientes de {QWEN_MAX_TICKETS + 5}" in grabador.system
+    total = QWEN_MAX_TICKETS + 5
+    assert (
+        f"Tickets en estado Nuevo ({total}, se muestran los {QWEN_MAX_TICKETS} más recientes):"
+        in grabador.system
+    )
+    lineas_nuevo = grabador.system.split("Tickets en estado Nuevo")[1].split("Tickets en estado En proceso")[0]
+    assert lineas_nuevo.count("- #") == QWEN_MAX_TICKETS
+
+
+def test_context_groups_and_counts_tickets_for_the_model(client, session, fake_claude):
+    """Las preguntas típicas se responden copiando una línea ya contada."""
+    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
+    jose = session.query(User).filter_by(email="tec@tec.local").one()
+    en_proceso = add_ticket(session, "Problemas")
+    en_proceso.state = "En proceso"
+    en_proceso.assigned_to_id = jose.id
+    critico = add_ticket(session, "Servidor caído")
+    critico.priority = "Crítica"
+    session.commit()
+
+    ask(client, headers, "¿Hay tickets en proceso?")
+    system = fake_claude.system_text()
+    assert "Tickets en estado En proceso (1):\n- #%d «Problemas»" % en_proceso.id in system
+    assert "Tickets en estado Resuelto (0): ninguno." in system
+    assert "Tickets críticos sin resolver (1):\n- #%d «Servidor caído»" % critico.id in system
+    assert "Tickets sin asignar sin resolver (1):" in system
+    assert "Tickets asignados a José Solano sin resolver (1):" in system
+
