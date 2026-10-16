@@ -231,9 +231,18 @@ function crearAsistente() {
 
   panel.append(cabecera, lista, formulario);
 
-  const abrir = crearElemento("button", "chat-boton", "Asistente");
+  /* Botón redondo con ícono de chat; al abrir el panel cambia a una «X». */
+  const abrir = crearElemento("button", "chat-boton");
   abrir.type = "button";
   abrir.setAttribute("aria-expanded", "false");
+  abrir.setAttribute("aria-label", "Abrir asistente");
+  abrir.dataset.tooltip = "Asistente";
+  abrir.innerHTML =
+    '<svg class="chat-boton-icono icono-chat" viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/>' +
+    '<path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>' +
+    '<svg class="chat-boton-icono icono-cerrar" viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="M6 6l12 12M18 6L6 18"/></svg>';
 
   contenedor.append(panel, abrir);
   document.body.appendChild(contenedor);
@@ -241,6 +250,8 @@ function crearAsistente() {
   const alternar = (mostrar) => {
     panel.hidden = !mostrar;
     abrir.setAttribute("aria-expanded", String(mostrar));
+    abrir.setAttribute("aria-label", mostrar ? "Cerrar asistente" : "Abrir asistente");
+    abrir.dataset.tooltip = mostrar ? "Cerrar" : "Asistente";
     if (mostrar) {
       pintarMensajes(lista, leerChat());
       entrada.focus();

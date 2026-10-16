@@ -1383,14 +1383,81 @@ body.app {
 }
 
 .chat-boton {
-  padding: 0.75rem 1.25rem;
-  border-radius: var(--radio-pill);
-  background: var(--color-marca);
-  box-shadow: 0 8px 24px rgba(0, 65, 255, 0.35);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-marca) 0%, var(--color-primario-oscuro) 100%);
+  color: var(--color-texto-inverso);
+  box-shadow: 0 8px 24px rgba(0, 65, 255, 0.4), 0 0 0 4px rgba(0, 65, 255, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .chat-boton:hover {
-  background: var(--color-primario-oscuro);
+  background: linear-gradient(135deg, var(--color-marca) 0%, var(--color-marino) 100%);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 12px 28px rgba(0, 65, 255, 0.45), 0 0 0 6px rgba(0, 65, 255, 0.14);
+}
+
+.chat-boton:focus-visible {
+  outline: 3px solid var(--color-primario-suave);
+  outline-offset: 3px;
+}
+
+.chat-boton-icono {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  grid-area: 1 / 1;
+  transition: opacity 0.15s ease, transform 0.2s ease;
+}
+
+.chat-boton .icono-cerrar {
+  opacity: 0;
+  transform: rotate(-90deg);
+}
+
+.chat-boton[aria-expanded="true"] .icono-chat {
+  opacity: 0;
+  transform: rotate(90deg);
+}
+
+.chat-boton[aria-expanded="true"] .icono-cerrar {
+  opacity: 1;
+  transform: none;
+}
+
+/* Etiqueta «Asistente» al pasar el mouse. */
+.chat-boton::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  right: calc(100% + 0.6rem);
+  top: 50%;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radio-suave);
+  background: var(--color-marino);
+  color: var(--color-texto-inverso);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(4px, -50%);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.chat-boton:hover::before,
+.chat-boton:focus-visible::before {
+  opacity: 1;
+  transform: translate(0, -50%);
 }
 
 .chat-panel {
