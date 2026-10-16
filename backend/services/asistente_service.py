@@ -21,7 +21,7 @@ import re
 import httpx
 from sqlalchemy import select
 
-from backend.constants import UserRole
+from backend.constants import TicketState, UserRole
 from backend.models import Ticket, User
 from backend.services import ticket_service
 
@@ -134,9 +134,22 @@ def build_context(session, user: User, max_tickets: int = MAX_TICKETS_IN_CONTEXT
         f"resolver; {resumen['mios_abiertos']} asignados a esta persona sin resolver."
     )
 
+    created_by_id = user.id if user.role == UserRole.REQUESTER.value else None
+
+    # Los números de cada estado ya agrupados: un modelo pequeño se equivoca
+    # si tiene que filtrar él mismo la lista de tickets por estado.
+    lines.append("Números de ticket por estado (lista completa y exacta):")
+    for state in TicketState:
+        statement = select(Ticket.id).where(Ticket.state == state.value)
+        if created_by_id is not None:
+            statement = statement.where(Ticket.created_by_id == created_by_id)
+        ids = session.scalars(statement.order_by(Ticket.id)).all()
+        numeros = ", ".join(f"#{i}" for i in ids) if ids else "ninguno"
+        lines.append(f"- {state.value} ({len(ids)}): {numeros}")
+
     tickets, total = ticket_service.list_tickets(
         session,
-        created_by_id=user.id if user.role == UserRole.REQUESTER.value else None,
+        created_by_id=created_by_id,
         limit=max_tickets,
     )
     if tickets:

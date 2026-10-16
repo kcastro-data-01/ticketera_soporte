@@ -127,6 +127,31 @@ def test_admin_context_has_all_tickets_and_team_without_emails(client, session, 
     assert "tec@tec.local" not in system
 
 
+def test_context_lists_ticket_numbers_by_state(client, session, fake_claude):
+    """Un modelo pequeño no debe filtrar la lista: recibe los números ya agrupados."""
+    headers = login_as(client, session, "Administrador", "admin@adn.local", "Laura Méndez")
+    primero = add_ticket(session, "Correo lento")
+    segundo = add_ticket(session, "VPN no conecta")
+    segundo.state = "En proceso"
+    session.commit()
+
+    assert ask(client, headers, "¿Cuántos tickets están en proceso?").status_code == 200
+    system = fake_claude.system_text()
+    assert f"- En proceso (1): #{segundo.id}\n" in system
+    assert f"- Nuevo (1): #{primero.id}\n" in system
+    assert "- Cerrado (0): ninguno\n" in system
+
+
+def test_requester_state_numbers_only_include_own_tickets(client, session, fake_claude):
+    headers = login_as(client, session, "Solicitante", "sol@soli.local", "Andrea Castillo")
+    andrea = session.query(User).filter_by(email="sol@soli.local").one()
+    propio = add_ticket(session, "Mi impresora", created_by=andrea.id)
+    add_ticket(session, "Servidor interno caído")
+
+    assert ask(client, headers).status_code == 200
+    assert f"- Nuevo (1): #{propio.id}\n" in fake_claude.system_text()
+
+
 def test_technician_sees_tickets_but_not_the_team(client, session, fake_claude):
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
     add_ticket(session, "Servidor interno caído")
