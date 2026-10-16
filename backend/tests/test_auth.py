@@ -27,8 +27,8 @@ def test_register_first_user_can_be_admin(client):
     assert data["expires_in"] > 0
 
 
-def test_register_is_closed_after_the_first_user(client):
-    """Once a user can log in, self-registration answers 403."""
+def test_register_after_the_first_user_is_always_requester(client):
+    """Once a user exists, anyone can register but only as Solicitante."""
     first = client.post(
         "/api/auth/register",
         json={
@@ -42,15 +42,23 @@ def test_register_is_closed_after_the_first_user(client):
 
     resp = client.post(
         "/api/auth/register",
-        json={"name": "Second User", "email": "second@test.com", "password": "pass123456"},
+        json={
+            "name": "Second User",
+            "email": "second@test.com",
+            "password": "pass123456",
+            "role": "Administrador",
+        },
     )
-    assert resp.status_code == 403
-    # Even reusing an email it never reveals whether it exists.
-    resp = client.post(
+    assert resp.status_code == 201
+    token = resp.json()["access_token"]
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.json()["role"] == "Solicitante"
+
+    dup = client.post(
         "/api/auth/register",
         json={"name": "Dup", "email": "first@test.com", "password": "pass123456"},
     )
-    assert resp.status_code == 403
+    assert dup.status_code == 409
 
 
 def test_setup_status_reports_first_run(client):

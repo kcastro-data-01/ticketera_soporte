@@ -529,3 +529,38 @@ Para que un modelo pequeño responda bien y rápido:
 
 En ambos casos la restricción por rol la aplica el servidor: el modelo solo
 recibe los datos que el rol ya puede ver en la aplicación.
+
+## Tickets por correo
+
+La ticketera puede revisar un buzón (por ejemplo `kcastro@data.cr`) cada minuto
+y crear un ticket por cada correo nuevo:
+
+| Quién escribe | Qué pasa |
+|---|---|
+| Usuario activo de la ticketera (mismo correo) | Se crea el ticket a su nombre (asunto = título, cuerpo = descripción, categoría y prioridad por palabras clave) y se le responde con el número y el enlace. |
+| Responde a «Ticket #N» de un ticket suyo | Se agrega como comentario a ese ticket. |
+| Alguien sin cuenta | Se le responde que debe registrarse, con el enlace `APP_URL/login.html?registro=1` (máximo un aviso por día). |
+| Cuenta desactivada | Se le avisa que hable con un administrador. |
+| Respuestas automáticas, rebotes, «noreply» | Se ignoran (evita bucles). |
+
+Los correos se leen **sin marcarlos como leídos** y solo se procesan los que
+llegan después de activar la función. Cualquiera puede registrarse en
+`login.html`; esas cuentas siempre quedan como **Solicitante**.
+
+Configuración en el archivo `.env` (junto a `docker-compose.yml`, no se sube a Git):
+
+```env
+CORREO_ACTIVO=1
+CORREO_USUARIO=kcastro@data.cr
+APP_URL=http://IP-O-NOMBRE-DEL-EQUIPO:8000
+# Opción A: contraseña (o contraseña de aplicación) con IMAP/SMTP habilitado
+CORREO_CLAVE=...
+# Opción B: Microsoft 365 con OAuth (app registrada en Entra ID)
+CORREO_M365_TENANT=...
+CORREO_M365_CLIENT_ID=...
+CORREO_M365_CLIENT_SECRET=...
+# Otros servidores (Gmail: imap.gmail.com / smtp.gmail.com)
+# CORREO_IMAP_SERVIDOR=outlook.office365.com
+# CORREO_SMTP_SERVIDOR=smtp.office365.com
+# CORREO_CARPETA=INBOX
+```

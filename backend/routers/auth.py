@@ -166,17 +166,11 @@ def change_password(
 def register(payload: RegisterRequest, session: Session = Depends(get_session)) -> TokenResponse:
     """Register a new user and return an access token.
 
-    Only available while no user can log in yet: the first user chooses their
-    role (``Administrador`` by default). Afterwards it answers ``403``.
+    The first user (while nobody can log in yet) becomes ``Administrador``
+    unless another role is given. Everyone who registers afterwards is
+    always created as ``Solicitante``: other roles are assigned by an
+    administrator from Usuarios.
     """
-    # Registration is only open to create the first user (the administrator);
-    # afterwards accounts are created by an administrator from Usuarios.
-    if _count_users_with_password(session) > 0:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="El registro está cerrado: pide a un administrador que cree tu cuenta",
-        )
-
     # Check if email already exists
     existing = _get_user_by_email(session, payload.email)
     if existing is not None:
@@ -184,7 +178,10 @@ def register(payload: RegisterRequest, session: Session = Depends(get_session)) 
             status_code=status.HTTP_409_CONFLICT,
             detail=f"El email {payload.email} ya está registrado",
         )
-    role = payload.role if payload.role else UserRole.ADMIN
+    if _count_users_with_password(session) == 0:
+        role = payload.role if payload.role else UserRole.ADMIN
+    else:
+        role = UserRole.REQUESTER
 
     # Create the user with hashed password
     user = User(

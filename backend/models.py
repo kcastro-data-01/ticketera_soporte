@@ -227,3 +227,28 @@ class History(Base):
     def ticket_title(self) -> str | None:
         """Title of the audited ticket, so history lists read on their own."""
         return self.ticket.title if self.ticket is not None else None
+
+
+class ProcessedEmail(Base):
+    """Correo del buzón de soporte que ya se revisó (no se procesa dos veces).
+
+    ``message_id`` es la cabecera ``Message-ID`` del correo. ``result`` dice
+    qué se hizo: ``ticket``, ``comentario``, ``registro`` (se le pidió
+    registrarse), ``inactivo``, ``ignorado`` o ``inicio`` (marca de cuándo se
+    activó la lectura del buzón: los correos anteriores no se procesan).
+    """
+
+    __tablename__ = "processed_emails"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    message_id: Mapped[str] = mapped_column(String(500), nullable=False, unique=True, index=True)
+    sender: Mapped[str | None] = mapped_column(String(255), index=True)
+    result: Mapped[str] = mapped_column(String(20), nullable=False)
+    ticket_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(),
+        nullable=False,
+        default=utc_now,
+    )

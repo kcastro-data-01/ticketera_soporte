@@ -306,8 +306,7 @@
         </div>
         <div class="btn-grp">
           <button type="submit" id="btn-login" class="btn-primario">Entrar</button>
-          <!-- Solo aparece la primera vez, cuando aún no existe ningún usuario. -->
-          <button type="button" id="tab-register" class="btn-secundario" hidden>Crear administrador</button>
+          <button type="button" id="tab-register" class="btn-secundario">Crear cuenta</button>
         </div>
       </form>
 
@@ -329,12 +328,12 @@
           <input type="checkbox" id="register-memory" name="remember-memory">
           <span>Recordar sesión</span>
         </div>
-        <p class="nota-registro">
-          Primera vez: esta cuenta será el <b>Administrador</b>. Después, las
-          demás cuentas se crean desde <b>Usuarios</b>.
+        <p class="nota-registro" id="nota-registro">
+          Usa tu correo de la empresa. Tu cuenta se crea como <b>Solicitante</b>
+          para que puedas reportar y seguir tus tickets.
         </p>
         <div class="btn-grp">
-          <button type="submit" id="btn-register" class="btn-primario">Crear administrador</button>
+          <button type="submit" id="btn-register" class="btn-primario">Crear cuenta</button>
           <button type="button" id="tab-login" class="btn-secundario">Volver a iniciar sesión</button>
         </div>
       </form>
@@ -415,7 +414,8 @@
           tabLogin.classList.remove("activo");
           formRegister.classList.add("activo");
           formLogin.classList.remove("activo");
-          document.querySelector('.login-titulo').textContent = 'Crear administrador';
+          document.querySelector('.login-titulo').textContent =
+            isFirstUser ? 'Crear administrador' : 'Crear cuenta';
         }
       }
 
@@ -512,9 +512,10 @@
           return;
         }
 
-        /* El registro solo existe para el primer usuario: el servidor lo
-           crea como Administrador. */
-        const payload = { name, email, password, role: "Administrador" };
+        /* El primer usuario se crea como Administrador; los demás, el
+           servidor siempre los crea como Solicitante. */
+        const payload = { name, email, password };
+        if (isFirstUser) payload.role = "Administrador";
 
         setLoading(btnRegister, true);
 
@@ -575,22 +576,33 @@
       document.querySelectorAll(".toggle-password").forEach(el => el.addEventListener("click", () => { const i = el.parentElement.querySelector("input"); i.type = i.type === "password" ? "text" : "password"; }));
       // --- Inicialización ---
 
-      // Primera vez (ningún usuario puede iniciar sesión): se ofrece crear
-      // el Administrador. Después el registro queda cerrado.
+      // Primera vez (ningún usuario puede iniciar sesión): la cuenta que se
+      // cree será el Administrador. Después, quien se registre es Solicitante.
+      // El enlace del correo de bienvenida abre directo el registro
+      // (login.html?registro=1&email=...).
       async function initCheck() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("email")) {
+          document.getElementById("register-email").value = params.get("email");
+        }
         try {
           const resp = await fetch(`${API_BASE}/setup`);
           if (resp.ok) {
             const data = await resp.json();
             if (data.needs_setup) {
               isFirstUser = true;
-              tabRegister.hidden = false;
+              tabRegister.textContent = "Crear administrador";
+              btnRegister.textContent = "Crear administrador";
+              document.getElementById("nota-registro").innerHTML =
+                "Primera vez: esta cuenta será el <b>Administrador</b>.";
               activateTab("register");
+              return;
             }
           }
         } catch (e) {
           isFirstUser = false;
         }
+        if (params.get("registro")) activateTab("register");
       }
 
       initCheck();

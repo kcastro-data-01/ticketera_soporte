@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
-from backend.services import asistente_service
+from backend.services import asistente_service, correo_service
 from backend.routers.asistente import router as asistente_router
 from backend.routers.auth import router as auth_router
 from backend.routers.comentarios import router as comments_router
@@ -24,7 +24,11 @@ async def lifespan(application: FastAPI):
     # Carga Qwen en Ollama en segundo plano (si aplica) para que la primera
     # pregunta del asistente no espere a que el modelo se cargue.
     asistente_service.iniciar_precarga()
+    # Si CORREO_ACTIVO está encendido, revisa el buzón de soporte y crea
+    # tickets con los correos que llegan.
+    correo_service.iniciar_lector()
     yield
+    correo_service.detener_lector()
 
 
 app = FastAPI(

@@ -14,6 +14,21 @@ services:
       OLLAMA_URL: http://ollama:11434
       QWEN_MODELO: ${QWEN_MODELO:-qwen3:0.6b}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Tickets por correo (apagado por defecto). Los datos van en .env.
+      CORREO_ACTIVO: ${CORREO_ACTIVO:-0}
+      CORREO_USUARIO: ${CORREO_USUARIO:-}
+      CORREO_CLAVE: ${CORREO_CLAVE:-}
+      CORREO_IMAP_SERVIDOR: ${CORREO_IMAP_SERVIDOR:-outlook.office365.com}
+      CORREO_IMAP_PUERTO: ${CORREO_IMAP_PUERTO:-993}
+      CORREO_SMTP_SERVIDOR: ${CORREO_SMTP_SERVIDOR:-smtp.office365.com}
+      CORREO_SMTP_PUERTO: ${CORREO_SMTP_PUERTO:-587}
+      CORREO_CARPETA: ${CORREO_CARPETA:-INBOX}
+      CORREO_INTERVALO: ${CORREO_INTERVALO:-60}
+      CORREO_M365_TENANT: ${CORREO_M365_TENANT:-}
+      CORREO_M365_CLIENT_ID: ${CORREO_M365_CLIENT_ID:-}
+      CORREO_M365_CLIENT_SECRET: ${CORREO_M365_CLIENT_SECRET:-}
+      # Dirección con la que los demás abren la app (va en los correos).
+      APP_URL: ${APP_URL:-http://localhost:8000}
     volumes:
       - ticketera-data:/data
     depends_on:
