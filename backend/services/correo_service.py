@@ -47,6 +47,14 @@ from backend.schemas import CommentCreate, TicketCreate
 from backend.services import ticket_service
 
 logger = logging.getLogger(__name__)
+# Los mensajes salen en «docker compose logs ticketera» (uvicorn no muestra
+# los INFO de la aplicación por su cuenta).
+if not logger.handlers:
+    _salida = logging.StreamHandler()
+    _salida.setFormatter(logging.Formatter("CORREO: %(message)s"))
+    logger.addHandler(_salida)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 MAX_DESCRIPCION = 5000
 MAX_TITULO = 200
@@ -586,6 +594,8 @@ def revisar_buzon(session_factory, config: ConfigCorreo, conectar=conectar_imap,
                     logger.exception("No se pudo procesar el correo %s", correo.message_id)
                     continue
             conteo[resultado] = conteo.get(resultado, 0) + 1
+            if resultado not in ("repetido", "otro"):
+                logger.info("%s «%s» → %s", correo.remitente, correo.asunto, resultado)
             if respuesta is not None:
                 try:
                     enviar(config, respuesta)
@@ -606,14 +616,22 @@ _hilo: threading.Thread | None = None
 
 
 def _bucle(session_factory, config: ConfigCorreo) -> None:
-    logger.info("Leyendo el buzón %s cada %s s", config.usuario, config.intervalo)
+    logger.info("leyendo el buzón %s cada %s s (asunto con: %s)", config.usuario,
+                config.intervalo, ", ".join(config.palabras_asunto) or "cualquiera")
+    conectado = False
     while not _detener.is_set():
         try:
-            conteo = revisar_buzon(session_factory, config)
-            if any(k != "repetido" for k in conteo):
-                logger.info("Correos procesados: %s", conteo)
+            revisar_buzon(session_factory, config)
+            if not conectado:
+                logger.info("conexión con el buzón correcta")
+                conectado = True
+        except imaplib.IMAP4.error as error:
+            logger.error("no se pudo entrar al buzón %s: %s. Revisa la clave y que "
+                         "IMAP esté habilitado para la cuenta.", config.usuario, error)
+            conectado = False
         except Exception:
-            logger.exception("Error al revisar el buzón %s", config.usuario)
+            logger.exception("error al revisar el buzón %s", config.usuario)
+            conectado = False
         _detener.wait(config.intervalo)
 
 
@@ -621,8 +639,13 @@ def iniciar_lector(session_factory=None) -> bool:
     """Arranca el hilo que revisa el buzón si ``CORREO_ACTIVO`` está encendido."""
     global _hilo
     config = config_desde_entorno()
-    if config is None or (_hilo is not None and _hilo.is_alive()):
+    if config is None:
+        logger.info("lectura del buzón apagada (CORREO_ACTIVO no está en 1)")
         return False
+    if _hilo is not None and _hilo.is_alive():
+        return False
+    if not config.usa_oauth and not config.clave:
+        logger.warning("falta CORREO_CLAVE (o los datos CORREO_M365_*): no se puede entrar al buzón")
     if session_factory is None:
         from backend.database import SessionLocal
 
