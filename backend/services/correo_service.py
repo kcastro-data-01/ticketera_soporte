@@ -92,6 +92,9 @@ class ConfigCorreo:
     smtp_servidor: str = "smtp.office365.com"
     smtp_puerto: int = 587
     carpeta: str = "INBOX"
+    # Solo se procesan los correos cuyo asunto contiene alguna de estas
+    # palabras (vacío = todos). Los demás se dejan tal cual, sin responder.
+    palabras_asunto: tuple[str, ...] = ("soporte", "ticket")
     intervalo: int = 60
     app_url: str = "http://localhost:8000"
     m365_tenant: str = ""
@@ -124,6 +127,11 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         smtp_servidor=env.get("CORREO_SMTP_SERVIDOR") or "smtp.office365.com",
         smtp_puerto=int(env.get("CORREO_SMTP_PUERTO") or 587),
         carpeta=env.get("CORREO_CARPETA") or "INBOX",
+        palabras_asunto=tuple(
+            p.strip().lower()
+            for p in (env.get("CORREO_PALABRAS_ASUNTO", "soporte,ticket")).split(",")
+            if p.strip()
+        ),
         intervalo=max(15, int(env.get("CORREO_INTERVALO") or 60)),
         app_url=(env.get("APP_URL") or "http://localhost:8000").rstrip("/"),
         m365_tenant=env.get("CORREO_M365_TENANT") or "",
@@ -370,6 +378,30 @@ def _ya_avisado(session, remitente: str) -> bool:
     ) > 0
 
 
+def es_de_soporte(asunto: str, config: ConfigCorreo) -> bool:
+    """¿El asunto trae alguna de las palabras de soporte?"""
+    if not config.palabras_asunto:
+        return True
+    asunto = asunto.lower()
+    return any(palabra in asunto for palabra in config.palabras_asunto)
+
+
+def criterio_busqueda(desde: str, config: ConfigCorreo) -> list[str]:
+    """Criterio IMAP: desde la fecha y, si hay palabras, con ellas en el asunto.
+
+    Así el servidor solo devuelve los correos de soporte y no se descargan
+    los demás.
+    """
+    criterio = ["SINCE", desde]
+    palabras = list(config.palabras_asunto)
+    if palabras:
+        asuntos = ["SUBJECT", f'"{palabras[-1]}"']
+        for palabra in reversed(palabras[:-1]):
+            asuntos = ["OR", "SUBJECT", f'"{palabra}"'] + asuntos
+        criterio += asuntos
+    return criterio
+
+
 def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tuple[str, Respuesta | None]:
     """Decide qué hacer con un correo; devuelve (resultado, respuesta a enviar).
 
@@ -379,6 +411,10 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
     if session.scalar(select(ProcessedEmail.id).where(
             ProcessedEmail.message_id == correo.message_id)) is not None:
         return "repetido", None
+
+    if not es_de_soporte(correo.asunto, config):
+        # Correo normal de la empresa: no se toca ni se guarda.
+        return "otro", None
 
     propio = correo.remitente == config.usuario.strip().lower()
     if correo.automatico or propio or "@" not in correo.remitente:
@@ -529,7 +565,7 @@ def revisar_buzon(session_factory, config: ConfigCorreo, conectar=conectar_imap,
         if estado != "OK":
             raise RuntimeError(f"No se pudo abrir la carpeta {config.carpeta!r}")
         desde = f"{inicio.day:02d}-{_MESES[inicio.month - 1]}-{inicio.year}"
-        estado, datos = imap.uid("SEARCH", None, "SINCE", desde)
+        estado, datos = imap.uid("SEARCH", None, *criterio_busqueda(desde, config))
         uids = (datos[0] or b"").split() if estado == "OK" else []
         for uid in uids:
             # BODY.PEEK: se lee sin marcar el correo como leído.
