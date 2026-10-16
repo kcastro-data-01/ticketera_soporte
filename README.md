@@ -533,12 +533,14 @@ recibe los datos que el rol ya puede ver en la aplicación.
 ## Tickets por correo
 
 La ticketera puede revisar un buzón (por ejemplo `kcastro@data.cr`) cada minuto
-y crear un ticket por cada correo nuevo **cuyo asunto contenga «soporte» o
-«ticket»** (sin importar mayúsculas). Los demás correos del buzón no se tocan,
-no se guardan y no reciben respuesta. Las palabras se cambian con
-`CORREO_PALABRAS_ASUNTO=soporte,ticket` (vacío = todos los correos).
+y crear un ticket con cada correo nuevo **que pida ayuda**. La app revisa el
+asunto y el texto buscando frases como «se dañó», «no funciona», «no enciende»,
+«no puedo entrar», «error», «impresora», «contraseña», «sin internet», «ayuda»
+o «soporte». Los correos normales de la empresa (reuniones, facturas…) no se
+tocan, no se guardan y no reciben respuesta. Si el buzón es solo de soporte,
+`CORREO_FILTRO=todos` convierte cada correo en ticket.
 
-| Quién escribe (asunto con «soporte» o «ticket») | Qué pasa |
+| Quién escribe (correo que pide ayuda) | Qué pasa |
 |---|---|
 | Usuario activo de la ticketera (mismo correo) | Se crea el ticket a su nombre (asunto = título, cuerpo = descripción, categoría y prioridad por palabras clave) y se le responde con el número y el enlace. |
 | Responde a «Ticket #N» de un ticket suyo | Se agrega como comentario a ese ticket. |

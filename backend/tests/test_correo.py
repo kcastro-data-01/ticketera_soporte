@@ -11,9 +11,9 @@ from sqlalchemy.orm import sessionmaker
 from backend.models import Comment, ProcessedEmail, Ticket, User
 from backend.services import correo_service as cs
 
-# Sin filtro de asunto para probar el procesamiento; el filtro tiene sus pruebas.
+# Sin filtro para probar el procesamiento; la detección tiene sus pruebas.
 CONFIG = cs.ConfigCorreo(usuario="kcastro@data.cr", clave="x", app_url="http://ticketera.data.cr",
-                         palabras_asunto=())
+                         filtro="todos")
 CONFIG_FILTRO = cs.ConfigCorreo(usuario="kcastro@data.cr", clave="x",
                                 app_url="http://ticketera.data.cr")
 
@@ -236,42 +236,68 @@ def test_reply_message_is_marked_automatic(monkeypatch):
     assert msg["From"] == "kcastro@data.cr"
 
 
-@pytest.mark.parametrize("asunto,esperado", [
-    ("Soporte: la impresora no imprime", "ticket"),
-    ("[SOPORTE] VPN", "ticket"),
-    ("Necesito un ticket para mi laptop", "ticket"),
-    ("Reunión del viernes", "otro"),
-    ("Factura de octubre", "otro"),
+@pytest.mark.parametrize("asunto,cuerpo", [
+    ("Se dañó una impresora, ocupo arreglo urgente", "La impresora no enciende"),
+    ("Ayuda", "hola"),
+    ("Hola", "Desde hoy la computadora no prende"),
+    ("Consulta", "No puedo entrar al sistema de planillas"),
+    ("Outlook", "me sale un error al enviar"),
+    ("Olvidé mi contraseña", ""),
+    ("Sin internet", "En el segundo piso estamos sin conexión"),
+    ("Soporte", ""),
+    ("RE: Ticket #4 creado", "gracias"),
 ])
-def test_only_support_subjects_are_processed(session, usuario, asunto, esperado):
+def test_help_requests_are_detected(asunto, cuerpo):
+    assert cs.es_de_soporte(asunto, cuerpo, CONFIG_FILTRO)
+
+
+@pytest.mark.parametrize("asunto,cuerpo", [
+    ("Reunión del viernes", "Les recuerdo la reunión a las 10 am."),
+    ("Factura de octubre", "Adjunto la factura del mes."),
+    ("Cumpleaños", "Mañana celebramos el cumpleaños de Ana en la sala."),
+    ("Propuesta comercial", "Le envío la propuesta para su revisión."),
+])
+def test_normal_company_mail_is_not_a_ticket(session, usuario, asunto, cuerpo):
+    assert not cs.es_de_soporte(asunto, cuerpo, CONFIG_FILTRO)
     resultado, respuesta = cs.procesar_correo(
-        session, cs.leer_correo(crear_correo(asunto=asunto)), CONFIG_FILTRO)
-    assert resultado == esperado
-    if esperado == "otro":
-        assert respuesta is None
-        assert session.scalars(select(Ticket)).first() is None
-        assert session.scalars(select(ProcessedEmail)).first() is None
+        session, cs.leer_correo(crear_correo(asunto=asunto, cuerpo=cuerpo)), CONFIG_FILTRO)
+    assert (resultado, respuesta) == ("otro", None)
+    assert session.scalars(select(Ticket)).first() is None
+    assert session.scalars(select(ProcessedEmail)).first() is None
+
+
+def test_unknown_sender_asking_for_help_gets_the_register_mail(session):
+    crudo = crear_correo(remitente="Kristin <kristin@gmail.com>",
+                         asunto="Se dañó una impresora, ocupo arreglo urgente",
+                         cuerpo="La impresora no enciende y la necesito para el trabajo")
+    resultado, respuesta = cs.procesar_correo(session, cs.leer_correo(crudo), CONFIG_FILTRO)
+    assert resultado == "registro"
+    assert "login.html?registro=1&email=kristin@gmail.com" in respuesta.texto
 
 
 def test_non_support_mail_from_unknown_sender_gets_no_reply(session):
     resultado, respuesta = cs.procesar_correo(
-        session, cs.leer_correo(crear_correo(remitente="cliente@otro.com", asunto="Cotización")),
+        session, cs.leer_correo(crear_correo(remitente="cliente@otro.com", asunto="Cotización",
+                                             cuerpo="Adjunto la cotización solicitada.")),
         CONFIG_FILTRO)
     assert (resultado, respuesta) == ("otro", None)
 
 
-def test_search_criteria_asks_the_server_for_support_subjects():
-    assert cs.criterio_busqueda("16-Oct-2026", CONFIG_FILTRO) == [
-        "SINCE", "16-Oct-2026", "OR", "SUBJECT", '"soporte"', "SUBJECT", '"ticket"']
-    assert cs.criterio_busqueda("16-Oct-2026", CONFIG) == ["SINCE", "16-Oct-2026"]
-    tres = cs.ConfigCorreo(usuario="x@y", palabras_asunto=("a", "b", "c"))
-    assert cs.criterio_busqueda("1-Jan-2026", tres) == [
-        "SINCE", "1-Jan-2026", "OR", "SUBJECT", '"a"', "OR", "SUBJECT", '"b"', "SUBJECT", '"c"']
-
-
-def test_subject_words_from_env():
+def test_filter_from_env():
     base = {"CORREO_ACTIVO": "1", "CORREO_USUARIO": "kcastro@data.cr"}
-    assert cs.config_desde_entorno(base).palabras_asunto == ("soporte", "ticket")
-    cfg = cs.config_desde_entorno({**base, "CORREO_PALABRAS_ASUNTO": "Soporte, Ayuda TI"})
-    assert cfg.palabras_asunto == ("soporte", "ayuda ti")
-    assert cs.config_desde_entorno({**base, "CORREO_PALABRAS_ASUNTO": ""}).palabras_asunto == ()
+    assert cs.config_desde_entorno(base).filtro == "auto"
+    assert cs.config_desde_entorno({**base, "CORREO_FILTRO": "Todos"}).filtro == "todos"
+
+
+def test_memory_only_downloads_new_mail(engine, usuario):
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    imap = FakeImap([crear_correo(msg_id="<a@x>")])
+    memoria = {}
+    enviar = lambda c, r: None
+    assert cs.revisar_buzon(factory, CONFIG, conectar=lambda c: imap, enviar=enviar,
+                            memoria=memoria) == {"ticket": 1}
+    assert cs.revisar_buzon(factory, CONFIG, conectar=lambda c: imap, enviar=enviar,
+                            memoria=memoria) == {}
+    imap.mensajes.append(crear_correo(msg_id="<b@x>"))
+    assert cs.revisar_buzon(factory, CONFIG, conectar=lambda c: imap, enviar=enviar,
+                            memoria=memoria) == {"ticket": 1}

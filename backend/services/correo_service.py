@@ -32,6 +32,7 @@ import os
 import re
 import smtplib
 import threading
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email import message_from_bytes, policy
@@ -84,6 +85,23 @@ PALABRAS_PRIORIDAD: list[tuple[TicketPriority, tuple[str, ...]]] = [
                           "sin prisa")),
 ]
 
+# Frases que indican una solicitud de ayuda (en minúsculas y sin tildes).
+# Se buscan en el asunto y el texto del correo.
+SEÑALES_SOPORTE: tuple[str, ...] = (
+    r"\bsoporte\b", r"\bticket", r"\bayuda\b", r"\bayudar(me|nos)?\b",
+    r"\bno (me |nos |le )?(funciona|sirve|enciende|prende|arranca|abre|carga|imprime|"
+    r"conecta|deja|responde|aparece|llega|reconoce|suena)",
+    r"\bno (puedo|podemos|logro) (entrar|ingresar|abrir|imprimir|conectar|acceder|enviar|"
+    r"iniciar|trabajar|instalar|usar|ver)",
+    r"\bse (me |nos |le )?(dano|danaron|quebro|cayo|cayeron|trabo|pego|congelo|apago|reinicia|"
+    r"desconecta|bloqueo)",
+    r"\bdanad[oa]s?\b", r"\bfall(a|o|ando)\b", r"\berror(es)?\b", r"\bproblemas? con\b",
+    r"\barregl", r"\brepar", r"\bimpresora", r"\bcontrasena", r"\bclave\b",
+    r"\bbloquead", r"\binternet\b", r"\bwi-?fi\b", r"\bvpn\b", r"\bsin (red|conexion|internet|sistema)",
+    r"\blent[oa] (la|el|mi)", r"\bcomputadora\b", r"\blaptop\b", r"\bmonitor\b",
+    r"\bteclado\b", r"\bmouse\b", r"\binstalar\b", r"\blicencia\b", r"\bacceso\b",
+)
+
 PATRON_TICKET = re.compile(r"ticket\s*#\s*(\d+)", re.IGNORECASE)
 REMITENTES_AUTOMATICOS = ("noreply", "no-reply", "no_reply", "donotreply", "mailer-daemon",
                           "postmaster", "bounce")
@@ -100,9 +118,10 @@ class ConfigCorreo:
     smtp_servidor: str = "smtp.office365.com"
     smtp_puerto: int = 587
     carpeta: str = "INBOX"
-    # Solo se procesan los correos cuyo asunto contiene alguna de estas
-    # palabras (vacío = todos). Los demás se dejan tal cual, sin responder.
-    palabras_asunto: tuple[str, ...] = ("soporte", "ticket")
+    # «auto»: solo los correos que parecen una solicitud de ayuda (ver
+    # SEÑALES_SOPORTE); «todos»: cada correo es un ticket (buzón exclusivo
+    # de soporte). Los demás se dejan tal cual, sin guardar ni responder.
+    filtro: str = "auto"
     intervalo: int = 60
     app_url: str = "http://localhost:8000"
     m365_tenant: str = ""
@@ -135,11 +154,7 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         smtp_servidor=env.get("CORREO_SMTP_SERVIDOR") or "smtp.office365.com",
         smtp_puerto=int(env.get("CORREO_SMTP_PUERTO") or 587),
         carpeta=env.get("CORREO_CARPETA") or "INBOX",
-        palabras_asunto=tuple(
-            p.strip().lower()
-            for p in (env.get("CORREO_PALABRAS_ASUNTO", "soporte,ticket")).split(",")
-            if p.strip()
-        ),
+        filtro="todos" if (env.get("CORREO_FILTRO") or "").strip().lower() == "todos" else "auto",
         intervalo=max(15, int(env.get("CORREO_INTERVALO") or 60)),
         app_url=(env.get("APP_URL") or "http://localhost:8000").rstrip("/"),
         m365_tenant=env.get("CORREO_M365_TENANT") or "",
@@ -386,28 +401,16 @@ def _ya_avisado(session, remitente: str) -> bool:
     ) > 0
 
 
-def es_de_soporte(asunto: str, config: ConfigCorreo) -> bool:
-    """¿El asunto trae alguna de las palabras de soporte?"""
-    if not config.palabras_asunto:
+def _sin_tildes(texto: str) -> str:
+    return unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+
+
+def es_de_soporte(asunto: str, cuerpo: str, config: ConfigCorreo) -> bool:
+    """¿El correo parece una solicitud de ayuda? (asunto y texto, sin tildes)."""
+    if config.filtro == "todos":
         return True
-    asunto = asunto.lower()
-    return any(palabra in asunto for palabra in config.palabras_asunto)
-
-
-def criterio_busqueda(desde: str, config: ConfigCorreo) -> list[str]:
-    """Criterio IMAP: desde la fecha y, si hay palabras, con ellas en el asunto.
-
-    Así el servidor solo devuelve los correos de soporte y no se descargan
-    los demás.
-    """
-    criterio = ["SINCE", desde]
-    palabras = list(config.palabras_asunto)
-    if palabras:
-        asuntos = ["SUBJECT", f'"{palabras[-1]}"']
-        for palabra in reversed(palabras[:-1]):
-            asuntos = ["OR", "SUBJECT", f'"{palabra}"'] + asuntos
-        criterio += asuntos
-    return criterio
+    texto = _sin_tildes(f"{asunto}\n{cuerpo}".lower())
+    return any(re.search(senal, texto) for senal in SEÑALES_SOPORTE)
 
 
 def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tuple[str, Respuesta | None]:
@@ -420,7 +423,7 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
             ProcessedEmail.message_id == correo.message_id)) is not None:
         return "repetido", None
 
-    if not es_de_soporte(correo.asunto, config):
+    if not es_de_soporte(correo.asunto, correo.cuerpo, config):
         # Correo normal de la empresa: no se toca ni se guarda.
         return "otro", None
 
@@ -558,9 +561,11 @@ _MESES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", 
 
 
 def revisar_buzon(session_factory, config: ConfigCorreo, conectar=conectar_imap,
-                  enviar=enviar_respuesta) -> dict[str, int]:
+                  enviar=enviar_respuesta, memoria: dict | None = None) -> dict[str, int]:
     """Revisa el buzón una vez y procesa los correos nuevos.
 
+    ``memoria`` (opcional) guarda el último UID revisado entre llamadas, para
+    descargar solo los correos que llegaron desde la revisión anterior.
     Devuelve cuántos correos terminaron en cada resultado.
     """
     conteo: dict[str, int] = {}
@@ -573,8 +578,13 @@ def revisar_buzon(session_factory, config: ConfigCorreo, conectar=conectar_imap,
         if estado != "OK":
             raise RuntimeError(f"No se pudo abrir la carpeta {config.carpeta!r}")
         desde = f"{inicio.day:02d}-{_MESES[inicio.month - 1]}-{inicio.year}"
-        estado, datos = imap.uid("SEARCH", None, *criterio_busqueda(desde, config))
+        estado, datos = imap.uid("SEARCH", None, "SINCE", desde)
         uids = (datos[0] or b"").split() if estado == "OK" else []
+        if memoria is not None:
+            ultimo = memoria.get(config.carpeta, 0)
+            uids = [u for u in uids if int(u) > ultimo]
+            if uids:
+                memoria[config.carpeta] = max(int(u) for u in uids)
         for uid in uids:
             # BODY.PEEK: se lee sin marcar el correo como leído.
             estado, partes = imap.uid("FETCH", uid, "(BODY.PEEK[])")
@@ -616,12 +626,13 @@ _hilo: threading.Thread | None = None
 
 
 def _bucle(session_factory, config: ConfigCorreo) -> None:
-    logger.info("leyendo el buzón %s cada %s s (asunto con: %s)", config.usuario,
-                config.intervalo, ", ".join(config.palabras_asunto) or "cualquiera")
+    logger.info("leyendo el buzón %s cada %s s (correos: %s)", config.usuario, config.intervalo,
+                "todos" if config.filtro == "todos" else "solo los que piden ayuda")
     conectado = False
+    memoria: dict = {}
     while not _detener.is_set():
         try:
-            revisar_buzon(session_factory, config)
+            revisar_buzon(session_factory, config, memoria=memoria)
             if not conectado:
                 logger.info("conexión con el buzón correcta")
                 conectado = True
