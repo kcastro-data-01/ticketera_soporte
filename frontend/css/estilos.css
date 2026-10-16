@@ -1471,6 +1471,11 @@ body.app {
   color: var(--color-texto-inverso);
 }
 
+.chat-enlace {
+  color: var(--color-enlace);
+  font-weight: 600;
+}
+
 .chat-mensaje.error {
   border-color: var(--color-error);
   background: var(--color-error-fondo);

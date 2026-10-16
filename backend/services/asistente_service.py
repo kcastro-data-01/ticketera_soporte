@@ -15,8 +15,12 @@ además le indica que rechace con amabilidad las preguntas fuera de su
 alcance.
 """
 
+import json
 import os
 import re
+import threading
+import time
+import unicodedata
 
 import httpx
 from sqlalchemy import func, select
@@ -125,66 +129,134 @@ def _ticket_line(ticket: Ticket) -> str:
     )
 
 
+def _base_visible(user: User):
+    """Tickets que ``user`` puede ver (el Solicitante, solo los suyos)."""
+    base = select(Ticket)
+    if user.role == UserRole.REQUESTER.value:
+        base = base.where(Ticket.created_by_id == user.id)
+    return base
+
+
+def _abiertos():
+    return Ticket.state.in_(ticket_service.OPEN_STATES)
+
+
+def _grupos(user: User) -> dict[str, tuple[str, tuple]]:
+    """Grupos de tickets: clave → (título, condiciones). El servidor los
+    filtra y cuenta; el modelo solo copia la línea o se responde directo."""
+    solicitante = user.role == UserRole.REQUESTER.value
+    grupos = {
+        "nuevos": ("Tickets en estado Nuevo", (Ticket.state == TicketState.NEW.value,)),
+        "en_proceso": (
+            "Tickets en estado En proceso",
+            (Ticket.state == TicketState.IN_PROGRESS.value,),
+        ),
+        # Un ticket Cerrado ya pasó por Resuelto: los dos cuentan como resueltos.
+        "resueltos": (
+            "Tickets resueltos (estado Resuelto o Cerrado)",
+            (Ticket.state.in_((TicketState.RESOLVED.value, TicketState.CLOSED.value)),),
+        ),
+        "criticos": (
+            "Tickets críticos sin resolver",
+            (Ticket.priority == TicketPriority.CRITICAL.value, _abiertos()),
+        ),
+        "sin_asignar": (
+            "Tickets sin asignar sin resolver",
+            (Ticket.assigned_to_id.is_(None), _abiertos()),
+        ),
+    }
+    if solicitante:
+        grupos["mios"] = ("Sus tickets sin resolver", (_abiertos(),))
+    else:
+        grupos["mios"] = (
+            f"Tickets asignados a {user.name} sin resolver",
+            (Ticket.assigned_to_id == user.id, _abiertos()),
+        )
+    return grupos
+
+
+def _contar_y_listar(session, statement, limite: int) -> tuple[int, list[Ticket]]:
+    total = session.scalar(select(func.count()).select_from(statement.subquery()))
+    if not total:
+        return 0, []
+    tickets = session.scalars(
+        statement.order_by(Ticket.created_at.desc(), Ticket.id.desc()).limit(limite)
+    ).all()
+    return total, list(tickets)
+
+
 def _grupo(session, base, titulo: str, max_tickets: int, *condiciones) -> list[str]:
     """«Título (N): …» con hasta ``max_tickets`` tickets, ya filtrado y contado
     por el servidor: un modelo pequeño solo tiene que copiar la línea."""
     statement = base.where(*condiciones) if condiciones else base
-    total = session.scalar(select(func.count()).select_from(statement.subquery()))
+    total, tickets = _contar_y_listar(session, statement, max_tickets)
     if not total:
         return [f"{titulo} (0): ninguno."]
-    tickets = session.scalars(
-        statement.order_by(Ticket.created_at.desc(), Ticket.id.desc()).limit(max_tickets)
-    ).all()
     extra = f", se muestran los {len(tickets)} más recientes" if total > len(tickets) else ""
     return [f"{titulo} ({total}{extra}):", *(_ticket_line(t) for t in tickets)]
 
 
-def build_context(session, user: User, max_tickets: int = MAX_TICKETS_IN_CONTEXT) -> str:
+def _recortar(texto: str, maximo: int) -> str:
+    limpio = " ".join(str(texto).split())
+    return limpio if len(limpio) <= maximo else limpio[: maximo - 1] + "…"
+
+
+def tickets_mencionados(texto: str) -> list[int]:
+    """Números de ticket en la pregunta: «#5», «ticket 5», «ticket número 5»."""
+    encontrados = re.findall(r"#\s*(\d+)|\btickets?\s+(?:n[uú]mero\s+|nro\.?\s*)?(\d+)", texto, re.I)
+    ids = []
+    for con_numeral, con_palabra in encontrados:
+        valor = int(con_numeral or con_palabra)
+        if valor not in ids:
+            ids.append(valor)
+    return ids[:3]
+
+
+def _detalle_ticket(session, user: User, ticket_id: int) -> list[str]:
+    """Detalle de un ticket visible (descripción, últimos comentarios y
+    último cambio) para que el modelo explique «qué pasa con el #N»."""
+    ticket = ticket_service.get_visible_ticket(session, ticket_id, user)
+    if ticket is None:
+        return [f"Ticket #{ticket_id}: no existe o no está entre los que esta persona puede ver."]
+    lines = [f"Detalle del ticket #{ticket.id}:", _ticket_line(ticket)]
+    lines.append(f"  Descripción: {_recortar(ticket.description, 400)}")
+    comentarios = list(ticket.comments)[-3:]
+    if comentarios:
+        lines.append("  Últimos comentarios:")
+        lines.extend(f"  · {c.author}: {_recortar(c.content, 200)}" for c in comentarios)
+    else:
+        lines.append("  Sin comentarios.")
+    if ticket.history:
+        ultimo = ticket.history[-1]
+        cambio = f" ({ultimo.old_value or '—'} → {ultimo.new_value or '—'})" if ultimo.field else ""
+        lines.append(f"  Último cambio: {ultimo.action}{cambio} por {ultimo.author or 'Sistema'}.")
+    return lines
+
+
+def build_context(
+    session, user: User, max_tickets: int = MAX_TICKETS_IN_CONTEXT, pregunta: str = ""
+) -> str:
     """Data the user is allowed to see, scoped by role on the server.
 
     Tickets come grouped and counted (por estado, críticos sin resolver, sin
     asignar, asignados a la persona) so the answer to the usual questions is
-    a line to copy, not something the model has to filter or count.
+    a line to copy, not something the model has to filter or count. Tickets
+    named in ``pregunta`` («#5») are added in detail.
     """
     lines = [f"Usuario: {user.name} · rol {user.role}"]
     lines.append(f"Permisos de su rol: {PERMISOS_POR_ROL.get(user.role, '—')}")
 
     solicitante = user.role == UserRole.REQUESTER.value
-    base = select(Ticket)
-    if solicitante:
-        base = base.where(Ticket.created_by_id == user.id)
+    base = _base_visible(user)
     total = session.scalar(select(func.count()).select_from(base.subquery()))
     lines.append(
         f"{'Sus tickets' if solicitante else 'Tickets visibles'} en total: {total}."
     )
+    for titulo, condiciones in _grupos(user).values():
+        lines.extend(_grupo(session, base, titulo, max_tickets, *condiciones))
 
-    abiertos = Ticket.state.in_(ticket_service.OPEN_STATES)
-    for estado in (TicketState.NEW.value, TicketState.IN_PROGRESS.value):
-        lines.extend(
-            _grupo(session, base, f"Tickets en estado {estado}", max_tickets, Ticket.state == estado)
-        )
-    # Un ticket Cerrado ya pasó por Resuelto: los dos cuentan como resueltos.
-    lines.extend(
-        _grupo(
-            session, base, "Tickets resueltos (estado Resuelto o Cerrado)", max_tickets,
-            Ticket.state.in_((TicketState.RESOLVED.value, TicketState.CLOSED.value)),
-        )
-    )
-    lines.extend(
-        _grupo(
-            session, base, "Tickets críticos sin resolver", max_tickets,
-            Ticket.priority == TicketPriority.CRITICAL.value, abiertos,
-        )
-    )
-    lines.extend(
-        _grupo(session, base, "Tickets sin asignar sin resolver", max_tickets,
-               Ticket.assigned_to_id.is_(None), abiertos)
-    )
-    if not solicitante:
-        lines.extend(
-            _grupo(session, base, f"Tickets asignados a {user.name} sin resolver",
-                   max_tickets, Ticket.assigned_to_id == user.id, abiertos)
-        )
+    for ticket_id in tickets_mencionados(pregunta):
+        lines.extend(_detalle_ticket(session, user, ticket_id))
 
     # Solo quienes asignan o administran ven el equipo; nunca correos.
     if user.role in (UserRole.ADMIN.value, UserRole.SUPERVISOR.value):
@@ -198,17 +270,177 @@ def build_context(session, user: User, max_tickets: int = MAX_TICKETS_IN_CONTEXT
     return "\n".join(lines)
 
 
-def build_system(session, user: User, max_tickets: int = MAX_TICKETS_IN_CONTEXT) -> str:
+def build_system(
+    session, user: User, max_tickets: int = MAX_TICKETS_IN_CONTEXT, pregunta: str = ""
+) -> str:
     """Stable instructions first, per-user data after."""
     return (
         INSTRUCCIONES
         + "\n"
         + GUIA_APP
-        + f"\n<datos_visibles>\n{build_context(session, user, max_tickets)}\n</datos_visibles>"
+        + f"\n<datos_visibles>\n{build_context(session, user, max_tickets, pregunta)}\n</datos_visibles>"
     )
 
 
+# ---------- Respuestas directas (sin IA) ----------
+
+DIRECTAS_MAX_TICKETS = 10
+
+FRASES_GRUPO = {
+    "nuevos": ("ticket nuevo", "tickets nuevos"),
+    "en_proceso": ("ticket en proceso", "tickets en proceso"),
+    "resueltos": ("ticket resuelto o cerrado", "tickets resueltos o cerrados"),
+    "criticos": ("ticket crítico sin resolver", "tickets críticos sin resolver"),
+    "sin_asignar": ("ticket sin asignar sin resolver", "tickets sin asignar sin resolver"),
+}
+
+
+def _normalizar(texto: str) -> str:
+    sin_tildes = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+    return " ".join(sin_tildes.lower().split())
+
+
+def detectar_consulta(pregunta: str) -> str | None:
+    """Grupo de tickets que pide la pregunta, o ``None`` si es otra cosa.
+
+    Solo reconoce preguntas de listar o contar («¿cuántos…?», «¿hay…?»,
+    «¿qué tickets…?»); las de cómo usar la app («¿cómo creo un ticket
+    nuevo?») van a la IA.
+    """
+    t = _normalizar(pregunta)
+    if re.search(r"\bcomo\s+(se\s+)?(creo|crear|hago|hacer|cambio|cambiar|asigno|asignar|"
+                 r"cierro|cerrar|edito|editar|puedo|reabro|veo|desactivo|comento)\b", t):
+        return None
+    pide_lista = re.search(r"\b(cuant\w*|cuales|cual|que tickets|hay|lista\w*|muestra\w*|mostrar|"
+                           r"dime|ver|tengo|pendientes?|abiertos?)\b", t)
+    # Preguntas cortas de seguimiento («¿en proceso?», «y los críticos?»).
+    corta = len(t.split()) <= 4 and not re.search(r"\b(crear|creo|nuevo ticket)\b", t)
+    if not (pide_lista or corta):
+        return None
+    if "critic" in t:
+        return "criticos"
+    if "sin asignar" in t or "no asignad" in t or "sin responsable" in t:
+        return "sin_asignar"
+    if re.search(r"\b(mis tickets|mios|asignados a mi|tengo|mis pendientes)\b", t):
+        return "mios"
+    if "en proceso" in t or "en progreso" in t:
+        return "en_proceso"
+    if re.search(r"\bnuevos?\b", t):
+        return "nuevos"
+    if re.search(r"resuelt|cerrad", t):
+        return "resueltos"
+    if re.search(r"\b(cuant\w*|total)\b.*\btickets?\b", t):
+        return "total"
+    return None
+
+
+def _frase_grupo(clave: str, user: User, total: int) -> str:
+    if clave == "mios":
+        if user.role == UserRole.REQUESTER.value:
+            sujeto = "ticket tuyo sin resolver" if total == 1 else "tickets tuyos sin resolver"
+        else:
+            sujeto = "ticket asignado a ti sin resolver" if total == 1 else "tickets asignados a ti sin resolver"
+        return sujeto
+    singular, plural = FRASES_GRUPO[clave]
+    return singular if total == 1 else plural
+
+
+def _lista_tickets(tickets: list[Ticket], total: int) -> list[str]:
+    lines = [_ticket_line(t) for t in tickets]
+    if total > len(tickets):
+        lines.append(f"…y {total - len(tickets)} más. Puedes verlos en el listado de Tickets.")
+    return lines
+
+
+def respuesta_directa(session, user: User, pregunta: str) -> str | None:
+    """Respuesta exacta calculada por el servidor para las preguntas
+    frecuentes sobre tickets; ``None`` si la pregunta es para la IA."""
+    t = _normalizar(pregunta)
+    ids = tickets_mencionados(pregunta)
+    if len(ids) == 1 and re.search(
+        r"\b(estado|como va|en que va|que paso|quien|asignad\w*|prioridad)\b", t
+    ):
+        ticket = ticket_service.get_visible_ticket(session, ids[0], user)
+        if ticket is None:
+            return f"No encontré el ticket #{ids[0]} entre los tickets que puedes ver."
+        asignado = ticket.assignee.name if ticket.assignee is not None else "nadie (sin asignar)"
+        return (
+            f"El ticket #{ticket.id} «{ticket.title}» está en estado {ticket.state}, "
+            f"con prioridad {ticket.priority}, y está asignado a {asignado}."
+        )
+    if ids:
+        return None
+
+    clave = detectar_consulta(pregunta)
+    if clave is None:
+        return None
+    base = _base_visible(user)
+    if clave == "total":
+        total = session.scalar(select(func.count()).select_from(base.subquery()))
+        quien = "tuyos" if user.role == UserRole.REQUESTER.value else "visibles para ti"
+        return f"Hay {total} {'ticket' if total == 1 else 'tickets'} {quien} en total."
+
+    _titulo, condiciones = _grupos(user)[clave]
+    total, tickets = _contar_y_listar(session, base.where(*condiciones), DIRECTAS_MAX_TICKETS)
+    frase = _frase_grupo(clave, user, total)
+    if not total:
+        return f"No hay {frase}."
+    return "\n".join([f"Hay {total} {frase}:", *_lista_tickets(tickets, total)])
+
+
 SIN_RESPUESTA = "No tengo una respuesta para eso. ¿Puedes reformular la pregunta?"
+
+
+class _FiltroPensamiento:
+    """Quita los bloques ``<think>…</think>`` de un texto que llega por
+    partes (streaming), sin cortar etiquetas que vienen partidas."""
+
+    ABRE, CIERRA = "<think>", "</think>"
+
+    def __init__(self):
+        self.buffer = ""
+        self.dentro = False
+        self.empezo = False
+
+    def _limpiar_inicio(self, texto: str) -> str:
+        if not self.empezo:
+            texto = texto.lstrip()
+            self.empezo = bool(texto)
+        return texto
+
+    def agregar(self, texto: str) -> str:
+        self.buffer += texto
+        salida = []
+        while True:
+            if self.dentro:
+                fin = self.buffer.find(self.CIERRA)
+                if fin < 0:
+                    self.buffer = self.buffer[-len(self.CIERRA):]
+                    break
+                self.buffer = self.buffer[fin + len(self.CIERRA):]
+                self.dentro = False
+                continue
+            inicio = self.buffer.find(self.ABRE)
+            if inicio >= 0:
+                salida.append(self.buffer[:inicio])
+                self.buffer = self.buffer[inicio + len(self.ABRE):]
+                self.dentro = True
+                continue
+            # Guarda un posible «<thi» del final hasta saber si es etiqueta.
+            guardar = max(
+                (k for k in range(1, len(self.ABRE)) if self.ABRE.startswith(self.buffer[-k:])),
+                default=0,
+            )
+            corte = len(self.buffer) - guardar
+            salida.append(self.buffer[:corte])
+            self.buffer = self.buffer[corte:]
+            break
+        return self._limpiar_inicio("".join(salida))
+
+    def terminar(self) -> str:
+        resto = "" if self.dentro else self.buffer
+        self.buffer = ""
+        return self._limpiar_inicio(resto)
 
 
 class ProveedorQwen:
@@ -223,56 +455,112 @@ class ProveedorQwen:
         # Un modelo local en CPU puede tardar en la primera respuesta.
         self.http = http or httpx.Client(timeout=180.0)
 
-    def responder(self, system: str, messages: list[dict]) -> str:
-        try:
-            response = self.http.post(
-                f"{self.url}/api/chat",
-                json={
-                    "model": self.modelo,
-                    "messages": [{"role": "system", "content": system}, *messages],
-                    "stream": False,
-                    # Sin modo de razonamiento: respuestas de chat más rápidas.
-                    "think": False,
-                    "options": {"temperature": 0.3, "num_ctx": QWEN_CONTEXTO},
-                    "keep_alive": QWEN_MANTENER_CARGADO,
-                },
-            )
-        except httpx.TimeoutException:
-            raise AsistenteNoDisponible(
-                "El modelo tardó demasiado en responder; si tu computadora tiene poca "
-                "memoria, usa un modelo más pequeño (QWEN_MODELO=qwen3:0.6b)"
-            )
-        except httpx.HTTPError:
-            raise AsistenteNoDisponible(
-                "No se pudo conectar con Ollama: comprueba que el servicio está en ejecución"
-            )
+    def _cuerpo(self, system: str, messages: list[dict], stream: bool) -> dict:
+        return {
+            "model": self.modelo,
+            "messages": [{"role": "system", "content": system}, *messages],
+            "stream": stream,
+            # Sin modo de razonamiento: respuestas de chat más rápidas.
+            "think": False,
+            "options": {"temperature": 0.3, "num_ctx": QWEN_CONTEXTO},
+            "keep_alive": QWEN_MANTENER_CARGADO,
+        }
+
+    def _error_http(self, response: httpx.Response) -> AsistenteNoDisponible:
         if response.status_code == 404:
-            raise AsistenteNoDisponible(
+            return AsistenteNoDisponible(
                 f"El modelo {self.modelo} todavía no está descargado en Ollama; "
                 "espera a que termine la descarga e inténtalo de nuevo"
             )
-        if response.status_code >= 400:
-            detalle = ""
-            try:
-                detalle = str(response.json().get("error", ""))
-            except ValueError:
-                pass
-            if "memory" in detalle.lower():
-                raise AsistenteNoDisponible(
-                    f"No hay memoria suficiente para el modelo {self.modelo}; "
-                    "usa uno más pequeño (QWEN_MODELO=qwen3:0.6b)"
-                )
-            raise AsistenteNoDisponible(
-                f"Ollama respondió con un error ({response.status_code})"
-                + (f": {detalle}" if detalle else "")
+        detalle = ""
+        try:
+            detalle = str(response.json().get("error", ""))
+        except ValueError:
+            pass
+        if "memory" in detalle.lower():
+            return AsistenteNoDisponible(
+                f"No hay memoria suficiente para el modelo {self.modelo}; "
+                "usa uno más pequeño (QWEN_MODELO=qwen3:0.6b)"
             )
+        return AsistenteNoDisponible(
+            f"Ollama respondió con un error ({response.status_code})"
+            + (f": {detalle}" if detalle else "")
+        )
+
+    @staticmethod
+    def _error_conexion(error: httpx.HTTPError) -> AsistenteNoDisponible:
+        if isinstance(error, httpx.TimeoutException):
+            return AsistenteNoDisponible(
+                "El modelo tardó demasiado en responder; si tu computadora tiene poca "
+                "memoria, usa un modelo más pequeño (QWEN_MODELO=qwen3:0.6b)"
+            )
+        return AsistenteNoDisponible(
+            "No se pudo conectar con Ollama: comprueba que el servicio está en ejecución"
+        )
+
+    def responder(self, system: str, messages: list[dict]) -> str:
+        try:
+            response = self.http.post(
+                f"{self.url}/api/chat", json=self._cuerpo(system, messages, stream=False)
+            )
+        except httpx.HTTPError as error:
+            raise self._error_conexion(error)
+        if response.status_code >= 400:
+            raise self._error_http(response)
         try:
             texto = response.json()["message"]["content"]
         except (ValueError, KeyError, TypeError):
             raise AsistenteNoDisponible("Ollama devolvió una respuesta inválida")
-        # Por si el modelo igualmente emite su razonamiento entre etiquetas.
-        texto = re.sub(r"<think>.*?</think>", "", texto or "", flags=re.S).strip()
+        filtro = _FiltroPensamiento()
+        texto = (filtro.agregar(texto or "") + filtro.terminar()).strip()
         return texto or SIN_RESPUESTA
+
+    def responder_stream(self, system: str, messages: list[dict]):
+        """Va entregando el texto a medida que Qwen lo genera."""
+        filtro = _FiltroPensamiento()
+        emitido = False
+        try:
+            with self.http.stream(
+                "POST", f"{self.url}/api/chat", json=self._cuerpo(system, messages, stream=True)
+            ) as response:
+                if response.status_code >= 400:
+                    response.read()
+                    raise self._error_http(response)
+                for linea in response.iter_lines():
+                    if not linea.strip():
+                        continue
+                    try:
+                        datos = json.loads(linea)
+                    except ValueError:
+                        raise AsistenteNoDisponible("Ollama devolvió una respuesta inválida")
+                    if datos.get("error"):
+                        raise AsistenteNoDisponible(f"Ollama respondió con un error: {datos['error']}")
+                    parte = filtro.agregar((datos.get("message") or {}).get("content", ""))
+                    if parte:
+                        emitido = True
+                        yield parte
+                    if datos.get("done"):
+                        break
+        except httpx.HTTPError as error:
+            raise self._error_conexion(error)
+        resto = filtro.terminar()
+        if resto:
+            emitido = True
+            yield resto
+        if not emitido:
+            yield SIN_RESPUESTA
+
+    def precargar(self) -> bool:
+        """Carga el modelo en memoria sin generar texto; ``True`` si quedó listo."""
+        try:
+            response = self.http.post(
+                f"{self.url}/api/generate",
+                json={"model": self.modelo, "keep_alive": QWEN_MANTENER_CARGADO},
+                timeout=300.0,
+            )
+        except httpx.HTTPError:
+            return False
+        return response.status_code == 200
 
 
 class ProveedorClaude:
@@ -314,6 +602,9 @@ class ProveedorClaude:
         ).strip()
         return texto or SIN_RESPUESTA
 
+    def responder_stream(self, system: str, messages: list[dict]):
+        yield self.responder(system, messages)
+
 
 def crear_proveedor():
     """Proveedor elegido con ``ASISTENTE_PROVEEDOR`` (``qwen`` por defecto)."""
@@ -336,11 +627,79 @@ def crear_proveedor():
     )
 
 
-def responder(proveedor, session, user: User, messages: list[dict]) -> str:
-    """Answer with the chosen provider using only the user's visible data.
+def _preparar(proveedor, session, user: User, messages: list[dict]):
+    """Respuesta directa si la hay; si no, el prompt para la IA."""
+    pregunta = messages[-1]["content"]
+    directa = respuesta_directa(session, user, pregunta)
+    if directa is not None:
+        return directa, None
+    max_tickets = getattr(proveedor, "max_tickets", MAX_TICKETS_IN_CONTEXT)
+    return None, build_system(session, user, max_tickets, pregunta)
+
+
+def responder_completo(proveedor, session, user: User, messages: list[dict]) -> tuple[str, str]:
+    """``(texto, fuente)``: ``fuente`` es «directa» (calculada por el servidor)
+    o «ia».
 
     ``messages`` is the conversation (alternating ``user``/``assistant``,
     ending in ``user``) already validated by the router.
     """
-    max_tickets = getattr(proveedor, "max_tickets", MAX_TICKETS_IN_CONTEXT)
-    return proveedor.responder(build_system(session, user, max_tickets), messages)
+    directa, system = _preparar(proveedor, session, user, messages)
+    if directa is not None:
+        return directa, "directa"
+    return proveedor.responder(system, messages), "ia"
+
+
+def responder(proveedor, session, user: User, messages: list[dict]) -> str:
+    """Answer with the chosen provider using only the user's visible data."""
+    return responder_completo(proveedor, session, user, messages)[0]
+
+
+def responder_stream(proveedor, session, user: User, messages: list[dict]):
+    """Eventos para el chat: ``{"t": texto}`` por partes, ``{"error": msg}``
+    si el proveedor falla y ``{"fin": True, "fuente": …}`` al terminar."""
+    directa, system = _preparar(proveedor, session, user, messages)
+    if directa is not None:
+        yield {"t": directa}
+        yield {"fin": True, "fuente": "directa"}
+        return
+    stream = getattr(proveedor, "responder_stream", None)
+
+    def partes():
+        if stream is not None:
+            yield from stream(system, messages)
+        else:
+            yield proveedor.responder(system, messages)
+
+    try:
+        for parte in partes():
+            yield {"t": parte}
+    except AsistenteOcupado:
+        yield {"error": "El asistente está recibiendo demasiadas consultas; intenta en un momento"}
+        return
+    except (AsistenteNoDisponible, AsistenteNoConfigurado) as error:
+        yield {"error": str(error)}
+        return
+    yield {"fin": True, "fuente": "ia"}
+
+
+def iniciar_precarga() -> threading.Thread | None:
+    """Al arrancar, carga Qwen en Ollama en segundo plano para que la primera
+    pregunta no espere ~1 minuto. Reintenta mientras Ollama arranca o el
+    modelo se descarga. Solo actúa con Qwen y ``OLLAMA_URL`` definido (como
+    en docker-compose)."""
+    if os.environ.get("ASISTENTE_PROVEEDOR", "qwen").strip().lower() not in ("", "qwen"):
+        return None
+    if not os.environ.get("OLLAMA_URL", "").strip():
+        return None
+
+    def trabajo():
+        proveedor = crear_proveedor()
+        for _intento in range(60):  # hasta ~10 minutos
+            if proveedor.precargar():
+                return
+            time.sleep(10)
+
+    hilo = threading.Thread(target=trabajo, name="precarga-qwen", daemon=True)
+    hilo.start()
+    return hilo

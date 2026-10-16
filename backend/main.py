@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
+from backend.services import asistente_service
 from backend.routers.asistente import router as asistente_router
 from backend.routers.auth import router as auth_router
 from backend.routers.comentarios import router as comments_router
@@ -20,6 +21,9 @@ from backend.routers.users import router as users_router
 async def lifespan(application: FastAPI):
     """Create the database schema when the application starts."""
     init_db()
+    # Carga Qwen en Ollama en segundo plano (si aplica) para que la primera
+    # pregunta del asistente no espere a que el modelo se cargue.
+    asistente_service.iniciar_precarga()
     yield
 
 

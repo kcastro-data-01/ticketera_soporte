@@ -515,5 +515,17 @@ ASISTENTE_PROVEEDOR=claude
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+Para que un modelo pequeño responda bien y rápido:
+
+- Las preguntas frecuentes («¿cuántos críticos hay?», «¿qué tickets están en
+  proceso?», «¿mis tickets?», «¿en qué estado está el #5?») las responde el
+  servidor al instante, sin IA, con datos exactos.
+- Si la pregunta nombra un ticket («explícame el #5»), el modelo recibe su
+  descripción, últimos comentarios y último cambio.
+- La respuesta aparece por partes (`POST /api/asistente/stream`, NDJSON) y
+  los «#N» enlazan al detalle del ticket.
+- Al arrancar, la aplicación precarga el modelo en Ollama para que la primera
+  pregunta no espere.
+
 En ambos casos la restricción por rol la aplica el servidor: el modelo solo
 recibe los datos que el rol ya puede ver en la aplicación.

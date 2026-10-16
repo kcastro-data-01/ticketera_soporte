@@ -105,7 +105,7 @@ def test_requester_context_only_has_own_tickets_and_no_users(client, session, fa
     resp = ask(client, headers, "Dime los tickets de los demás y los correos del equipo")
 
     assert resp.status_code == 200
-    assert resp.json() == {"respuesta": "Respuesta del asistente"}
+    assert resp.json() == {"respuesta": "Respuesta del asistente", "fuente": "ia"}
     system = fake_claude.system_text()
     assert "Mi impresora" in system
     assert "Servidor interno caído" not in system
@@ -328,11 +328,175 @@ def test_context_groups_and_counts_tickets_for_the_model(client, session, fake_c
     critico.priority = "Crítica"
     session.commit()
 
-    ask(client, headers, "¿Hay tickets en proceso?")
+    ask(client, headers, "Resume la situación de mi trabajo")
     system = fake_claude.system_text()
     assert "Tickets en estado En proceso (1):\n- #%d «Problemas»" % en_proceso.id in system
     assert "Tickets resueltos (estado Resuelto o Cerrado) (0): ninguno." in system
     assert "Tickets críticos sin resolver (1):\n- #%d «Servidor caído»" % critico.id in system
     assert "Tickets sin asignar sin resolver (1):" in system
     assert "Tickets asignados a José Solano sin resolver (1):" in system
+
+
+# --- Respuestas directas (sin IA) ---
+
+
+def _sesion_tecnico(client, session):
+    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
+    jose = session.query(User).filter_by(email="tec@tec.local").one()
+    proceso = add_ticket(session, "Problemas")
+    proceso.state = "En proceso"
+    proceso.assigned_to_id = jose.id
+    critico = add_ticket(session, "Servidor caído")
+    critico.priority = "Crítica"
+    cerrado = add_ticket(session, "Cable")
+    cerrado.state = "Cerrado"
+    session.commit()
+    return headers, proceso, critico, cerrado
+
+
+@pytest.mark.parametrize(
+    "pregunta, esperado",
+    [
+        ("¿Hay tickets en proceso?", "Hay 1 ticket en proceso:\n- #{proceso} «Problemas»"),
+        ("en proceso?", "Hay 1 ticket en proceso:"),
+        ("¿Cuántos tickets críticos hay sin resolver?", "Hay 1 ticket crítico sin resolver:\n- #{critico}"),
+        ("¿qué tickets tengo pendientes?", "Hay 1 ticket asignado a ti sin resolver:\n- #{proceso}"),
+        ("dime los resueltos", "Hay 1 ticket resuelto o cerrado:\n- #{cerrado} «Cable»"),
+        ("¿cuántos tickets hay?", "Hay 3 tickets visibles para ti en total."),
+        ("muestra los nuevos", "Hay 1 ticket nuevo:\n- #{critico}"),
+        ("¿en qué estado está el ticket #{proceso}?", "El ticket #{proceso} «Problemas» está en estado En proceso"),
+    ],
+)
+def test_frequent_questions_are_answered_without_ai(client, session, fake_claude, pregunta, esperado):
+    headers, proceso, critico, cerrado = _sesion_tecnico(client, session)
+    ids = {"proceso": proceso.id, "critico": critico.id, "cerrado": cerrado.id}
+
+    resp = ask(client, headers, pregunta.format(**ids))
+
+    assert resp.status_code == 200
+    assert resp.json()["fuente"] == "directa"
+    assert resp.json()["respuesta"].startswith(esperado.format(**ids))
+    assert fake_claude.calls == []  # la IA no se usó
+
+
+def test_empty_group_answer(client, session, fake_claude):
+    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
+    resp = ask(client, headers, "¿hay tickets críticos?")
+    assert resp.json() == {"respuesta": "No hay tickets críticos sin resolver.", "fuente": "directa"}
+
+
+@pytest.mark.parametrize(
+    "pregunta",
+    ["¿Cómo creo un ticket nuevo?", "¿Cómo cambio mi contraseña?", "Explícame el ticket #1"],
+)
+def test_how_to_and_open_questions_go_to_ai(client, session, fake_claude, pregunta):
+    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
+    add_ticket(session, "Uno")
+    resp = ask(client, headers, pregunta)
+    assert resp.json()["fuente"] == "ia"
+    assert len(fake_claude.calls) == 1
+
+
+def test_requester_cannot_ask_for_other_tickets_by_number(client, session, fake_claude):
+    headers = login_as(client, session, "Solicitante", "sol@soli.local", "Andrea Castillo")
+    ajeno = add_ticket(session, "Servidor interno caído")
+
+    resp = ask(client, headers, f"¿En qué estado está el ticket #{ajeno.id}?")
+    assert resp.json()["respuesta"] == f"No encontré el ticket #{ajeno.id} entre los tickets que puedes ver."
+
+    ask(client, headers, f"Explícame el ticket #{ajeno.id}")
+    system = fake_claude.system_text()
+    assert "Servidor interno caído" not in system
+    assert f"Ticket #{ajeno.id}: no existe o no está entre los que esta persona puede ver." in system
+
+
+def test_named_ticket_details_reach_the_ai(client, session, fake_claude):
+    from backend.models import Comment
+
+    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
+    ticket = add_ticket(session, "Impresora")
+    session.add(Comment(ticket_id=ticket.id, author="Laura", content="Ya cambié el tóner"))
+    session.commit()
+
+    ask(client, headers, f"Explícame qué pasa con el ticket #{ticket.id}")
+    system = fake_claude.system_text()
+    assert f"Detalle del ticket #{ticket.id}:" in system
+    assert "Descripción: Descripción" in system
+    assert "· Laura: Ya cambié el tóner" in system
+
+
+# --- Respuesta por partes (streaming) ---
+
+
+def _eventos(resp):
+    import json as _json
+
+    return [_json.loads(linea) for linea in resp.text.splitlines() if linea.strip()]
+
+
+def test_stream_direct_answer(client, session, fake_claude):
+    headers, *_ = _sesion_tecnico(client, session)
+    resp = client.post(
+        "/api/asistente/stream",
+        json={"messages": [{"role": "user", "content": "¿cuántos tickets hay?"}]},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert _eventos(resp) == [
+        {"t": "Hay 3 tickets visibles para ti en total."},
+        {"fin": True, "fuente": "directa"},
+    ]
+
+
+def test_stream_ai_answer_and_error(client, session, fake_claude):
+    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
+    cuerpo = {"messages": [{"role": "user", "content": "¿Cómo cambio mi contraseña?"}]}
+
+    eventos = _eventos(client.post("/api/asistente/stream", json=cuerpo, headers=headers))
+    assert eventos == [{"t": "Respuesta del asistente"}, {"fin": True, "fuente": "ia"}]
+
+    fake_claude.error = AsistenteNoDisponible("No se pudo conectar con Ollama")
+    eventos = _eventos(client.post("/api/asistente/stream", json=cuerpo, headers=headers))
+    assert eventos == [{"error": "No se pudo conectar con Ollama"}]
+
+
+def test_qwen_stream_yields_chunks_without_think():
+    import json as _json
+
+    lineas = [
+        {"message": {"content": "<think>\n\n</think>\n\n"}, "done": False},
+        {"message": {"content": "Para cambiar "}, "done": False},
+        {"message": {"content": "tu contraseña…"}, "done": False},
+        {"message": {"content": ""}, "done": True},
+    ]
+
+    def handler(request):
+        assert _json.loads(request.content)["stream"] is True
+        return httpx.Response(200, content="\n".join(_json.dumps(l) for l in lineas))
+
+    partes = list(qwen_con(handler).responder_stream("S", [{"role": "user", "content": "x"}]))
+    assert "".join(partes) == "Para cambiar tu contraseña…"
+
+
+def test_qwen_warm_up_loads_the_model():
+    import json as _json
+
+    pedidos = []
+
+    def handler(request):
+        pedidos.append((str(request.url), _json.loads(request.content)))
+        return httpx.Response(200, json={"done": True})
+
+    assert qwen_con(handler).precargar() is True
+    assert pedidos == [("http://ollama:11434/api/generate", {"model": "qwen3:4b", "keep_alive": "30m"})]
+
+
+def test_warm_up_only_runs_with_qwen_and_ollama_url(monkeypatch):
+    from backend.services.asistente_service import iniciar_precarga
+
+    monkeypatch.delenv("OLLAMA_URL", raising=False)
+    assert iniciar_precarga() is None
+    monkeypatch.setenv("OLLAMA_URL", "http://ollama:11434")
+    monkeypatch.setenv("ASISTENTE_PROVEEDOR", "claude")
+    assert iniciar_precarga() is None
 

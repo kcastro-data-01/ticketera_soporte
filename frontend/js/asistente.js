@@ -3,7 +3,7 @@
    puede usar la IA según el rol de la sesión. La conversación se guarda en
    sessionStorage (se pierde al cerrar la pestaña o la sesión). */
 
-const API_ASISTENTE_URL = "/api/asistente";
+const API_ASISTENTE_URL = "/api/asistente/stream";
 const CHAT_KEY = "asistente_chat";
 const CHAT_MAX_MENSAJES = 20;
 
@@ -47,6 +47,33 @@ function crearElemento(tag, clase, texto) {
   return el;
 }
 
+/* Escribe el texto con «#N» como enlace al detalle del ticket. Usa nodos
+   de texto: nada de lo que responde el servidor se interpreta como HTML. */
+function pintarTexto(elemento, texto) {
+  elemento.replaceChildren();
+  const partes = String(texto).split(/(#\d+)/);
+  partes.forEach((parte) => {
+    const numero = /^#(\d+)$/.exec(parte);
+    if (numero) {
+      const enlace = document.createElement("a");
+      enlace.className = "chat-enlace";
+      enlace.href = `detalle.html?id=${numero[1]}`;
+      enlace.textContent = parte;
+      elemento.appendChild(enlace);
+    } else if (parte) {
+      elemento.appendChild(document.createTextNode(parte));
+    }
+  });
+}
+
+function burbuja(mensaje) {
+  const clase = `chat-mensaje ${mensaje.role === "user" ? "usuario" : "asistente"}${mensaje.error ? " error" : ""}`;
+  const el = crearElemento("div", clase);
+  if (mensaje.role === "user" || mensaje.error) el.textContent = mensaje.content;
+  else pintarTexto(el, mensaje.content);
+  return el;
+}
+
 function pintarMensajes(lista, mensajes) {
   lista.replaceChildren();
   const user = getUser();
@@ -66,15 +93,7 @@ function pintarMensajes(lista, mensajes) {
     });
     lista.appendChild(sugerencias);
   }
-  mensajes.forEach((mensaje) => {
-    lista.appendChild(
-      crearElemento(
-        "div",
-        `chat-mensaje ${mensaje.role === "user" ? "usuario" : "asistente"}${mensaje.error ? " error" : ""}`,
-        mensaje.content
-      )
-    );
-  });
+  mensajes.forEach((mensaje) => lista.appendChild(burbuja(mensaje)));
   lista.scrollTop = lista.scrollHeight;
 }
 
@@ -104,25 +123,55 @@ async function enviarPregunta(texto) {
       "Pensando… la primera respuesta puede tardar hasta un minuto mientras se carga el modelo.";
   }, 8000);
 
+  /* La respuesta llega por partes (NDJSON): {"t"} texto, {"fin"} o {"error"}. */
   let respuesta;
+  let acumulado = "";
   try {
     const response = await fetchWithAuth(API_ASISTENTE_URL, {
       method: "POST",
       body: JSON.stringify({ messages: recortarConversacion(historial) }),
     });
-    const body = await response.json().catch(() => null);
-    if (response.ok && body && typeof body.respuesta === "string") {
-      respuesta = { role: "assistant", content: body.respuesta };
-    } else {
+    if (!response.ok || !response.body) {
+      const body = await response.json().catch(() => null);
       const detalle = body && typeof body.detail === "string" ? body.detail : "";
       respuesta = {
         role: "assistant",
         error: true,
         content: detalle || `El asistente no pudo responder (${response.status}).`,
       };
+    } else {
+      const lector = response.body.getReader();
+      const decodificador = new TextDecoder();
+      let pendiente = "";
+      let error = "";
+      for (;;) {
+        const { value, done } = await lector.read();
+        if (done) break;
+        pendiente += decodificador.decode(value, { stream: true });
+        const lineas = pendiente.split("\n");
+        pendiente = lineas.pop();
+        for (const linea of lineas) {
+          if (!linea.trim()) continue;
+          const evento = JSON.parse(linea);
+          if (typeof evento.t === "string") {
+            if (!acumulado) {
+              clearTimeout(aviso);
+              escribiendo.className = "chat-mensaje asistente";
+            }
+            acumulado += evento.t;
+            pintarTexto(escribiendo, acumulado);
+            lista.scrollTop = lista.scrollHeight;
+          } else if (evento.error) {
+            error = evento.error;
+          }
+        }
+      }
+      respuesta = error
+        ? { role: "assistant", error: true, content: error }
+        : { role: "assistant", content: acumulado || "No tengo una respuesta para eso." };
     }
   } catch (error) {
-    console.error("POST /api/asistente:", error);
+    console.error("POST /api/asistente/stream:", error);
     respuesta = {
       role: "assistant",
       error: true,
