@@ -84,6 +84,9 @@ escribe) e historial de cambios; a la derecha, asignación y cambio de estado \
 según el rol.
 - Mi cuenta: cambiar la propia contraseña (mínimo 6 caracteres).
 - Contraseña olvidada: la restablece un Administrador desde Usuarios → Editar.
+- Usuarios (solo Administrador): «Agregar usuario» con nombre, correo, contraseña \
+y rol; «Editar» para cambiar datos, rol o contraseña; «Desactivar» / «Reactivar» \
+en la fila de cada persona.
 """
 
 INSTRUCCIONES = """\
@@ -352,6 +355,170 @@ def _lista_tickets(tickets: list[Ticket], total: int) -> list[str]:
     return lines
 
 
+# ---------- Guía de uso por rol (sin IA) ----------
+# Cada entrada: (patrón que debe aparecer en la pregunta normalizada, sin
+# tildes; roles que pueden hacerlo; qué es la acción; pasos; a quién acudir
+# si el rol no puede). Se revisan en orden: las más específicas primero.
+
+TODOS = ("Administrador", "Supervisor", "Técnico", "Solicitante")
+EQUIPO = ("Administrador", "Supervisor", "Técnico")
+GESTION = ("Administrador", "Supervisor")
+SOLO_ADMIN = ("Administrador",)
+
+GUIA_POR_ACCION = [
+    (
+        r"(desactiv|reactiv|activar|dar de baja|bloque|deshabilit|inhabilit)\w*.*\b(usuario|cuenta|persona|empleado)",
+        SOLO_ADMIN,
+        "desactivar o reactivar usuarios",
+        "Entra a «Usuarios» en el menú lateral. En la lista «Usuarios registrados», "
+        "pulsa «Desactivar» en la fila de la persona y confirma. Un usuario "
+        "desactivado no puede iniciar sesión ni recibe tickets, pero su historial se "
+        "conserva. Para devolverle el acceso, pulsa «Reactivar» en su fila. No puedes "
+        "desactivar tu propio usuario.",
+        "a un Administrador",
+    ),
+    (
+        r"(contrasena|clave|password).*(usuario|otra persona|otro|de alguien|olvid|restablec|resete|recuper)"
+        r"|(olvid|restablec|resete|recuper)\w*.*(contrasena|clave|password)",
+        SOLO_ADMIN,
+        "restablecer la contraseña de otra persona",
+        "Entra a «Usuarios», pulsa «Editar» en la fila de la persona, escribe la "
+        "nueva contraseña (mínimo 6 caracteres) en «Nueva contraseña» y pulsa "
+        "«Guardar cambios». Compártela con esa persona para que inicie sesión.",
+        "a un Administrador (desde Usuarios → Editar)",
+    ),
+    (
+        r"(contrasena|clave|password)",
+        TODOS,
+        "cambiar tu contraseña",
+        "Entra a «Mi cuenta» en el menú lateral, escribe tu contraseña actual y la "
+        "nueva dos veces (mínimo 6 caracteres) y pulsa «Cambiar contraseña».",
+        "",
+    ),
+    (
+        r"\b(rol|roles|puesto)\b.*(cambi|asign|modific|poner|dar)|(cambi|asign|modific|poner|dar)\w*.*\b(rol|roles|puesto)\b",
+        SOLO_ADMIN,
+        "cambiar el rol de un usuario",
+        "Entra a «Usuarios», pulsa «Editar» en la fila de la persona, elige el rol "
+        "nuevo en «Rol» y pulsa «Guardar cambios».",
+        "a un Administrador",
+    ),
+    (
+        r"(crear|creo|agreg|anad|registr|dar de alta|alta de)\w*.*\busuarios?\b|\busuarios?\b.*(nuevo|crear|agregar)",
+        SOLO_ADMIN,
+        "crear usuarios",
+        "Entra a «Usuarios». En «Agregar usuario» escribe el nombre, el correo, una "
+        "contraseña (mínimo 6 caracteres) y elige el rol; luego pulsa «Agregar "
+        "usuario». La persona ya puede iniciar sesión con ese correo y contraseña.",
+        "a un Administrador",
+    ),
+    (
+        r"(asign|reasign)\w*",
+        GESTION,
+        "asignar tickets",
+        "Abre el ticket desde el listado. En la columna derecha, en «Asignación», "
+        "elige a la persona en «Persona asignada» y pulsa «Guardar asignación». Los "
+        "tickets nuevos ya se asignan solos al Técnico con menos tickets.",
+        "a un Administrador o a un Supervisor",
+    ),
+    (
+        r"(cambi\w* (el |de )?estado|estado de(l)? ticket|cerr(ar|o)|cierr\w*|resolv\w*|resuelv\w*|"
+        r"marc\w* como|pasar a|en proceso)",
+        EQUIPO,
+        "cambiar el estado de un ticket",
+        "Abre el ticket. En la columna derecha, en «Cambio de estado», elige el "
+        "estado siguiente en «Pasar a» y pulsa «Cambiar estado». El orden es Nuevo → "
+        "En proceso → Resuelto → Cerrado, y un ticket Cerrado ya no cambia.",
+        "al Técnico asignado, a un Supervisor o a un Administrador",
+    ),
+    (
+        r"(edit|modific|correg|actualiz)\w*|(cambi\w* (el |la )?(titulo|descripcion|categoria|prioridad))",
+        GESTION,
+        "editar un ticket",
+        "Abre el ticket y pulsa «Editar ticket». Cambia el título, la descripción, "
+        "la categoría o la prioridad y pulsa «Guardar cambios».",
+        "a un Administrador o a un Supervisor",
+    ),
+    (
+        r"(crear|creo|abrir|abro|registr|levant|report|hacer|hago|nuevo)\w*.*\b(ticket|solicitud|caso|incidencia)s?\b"
+        r"|\b(ticket|solicitud)s?\b.*\bnuevos?\b",
+        TODOS,
+        "crear un ticket",
+        "Pulsa «Nuevo ticket» en el menú lateral. Escribe el título y la "
+        "descripción, elige la categoría (Hardware, Software, Red o Accesos) y la "
+        "prioridad (Baja, Media, Alta o Crítica) y guarda. El ticket se asigna solo "
+        "al Técnico con menos tickets.",
+        "",
+    ),
+    (
+        r"coment\w*",
+        TODOS,
+        "comentar un ticket",
+        "Abre el ticket, escribe en «Nuevo comentario» y pulsa «Agregar comentario». "
+        "El comentario queda firmado con tu nombre.",
+        "",
+    ),
+    (
+        r"historial",
+        EQUIPO,
+        "ver el historial",
+        "El historial de todos los tickets está en «Historial» en el menú lateral. "
+        "El de un ticket en particular está al final de su detalle, con el botón "
+        "«Ver historial».",
+        "",
+    ),
+    (
+        r"(busc|filtr|encontr)\w*",
+        TODOS,
+        "buscar o filtrar tickets",
+        "En «Tickets», escribe en «Buscar» (busca en el título y la descripción) y "
+        "usa los filtros de categoría, prioridad y estado; luego pulsa «Buscar». Las "
+        "tarjetas de arriba también filtran al pulsarlas.",
+        "",
+    ),
+]
+
+# Solo se usa la guía en preguntas de «cómo / dónde / puedo»: así «¿cuántos
+# tickets en proceso hay?» sigue yendo a los conteos.
+_PIDE_COMO = re.compile(
+    r"\b(como|donde|puedo|puede|podria|se puede|pasos|forma|manera|quiero|necesito|ayuda\w*|"
+    r"me (ensenas|explicas|dices)|deseo|tengo que|hay que)\b"
+)
+
+
+def respuesta_guia(user: User, pregunta: str) -> str | None:
+    """Pasos para hacer algo en la app según el rol, o ``None``."""
+    t = _normalizar(pregunta)
+    if not _PIDE_COMO.search(t):
+        return None
+    if re.search(r"\b(que puedo hacer|mis permisos|permisos|mi rol)\b", t):
+        return (
+            f"Tu rol es {user.role}. {PERMISOS_POR_ROL.get(user.role, '')}"
+        ).strip()
+    for patron, roles, accion, pasos, quien in GUIA_POR_ACCION:
+        if not re.search(patron, t):
+            continue
+        if user.role in roles:
+            if accion == "comentar un ticket" and user.role == "Solicitante":
+                return pasos + " Como Solicitante, puedes comentar en los tickets que creaste."
+            if accion == "ver el historial" and user.role == "Solicitante":
+                return (
+                    "Como Solicitante no tienes el historial general, pero puedes ver el "
+                    "de tus tickets: abre el ticket y pulsa «Ver historial» al final."
+                )
+            return pasos
+        if accion == "ver el historial" and user.role == "Solicitante":
+            return (
+                "Como Solicitante no tienes el historial general, pero puedes ver el de "
+                "tus tickets: abre el ticket y pulsa «Ver historial» al final."
+            )
+        respuesta = f"Con tu rol ({user.role}) no puedes {accion}."
+        if quien:
+            respuesta += f" Pídeselo {quien}."
+        return respuesta
+    return None
+
+
 def respuesta_directa(session, user: User, pregunta: str) -> str | None:
     """Respuesta exacta calculada por el servidor para las preguntas
     frecuentes sobre tickets; ``None`` si la pregunta es para la IA."""
@@ -368,6 +535,9 @@ def respuesta_directa(session, user: User, pregunta: str) -> str | None:
             f"El ticket #{ticket.id} «{ticket.title}» está en estado {ticket.state}, "
             f"con prioridad {ticket.priority}, y está asignado a {asignado}."
         )
+    guia = respuesta_guia(user, pregunta)
+    if guia is not None:
+        return guia
     if ids:
         return None
 

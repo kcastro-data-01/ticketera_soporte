@@ -387,7 +387,7 @@ def test_empty_group_answer(client, session, fake_claude):
 
 @pytest.mark.parametrize(
     "pregunta",
-    ["¿Cómo creo un ticket nuevo?", "¿Cómo cambio mi contraseña?", "Explícame el ticket #1"],
+    ["Resume la situación de mi trabajo", "Hola, ¿quién eres?", "Explícame el ticket #1"],
 )
 def test_how_to_and_open_questions_go_to_ai(client, session, fake_claude, pregunta):
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
@@ -450,7 +450,7 @@ def test_stream_direct_answer(client, session, fake_claude):
 
 def test_stream_ai_answer_and_error(client, session, fake_claude):
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
-    cuerpo = {"messages": [{"role": "user", "content": "¿Cómo cambio mi contraseña?"}]}
+    cuerpo = {"messages": [{"role": "user", "content": "Resume la situación de mi trabajo"}]}
 
     eventos = _eventos(client.post("/api/asistente/stream", json=cuerpo, headers=headers))
     assert eventos == [{"t": "Respuesta del asistente"}, {"fin": True, "fuente": "ia"}]
@@ -499,4 +499,38 @@ def test_warm_up_only_runs_with_qwen_and_ollama_url(monkeypatch):
     monkeypatch.setenv("OLLAMA_URL", "http://ollama:11434")
     monkeypatch.setenv("ASISTENTE_PROVEEDOR", "claude")
     assert iniciar_precarga() is None
+
+
+# --- Guía de uso por rol ---
+
+
+@pytest.mark.parametrize(
+    "rol, pregunta, empieza",
+    [
+        ("Administrador", "¿Cómo desactivo a un usuario?", "Entra a «Usuarios» en el menú lateral."),
+        ("Técnico", "¿Cómo desactivo a un usuario?", "Con tu rol (Técnico) no puedes desactivar o reactivar usuarios. Pídeselo a un Administrador."),
+        ("Solicitante", "¿Cómo cierro un ticket?", "Con tu rol (Solicitante) no puedes cambiar el estado de un ticket. Pídeselo al Técnico asignado"),
+        ("Técnico", "¿cómo cierro un ticket?", "Abre el ticket. En la columna derecha, en «Cambio de estado»"),
+        ("Técnico", "¿cómo asigno un ticket?", "Con tu rol (Técnico) no puedes asignar tickets. Pídeselo a un Administrador o a un Supervisor."),
+        ("Supervisor", "¿cómo asigno un ticket?", "Abre el ticket desde el listado."),
+        ("Solicitante", "¿Cómo creo un ticket nuevo?", "Pulsa «Nuevo ticket» en el menú lateral."),
+        ("Solicitante", "¿cómo cambio mi contraseña?", "Entra a «Mi cuenta»"),
+        ("Supervisor", "olvidé la contraseña de Carlos, ¿cómo la restablezco?", "Con tu rol (Supervisor) no puedes restablecer la contraseña de otra persona."),
+        ("Administrador", "¿cómo agrego un usuario?", "Entra a «Usuarios». En «Agregar usuario»"),
+        ("Solicitante", "¿dónde veo el historial?", "Como Solicitante no tienes el historial general"),
+        ("Técnico", "¿qué puedo hacer?", "Tu rol es Técnico."),
+    ],
+)
+def test_how_to_answers_depend_on_the_role(client, session, fake_claude, rol, pregunta, empieza):
+    headers = login_as(client, session, rol, "persona@adn.local", "Persona Prueba")
+    resp = ask(client, headers, pregunta)
+    assert resp.json()["fuente"] == "directa"
+    assert resp.json()["respuesta"].startswith(empieza)
+    assert fake_claude.calls == []
+
+
+def test_how_to_does_not_hijack_counting_questions(client, session, fake_claude):
+    headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
+    resp = ask(client, headers, "¿cuántos tickets en proceso hay?")
+    assert resp.json()["respuesta"] == "No hay tickets en proceso."
 
