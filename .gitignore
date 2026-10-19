@@ -26,3 +26,6 @@ Thumbs.db
 
 # Entorno
 .env
+
+# Caché de tokens de Microsoft 365 (correo)
+.msal_cache.json

@@ -1,7 +1,8 @@
 """Crea tickets a partir de los correos que llegan al buzón de soporte.
 
 Cada ``CORREO_INTERVALO`` segundos (60 por defecto) un hilo en segundo plano
-revisa el buzón por IMAP y, por cada correo nuevo:
+revisa los correos **no leídos** de la bandeja de entrada con Microsoft Graph
+y, por cada correo nuevo que pide ayuda:
 
 * Si el remitente es un usuario activo de la ticketera, se crea un ticket a
   su nombre (asunto = título, cuerpo = descripción, categoría y prioridad
@@ -11,41 +12,43 @@ revisa el buzón por IMAP y, por cada correo nuevo:
   el enlace a la aplicación (una vez por día como máximo).
 * Si su cuenta está desactivada, se le avisa.
 
+Las respuestas se envían en el mismo hilo (``/reply``). Cada correo
+procesado se marca como leído y se mueve a la carpeta
+``CORREO_CARPETA_PROCESADOS``. Los que no piden ayuda se dejan sin tocar.
 Los correos automáticos (respuestas automáticas, rebotes, «noreply»...) se
-ignoran para no crear bucles. Los correos se leen sin marcarlos como leídos
-y se recuerda su ``Message-ID`` para no procesarlos dos veces. Solo se
-procesan los que llegan después de activar la función.
+ignoran para no crear bucles, y se recuerda el ``Message-ID`` de cada correo
+para no procesarlo dos veces. Solo se procesan los que llegan después de
+activar la función.
 
-Configuración (variables de entorno, ver README):
-``CORREO_ACTIVO``, ``CORREO_USUARIO``, ``CORREO_CLAVE``,
-``CORREO_IMAP_SERVIDOR``, ``CORREO_IMAP_PUERTO``, ``CORREO_SMTP_SERVIDOR``,
-``CORREO_SMTP_PUERTO``, ``CORREO_CARPETA``, ``CORREO_INTERVALO``, ``APP_URL``
-y, para Microsoft 365 con OAuth, ``CORREO_M365_TENANT``,
-``CORREO_M365_CLIENT_ID`` y ``CORREO_M365_CLIENT_SECRET``.
+El inicio de sesión (msal, device code) está en ``correo_auth``; la primera
+vez se ejecuta ``python -m backend.correo_login``.
+
+Configuración (variables de entorno, ver README): ``CORREO_ACTIVO``,
+``CORREO_USUARIO``, ``CORREO_M365_TENANT``, ``CORREO_M365_CLIENT_ID``,
+``CORREO_M365_CACHE``, ``CORREO_CARPETA_PROCESADOS``, ``CORREO_FILTRO``,
+``CORREO_INTERVALO`` y ``APP_URL``.
 """
 
 from __future__ import annotations
 
-import imaplib
 import logging
 import os
 import re
-import smtplib
 import threading
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from email import message_from_bytes, policy
-from email.message import EmailMessage
-from email.utils import make_msgid, parseaddr, parsedate_to_datetime
 from html import unescape
+from pathlib import Path
 
+import httpx
 from sqlalchemy import func, select
 
 from backend.constants import TicketCategory, TicketPriority
 from backend.models import ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate
 from backend.services import ticket_service
+from backend.services.correo_auth import ProveedorToken, SinSesionError, ruta_cache
 
 logger = logging.getLogger(__name__)
 # Los mensajes salen en «docker compose logs ticketera» (uvicorn no muestra
@@ -62,6 +65,9 @@ MAX_TITULO = 200
 TITULO_POR_DEFECTO = "Solicitud recibida por correo"
 MARCA_INICIO = "__inicio__"
 HORAS_ENTRE_AVISOS = 24
+GRAPH_URL = "https://graph.microsoft.com/v1.0"
+CARPETA_PROCESADOS = "Tickets-Procesados"
+MAX_PAGINAS = 10  # hasta 500 no leídos por revisión (50 por página)
 
 # Palabras clave → categoría / prioridad (se revisan en minúsculas, en el
 # asunto y el cuerpo). Si nada coincide: Software y Media.
@@ -109,28 +115,19 @@ REMITENTES_AUTOMATICOS = ("noreply", "no-reply", "no_reply", "donotreply", "mail
 
 @dataclass
 class ConfigCorreo:
-    """Datos para conectarse al buzón (se leen de variables de entorno)."""
+    """Datos del buzón (se leen de variables de entorno)."""
 
     usuario: str
-    clave: str = ""
-    imap_servidor: str = "outlook.office365.com"
-    imap_puerto: int = 993
-    smtp_servidor: str = "smtp.office365.com"
-    smtp_puerto: int = 587
-    carpeta: str = "INBOX"
+    m365_tenant: str = ""
+    m365_client_id: str = ""
+    cache_path: Path = field(default_factory=ruta_cache)
+    carpeta_procesados: str = CARPETA_PROCESADOS
     # «auto»: solo los correos que parecen una solicitud de ayuda (ver
     # SEÑALES_SOPORTE); «todos»: cada correo es un ticket (buzón exclusivo
     # de soporte). Los demás se dejan tal cual, sin guardar ni responder.
     filtro: str = "auto"
     intervalo: int = 60
     app_url: str = "http://localhost:8000"
-    m365_tenant: str = ""
-    m365_client_id: str = ""
-    m365_client_secret: str = ""
-
-    @property
-    def usa_oauth(self) -> bool:
-        return bool(self.m365_tenant and self.m365_client_id and self.m365_client_secret)
 
 
 def _activo(valor: str | None) -> bool:
@@ -148,18 +145,13 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         return None
     return ConfigCorreo(
         usuario=usuario,
-        clave=env.get("CORREO_CLAVE") or "",
-        imap_servidor=env.get("CORREO_IMAP_SERVIDOR") or "outlook.office365.com",
-        imap_puerto=int(env.get("CORREO_IMAP_PUERTO") or 993),
-        smtp_servidor=env.get("CORREO_SMTP_SERVIDOR") or "smtp.office365.com",
-        smtp_puerto=int(env.get("CORREO_SMTP_PUERTO") or 587),
-        carpeta=env.get("CORREO_CARPETA") or "INBOX",
+        m365_tenant=(env.get("CORREO_M365_TENANT") or "").strip(),
+        m365_client_id=(env.get("CORREO_M365_CLIENT_ID") or "").strip(),
+        cache_path=ruta_cache(env.get("CORREO_M365_CACHE")),
+        carpeta_procesados=(env.get("CORREO_CARPETA_PROCESADOS") or CARPETA_PROCESADOS).strip(),
         filtro="todos" if (env.get("CORREO_FILTRO") or "").strip().lower() == "todos" else "auto",
         intervalo=max(15, int(env.get("CORREO_INTERVALO") or 60)),
         app_url=(env.get("APP_URL") or "http://localhost:8000").rstrip("/"),
-        m365_tenant=env.get("CORREO_M365_TENANT") or "",
-        m365_client_id=env.get("CORREO_M365_CLIENT_ID") or "",
-        m365_client_secret=env.get("CORREO_M365_CLIENT_SECRET") or "",
     )
 
 
@@ -192,7 +184,7 @@ def _limpiar_cuerpo(texto: str) -> str:
     for linea in texto.replace("\r\n", "\n").split("\n"):
         # Lo que viene después de «El ... escribió:» / «De: ...» es el correo
         # anterior citado: no forma parte de la solicitud.
-        if re.match(r"^\s*(el .+ escribió:|on .+ wrote:|de:\s.+|from:\s.+|-----\s*original)",
+        if re.match(r"^\s*(el .+ escribió:|on .+ wrote:|de:\s.+|from:\s.+|-----\s*original|_{10,})",
                     linea, re.IGNORECASE):
             break
         if linea.lstrip().startswith(">"):
@@ -204,60 +196,55 @@ def _limpiar_cuerpo(texto: str) -> str:
     return texto.strip()
 
 
-def leer_correo(crudo: bytes) -> CorreoEntrante:
-    """Convierte los bytes de un correo en un :class:`CorreoEntrante`."""
-    msg = message_from_bytes(crudo, policy=policy.default)
-    nombre, remitente = parseaddr(str(msg.get("From", "")))
-    asunto = " ".join(str(msg.get("Subject", "")).split())
-
-    cuerpo = ""
-    # Texto plano primero; si viene vacío, la versión HTML.
-    for tipo in ("plain", "html"):
-        parte = msg.get_body(preferencelist=(tipo,))
-        if parte is None:
-            continue
-        try:
-            contenido = parte.get_content()
-        except (LookupError, UnicodeDecodeError):
-            contenido = parte.get_payload(decode=True).decode("utf-8", "replace")
-        if tipo == "html":
-            contenido = _html_a_texto(contenido)
-        cuerpo = _limpiar_cuerpo(contenido)
-        if cuerpo:
-            break
-
-    fecha = None
-    if msg.get("Date"):
-        try:
-            fecha = parsedate_to_datetime(str(msg["Date"]))
-            if fecha.tzinfo is None:
-                fecha = fecha.replace(tzinfo=timezone.utc)
-        except (TypeError, ValueError):
-            fecha = None
-
-    auto_submitted = str(msg.get("Auto-Submitted", "no")).strip().lower()
-    precedencia = str(msg.get("Precedence", "")).strip().lower()
-    automatico = (
+def _es_automatico(cabeceras: dict[str, str], remitente: str) -> bool:
+    """¿Es una respuesta automática, un rebote o un envío masivo?"""
+    auto_submitted = cabeceras.get("auto-submitted", "no").strip().lower()
+    precedencia = cabeceras.get("precedence", "").strip().lower()
+    return (
         auto_submitted not in ("", "no")
         or precedencia in ("bulk", "junk", "list", "auto_reply")
-        or msg.get("X-Autoreply") is not None
-        or msg.get("X-Autorespond") is not None
-        or any(p in remitente.lower() for p in REMITENTES_AUTOMATICOS)
+        or "x-autoreply" in cabeceras
+        or "x-autorespond" in cabeceras
+        or any(p in remitente for p in REMITENTES_AUTOMATICOS)
     )
 
-    message_id = str(msg.get("Message-ID", "")).strip()
-    if not message_id:
-        # Sin Message-ID: se arma uno estable con remitente, fecha y asunto.
-        message_id = f"<sin-id:{remitente}:{msg.get('Date', '')}:{asunto}>"
+
+def _fecha_iso(valor: str | None) -> datetime | None:
+    if not valor:
+        return None
+    try:
+        fecha = datetime.fromisoformat(valor.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return fecha if fecha.tzinfo else fecha.replace(tzinfo=timezone.utc)
+
+
+def correo_desde_graph(mensaje: dict) -> CorreoEntrante:
+    """Convierte un mensaje de Graph (``/me/messages``) en un :class:`CorreoEntrante`."""
+    direccion = ((mensaje.get("from") or {}).get("emailAddress") or {})
+    remitente = (direccion.get("address") or "").strip().lower()
+    asunto = " ".join((mensaje.get("subject") or "").split())
+
+    cuerpo_graph = mensaje.get("body") or {}
+    contenido = cuerpo_graph.get("content") or ""
+    if (cuerpo_graph.get("contentType") or "").lower() == "html":
+        contenido = _html_a_texto(contenido)
+    cuerpo = _limpiar_cuerpo(contenido)
+
+    cabeceras = {
+        (c.get("name") or "").lower(): c.get("value") or ""
+        for c in mensaje.get("internetMessageHeaders") or []
+    }
+    message_id = (mensaje.get("internetMessageId") or "").strip() or f"<graph:{mensaje.get('id')}>"
 
     return CorreoEntrante(
         message_id=message_id[:500],
-        remitente=remitente.strip().lower(),
-        nombre=(nombre or "").strip(),
+        remitente=remitente,
+        nombre=(direccion.get("name") or "").strip(),
         asunto=asunto,
         cuerpo=cuerpo,
-        fecha=fecha,
-        automatico=automatico,
+        fecha=_fecha_iso(mensaje.get("receivedDateTime")),
+        automatico=_es_automatico(cabeceras, remitente),
     )
 
 
@@ -301,7 +288,6 @@ class Respuesta:
     para: str
     asunto: str
     texto: str
-    en_respuesta_a: str | None = None
 
 
 def _saludo(nombre: str) -> str:
@@ -325,7 +311,6 @@ def _respuesta_ticket(correo, usuario, ticket, config) -> Respuesta:
             f"el asunto (debe mantener «Ticket #{ticket.id}»).\n\n"
             "Mesa de ayuda"
         ),
-        en_respuesta_a=correo.message_id,
     )
 
 
@@ -339,7 +324,6 @@ def _respuesta_comentario(correo, usuario, ticket, config) -> Respuesta:
             f"Agregamos tu mensaje como comentario del ticket #{ticket.id} "
             f"({ticket.title}).\n\nPuedes verlo aquí: {enlace}\n\nMesa de ayuda"
         ),
-        en_respuesta_a=correo.message_id,
     )
 
 
@@ -358,7 +342,6 @@ def _respuesta_registro(correo, config) -> Respuesta:
             "correo o créala directamente en la aplicación.\n\n"
             "Mesa de ayuda"
         ),
-        en_respuesta_a=correo.message_id,
     )
 
 
@@ -372,7 +355,6 @@ def _respuesta_inactivo(correo, usuario) -> Respuesta:
             "pudimos crear tu ticket. Comunícate con un administrador para "
             "reactivarla.\n\nMesa de ayuda"
         ),
-        en_respuesta_a=correo.message_id,
     )
 
 
@@ -486,136 +468,147 @@ def fecha_de_inicio(session) -> datetime:
     return inicio if inicio.tzinfo else inicio.replace(tzinfo=timezone.utc)
 
 
-# --- Conexión con el servidor ---------------------------------------------
+# --- Microsoft Graph -------------------------------------------------------
 
 
-def obtener_token_m365(config: ConfigCorreo) -> str:
-    """Token OAuth (client credentials) para IMAP/SMTP de Microsoft 365."""
-    import httpx
-
-    resp = httpx.post(
-        f"https://login.microsoftonline.com/{config.m365_tenant}/oauth2/v2.0/token",
-        data={
-            "grant_type": "client_credentials",
-            "client_id": config.m365_client_id,
-            "client_secret": config.m365_client_secret,
-            "scope": "https://outlook.office365.com/.default",
-        },
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()["access_token"]
+class ErrorGraph(Exception):
+    """Graph respondió con un error."""
 
 
-def _xoauth2(usuario: str, token: str) -> str:
-    return f"user={usuario}\x01auth=Bearer {token}\x01\x01"
+class ClienteGraph:
+    """Lo mínimo de Microsoft Graph que usa la ticketera (permisos delegados)."""
 
+    def __init__(self, token: ProveedorToken, http: httpx.Client | None = None):
+        self._token = token
+        self._http = http or httpx.Client(timeout=60)
+        self._carpetas: dict[str, str] = {}
 
-def conectar_imap(config: ConfigCorreo):
-    imap = imaplib.IMAP4_SSL(config.imap_servidor, config.imap_puerto, timeout=60)
-    if config.usa_oauth:
-        token = obtener_token_m365(config)
-        imap.authenticate("XOAUTH2", lambda _: _xoauth2(config.usuario, token).encode())
-    else:
-        imap.login(config.usuario, config.clave)
-    return imap
+    def _pedir(self, metodo: str, url: str, **kwargs) -> dict:
+        if not url.startswith("http"):
+            url = GRAPH_URL + url
+        cabeceras = kwargs.pop("headers", {})
+        cabeceras["Authorization"] = f"Bearer {self._token.obtener()}"
+        resp = self._http.request(metodo, url, headers=cabeceras, **kwargs)
+        if resp.status_code == 401:
+            raise SinSesionError("Graph rechazó el token (401)")
+        if resp.status_code >= 400:
+            try:
+                detalle = resp.json().get("error", {}).get("message", resp.text)
+            except ValueError:
+                detalle = resp.text
+            raise ErrorGraph(f"{metodo} {url} → {resp.status_code}: {detalle}")
+        return resp.json() if resp.content else {}
 
+    def no_leidos(self) -> list[dict]:
+        """Correos no leídos de la bandeja de entrada (todas las páginas)."""
+        mensajes: list[dict] = []
+        url = "/me/mailFolders/inbox/messages"
+        params = {
+            "$filter": "isRead eq false",
+            "$top": "50",
+            "$select": "id,internetMessageId,subject,from,body,receivedDateTime,"
+                       "internetMessageHeaders",
+        }
+        for _ in range(MAX_PAGINAS):
+            datos = self._pedir("GET", url, params=params,
+                                headers={"Prefer": 'outlook.body-content-type="text"'})
+            mensajes.extend(datos.get("value", []))
+            url = datos.get("@odata.nextLink")
+            if not url:
+                break
+            params = None  # el nextLink ya trae los parámetros
+        return mensajes
 
-def enviar_respuesta(config: ConfigCorreo, respuesta: Respuesta) -> None:
-    """Envía la respuesta por SMTP (STARTTLS en 587, SSL en 465)."""
-    msg = EmailMessage()
-    msg["From"] = config.usuario
-    msg["To"] = respuesta.para
-    msg["Subject"] = respuesta.asunto
-    msg["Message-ID"] = make_msgid(domain=config.usuario.split("@")[-1])
-    # Marcan el correo como automático: evita respuestas automáticas en bucle.
-    msg["Auto-Submitted"] = "auto-replied"
-    msg["X-Auto-Response-Suppress"] = "All"
-    if respuesta.en_respuesta_a:
-        msg["In-Reply-To"] = respuesta.en_respuesta_a
-        msg["References"] = respuesta.en_respuesta_a
-    msg.set_content(respuesta.texto)
-
-    if config.smtp_puerto == 465:
-        smtp = smtplib.SMTP_SSL(config.smtp_servidor, config.smtp_puerto, timeout=60)
-    else:
-        smtp = smtplib.SMTP(config.smtp_servidor, config.smtp_puerto, timeout=60)
-        smtp.starttls()
-    try:
-        if config.usa_oauth:
-            token = obtener_token_m365(config)
-            smtp.ehlo()
-            smtp.auth("XOAUTH2", lambda challenge=None: _xoauth2(config.usuario, token),
-                      initial_response_ok=True)
+    def id_carpeta(self, nombre: str) -> str:
+        """Id de la carpeta (en la raíz del buzón); la crea si no existe."""
+        if nombre in self._carpetas:
+            return self._carpetas[nombre]
+        filtro = "displayName eq '{}'".format(nombre.replace("'", "''"))
+        datos = self._pedir("GET", "/me/mailFolders", params={"$filter": filtro})
+        if datos.get("value"):
+            carpeta_id = datos["value"][0]["id"]
         else:
-            smtp.login(config.usuario, config.clave)
-        smtp.send_message(msg)
-    finally:
+            carpeta_id = self._pedir("POST", "/me/mailFolders", json={"displayName": nombre})["id"]
+            logger.info("se creó la carpeta «%s» en el buzón", nombre)
+        self._carpetas[nombre] = carpeta_id
+        return carpeta_id
+
+    def marcar_y_mover(self, mensaje_id: str, carpeta_id: str) -> None:
+        self._pedir("PATCH", f"/me/messages/{mensaje_id}", json={"isRead": True})
+        self._pedir("POST", f"/me/messages/{mensaje_id}/move", json={"destinationId": carpeta_id})
+
+    def responder(self, mensaje_id: str, respuesta: Respuesta) -> None:
+        """Responde en el mismo hilo del correo recibido."""
+        mensaje = {
+            "subject": respuesta.asunto,
+            "body": {"contentType": "Text", "content": respuesta.texto},
+            # Pide a los servidores no contestar con respuestas automáticas.
+            "internetMessageHeaders": [{"name": "X-Auto-Response-Suppress", "value": "All"}],
+        }
         try:
-            smtp.quit()
-        except smtplib.SMTPException:
-            pass
+            self._pedir("POST", f"/me/messages/{mensaje_id}/reply", json={"message": mensaje})
+        except ErrorGraph as error:
+            if "→ 400" not in str(error):
+                raise
+            # Si Graph no acepta la cabecera en /reply, se responde sin ella.
+            logger.info("Graph no aceptó X-Auto-Response-Suppress en la respuesta; se envía sin ella")
+            del mensaje["internetMessageHeaders"]
+            self._pedir("POST", f"/me/messages/{mensaje_id}/reply", json={"message": mensaje})
 
 
-_MESES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+def crear_cliente(config: ConfigCorreo) -> ClienteGraph:
+    token = ProveedorToken(config.m365_tenant, config.m365_client_id, config.usuario,
+                           config.cache_path)
+    return ClienteGraph(token)
 
 
-def revisar_buzon(session_factory, config: ConfigCorreo, conectar=conectar_imap,
-                  enviar=enviar_respuesta, memoria: dict | None = None) -> dict[str, int]:
-    """Revisa el buzón una vez y procesa los correos nuevos.
+def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph) -> dict[str, int]:
+    """Revisa los no leídos una vez y procesa los que piden ayuda.
 
-    ``memoria`` (opcional) guarda el último UID revisado entre llamadas, para
-    descargar solo los correos que llegaron desde la revisión anterior.
-    Devuelve cuántos correos terminaron en cada resultado.
+    Devuelve cuántos correos terminaron en cada resultado. Un error de token
+    (``SinSesionError``) sube a quien llama; los errores de un correo
+    puntual se registran y se sigue con el siguiente.
     """
     conteo: dict[str, int] = {}
     with session_factory() as session:
         inicio = fecha_de_inicio(session)
 
-    imap = conectar(config)
-    try:
-        estado, _ = imap.select(config.carpeta, readonly=True)
-        if estado != "OK":
-            raise RuntimeError(f"No se pudo abrir la carpeta {config.carpeta!r}")
-        desde = f"{inicio.day:02d}-{_MESES[inicio.month - 1]}-{inicio.year}"
-        estado, datos = imap.uid("SEARCH", None, "SINCE", desde)
-        uids = (datos[0] or b"").split() if estado == "OK" else []
-        if memoria is not None:
-            ultimo = memoria.get(config.carpeta, 0)
-            uids = [u for u in uids if int(u) > ultimo]
-            if uids:
-                memoria[config.carpeta] = max(int(u) for u in uids)
-        for uid in uids:
-            # BODY.PEEK: se lee sin marcar el correo como leído.
-            estado, partes = imap.uid("FETCH", uid, "(BODY.PEEK[])")
-            if estado != "OK":
+    mensajes = cliente.no_leidos()
+    carpeta_id = None
+    for mensaje in mensajes:
+        correo = correo_desde_graph(mensaje)
+        if correo.fecha is not None and correo.fecha < inicio:
+            continue  # Llegó antes de activar la función: no se toca.
+        with session_factory() as session:
+            try:
+                resultado, respuesta = procesar_correo(session, correo, config)
+            except Exception:
+                session.rollback()
+                logger.exception("No se pudo procesar el correo %s", correo.message_id)
                 continue
-            crudo = next((p[1] for p in partes if isinstance(p, tuple)), None)
-            if not crudo:
-                continue
-            correo = leer_correo(crudo)
-            if correo.fecha is not None and correo.fecha < inicio:
-                continue  # Llegó antes de activar la función.
-            with session_factory() as session:
-                try:
-                    resultado, respuesta = procesar_correo(session, correo, config)
-                except Exception:
-                    session.rollback()
-                    logger.exception("No se pudo procesar el correo %s", correo.message_id)
-                    continue
-            conteo[resultado] = conteo.get(resultado, 0) + 1
-            if resultado not in ("repetido", "otro"):
-                logger.info("%s «%s» → %s", correo.remitente, correo.asunto, resultado)
-            if respuesta is not None:
-                try:
-                    enviar(config, respuesta)
-                except Exception:
-                    logger.exception("No se pudo enviar la respuesta a %s", respuesta.para)
-    finally:
+        conteo[resultado] = conteo.get(resultado, 0) + 1
+        if resultado == "otro":
+            continue  # No pide ayuda: queda sin leer y en la bandeja.
+        if resultado != "repetido":
+            logger.info("%s «%s» → %s", correo.remitente, correo.asunto, resultado)
+        # Primero se responde (al mover, Graph le cambia el id al correo).
+        if respuesta is not None:
+            try:
+                cliente.responder(mensaje["id"], respuesta)
+            except SinSesionError:
+                raise
+            except Exception:
+                logger.exception("No se pudo enviar la respuesta a %s", respuesta.para)
         try:
-            imap.logout()
+            if carpeta_id is None:
+                carpeta_id = cliente.id_carpeta(config.carpeta_procesados)
+            cliente.marcar_y_mover(mensaje["id"], carpeta_id)
+        except SinSesionError:
+            raise
         except Exception:
-            pass
+            # Queda en la bandeja: la próxima vez sale como «repetido» y se
+            # vuelve a intentar mover, sin responder otra vez.
+            logger.exception("No se pudo mover el correo «%s»", correo.asunto)
     return conteo
 
 
@@ -625,20 +618,19 @@ _detener = threading.Event()
 _hilo: threading.Thread | None = None
 
 
-def _bucle(session_factory, config: ConfigCorreo) -> None:
+def _bucle(session_factory, config: ConfigCorreo, cliente: ClienteGraph) -> None:
     logger.info("leyendo el buzón %s cada %s s (correos: %s)", config.usuario, config.intervalo,
                 "todos" if config.filtro == "todos" else "solo los que piden ayuda")
     conectado = False
-    memoria: dict = {}
     while not _detener.is_set():
         try:
-            revisar_buzon(session_factory, config, memoria=memoria)
+            revisar_buzon(session_factory, config, cliente)
             if not conectado:
                 logger.info("conexión con el buzón correcta")
                 conectado = True
-        except imaplib.IMAP4.error as error:
-            logger.error("no se pudo entrar al buzón %s: %s. Revisa la clave y que "
-                         "IMAP esté habilitado para la cuenta.", config.usuario, error)
+        except SinSesionError as error:
+            logger.error("sesión de Microsoft no iniciada o vencida (%s). Ejecuta: "
+                         "docker compose exec ticketera python -m backend.correo_login", error)
             conectado = False
         except Exception:
             logger.exception("error al revisar el buzón %s", config.usuario)
@@ -655,14 +647,14 @@ def iniciar_lector(session_factory=None) -> bool:
         return False
     if _hilo is not None and _hilo.is_alive():
         return False
-    if not config.usa_oauth and not config.clave:
-        logger.warning("falta CORREO_CLAVE (o los datos CORREO_M365_*): no se puede entrar al buzón")
+    if not (config.m365_tenant and config.m365_client_id):
+        logger.warning("faltan CORREO_M365_TENANT o CORREO_M365_CLIENT_ID: no se puede entrar al buzón")
     if session_factory is None:
         from backend.database import SessionLocal
 
         session_factory = SessionLocal
     _detener.clear()
-    _hilo = threading.Thread(target=_bucle, args=(session_factory, config),
+    _hilo = threading.Thread(target=_bucle, args=(session_factory, config, crear_cliente(config)),
                              name="lector-correo", daemon=True)
     _hilo.start()
     return True

@@ -8,6 +8,9 @@ pydantic>=2.10.0
 anthropic>=1.15.0
 httpx>=0.28.0
 
+# Correo con Microsoft Graph (inicio de sesión device code)
+msal>=1.31.0
+
 # Autenticación
 PyJWT>=2.9.0
 passlib[bcrypt]>=1.7.4

@@ -548,24 +548,58 @@ tocan, no se guardan y no reciben respuesta. Si el buzón es solo de soporte,
 | Cuenta desactivada | Se le avisa que hable con un administrador. |
 | Respuestas automáticas, rebotes, «noreply» | Se ignoran (evita bucles). |
 
-Los correos se leen **sin marcarlos como leídos** y solo se procesan los que
-llegan después de activar la función. Cualquiera puede registrarse en
+La app lee los correos **no leídos** de la bandeja de entrada con Microsoft
+Graph. Cada correo que procesa se responde **en el mismo hilo**, se marca como
+leído y se mueve a la carpeta **Tickets-Procesados** (se crea sola). Los que
+no piden ayuda se quedan sin leer en la bandeja. Solo se procesan los correos
+que llegan después de activar la función. Cualquiera puede registrarse en
 `login.html`; esas cuentas siempre quedan como **Solicitante**.
 
-Configuración en el archivo `.env` (junto a `docker-compose.yml`, no se sube a Git):
+### Requisitos en Microsoft Entra ID (Azure)
+
+App registrada con:
+
+- Permisos **delegados** de Microsoft Graph: `Mail.ReadWrite`, `Mail.Send` y
+  `User.Read` (con consentimiento concedido).
+- *Authentication* → **Permitir flujos de clientes públicos = Sí** (el inicio
+  de sesión es con código de dispositivo; no hay secreto de cliente).
+
+### Configuración
+
+En el archivo `.env` (copia de `.env.example`, no se sube a Git):
 
 ```env
 CORREO_ACTIVO=1
 CORREO_USUARIO=kcastro@data.cr
+CORREO_M365_TENANT=<Tenant ID>
+CORREO_M365_CLIENT_ID=<Client ID>
 APP_URL=http://IP-O-NOMBRE-DEL-EQUIPO:8000
-# Opción A: contraseña (o contraseña de aplicación) con IMAP/SMTP habilitado
-CORREO_CLAVE=...
-# Opción B: Microsoft 365 con OAuth (app registrada en Entra ID)
-CORREO_M365_TENANT=...
-CORREO_M365_CLIENT_ID=...
-CORREO_M365_CLIENT_SECRET=...
-# Otros servidores (Gmail: imap.gmail.com / smtp.gmail.com)
-# CORREO_IMAP_SERVIDOR=outlook.office365.com
-# CORREO_SMTP_SERVIDOR=smtp.office365.com
-# CORREO_CARPETA=INBOX
 ```
+
+Opcionales: `CORREO_CARPETA_PROCESADOS` (por defecto `Tickets-Procesados`),
+`CORREO_FILTRO` (`auto` o `todos`), `CORREO_INTERVALO` (segundos, 60) y
+`CORREO_M365_CACHE` (archivo de la caché de tokens; en Docker es
+`/data/msal_cache.json`, dentro del volumen `ticketera-data`; fuera de Docker,
+`.msal_cache.json` en la raíz, ignorado por Git).
+
+### Primer inicio de sesión
+
+```bash
+docker compose up -d --build
+docker compose exec ticketera python -m backend.correo_login
+```
+
+Muestra un código: ábrelo en <https://microsoft.com/devicelogin>, escribe el
+código y entra con la cuenta del buzón. Los tokens quedan en la caché y la app
+los renueva sola; no hace falta reiniciar. Sin Docker: `python -m backend.correo_login`.
+
+Para ver qué está pasando:
+
+```bash
+docker compose logs ticketera | grep CORREO
+```
+
+Si aparece «sesión de Microsoft no iniciada o vencida», vuelve a ejecutar
+`correo_login` (pasa si se cambió la contraseña de la cuenta, se revocó la
+sesión o estuvo apagada mucho tiempo). La app no se cae: sigue intentando
+cada minuto.

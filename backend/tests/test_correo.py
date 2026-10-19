@@ -1,38 +1,40 @@
-"""Tests de la creación de tickets por correo (sin servidor real)."""
+"""Tests de la creación de tickets por correo (Graph simulado, sin correo real)."""
 
+import json
 from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
-from email.utils import format_datetime
+from itertools import count
 
+import httpx
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from backend.models import Comment, ProcessedEmail, Ticket, User
 from backend.services import correo_service as cs
+from backend.services.correo_auth import SinSesionError
 
 # Sin filtro para probar el procesamiento; la detección tiene sus pruebas.
-CONFIG = cs.ConfigCorreo(usuario="kcastro@data.cr", clave="x", app_url="http://ticketera.data.cr",
+CONFIG = cs.ConfigCorreo(usuario="kcastro@data.cr", app_url="http://ticketera.data.cr",
                          filtro="todos")
-CONFIG_FILTRO = cs.ConfigCorreo(usuario="kcastro@data.cr", clave="x",
-                                app_url="http://ticketera.data.cr")
+CONFIG_FILTRO = cs.ConfigCorreo(usuario="kcastro@data.cr", app_url="http://ticketera.data.cr")
+
+_ids = count(1)
 
 
-def crear_correo(remitente="Ana Pérez <ana@data.cr>", asunto="La impresora no imprime",
+def crear_correo(remitente="ana@data.cr", nombre="Ana Pérez", asunto="La impresora no imprime",
                  cuerpo="Desde ayer la impresora del segundo piso no imprime.",
-                 msg_id="<m1@data.cr>", fecha=None, extra=None, html=None) -> bytes:
-    msg = EmailMessage()
-    msg["From"] = remitente
-    msg["To"] = "kcastro@data.cr"
-    msg["Subject"] = asunto
-    msg["Message-ID"] = msg_id
-    msg["Date"] = format_datetime(fecha or datetime.now(timezone.utc) + timedelta(minutes=1))
-    for clave, valor in (extra or {}).items():
-        msg[clave] = valor
-    msg.set_content(cuerpo)
-    if html:
-        msg.add_alternative(html, subtype="html")
-    return msg.as_bytes()
+                 msg_id="<m1@data.cr>", fecha=None, cabeceras=None, html=False) -> dict:
+    """Mensaje con la forma que devuelve Graph en /me/mailFolders/inbox/messages."""
+    fecha = fecha or datetime.now(timezone.utc) + timedelta(minutes=1)
+    return {
+        "id": f"AAMk{next(_ids)}",
+        "internetMessageId": msg_id,
+        "subject": asunto,
+        "from": {"emailAddress": {"name": nombre, "address": remitente}},
+        "body": {"contentType": "html" if html else "text", "content": cuerpo},
+        "receivedDateTime": fecha.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "internetMessageHeaders": [{"name": k, "value": v} for k, v in (cabeceras or {}).items()],
+    }
 
 
 @pytest.fixture
@@ -44,8 +46,11 @@ def usuario(session):
     return user
 
 
-def procesar(session, crudo):
-    return cs.procesar_correo(session, cs.leer_correo(crudo), CONFIG)
+def procesar(session, mensaje, config=CONFIG):
+    return cs.procesar_correo(session, cs.correo_desde_graph(mensaje), config)
+
+
+# --- Lógica de procesamiento ------------------------------------------------
 
 
 def test_known_user_gets_a_ticket_and_a_reply(session, usuario):
@@ -61,11 +66,10 @@ def test_known_user_gets_a_ticket_and_a_reply(session, usuario):
     assert respuesta.para == "ana@data.cr"
     assert f"#{ticket.id}" in respuesta.asunto
     assert f"http://ticketera.data.cr/detalle.html?id={ticket.id}" in respuesta.texto
-    assert respuesta.en_respuesta_a == "<m1@data.cr>"
 
 
 def test_unknown_sender_is_asked_to_register(session):
-    resultado, respuesta = procesar(session, crear_correo(remitente="Luis <luis@otro.com>"))
+    resultado, respuesta = procesar(session, crear_correo(remitente="luis@otro.com", nombre="Luis"))
     assert resultado == "registro"
     assert session.scalars(select(Ticket)).first() is None
     assert respuesta.para == "luis@otro.com"
@@ -86,33 +90,35 @@ def test_inactive_user_is_told_the_account_is_disabled(session, usuario):
     assert session.scalars(select(Ticket)).first() is None
 
 
-@pytest.mark.parametrize("extra,remitente", [
+@pytest.mark.parametrize("cabeceras,remitente", [
     ({"Auto-Submitted": "auto-replied"}, "ana@data.cr"),
     ({"Precedence": "bulk"}, "ana@data.cr"),
     ({}, "MAILER-DAEMON@data.cr"),
     ({}, "noreply@servicio.com"),
     ({}, "kcastro@data.cr"),
+    ({}, "KCastro@Data.cr"),
 ])
-def test_automatic_or_own_mail_is_ignored(session, usuario, extra, remitente):
-    resultado, respuesta = procesar(session, crear_correo(remitente=remitente, extra=extra))
+def test_automatic_or_own_mail_is_ignored(session, usuario, cabeceras, remitente):
+    resultado, respuesta = procesar(session, crear_correo(remitente=remitente, cabeceras=cabeceras))
     assert (resultado, respuesta) == ("ignorado", None)
     assert session.scalars(select(Ticket)).first() is None
 
 
 def test_same_message_is_processed_only_once(session, usuario):
-    crudo = crear_correo()
-    assert procesar(session, crudo)[0] == "ticket"
-    assert procesar(session, crudo) == ("repetido", None)
+    mensaje = crear_correo()
+    assert procesar(session, mensaje)[0] == "ticket"
+    assert procesar(session, mensaje) == ("repetido", None)
     assert len(session.scalars(select(Ticket)).all()) == 1
 
 
 def test_reply_with_ticket_number_adds_a_comment(session, usuario):
     procesar(session, crear_correo())
     ticket = session.scalars(select(Ticket)).one()
-    crudo = crear_correo(asunto=f"RE: Ticket #{ticket.id} creado: La impresora",
-                         cuerpo="Ya probé reiniciarla.\n\nEl lunes, Mesa escribió:\n> texto viejo",
-                         msg_id="<m3@data.cr>")
-    resultado, respuesta = procesar(session, crudo)
+    mensaje = crear_correo(asunto=f"RE: Ticket #{ticket.id} creado: La impresora",
+                           cuerpo="Ya probé reiniciarla.\n\n________________________________\n"
+                                  "De: Mesa de ayuda\nTexto viejo",
+                           msg_id="<m3@data.cr>")
+    resultado, respuesta = procesar(session, mensaje)
     assert resultado == "comentario"
     comentario = session.scalars(select(Comment)).one()
     assert comentario.content == "Ya probé reiniciarla."
@@ -131,12 +137,20 @@ def test_reply_to_someone_elses_ticket_creates_a_new_one(session, usuario):
 
 
 def test_short_subject_and_html_body(session, usuario):
-    crudo = crear_correo(asunto="Re:", cuerpo="", html="<p>No tengo <b>internet</b></p><br>gracias")
-    procesar(session, crudo)
+    mensaje = crear_correo(asunto="Re:", cuerpo="<p>No tengo <b>internet</b></p><br>gracias",
+                           html=True)
+    procesar(session, mensaje)
     ticket = session.scalars(select(Ticket)).one()
     assert ticket.title == cs.TITULO_POR_DEFECTO
     assert ticket.category == "Red"
     assert ticket.priority == "Media"
+    assert "<p>" not in ticket.description
+
+
+def test_message_without_internet_message_id_uses_graph_id():
+    mensaje = crear_correo()
+    mensaje["internetMessageId"] = None
+    assert cs.correo_desde_graph(mensaje).message_id == f"<graph:{mensaje['id']}>"
 
 
 @pytest.mark.parametrize("asunto,cuerpo,categoria,prioridad", [
@@ -148,92 +162,6 @@ def test_short_subject_and_html_body(session, usuario):
 def test_classification(asunto, cuerpo, categoria, prioridad):
     cat, pri = cs.clasificar(asunto, cuerpo)
     assert (cat.value, pri.value) == (categoria, prioridad)
-
-
-def test_config_from_env():
-    assert cs.config_desde_entorno({}) is None
-    assert cs.config_desde_entorno({"CORREO_ACTIVO": "1"}) is None
-    cfg = cs.config_desde_entorno({"CORREO_ACTIVO": "si", "CORREO_USUARIO": "kcastro@data.cr",
-                                   "APP_URL": "http://10.0.0.5:8000/"})
-    assert cfg.usuario == "kcastro@data.cr"
-    assert cfg.app_url == "http://10.0.0.5:8000"
-    assert cfg.imap_servidor == "outlook.office365.com"
-    assert not cfg.usa_oauth
-
-
-class FakeImap:
-    def __init__(self, mensajes):
-        self.mensajes = mensajes
-        self.seleccion = None
-        self.cerrado = False
-
-    def select(self, carpeta, readonly=False):
-        self.seleccion = (carpeta, readonly)
-        return "OK", [b"1"]
-
-    def uid(self, comando, *args):
-        if comando == "SEARCH":
-            return "OK", [b" ".join(str(i).encode() for i in range(1, len(self.mensajes) + 1))]
-        uid = int(args[0])
-        assert args[1] == "(BODY.PEEK[])"  # nunca marca como leído
-        return "OK", [(b"1 (BODY[] {10}", self.mensajes[uid - 1]), b")"]
-
-    def logout(self):
-        self.cerrado = True
-
-
-def test_revisar_buzon_processes_new_mail_and_sends_replies(engine, session, usuario):
-    factory = sessionmaker(bind=engine, expire_on_commit=False)
-    viejo = crear_correo(msg_id="<viejo@x>", fecha=datetime.now(timezone.utc) - timedelta(days=2))
-    nuevo = crear_correo(msg_id="<nuevo@x>")
-    desconocido = crear_correo(remitente="otro@x.com", msg_id="<otro@x>")
-    imap = FakeImap([viejo, nuevo, desconocido])
-    enviados = []
-
-    conteo = cs.revisar_buzon(factory, CONFIG, conectar=lambda c: imap,
-                              enviar=lambda c, r: enviados.append(r))
-    assert conteo == {"ticket": 1, "registro": 1}
-    assert imap.seleccion == ("INBOX", True)
-    assert imap.cerrado
-    assert [r.para for r in enviados] == ["ana@data.cr", "otro@x.com"]
-
-    # Segunda revisión: no repite nada.
-    enviados.clear()
-    conteo = cs.revisar_buzon(factory, CONFIG, conectar=lambda c: imap,
-                              enviar=lambda c, r: enviados.append(r))
-    assert conteo == {"repetido": 2}
-    assert enviados == []
-    assert session.scalar(select(ProcessedEmail).where(
-        ProcessedEmail.message_id == cs.MARCA_INICIO)) is not None
-
-
-def test_send_failure_does_not_stop_processing(engine, usuario):
-    factory = sessionmaker(bind=engine, expire_on_commit=False)
-    imap = FakeImap([crear_correo(msg_id="<a@x>"), crear_correo(msg_id="<b@x>")])
-
-    def falla(c, r):
-        raise OSError("sin conexión")
-
-    assert cs.revisar_buzon(factory, CONFIG, conectar=lambda c: imap, enviar=falla) == {"ticket": 2}
-
-
-def test_reply_message_is_marked_automatic(monkeypatch):
-    enviados = []
-
-    class FakeSmtp:
-        def __init__(self, *a, **k): pass
-        def starttls(self): pass
-        def login(self, u, p): enviados.append(("login", u))
-        def send_message(self, msg): enviados.append(msg)
-        def quit(self): pass
-
-    monkeypatch.setattr(cs.smtplib, "SMTP", FakeSmtp)
-    cs.enviar_respuesta(CONFIG, cs.Respuesta(para="ana@data.cr", asunto="Hola", texto="t",
-                                             en_respuesta_a="<m1@x>"))
-    msg = enviados[1]
-    assert msg["Auto-Submitted"] == "auto-replied"
-    assert msg["In-Reply-To"] == "<m1@x>"
-    assert msg["From"] == "kcastro@data.cr"
 
 
 @pytest.mark.parametrize("asunto,cuerpo", [
@@ -259,45 +187,247 @@ def test_help_requests_are_detected(asunto, cuerpo):
 ])
 def test_normal_company_mail_is_not_a_ticket(session, usuario, asunto, cuerpo):
     assert not cs.es_de_soporte(asunto, cuerpo, CONFIG_FILTRO)
-    resultado, respuesta = cs.procesar_correo(
-        session, cs.leer_correo(crear_correo(asunto=asunto, cuerpo=cuerpo)), CONFIG_FILTRO)
+    resultado, respuesta = procesar(session, crear_correo(asunto=asunto, cuerpo=cuerpo), CONFIG_FILTRO)
     assert (resultado, respuesta) == ("otro", None)
     assert session.scalars(select(Ticket)).first() is None
     assert session.scalars(select(ProcessedEmail)).first() is None
 
 
 def test_unknown_sender_asking_for_help_gets_the_register_mail(session):
-    crudo = crear_correo(remitente="Kristin <kristin@gmail.com>",
-                         asunto="Se dañó una impresora, ocupo arreglo urgente",
-                         cuerpo="La impresora no enciende y la necesito para el trabajo")
-    resultado, respuesta = cs.procesar_correo(session, cs.leer_correo(crudo), CONFIG_FILTRO)
+    mensaje = crear_correo(remitente="kristin@gmail.com", nombre="Kristin",
+                           asunto="Se dañó una impresora, ocupo arreglo urgente",
+                           cuerpo="La impresora no enciende y la necesito para el trabajo")
+    resultado, respuesta = procesar(session, mensaje, CONFIG_FILTRO)
     assert resultado == "registro"
     assert "login.html?registro=1&email=kristin@gmail.com" in respuesta.texto
 
 
 def test_non_support_mail_from_unknown_sender_gets_no_reply(session):
-    resultado, respuesta = cs.procesar_correo(
-        session, cs.leer_correo(crear_correo(remitente="cliente@otro.com", asunto="Cotización",
-                                             cuerpo="Adjunto la cotización solicitada.")),
-        CONFIG_FILTRO)
-    assert (resultado, respuesta) == ("otro", None)
+    mensaje = crear_correo(remitente="cliente@otro.com", asunto="Cotización",
+                           cuerpo="Adjunto la cotización solicitada.")
+    assert procesar(session, mensaje, CONFIG_FILTRO) == ("otro", None)
+
+
+# --- Configuración ------------------------------------------------------------
+
+
+def test_config_from_env(tmp_path):
+    assert cs.config_desde_entorno({}) is None
+    assert cs.config_desde_entorno({"CORREO_ACTIVO": "1"}) is None
+    cfg = cs.config_desde_entorno({
+        "CORREO_ACTIVO": "si", "CORREO_USUARIO": "kcastro@data.cr",
+        "APP_URL": "http://10.0.0.5:8000/", "CORREO_M365_TENANT": "t", "CORREO_M365_CLIENT_ID": "c",
+        "CORREO_M365_CACHE": str(tmp_path / "cache.json"),
+    })
+    assert cfg.usuario == "kcastro@data.cr"
+    assert cfg.app_url == "http://10.0.0.5:8000"
+    assert (cfg.m365_tenant, cfg.m365_client_id) == ("t", "c")
+    assert cfg.cache_path == tmp_path / "cache.json"
+    assert cfg.carpeta_procesados == "Tickets-Procesados"
+    assert cfg.filtro == "auto"
 
 
 def test_filter_from_env():
     base = {"CORREO_ACTIVO": "1", "CORREO_USUARIO": "kcastro@data.cr"}
-    assert cs.config_desde_entorno(base).filtro == "auto"
     assert cs.config_desde_entorno({**base, "CORREO_FILTRO": "Todos"}).filtro == "todos"
+    cfg = cs.config_desde_entorno({**base, "CORREO_CARPETA_PROCESADOS": "Soporte-Hecho"})
+    assert cfg.carpeta_procesados == "Soporte-Hecho"
 
 
-def test_memory_only_downloads_new_mail(engine, usuario):
-    factory = sessionmaker(bind=engine, expire_on_commit=False)
-    imap = FakeImap([crear_correo(msg_id="<a@x>")])
-    memoria = {}
-    enviar = lambda c, r: None
-    assert cs.revisar_buzon(factory, CONFIG, conectar=lambda c: imap, enviar=enviar,
-                            memoria=memoria) == {"ticket": 1}
-    assert cs.revisar_buzon(factory, CONFIG, conectar=lambda c: imap, enviar=enviar,
-                            memoria=memoria) == {}
-    imap.mensajes.append(crear_correo(msg_id="<b@x>"))
-    assert cs.revisar_buzon(factory, CONFIG, conectar=lambda c: imap, enviar=enviar,
-                            memoria=memoria) == {"ticket": 1}
+# --- Graph simulado -------------------------------------------------------------
+
+
+class FakeGraph:
+    """Simula los endpoints de Graph que usa la ticketera."""
+
+    def __init__(self, mensajes, carpetas=None, rechazar_cabecera=False, paginas=1):
+        self.mensajes = {m["id"]: dict(m, isRead=False, carpeta="inbox") for m in mensajes}
+        self.carpetas = dict(carpetas or {})  # nombre -> id
+        self.respuestas = []  # (id, json enviado)
+        self.llamadas = []
+        self.rechazar_cabecera = rechazar_cabecera
+        self.paginas = paginas
+        self.cliente = cs.ClienteGraph(FakeToken(),
+                                       httpx.Client(transport=httpx.MockTransport(self.manejar)))
+
+    def no_leidos(self):
+        return [m for m in self.mensajes.values() if not m["isRead"] and m["carpeta"] == "inbox"]
+
+    def manejar(self, request: httpx.Request) -> httpx.Response:
+        assert request.headers["Authorization"] == "Bearer token-falso"
+        ruta = request.url.path.removeprefix("/v1.0")
+        cuerpo = json.loads(request.content) if request.content else None
+        self.llamadas.append((request.method, ruta))
+
+        if request.method == "GET" and ruta == "/me/mailFolders/inbox/messages":
+            assert request.url.params.get("$filter", "isRead eq false") == "isRead eq false"
+            assert request.headers["Prefer"] == 'outlook.body-content-type="text"'
+            pendientes = self.no_leidos()
+            pagina = int(request.url.params.get("pagina", "0"))
+            tam = max(1, -(-len(pendientes) // self.paginas))
+            datos = {"value": pendientes[pagina * tam:(pagina + 1) * tam]}
+            if pagina + 1 < self.paginas:
+                datos["@odata.nextLink"] = (f"{cs.GRAPH_URL}/me/mailFolders/inbox/messages"
+                                            f"?pagina={pagina + 1}")
+            return httpx.Response(200, json=datos)
+        if request.method == "GET" and ruta == "/me/mailFolders":
+            nombre = request.url.params["$filter"].split("'")[1]
+            valor = [{"id": self.carpetas[nombre]}] if nombre in self.carpetas else []
+            return httpx.Response(200, json={"value": valor})
+        if request.method == "POST" and ruta == "/me/mailFolders":
+            self.carpetas[cuerpo["displayName"]] = f"carpeta-{len(self.carpetas) + 1}"
+            return httpx.Response(201, json={"id": self.carpetas[cuerpo["displayName"]]})
+
+        partes = ruta.split("/")  # ['', 'me', 'messages', id, accion?]
+        mensaje = self.mensajes.get(partes[3]) if len(partes) > 3 else None
+        if mensaje is None:
+            return httpx.Response(404, json={"error": {"message": "no existe"}})
+        if request.method == "PATCH" and len(partes) == 4:
+            mensaje["isRead"] = cuerpo["isRead"]
+            return httpx.Response(200, json={})
+        if request.method == "POST" and partes[4] == "move":
+            mensaje["carpeta"] = cuerpo["destinationId"]
+            # Como en Graph, al mover el correo cambia de id.
+            nuevo = mensaje["id"] + "-movido"
+            self.mensajes[nuevo] = dict(self.mensajes.pop(mensaje["id"]), id=nuevo)
+            return httpx.Response(201, json={"id": nuevo})
+        if request.method == "POST" and partes[4] == "reply":
+            if self.rechazar_cabecera and "internetMessageHeaders" in cuerpo["message"]:
+                return httpx.Response(400, json={"error": {"message": "header no permitido"}})
+            self.respuestas.append((mensaje["id"], cuerpo))
+            return httpx.Response(202)
+        return httpx.Response(400, json={"error": {"message": f"no simulado: {ruta}"}})
+
+
+class FakeToken:
+    def __init__(self, error=None):
+        self.error = error
+
+    def obtener(self):
+        if self.error:
+            raise SinSesionError(self.error)
+        return "token-falso"
+
+
+@pytest.fixture
+def factory(engine):
+    return sessionmaker(bind=engine, expire_on_commit=False)
+
+
+def test_revisar_buzon_replies_in_thread_marks_read_and_moves(factory, session, usuario):
+    viejo = crear_correo(msg_id="<viejo@x>", fecha=datetime.now(timezone.utc) - timedelta(days=2))
+    nuevo = crear_correo(msg_id="<nuevo@x>")
+    desconocido = crear_correo(remitente="otro@x.com", msg_id="<otro@x>")
+    graph = FakeGraph([viejo, nuevo, desconocido])
+
+    conteo = cs.revisar_buzon(factory, CONFIG, graph.cliente)
+    assert conteo == {"ticket": 1, "registro": 1}
+
+    # Respuestas en el mismo hilo, con la cabecera anti respuestas automáticas.
+    assert [r[0] for r in graph.respuestas] == [nuevo["id"], desconocido["id"]]
+    enviado = graph.respuestas[0][1]["message"]
+    assert enviado["subject"].startswith("Ticket #")
+    assert enviado["body"]["contentType"] == "Text"
+    assert enviado["internetMessageHeaders"] == [{"name": "X-Auto-Response-Suppress", "value": "All"}]
+    # Se respondió antes de mover (después el id cambia).
+    assert graph.llamadas.index(("POST", f"/me/messages/{nuevo['id']}/reply")) < \
+        graph.llamadas.index(("POST", f"/me/messages/{nuevo['id']}/move"))
+
+    # Procesados: leídos y en la carpeta, que se creó porque no existía.
+    carpeta = graph.carpetas["Tickets-Procesados"]
+    movidos = [m for m in graph.mensajes.values() if m["carpeta"] == carpeta]
+    assert sorted(m["internetMessageId"] for m in movidos) == ["<nuevo@x>", "<otro@x>"]
+    assert all(m["isRead"] for m in movidos)
+    # El que llegó antes de activar la función no se toca.
+    assert [m["internetMessageId"] for m in graph.no_leidos()] == ["<viejo@x>"]
+
+    # Segunda revisión: nada nuevo, no se repite ninguna respuesta.
+    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {}
+    assert len(graph.respuestas) == 2
+    assert session.scalar(select(ProcessedEmail).where(
+        ProcessedEmail.message_id == cs.MARCA_INICIO)) is not None
+
+
+def test_mail_that_does_not_ask_for_help_is_left_untouched(factory, usuario):
+    reunion = crear_correo(asunto="Reunión del viernes", cuerpo="Nos vemos a las 10.")
+    graph = FakeGraph([reunion])
+    assert cs.revisar_buzon(factory, CONFIG_FILTRO, graph.cliente) == {"otro": 1}
+    assert graph.respuestas == []
+    assert graph.no_leidos()[0]["id"] == reunion["id"]  # sigue sin leer, en la bandeja
+    assert not any(m in ("PATCH", "POST") for m, _ in graph.llamadas)
+
+
+def test_existing_folder_is_reused(factory, usuario):
+    graph = FakeGraph([crear_correo()], carpetas={"Tickets-Procesados": "ya-existe"})
+    cs.revisar_buzon(factory, CONFIG, graph.cliente)
+    assert ("POST", "/me/mailFolders") not in graph.llamadas
+    assert list(graph.mensajes.values())[0]["carpeta"] == "ya-existe"
+
+
+def test_already_processed_mail_still_in_inbox_is_moved_without_replying(factory, session, usuario):
+    mensaje = crear_correo()
+    procesar(session, mensaje)  # procesado antes, pero no se pudo mover
+    graph = FakeGraph([mensaje])
+    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"repetido": 1}
+    assert graph.respuestas == []
+    assert graph.no_leidos() == []
+
+
+def test_unread_messages_are_read_from_every_page(factory, usuario):
+    mensajes = [crear_correo(msg_id=f"<p{i}@x>") for i in range(4)]
+    graph = FakeGraph(mensajes, paginas=2)
+    assert len(graph.cliente.no_leidos()) == 4
+
+
+def test_reply_falls_back_without_header_if_graph_rejects_it(factory, usuario):
+    graph = FakeGraph([crear_correo()], rechazar_cabecera=True)
+    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"ticket": 1}
+    assert len(graph.respuestas) == 1
+    assert "internetMessageHeaders" not in graph.respuestas[0][1]["message"]
+
+
+def test_reply_failure_does_not_stop_processing(factory, usuario):
+    graph = FakeGraph([crear_correo(msg_id="<a@x>"), crear_correo(msg_id="<b@x>")])
+
+    def falla(*args):
+        raise cs.ErrorGraph("POST → 500: caído")
+
+    graph.cliente.responder = falla
+    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"ticket": 2}
+    assert graph.no_leidos() == []  # igual se marcan y se mueven
+
+
+def test_missing_session_is_raised_without_touching_mail(factory, usuario):
+    graph = FakeGraph([crear_correo()])
+    graph.cliente._token = FakeToken(error="no existe la caché de tokens")
+    with pytest.raises(SinSesionError):
+        cs.revisar_buzon(factory, CONFIG, graph.cliente)
+    assert len(graph.no_leidos()) == 1
+
+
+def test_expired_token_401_is_a_session_error(usuario):
+    cliente = cs.ClienteGraph(FakeToken(), httpx.Client(
+        transport=httpx.MockTransport(lambda r: httpx.Response(401, json={}))))
+    with pytest.raises(SinSesionError):
+        cliente.no_leidos()
+
+
+def test_loop_logs_session_error_and_keeps_running(factory, caplog, monkeypatch):
+    graph = FakeGraph([])
+    graph.cliente._token = FakeToken(error="la sesión venció")
+    vueltas = []
+
+    def esperar(segundos):
+        vueltas.append(segundos)
+        if len(vueltas) == 2:
+            cs._detener.set()
+        return cs._detener.is_set()
+
+    monkeypatch.setattr(cs._detener, "wait", esperar)
+    monkeypatch.setattr(cs.logger, "propagate", True)
+    cs._detener.clear()
+    with caplog.at_level("ERROR", logger=cs.logger.name):
+        cs._bucle(factory, CONFIG, graph.cliente)  # no lanza
+    cs._detener.clear()
+    assert len(vueltas) == 2
+    assert "correo_login" in caplog.text
