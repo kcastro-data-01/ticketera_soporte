@@ -487,6 +487,43 @@ ticket #N? Esta acción no se puede deshacer.») y después se vuelve al listado
   (por ejemplo, `TICKETS: Laura Méndez (laura.mendez@adn.local, id 1) eliminó el
   ticket #6 «…» el 2026-10-19 15:30 UTC`).
 
+## Métricas
+
+El menú **«Métricas»** (`metricas.html`) lo ven solo **Supervisor y
+Administrador**; a los demás roles no les aparece y la API les responde `403`.
+Todos los números los calcula el servidor (sin IA) y se filtran por un rango de
+días en hora de Costa Rica (por defecto, los últimos 30 días contando hoy;
+máximo 366).
+
+Tarjetas:
+
+- **Abiertos hoy** (Nuevo + En proceso) y **En proceso hoy**: la cola actual,
+  sin importar el rango.
+- **Resueltos en el período**: tickets cuyo primer paso a «Resuelto» cae en el
+  rango (un Cerrado cuenta, porque antes pasó por Resuelto).
+- **Tiempo promedio de resolución**: de esos tickets, desde que se crearon hasta
+  ese primer «Resuelto» (por ejemplo «1 d 4 h»).
+- **Por correo / por web**: tickets creados en el rango que llegaron del buzón
+  de soporte frente al resto (los anteriores a la lectura del correo cuentan
+  como web).
+
+Gráficos (cada uno con su tabla en «Ver datos»):
+
+- **Por estado** y **por categoría**: tickets creados en el rango, según su
+  estado y su categoría actuales.
+- **Por persona asignada**: abiertos hoy y resueltos en el período, con el rol
+  de cada persona («Carlos Solís (Técnico)») y una fila «Sin asignar». Los
+  resueltos se cuentan a quien tiene el ticket asignado ahora.
+- **Creados por día**, con los días sin tickets en 0.
+
+Los gráficos usan Chart.js 4.4.1 desde cdnjs (versión fija, con hash de
+integridad). Si el navegador no tiene internet, la página muestra las mismas
+cifras en tablas. Los tickets eliminados no cuentan, porque se borran con su
+historial.
+
+API: `GET /api/metricas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` (ver
+[docs/api.md](docs/api.md)).
+
 ## Plan de desarrollo
 
 El desarrollo se realiza estrictamente por tareas. El plan completo está en

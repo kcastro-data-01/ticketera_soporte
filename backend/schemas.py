@@ -1,7 +1,7 @@
 """Pydantic schemas for input and output validation (Tasks 4, 6 and 8)."""
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -516,3 +516,47 @@ class ExplicacionResponse(BaseModel):
     generada_en: datetime | None
     modelo: str | None
     desde_cache: bool
+
+
+class MetricasTarjetas(BaseModel):
+    """«abiertos» y «en_proceso»: la cola de hoy. El resto, del período."""
+
+    abiertos: int
+    en_proceso: int
+    resueltos_periodo: int
+    tiempo_promedio_horas: float | None
+    creados_periodo: int
+    por_correo: int
+    por_web: int
+
+
+class MetricaConteo(BaseModel):
+    nombre: str
+    total: int
+
+
+class MetricaPersona(BaseModel):
+    id: int
+    nombre: str
+    rol: str
+    activo: bool
+    abiertos: int
+    resueltos: int
+
+
+class MetricaDia(BaseModel):
+    fecha: date
+    total: int
+
+
+class MetricasResponse(BaseModel):
+    """Respuesta de ``GET /api/metricas`` (la calcula el servidor, sin IA)."""
+
+    desde: date
+    hasta: date
+    tarjetas: MetricasTarjetas
+    por_estado: list[MetricaConteo]
+    por_categoria: list[MetricaConteo]
+    por_persona: list[MetricaPersona]
+    sin_asignar_abiertos: int
+    por_dia: list[MetricaDia]

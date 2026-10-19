@@ -34,6 +34,7 @@ Documentación de los endpoints **realmente implementados** en el código
 | `DELETE` | `/api/tickets/{ticket_id}` | Eliminar un ticket (solo Administrador) |
 | `GET` | `/api/tickets/{ticket_id}/explicacion` | Última explicación de la IA (sin generar) |
 | `POST` | `/api/tickets/{ticket_id}/explicacion` | Explicar el ticket con IA (`?regenerar=true` fuerza una nueva) |
+| `GET` | `/api/metricas` | Métricas de tickets para Supervisor y Administrador (`?desde=&hasta=`) |
 | `POST` | `/api/tickets/{ticket_id}/comments` | Agregar un comentario |
 | `GET` | `/api/tickets/{ticket_id}/comments` | Listar comentarios (cronológico) |
 | `GET` | `/api/tickets/{ticket_id}/history` | Historial de cambios (solo lectura) |
@@ -232,6 +233,39 @@ cambió; si cambió, o con `?regenerar=true`, la pide a la IA y la guarda.
 narrado (3 a 5 oraciones); viene vacío en explicaciones guardadas antes de que
 existiera, y el `POST` las genera de nuevo. `502` si la IA no está disponible o si
 devolvió dos veces un JSON inválido; `404` si el ticket no existe.
+
+### `GET /api/metricas`
+
+Solo **Supervisor y Administrador** (Técnico y Solicitante: `403`; sin sesión:
+`401`). Lo calcula el servidor, sin IA. `desde` y `hasta` son días
+`YYYY-MM-DD` en hora de Costa Rica, con los dos extremos incluidos; por
+defecto, los últimos 30 días hasta hoy. `422` si `desde` es posterior a `hasta`,
+si el rango pasa de 366 días o si una fecha está mal escrita.
+
+```json
+{
+  "desde": "2026-09-20",
+  "hasta": "2026-10-19",
+  "tarjetas": {
+    "abiertos": 12, "en_proceso": 5,
+    "resueltos_periodo": 30, "tiempo_promedio_horas": 26.5,
+    "creados_periodo": 41, "por_correo": 9, "por_web": 32
+  },
+  "por_estado": [{"nombre": "Nuevo", "total": 7}],
+  "por_categoria": [{"nombre": "Hardware", "total": 10}],
+  "por_persona": [{"id": 3, "nombre": "Carlos Solís", "rol": "Técnico", "activo": true,
+                   "abiertos": 4, "resueltos": 9}],
+  "sin_asignar_abiertos": 2,
+  "por_dia": [{"fecha": "2026-09-20", "total": 0}]
+}
+```
+
+`abiertos` y `en_proceso` (y `abiertos` por persona, y `sin_asignar_abiertos`)
+son la cola de hoy. El resto usa el rango: `por_estado`, `por_categoria`,
+`por_dia` y el origen cuentan los tickets **creados** en el rango;
+`resueltos_periodo`, `resueltos` por persona y `tiempo_promedio_horas` (`null`
+si no hay resueltos) usan el primer paso a «Resuelto» de cada ticket.
+`por_estado` y `por_categoria` incluyen todos los valores, aunque estén en 0.
 
 ### `PATCH /api/tickets/{ticket_id}/state`
 

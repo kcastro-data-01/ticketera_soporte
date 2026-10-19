@@ -1937,3 +1937,119 @@ body.app {
     animation: none;
   }
 }
+
+/* ---------- Métricas ---------- */
+
+:root {
+  /* Series de los gráficos (paleta validada para daltonismo). */
+  --color-serie-1: #2a78d6;
+  --color-serie-2: #eb6834;
+}
+
+.metricas-rango {
+  margin-bottom: var(--espaciado-lg);
+}
+
+.metricas-rango .acciones {
+  margin: 0;
+}
+
+.metricas-tarjetas {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* Las tarjetas de métricas solo muestran números (no filtran). */
+.tarjeta-resumen.metrica {
+  cursor: default;
+}
+
+.tarjeta-resumen.metrica:hover {
+  box-shadow: var(--sombra-suave);
+  transform: none;
+}
+
+.metrica-nota {
+  font-size: 0.78rem;
+  color: var(--color-tenue);
+}
+
+.metricas-graficos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espaciado-md);
+  margin-bottom: var(--espaciado-lg);
+}
+
+.grafico {
+  min-width: 0;
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-medio);
+  background: var(--color-superficie);
+  box-shadow: var(--sombra-suave);
+}
+
+.grafico.ancho {
+  grid-column: 1 / -1;
+}
+
+.grafico figcaption {
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+  color: var(--color-texto);
+}
+
+.grafico figcaption span {
+  display: block;
+  font-size: var(--texto-sm);
+  font-weight: 400;
+  color: var(--color-tenue);
+}
+
+.grafico-lienzo {
+  position: relative;
+  height: 240px;
+}
+
+.grafico-datos {
+  margin-top: 0.75rem;
+  font-size: var(--texto-sm);
+}
+
+.grafico-datos summary {
+  cursor: pointer;
+  color: var(--color-enlace);
+  font-weight: 600;
+}
+
+.grafico-datos > div {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.tabla-datos {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .metricas-graficos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .metricas-rango .campo,
+  .metricas-rango .acciones,
+  .metricas-rango button {
+    width: 100%;
+  }
+
+  .grafico {
+    padding: 0.75rem;
+  }
+
+  .grafico-lienzo {
+    height: 200px;
+  }
+}

@@ -90,6 +90,8 @@ PERMISOS_POR_ROL = {
 GUIA_APP = """\
 Guía de la aplicación (Sistema de Tickets de American Data Networks):
 - Menú lateral: Tickets (listado), Nuevo ticket, Historial (no para Solicitante), \
+Métricas (solo Supervisor y Administrador: cola de hoy, resueltos, tiempo promedio \
+de resolución, correo frente a web y gráficos por estado, categoría, persona y día), \
 Usuarios (solo Administrador), Ayuda y Mi cuenta.
 - Crear un ticket: menú «Nuevo ticket»; se indica título, descripción, categoría \
 (Hardware, Software, Red, Accesos) y prioridad (Baja, Media, Alta, Crítica). Al \

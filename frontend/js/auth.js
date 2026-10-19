@@ -89,6 +89,7 @@ const PERMISOS = {
   usuarios: ["Administrador"],
   eliminar: ["Administrador"],
   explicar_ia: ["Administrador", "Supervisor", "Técnico"],
+  metricas: ["Administrador", "Supervisor"],
 };
 
 /* true si el usuario de la sesión tiene el permiso indicado. */
