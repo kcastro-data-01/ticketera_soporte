@@ -790,6 +790,36 @@ class ProveedorQwen:
         if not emitido:
             raise AsistenteNoDisponible("el modelo devolvió una respuesta vacía")
 
+    def generar_json(self, messages: list[dict], esquema: dict, temperature: float = 0.1) -> str:
+        """Pide una respuesta JSON con la forma de ``esquema`` (``format`` de
+        Ollama: el modelo solo puede escribir JSON con esos campos).
+
+        ``messages`` ya incluye el mensaje ``system``. Devuelve el texto tal
+        cual; quien llama lo valida.
+        """
+        cuerpo = {
+            "model": self.modelo,
+            "messages": messages,
+            "stream": False,
+            "think": False,
+            "format": esquema,
+            # Temperatura baja: copia el formato del ejemplo y no inventa.
+            "options": {"temperature": temperature, "num_ctx": QWEN_CONTEXTO, "num_predict": 700},
+            "keep_alive": QWEN_MANTENER_CARGADO,
+        }
+        try:
+            response = self.http.post(f"{self.url}/api/chat", json=cuerpo)
+        except httpx.HTTPError as error:
+            raise self._error_conexion(error)
+        if response.status_code >= 400:
+            raise self._error_http(response)
+        try:
+            texto = response.json()["message"]["content"]
+        except (ValueError, KeyError, TypeError):
+            raise AsistenteNoDisponible("Ollama devolvió una respuesta inválida")
+        filtro = _FiltroPensamiento()
+        return (filtro.agregar(texto or "") + filtro.terminar()).strip()
+
     def precargar(self) -> bool:
         """Carga el modelo en memoria sin generar texto; ``True`` si quedó listo."""
         try:
@@ -846,6 +876,11 @@ class ProveedorClaude:
 
     def responder_stream(self, system: str, messages: list[dict]):
         yield self.responder(system, messages)
+
+    def generar_json(self, messages: list[dict], esquema: dict, temperature: float = 0.1) -> str:
+        """Misma interfaz que Qwen: el JSON se pide en las instrucciones."""
+        system = messages[0]["content"] + "\nResponde solo con el objeto JSON, sin texto alrededor."
+        return self.responder(system, messages[1:])
 
 
 def crear_proveedor():

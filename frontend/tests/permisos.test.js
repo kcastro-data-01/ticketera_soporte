@@ -29,10 +29,10 @@ function loadAuth(role) {
 }
 
 const TABLA = {
-  Administrador: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: true, eliminar: true },
-  Supervisor: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: false, eliminar: false },
-  Técnico: { editar: false, asignar: false, cambiar_estado: true, historial_global: true, usuarios: false, eliminar: false },
-  Solicitante: { editar: false, asignar: false, cambiar_estado: false, historial_global: false, usuarios: false, eliminar: false },
+  Administrador: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: true, eliminar: true, explicar_ia: true },
+  Supervisor: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: false, eliminar: false, explicar_ia: true },
+  Técnico: { editar: false, asignar: false, cambiar_estado: true, historial_global: true, usuarios: false, eliminar: false, explicar_ia: true },
+  Solicitante: { editar: false, asignar: false, cambiar_estado: false, historial_global: false, usuarios: false, eliminar: false, explicar_ia: false },
 };
 
 for (const [rol, permisos] of Object.entries(TABLA)) {

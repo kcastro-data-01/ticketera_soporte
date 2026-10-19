@@ -1830,3 +1830,100 @@ body.app {
     display: none;
   }
 }
+
+
+/* ---------- Explicar con IA (detalle del ticket) ---------- */
+
+.ia-panel {
+  margin-top: var(--espaciado-md);
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-primario-suave);
+  border-radius: var(--radio-medio);
+  background: var(--color-primario-tenue);
+  color: var(--color-texto);
+}
+
+.ia-aviso {
+  margin: 0 0 0.75rem;
+  font-size: var(--texto-sm, 0.85rem);
+  font-weight: 600;
+  color: var(--color-primario-oscuro);
+}
+
+.ia-desactualizada {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radio-medio);
+  background: var(--color-vacio-fondo);
+  color: var(--color-vacio);
+}
+
+.ia-claridad {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radio-pill);
+  font-weight: 600;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde-fuerte);
+}
+
+.ia-claridad.poco-detalle {
+  color: var(--color-vacio);
+  border-color: var(--color-vacio);
+}
+
+.ia-claridad.confusa {
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.ia-claridad.clara {
+  color: var(--color-exito);
+  border-color: var(--color-exito);
+}
+
+.ia-panel h3 {
+  margin: 0.9rem 0 0.35rem;
+  font-size: var(--texto-md);
+}
+
+.ia-panel ul,
+.ia-panel ol {
+  margin: 0;
+  padding-left: 1.3rem;
+}
+
+.ia-panel li + li {
+  margin-top: 0.2rem;
+}
+
+.ia-panel .ia-pie {
+  margin-top: 0.9rem;
+  font-size: var(--texto-sm, 0.85rem);
+  color: var(--color-tenue);
+}
+
+.ia-cargando::before {
+  content: "";
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.5rem;
+  vertical-align: -0.1em;
+  border: 2px solid var(--color-primario-suave);
+  border-top-color: var(--color-primario);
+  border-radius: 50%;
+  animation: ia-girar 0.8s linear infinite;
+}
+
+@keyframes ia-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ia-cargando::before {
+    animation: none;
+  }
+}

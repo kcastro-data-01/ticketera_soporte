@@ -88,6 +88,7 @@ const PERMISOS = {
   historial_global: ["Administrador", "Supervisor", "Técnico"],
   usuarios: ["Administrador"],
   eliminar: ["Administrador"],
+  explicar_ia: ["Administrador", "Supervisor", "Técnico"],
 };
 
 /* true si el usuario de la sesión tiene el permiso indicado. */

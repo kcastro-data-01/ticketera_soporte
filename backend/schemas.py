@@ -479,3 +479,38 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+
+
+class SugerenciaIA(BaseModel):
+    valor: str
+    razon: str = ""
+
+
+class ExplicacionContenido(BaseModel):
+    """Lo que generó la IA (ya validado por el servidor)."""
+
+    resumen: str
+    informacion_faltante: list[str]
+    preguntas_sugeridas: list[str]
+    puntos_clave: list[str]
+    siguiente_paso: str
+    categoria_sugerida: SugerenciaIA | None = None
+    prioridad_sugerida: SugerenciaIA | None = None
+
+
+class ExplicacionResponse(BaseModel):
+    """Respuesta de ``/api/tickets/{id}/explicacion``.
+
+    ``claridad`` y ``motivo_claridad`` los calcula el servidor (no la IA).
+    ``explicacion`` es ``null`` si el ticket nunca se explicó. ``vigente`` es
+    ``false`` si el ticket cambió desde que se explicó.
+    """
+
+    ticket_id: int
+    claridad: Literal["poco detalle", "clara", "confusa"]
+    motivo_claridad: str
+    explicacion: ExplicacionContenido | None
+    vigente: bool
+    generada_en: datetime | None
+    modelo: str | None
+    desde_cache: bool

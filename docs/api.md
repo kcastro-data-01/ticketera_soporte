@@ -32,6 +32,8 @@ Documentación de los endpoints **realmente implementados** en el código
 | `PATCH` | `/api/tickets/{ticket_id}/assign` | Asignar o desasignar un usuario |
 | `PATCH` | `/api/tickets/{ticket_id}/state` | Cambiar el estado (máquina de estados) |
 | `DELETE` | `/api/tickets/{ticket_id}` | Eliminar un ticket (solo Administrador) |
+| `GET` | `/api/tickets/{ticket_id}/explicacion` | Última explicación de la IA (sin generar) |
+| `POST` | `/api/tickets/{ticket_id}/explicacion` | Explicar el ticket con IA (`?regenerar=true` fuerza una nueva) |
 | `POST` | `/api/tickets/{ticket_id}/comments` | Agregar un comentario |
 | `GET` | `/api/tickets/{ticket_id}/comments` | Listar comentarios (cronológico) |
 | `GET` | `/api/tickets/{ticket_id}/history` | Historial de cambios (solo lectura) |
@@ -196,6 +198,37 @@ de la aplicación (`TICKETS: …`).
 ```bash
 curl -X DELETE http://localhost:8000/api/tickets/6 -H "Authorization: Bearer $TOKEN"
 ```
+
+### `GET` / `POST /api/tickets/{ticket_id}/explicacion`
+
+«Explicar con IA», para Técnico, Supervisor y Administrador (Solicitante:
+`403`). `GET` devuelve la explicación guardada sin llamar a la IA
+(`explicacion: null` si nunca se explicó). `POST` la reutiliza si el ticket no
+cambió; si cambió, o con `?regenerar=true`, la pide a la IA y la guarda.
+
+```json
+{
+  "ticket_id": 7,
+  "claridad": "poco detalle",
+  "motivo_claridad": "La descripción tiene 2 palabras y no dice: …",
+  "explicacion": {
+    "resumen": "…",
+    "informacion_faltante": ["…"],
+    "preguntas_sugeridas": ["…"],
+    "puntos_clave": [],
+    "siguiente_paso": "…",
+    "categoria_sugerida": {"valor": "Hardware", "razon": "…"},
+    "prioridad_sugerida": null
+  },
+  "vigente": true,
+  "generada_en": "2026-10-19T16:00:00Z",
+  "modelo": "qwen3:0.6b",
+  "desde_cache": false
+}
+```
+
+`claridad` la calcula el servidor. `502` si la IA no está disponible o si
+devolvió dos veces un JSON inválido; `404` si el ticket no existe.
 
 ### `PATCH /api/tickets/{ticket_id}/state`
 

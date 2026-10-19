@@ -136,6 +136,20 @@
             </form>
           </section>
 
+          <!-- Explicar con IA: Técnico, Supervisor y Administrador (js/explicacion.js). -->
+          <section id="seccion-ia" class="seccion" aria-label="Explicación con IA" data-permiso="explicar_ia">
+            <h2>Explicación con IA</h2>
+            <p class="nota">
+              Resume el ticket, dice qué datos faltan y propone preguntas para la persona.
+            </p>
+            <div class="acciones">
+              <button type="button" id="ia-explicar">Explicar con IA</button>
+              <button type="button" id="ia-regenerar" class="secundario" hidden>Volver a explicar</button>
+            </div>
+            <p id="ia-estado" class="estado" role="status" aria-live="polite" hidden></p>
+            <div id="ia-panel" class="ia-panel" hidden></div>
+          </section>
+
           <section class="seccion" aria-label="Comentarios del ticket">
             <h2>Comentarios</h2>
             <p class="nota">
@@ -243,6 +257,7 @@
   <script src="js/auth.js" defer></script>
   <script src="js/asistente.js" defer></script>
   <script src="js/detalle.js" defer></script>
+  <script src="js/explicacion.js" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       requireAuth();

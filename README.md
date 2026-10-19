@@ -559,6 +559,60 @@ Para que un modelo pequeño responda bien y rápido:
 En ambos casos la restricción por rol la aplica el servidor: el modelo solo
 recibe los datos que el rol ya puede ver en la aplicación.
 
+## Explicar con IA
+
+En el detalle de un ticket, **Técnico, Supervisor y Administrador** tienen el
+botón **«Explicar con IA»**. Sirve sobre todo para tickets con poco detalle o
+confusos. El panel muestra, con la nota «Generado por IA, revisalo antes de
+usarlo»:
+
+- **Claridad** («poco detalle», «clara» o «confusa») y por qué. **La calcula el
+  servidor, no la IA**:
+  - *poco detalle*: menos de 15 palabras, o le faltan 3 o más de estos datos:
+    qué equipo/programa, desde cuándo, qué error aparece, qué ya se intentó;
+  - *confusa*: más de 120 palabras, u oraciones de más de 40 palabras en promedio;
+  - *clara*: el resto.
+- **Qué pide** (resumen de 1 o 2 oraciones), **puntos clave** ordenados (si el
+  texto es largo), **información que falta** (máx. 4), **preguntas sugeridas**
+  (máx. 4) y **siguiente paso**.
+- **Categoría y prioridad sugeridas**, con su razón (opcionales; nunca se
+  aplican solas).
+
+El botón **«Usar preguntas en un comentario»** copia las preguntas al cuadro
+«Nuevo comentario»: se revisan y se publican con «Agregar comentario» (nunca
+se publican solas).
+
+La última explicación se guarda: al abrir el ticket se muestra sin llamar a la
+IA. Si el ticket cambió (título, descripción, categoría, prioridad, estado o
+comentarios) aparece «El ticket cambió…» y «Explicar con IA» la genera de
+nuevo; **«Volver a explicar»** fuerza una nueva en cualquier momento.
+
+Cómo se adapta a un modelo muy chico (`qwen3:0.6b`):
+
+- JSON corto con un **ejemplo completo** (entrada y salida) dentro del prompt;
+  Ollama recibe el esquema en `format`, `temperature` 0.1 y `think: false`.
+- Si el ticket es largo, se mandan solo el título, los primeros y últimos
+  párrafos de la descripción y los últimos 3 comentarios (no pasa de `num_ctx`).
+- El servidor valida el JSON; si viene mal, reintenta una vez y, si vuelve a
+  fallar, muestra «La IA no pudo generar una explicación válida». Si solo la
+  categoría o la prioridad vienen mal, se descartan y el resto se muestra.
+- Si la IA no da preguntas o datos faltantes, se usan los que detectó el servidor.
+- Si Ollama no responde: «La IA no está disponible en este momento» (detalle en
+  `docker compose logs ticketera | grep IA:`).
+- El modelo se sigue eligiendo con `QWEN_MODELO`.
+
+API: `GET /api/tickets/{id}/explicacion` (la guardada, sin IA) y
+`POST /api/tickets/{id}/explicacion[?regenerar=true]`.
+
+Para probarla con el modelo real y dos tickets de ejemplo («no sirve» y uno
+largo y confuso):
+
+```bash
+docker compose exec ticketera python -m backend.probar_explicar_ia
+```
+
+(con `--borrar` elimina los tickets de prueba al terminar).
+
 ## Tickets por correo
 
 La ticketera puede revisar un buzón (por ejemplo `kcastro@data.cr`) cada minuto

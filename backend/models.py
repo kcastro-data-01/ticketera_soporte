@@ -144,6 +144,12 @@ class Ticket(Base):
         cascade="all, delete-orphan",
         order_by="History.created_at",
     )
+    # Última explicación de la IA (se borra con el ticket).
+    explanation: Mapped["TicketExplanation | None"] = relationship(
+        back_populates="ticket",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
 
 class Comment(Base):
@@ -252,3 +258,30 @@ class ProcessedEmail(Base):
         nullable=False,
         default=utc_now,
     )
+
+
+
+class TicketExplanation(Base):
+    """Última explicación «Explicar con IA» de un ticket.
+
+    ``content`` es el JSON validado que devolvió la IA. ``fingerprint`` es una
+    huella del ticket (título, descripción, categoría, prioridad, estado y
+    comentarios) al momento de explicarlo: si cambia, la explicación queda
+    desactualizada y se vuelve a pedir.
+    """
+
+    __tablename__ = "ticket_explanations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(
+        ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utc_now)
+
+    ticket: Mapped[Ticket] = relationship(back_populates="explanation")
