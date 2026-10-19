@@ -65,6 +65,7 @@ MAX_TITULO = 200
 TITULO_POR_DEFECTO = "Solicitud recibida por correo"
 MARCA_INICIO = "__inicio__"
 HORAS_ENTRE_AVISOS = 24
+ASUNTO_REGISTRO = "Registrate para crear tickets"
 GRAPH_URL = "https://graph.microsoft.com/v1.0"
 CARPETA_PROCESADOS = "Tickets-Procesados"
 MAX_PAGINAS = 10  # hasta 500 no leídos por revisión (50 por página)
@@ -331,7 +332,7 @@ def _respuesta_registro(correo, config) -> Respuesta:
     enlace = f"{config.app_url}/login.html?registro=1&email={correo.remitente}"
     return Respuesta(
         para=correo.remitente,
-        asunto="Regístrate para crear tu ticket de soporte",
+        asunto=ASUNTO_REGISTRO,
         texto=(
             f"{_saludo(correo.nombre)}\n\n"
             "Recibimos tu correo, pero todavía no tienes una cuenta en la "
@@ -417,9 +418,14 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
     usuario = session.scalar(select(User).where(func.lower(User.email) == correo.remitente))
 
     if usuario is None:
+        # No se crea ticket: se le pide registrarse (un aviso cada 24 h).
         if _ya_avisado(session, correo.remitente):
+            logger.info("Correo ignorado: remitente no registrado %s "
+                        "(ya se le envió el aviso de registro en las últimas 24 h)", correo.remitente)
             _registrar(session, correo, "ignorado")
             return "ignorado", None
+        logger.info("Correo ignorado: remitente no registrado %s (se le envía el aviso de registro)",
+                    correo.remitente)
         _registrar(session, correo, "registro")
         return "registro", _respuesta_registro(correo, config)
 
@@ -562,8 +568,13 @@ def crear_cliente(config: ConfigCorreo) -> ClienteGraph:
     return ClienteGraph(token)
 
 
-def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph) -> dict[str, int]:
+def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
+                  avisados: set | None = None) -> dict[str, int]:
     """Revisa los no leídos una vez y procesa los que piden ayuda.
+
+    ``avisados`` (opcional) recuerda entre revisiones los correos que ya se
+    anotaron en el registro como «no parece solicitud de ayuda»: como quedan
+    sin leer, si no se anotarían de nuevo cada minuto.
 
     Devuelve cuántos correos terminaron en cada resultado. Un error de token
     (``SinSesionError``) sube a quien llama; los errores de un correo
@@ -588,7 +599,12 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph) 
                 continue
         conteo[resultado] = conteo.get(resultado, 0) + 1
         if resultado == "otro":
-            continue  # No pide ayuda: queda sin leer y en la bandeja.
+            # No pide ayuda: queda sin leer y en la bandeja.
+            if avisados is None or correo.message_id not in avisados:
+                logger.info("Correo ignorado: no parece solicitud de ayuda «%s»", correo.asunto)
+                if avisados is not None:
+                    avisados.add(correo.message_id)
+            continue
         if resultado != "repetido":
             logger.info("%s «%s» → %s", correo.remitente, correo.asunto, resultado)
         # Primero se responde (al mover, Graph le cambia el id al correo).
@@ -622,9 +638,10 @@ def _bucle(session_factory, config: ConfigCorreo, cliente: ClienteGraph) -> None
     logger.info("leyendo el buzón %s cada %s s (correos: %s)", config.usuario, config.intervalo,
                 "todos" if config.filtro == "todos" else "solo los que piden ayuda")
     conectado = False
+    avisados: set = set()
     while not _detener.is_set():
         try:
-            revisar_buzon(session_factory, config, cliente)
+            revisar_buzon(session_factory, config, cliente, avisados)
             if not conectado:
                 logger.info("conexión con el buzón correcta")
                 conectado = True

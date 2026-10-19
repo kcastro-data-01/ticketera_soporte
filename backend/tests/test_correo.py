@@ -431,3 +431,78 @@ def test_loop_logs_session_error_and_keeps_running(factory, caplog, monkeypatch)
     cs._detener.clear()
     assert len(vueltas) == 2
     assert "correo_login" in caplog.text
+
+
+# --- Remitentes registrados y no registrados (de punta a punta) ---------------
+
+
+@pytest.fixture
+def log_correo(caplog, monkeypatch):
+    monkeypatch.setattr(cs.logger, "propagate", True)
+    caplog.set_level("INFO", logger=cs.logger.name)
+    return caplog
+
+
+def test_registered_sender_creates_ticket_as_requester_and_gets_confirmation(factory, session, usuario):
+    mensaje = crear_correo(remitente="ANA@DATA.CR")  # sin distinguir mayúsculas
+    graph = FakeGraph([mensaje])
+    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"ticket": 1}
+
+    ticket = session.scalars(select(Ticket)).one()
+    assert ticket.created_by_id == usuario.id
+    assert session.get(User, ticket.created_by_id).role == "Solicitante"
+    [(respondido, enviado)] = graph.respuestas
+    assert respondido == mensaje["id"]  # en el mismo hilo
+    assert enviado["message"]["subject"] == f"Ticket #{ticket.id} creado: {ticket.title}"
+    assert f"/detalle.html?id={ticket.id}" in enviado["message"]["body"]["content"]
+    assert graph.no_leidos() == []
+
+
+def test_unregistered_sender_gets_register_notice_and_no_ticket(factory, session, log_correo):
+    mensaje = crear_correo(remitente="Luis@Otro.com", nombre="Luis")
+    graph = FakeGraph([mensaje])
+    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"registro": 1}
+
+    assert session.scalars(select(Ticket)).first() is None
+    [(respondido, enviado)] = graph.respuestas
+    assert respondido == mensaje["id"]
+    assert enviado["message"]["subject"] == "Registrate para crear tickets"
+    texto = enviado["message"]["body"]["content"]
+    assert "http://ticketera.data.cr/login.html?registro=1&email=luis@otro.com" in texto
+    assert "vuelve a enviarnos tu solicitud" in texto
+    # Igual queda procesado: leído y en la carpeta.
+    assert graph.no_leidos() == []
+    assert "Correo ignorado: remitente no registrado luis@otro.com" in log_correo.text
+
+
+def test_second_mail_from_unregistered_within_24h_gets_no_notice(factory, session, log_correo):
+    graph = FakeGraph([crear_correo(remitente="luis@otro.com", msg_id="<1@x>")])
+    cs.revisar_buzon(factory, CONFIG, graph.cliente)
+    assert len(graph.respuestas) == 1
+
+    graph.mensajes.update({m["id"]: dict(m, isRead=False, carpeta="inbox") for m in
+                           [crear_correo(remitente="luis@otro.com", msg_id="<2@x>")]})
+    log_correo.clear()
+    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"ignorado": 1}
+    assert len(graph.respuestas) == 1  # no hubo otro aviso
+    assert graph.no_leidos() == []  # pero se movió igual
+    assert session.scalars(select(Ticket)).first() is None
+    assert "Correo ignorado: remitente no registrado luis@otro.com" in log_correo.text
+
+
+def test_unregistered_gets_a_new_notice_after_24h(session):
+    procesar(session, crear_correo(remitente="luis@otro.com", msg_id="<1@x>"))
+    aviso = session.scalars(select(ProcessedEmail).where(ProcessedEmail.result == "registro")).one()
+    aviso.created_at = datetime.now(timezone.utc) - timedelta(hours=25)
+    session.commit()
+    resultado, respuesta = procesar(session, crear_correo(remitente="luis@otro.com", msg_id="<2@x>"))
+    assert resultado == "registro"
+    assert respuesta.asunto == "Registrate para crear tickets"
+
+
+def test_not_a_help_request_is_logged_once(factory, usuario, log_correo):
+    graph = FakeGraph([crear_correo(asunto="Reunión del viernes", cuerpo="Nos vemos a las 10.")])
+    avisados = set()
+    cs.revisar_buzon(factory, CONFIG_FILTRO, graph.cliente, avisados)
+    cs.revisar_buzon(factory, CONFIG_FILTRO, graph.cliente, avisados)
+    assert log_correo.text.count("Correo ignorado: no parece solicitud de ayuda «Reunión del viernes»") == 1

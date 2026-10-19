@@ -533,20 +533,37 @@ recibe los datos que el rol ya puede ver en la aplicación.
 ## Tickets por correo
 
 La ticketera puede revisar un buzón (por ejemplo `kcastro@data.cr`) cada minuto
-y crear un ticket con cada correo nuevo **que pida ayuda**. La app revisa el
-asunto y el texto buscando frases como «se dañó», «no funciona», «no enciende»,
-«no puedo entrar», «error», «impresora», «contraseña», «sin internet», «ayuda»
-o «soporte». Los correos normales de la empresa (reuniones, facturas…) no se
-tocan, no se guardan y no reciben respuesta. Si el buzón es solo de soporte,
-`CORREO_FILTRO=todos` convierte cada correo en ticket.
+y crear un ticket con cada correo nuevo **que pida ayuda**. Los correos normales
+de la empresa (reuniones, facturas…) no se tocan, no se guardan y no reciben
+respuesta. Si el buzón es solo de soporte, `CORREO_FILTRO=todos` convierte cada
+correo en ticket.
+
+### ¿Cómo se decide que un correo «pide ayuda»?
+
+Por **palabras clave** (`SEÑALES_SOPORTE` en `backend/services/correo_service.py`).
+Se buscan en el asunto **y** en el texto, en minúsculas y sin tildes; basta con
+que aparezca una:
+
+| Tipo | Frases |
+|---|---|
+| Pedido directo | soporte, ticket, ayuda, ayudarme / ayudarnos |
+| «No …» | no (me/nos/le) funciona, sirve, enciende, prende, arranca, abre, carga, imprime, conecta, deja, responde, aparece, llega, reconoce, suena |
+| «No puedo …» | no puedo / podemos / logro + entrar, ingresar, abrir, imprimir, conectar, acceder, enviar, iniciar, trabajar, instalar, usar, ver |
+| «Se …» | se (me/nos/le) dañó, dañaron, quebró, cayó, cayeron, trabó, pegó, congeló, apagó, reinicia, desconecta, bloqueó |
+| Fallas | dañado/a, falla / falló / fallando, error(es), problema(s) con, arreglar…, reparar… |
+| Equipos y accesos | impresora, contraseña, clave, bloqueado/a, internet, wifi, vpn, sin red / conexión / internet / sistema, lento/a + la/el/mi, computadora, laptop, monitor, teclado, mouse, instalar, licencia, acceso |
+
+Si ninguna aparece, el correo queda sin leer en la bandeja y el registro dice
+`Correo ignorado: no parece solicitud de ayuda «asunto»` (una vez por correo).
+Si un correo de soporte real no se detecta, agrega la frase a la lista.
 
 | Quién escribe (correo que pide ayuda) | Qué pasa |
 |---|---|
 | Usuario activo de la ticketera (mismo correo) | Se crea el ticket a su nombre (asunto = título, cuerpo = descripción, categoría y prioridad por palabras clave) y se le responde con el número y el enlace. |
 | Responde a «Ticket #N» de un ticket suyo | Se agrega como comentario a ese ticket. |
-| Alguien sin cuenta | Se le responde que debe registrarse, con el enlace `APP_URL/login.html?registro=1` (máximo un aviso por día). |
+| Alguien sin cuenta | **No se crea ticket.** Se le responde con el asunto «Registrate para crear tickets», que explica que primero cree su cuenta en `APP_URL/login.html?registro=1&email=…` y después vuelva a enviar su solicitud. Máximo un aviso cada 24 h por remitente; el correo igual se marca como leído y se mueve. En el registro: `Correo ignorado: remitente no registrado <correo>`. |
 | Cuenta desactivada | Se le avisa que hable con un administrador. |
-| Respuestas automáticas, rebotes, «noreply» | Se ignoran (evita bucles). |
+| Respuestas automáticas, rebotes, «noreply», o el propio buzón | Nunca se responden (evita bucles). |
 
 La app lee los correos **no leídos** de la bandeja de entrada con Microsoft
 Graph. Cada correo que procesa se responde **en el mismo hilo**, se marca como
