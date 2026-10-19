@@ -469,6 +469,24 @@ ejemplos), junto con el mapeo RF1–RF9 y la lista de lo **no implementado**,
 está en [docs/api.md](docs/api.md). La documentación interactiva se sirve en
 `/docs` con la aplicación arrancada.
 
+## Eliminar tickets
+
+Solo el **Administrador** puede eliminar un ticket: en el detalle del ticket
+aparece el botón **Eliminar** (los demás roles no lo ven, y la API les responde
+`403`). Antes de borrar se pide confirmación («¿Seguro que querés eliminar el
+ticket #N? Esta acción no se puede deshacer.») y después se vuelve al listado.
+
+- API: `DELETE /api/tickets/{id}` → `204` si se eliminó, `403` si el rol no es
+  Administrador, `404` si el ticket no existe.
+- Se borran el ticket, sus comentarios y su historial en una sola transacción
+  (si algo falla, no se borra nada).
+- Si el ticket vino por correo, el registro de ese correo se conserva sin
+  ticket: así el mismo correo nunca vuelve a crear un ticket.
+- Como el historial desaparece con el ticket, queda constancia en el registro
+  de la aplicación: `docker compose logs ticketera | grep TICKETS`
+  (por ejemplo, `TICKETS: Laura Méndez (laura.mendez@adn.local, id 1) eliminó el
+  ticket #6 «…» el 2026-10-19 15:30 UTC`).
+
 ## Plan de desarrollo
 
 El desarrollo se realiza estrictamente por tareas. El plan completo está en

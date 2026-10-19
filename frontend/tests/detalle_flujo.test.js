@@ -65,6 +65,7 @@ const ELEMENT_IDS = [
   "ver-updated",
   "form-editar",
   "editar",
+  "eliminar",
   "seccion-edicion",
   "modo-edicion",
   "cancelar-edicion",
@@ -153,6 +154,9 @@ function makeFetch(overrides = {}) {
     if (url === "/api/tickets/1/state" && method === "PATCH") {
       return resolve(overrides.state, jsonResponse(200, TICKET));
     }
+    if (url === "/api/tickets/1" && method === "DELETE") {
+      return resolve(overrides.remove, { ok: true, status: 204, json: async () => null });
+    }
     if (url === "/api/tickets/1" && method === "PATCH") {
       return resolve(overrides.edit, jsonResponse(200, TICKET));
     }
@@ -163,10 +167,11 @@ function makeFetch(overrides = {}) {
   };
 }
 
-function createHarness(fetchImpl) {
+function createHarness(fetchImpl, { confirmar = true } = {}) {
   const nodes = new Map(ELEMENT_IDS.map((id) => [id, createNode(id)]));
   const fetchCalls = [];
   const consoleErrors = [];
+  const confirmaciones = [];
 
   const sandbox = {
     document: {
@@ -178,7 +183,13 @@ function createHarness(fetchImpl) {
       },
       addEventListener() {},
     },
-    window: { location: { search: "?id=1" } },
+    window: {
+      location: { search: "?id=1", href: "detalle.html?id=1" },
+      confirm(mensaje) {
+        confirmaciones.push(mensaje);
+        return confirmar;
+      },
+    },
     localStorage: createLocalStorage(),
     fetch: (url, options) => {
       fetchCalls.push({ url, options });
@@ -205,6 +216,8 @@ function createHarness(fetchImpl) {
     urls: () => fetchCalls.map((call) => call.url),
     fetchCalls,
     consoleErrors,
+    confirmaciones,
+    location: () => sandbox.window.location.href,
     clearCalls: () => fetchCalls.splice(0, fetchCalls.length),
   };
 }
@@ -702,4 +715,64 @@ test("las escrituras envían Content-Type application/json con el token", async 
   const headers = harness.fetchCalls[0].options.headers || {};
   assert.equal(headers.Authorization, "Bearer token-de-prueba");
   assert.equal(headers["Content-Type"], "application/json");
+});
+
+
+/* Eliminar ticket (solo Administrador; el servidor valida el rol). */
+
+function clickEliminar(harness) {
+  return harness.node("eliminar").listeners.click[0]();
+}
+
+test("Eliminar: confirma con el número del ticket, borra y vuelve al listado", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  harness.clearCalls();
+
+  await clickEliminar(harness);
+
+  assert.deepEqual(harness.confirmaciones, [
+    "¿Seguro que querés eliminar el ticket #1? Esta acción no se puede deshacer.",
+  ]);
+  assert.equal(harness.fetchCalls.length, 1);
+  assert.equal(harness.fetchCalls[0].url, "/api/tickets/1");
+  assert.equal(harness.fetchCalls[0].options.method, "DELETE");
+  assert.equal(harness.location(), "index.html");
+});
+
+test("Eliminar: si se cancela la confirmación no se borra nada", async () => {
+  const harness = createHarness(makeFetch(), { confirmar: false });
+  await harness.init();
+  harness.clearCalls();
+
+  await clickEliminar(harness);
+
+  assert.equal(harness.confirmaciones.length, 1);
+  assert.deepEqual(harness.urls(), []);
+  assert.equal(harness.location(), "detalle.html?id=1");
+});
+
+test("Eliminar: un 403 muestra el aviso y deja el ticket en pantalla", async () => {
+  const harness = createHarness(
+    makeFetch({ remove: jsonResponse(403, { detail: "No autorizado" }) })
+  );
+  await harness.init();
+
+  await clickEliminar(harness);
+
+  assert.equal(harness.node("estado-carga").textContent, "Solo un Administrador puede eliminar tickets.");
+  assert.equal(harness.node("estado-carga").className, "estado error");
+  assert.equal(harness.location(), "detalle.html?id=1");
+  assert.equal(harness.node("eliminar").disabled, false);
+});
+
+test("Eliminar: un 404 avisa que el ticket ya no existe", async () => {
+  const harness = createHarness(
+    makeFetch({ remove: jsonResponse(404, { detail: "Ticket 1 no encontrado" }) })
+  );
+  await harness.init();
+
+  await clickEliminar(harness);
+
+  assert.equal(harness.node("estado-carga").textContent, "El ticket ya no existe. Vuelve al listado.");
 });

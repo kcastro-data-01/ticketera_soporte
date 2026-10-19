@@ -31,6 +31,7 @@ Documentación de los endpoints **realmente implementados** en el código
 | `PATCH` | `/api/tickets/{ticket_id}` | Editar título/descripción/categoría/prioridad |
 | `PATCH` | `/api/tickets/{ticket_id}/assign` | Asignar o desasignar un usuario |
 | `PATCH` | `/api/tickets/{ticket_id}/state` | Cambiar el estado (máquina de estados) |
+| `DELETE` | `/api/tickets/{ticket_id}` | Eliminar un ticket (solo Administrador) |
 | `POST` | `/api/tickets/{ticket_id}/comments` | Agregar un comentario |
 | `GET` | `/api/tickets/{ticket_id}/comments` | Listar comentarios (cronológico) |
 | `GET` | `/api/tickets/{ticket_id}/history` | Historial de cambios (solo lectura) |
@@ -175,6 +176,25 @@ ticket (`Ticket N no encontrado`) o el usuario (`Usuario N no encontrado`) ·
 curl -X PATCH http://127.0.0.1:8000/api/tickets/1/assign \
   -H "Content-Type: application/json" \
   -d '{"assigned_to_id": 1}'
+```
+
+### `DELETE /api/tickets/{ticket_id}`
+
+Elimina el ticket con sus comentarios y su historial en una sola transacción.
+Solo para el rol **Administrador**. El registro del correo que creó el ticket
+(si vino por correo) se conserva con `ticket_id` en `null`, para que ese correo
+no vuelva a crear un ticket. Quién eliminó qué ticket y cuándo queda en el log
+de la aplicación (`TICKETS: …`).
+
+| Código | Cuándo |
+|--------|--------|
+| `204` | Eliminado (sin cuerpo) |
+| `401` | Sin sesión |
+| `403` | El rol no es Administrador |
+| `404` | El ticket no existe |
+
+```bash
+curl -X DELETE http://localhost:8000/api/tickets/6 -H "Authorization: Bearer $TOKEN"
 ```
 
 ### `PATCH /api/tickets/{ticket_id}/state`

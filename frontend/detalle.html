@@ -50,8 +50,10 @@
       <div class="detalle-layout">
         <div class="detalle-principal">
   
-          <div class="acciones acciones-principales" data-permiso="editar">
-            <button type="button" id="editar">Editar ticket</button>
+          <div class="acciones acciones-principales">
+            <button type="button" id="editar" data-permiso="editar">Editar ticket</button>
+            <!-- Solo Administrador: borra el ticket con sus comentarios e historial. -->
+            <button type="button" id="eliminar" class="peligro" data-permiso="eliminar">Eliminar</button>
           </div>
   
           <section id="panel-ticket" class="filtros detalle" aria-label="Datos del ticket">

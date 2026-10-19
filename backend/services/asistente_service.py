@@ -47,8 +47,8 @@ QWEN_MAX_TICKETS = 5
 # Qué puede hacer cada rol (espejo de la tabla de permisos de ayuda.html).
 PERMISOS_POR_ROL = {
     UserRole.ADMIN.value: (
-        "Ve todos los tickets; crea, comenta, edita, asigna y cambia el estado de "
-        "cualquier ticket; consulta el historial global; administra usuarios "
+        "Ve todos los tickets; crea, comenta, edita, asigna, cambia el estado y "
+        "elimina cualquier ticket; consulta el historial global; administra usuarios "
         "(crear, editar, cambiar contraseña, desactivar y reactivar)."
     ),
     UserRole.SUPERVISOR.value: (

@@ -321,6 +321,25 @@ button.secundario:disabled:hover {
   color: var(--color-tenue);
 }
 
+/* Acción destructiva (Eliminar ticket): contorno rojo, relleno al pasar. */
+button.peligro {
+  background: var(--color-superficie-alta);
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+button.peligro:hover {
+  background: var(--color-error);
+  color: var(--color-texto-inverso);
+}
+
+button.peligro:disabled,
+button.peligro:disabled:hover {
+  background: var(--color-fondo-neutro);
+  border-color: var(--color-borde-fuerte);
+  color: var(--color-tenue);
+}
+
 /* ---------- 8. Focus visible consistente ---------- */
 
 :focus-visible {

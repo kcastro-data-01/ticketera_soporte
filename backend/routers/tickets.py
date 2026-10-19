@@ -1,5 +1,5 @@
 """Ticket endpoints (creation, listing with search and filters, retrieval,
-edition, assignment, state changes and history)."""
+edition, assignment, state changes, history and deletion)."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
@@ -23,7 +23,13 @@ from backend.services.ticket_service import (
 )
 from backend.models import User
 from backend.constants import UserRole
-from backend.routers.auth import ROLES_EQUIPO, ROLES_GESTION, ROLES_TODOS, role_required
+from backend.routers.auth import (
+    ROLES_ADMIN,
+    ROLES_EQUIPO,
+    ROLES_GESTION,
+    ROLES_TODOS,
+    role_required,
+)
 
 
 router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
@@ -274,3 +280,24 @@ def change_ticket_state(
             ),
         )
     return TicketResponse.model_validate(ticket)
+
+
+@router.delete(
+    "/{ticket_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un ticket (solo Administrador)",
+)
+def delete_ticket(
+    ticket_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(role_required(ROLES_ADMIN)),
+) -> Response:
+    """Delete a ticket with its comments and history (Administrador only)."""
+    try:
+        ticket_service.delete_ticket(session, ticket_id, current_user)
+    except TicketNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticket {ticket_id} no encontrado",
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

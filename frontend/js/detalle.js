@@ -45,6 +45,7 @@ function getElements() {
     },
     formEditar: document.getElementById("form-editar"),
     editar: document.getElementById("editar"),
+    eliminar: document.getElementById("eliminar"),
     seccionEdicion: document.getElementById("seccion-edicion"),
     cancelarEdicion: document.getElementById("cancelar-edicion"),
     title: document.getElementById("title"),
@@ -99,6 +100,7 @@ function bloquearBotones(bloqueado) {
   elements.asignar.disabled = bloqueado;
   elements.comentar.disabled = bloqueado;
   elements.historial.disabled = bloqueado;
+  if (elements.eliminar) elements.eliminar.disabled = bloqueado;
   /* El botón de estado solo se activa si hay alguna transición posible. */
   elements.cambiarEstado.disabled =
     bloqueado || elements.estadoDestino.options.length === 0;
@@ -306,6 +308,39 @@ function cancelarEdicion() {
   salirModoEdicion();
   showStatus("Edición cancelada. Los datos del ticket no se modificaron.");
   getElements().editar.focus();
+}
+
+/* Solo Administrador (el servidor responde 403 a los demás). Pide
+   confirmación y, si se elimina, vuelve al listado. */
+async function eliminarTicket() {
+  if (ocupado || ticketId === null) return;
+  const confirmado = window.confirm(
+    `¿Seguro que querés eliminar el ticket #${ticketId}? Esta acción no se puede deshacer.`
+  );
+  if (!confirmado) return;
+
+  ocupado = true;
+  bloquearBotones(true);
+  showStatus("Eliminando el ticket...", "cargando");
+  try {
+    const response = await fetchWithAuth(`/api/tickets/${ticketId}`, { method: "DELETE" });
+    if (response.status === 204) {
+      window.location.href = "index.html";
+      return;
+    }
+    if (response.status === 403) {
+      showStatus("Solo un Administrador puede eliminar tickets.", "error");
+    } else if (response.status === 404) {
+      showStatus("El ticket ya no existe. Vuelve al listado.", "error");
+    } else {
+      showStatus(await mensajeDeDetalle(response, "No se pudo eliminar el ticket."), "error");
+    }
+  } catch (error) {
+    console.error(`DELETE /api/tickets/${ticketId}:`, error);
+    showStatus("Error al comunicarse con la API.", "error");
+  }
+  ocupado = false;
+  bloquearBotones(false);
 }
 
 async function guardarEdicion() {
@@ -729,6 +764,7 @@ async function init() {
     guardarEdicion();
   });
   elements.editar.addEventListener("click", () => activarEdicion());
+  if (elements.eliminar) elements.eliminar.addEventListener("click", () => eliminarTicket());
   elements.cancelarEdicion.addEventListener("click", () => cancelarEdicion());
   elements.asignar.addEventListener("click", () => guardarAsignacion());
   elements.cambiarEstado.addEventListener("click", () => cambiarEstado());

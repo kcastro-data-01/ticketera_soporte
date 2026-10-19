@@ -29,10 +29,10 @@ function loadAuth(role) {
 }
 
 const TABLA = {
-  Administrador: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: true },
-  Supervisor: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: false },
-  Técnico: { editar: false, asignar: false, cambiar_estado: true, historial_global: true, usuarios: false },
-  Solicitante: { editar: false, asignar: false, cambiar_estado: false, historial_global: false, usuarios: false },
+  Administrador: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: true, eliminar: true },
+  Supervisor: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: false, eliminar: false },
+  Técnico: { editar: false, asignar: false, cambiar_estado: true, historial_global: true, usuarios: false, eliminar: false },
+  Solicitante: { editar: false, asignar: false, cambiar_estado: false, historial_global: false, usuarios: false, eliminar: false },
 };
 
 for (const [rol, permisos] of Object.entries(TABLA)) {
@@ -68,4 +68,15 @@ test("requirePermiso() redirige al listado sin permiso", () => {
   const ctx = loadAuth("Solicitante");
   assert.equal(ctx.requirePermiso("historial_global"), false);
   assert.equal(ctx.window.location.href, "index.html");
+});
+
+test("detalle.html: el botón Eliminar solo lo ve el Administrador", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "detalle.html"), "utf8");
+  assert.match(html, /<button[^>]*id="eliminar"[^>]*data-permiso="eliminar"/);
+  for (const [rol, visible] of [["Administrador", true], ["Supervisor", false], ["Técnico", false], ["Solicitante", false]]) {
+    const ctx = loadAuth(rol);
+    const boton = { dataset: { permiso: "eliminar" }, hidden: false };
+    ctx.aplicarPermisos({ querySelectorAll: () => [boton] });
+    assert.equal(boton.hidden, !visible, rol);
+  }
 });

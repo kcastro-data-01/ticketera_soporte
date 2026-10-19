@@ -1,11 +1,14 @@
 """Business logic for tickets (creation, listing, edition, retrieval,
 assignment and comments)."""
 
-from sqlalchemy import func, or_, select
+import logging
+from datetime import datetime, timezone
+
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import joinedload
 
 from backend.constants import TicketCategory, TicketPriority, TicketState, UserRole
-from backend.models import Comment, History, Ticket, User
+from backend.models import Comment, History, ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate, TicketUpdate
 from backend.services.user_service import get_auto_assignable_users
 
@@ -26,6 +29,16 @@ class UserNotFoundError(Exception):
     def __init__(self, user_id: int):
         self.user_id = user_id
         super().__init__(f"User {user_id} not found")
+
+
+logger = logging.getLogger(__name__)
+# Sale en «docker compose logs ticketera» (uvicorn no muestra los INFO de la app).
+if not logger.handlers:
+    _salida = logging.StreamHandler()
+    _salida.setFormatter(logging.Formatter("TICKETS: %(message)s"))
+    logger.addHandler(_salida)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 
 class TicketNotFoundError(Exception):
@@ -502,3 +515,36 @@ def create_comment(
     session.commit()
     session.refresh(comment)
     return comment
+
+
+def delete_ticket(session, ticket_id: int, current_user: User) -> None:
+    """Elimina un ticket con sus comentarios y su historial, en una transacción.
+
+    El registro del correo que lo creó (si vino por correo) se conserva con
+    ``ticket_id`` en ``NULL``: así ese correo nunca vuelve a crear un ticket.
+    Como el historial desaparece con el ticket, quién lo eliminó y cuándo
+    queda en el log de la aplicación.
+
+    Raises:
+        ``TicketNotFoundError``: el ticket no existe.
+    """
+    ticket = session.get(Ticket, ticket_id)
+    if ticket is None:
+        raise TicketNotFoundError(ticket_id)
+    titulo = ticket.title
+    try:
+        session.execute(
+            update(ProcessedEmail)
+            .where(ProcessedEmail.ticket_id == ticket_id)
+            .values(ticket_id=None)
+        )
+        session.delete(ticket)  # comentarios e historial: cascade en el modelo
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    momento = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    logger.info(
+        "%s (%s, id %s) eliminó el ticket #%s «%s» el %s",
+        current_user.name, current_user.email, current_user.id, ticket_id, titulo, momento,
+    )

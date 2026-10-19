@@ -87,6 +87,7 @@ const PERMISOS = {
   cambiar_estado: ["Administrador", "Supervisor", "Técnico"],
   historial_global: ["Administrador", "Supervisor", "Técnico"],
   usuarios: ["Administrador"],
+  eliminar: ["Administrador"],
 };
 
 /* true si el usuario de la sesión tiene el permiso indicado. */
