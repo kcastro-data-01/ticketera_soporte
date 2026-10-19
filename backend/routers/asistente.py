@@ -45,7 +45,7 @@ def preguntar(
     messages = [m.model_dump() for m in payload.messages]
     try:
         texto, fuente = asistente_service.responder_completo(
-            proveedor, session, current_user, messages
+            proveedor, session, current_user, messages, payload.ticket_id
         )
     except AsistenteNoConfigurado as error:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error))
@@ -75,7 +75,9 @@ def preguntar_stream(
     or ``{"error": "…"}``."""
     messages = [m.model_dump() for m in payload.messages]
     # Se calcula aquí (con la sesión abierta) y se envía a medida que llega.
-    eventos = asistente_service.responder_stream(proveedor, session, current_user, messages)
+    eventos = asistente_service.responder_stream(
+        proveedor, session, current_user, messages, payload.ticket_id
+    )
 
     def ndjson():
         for evento in eventos:

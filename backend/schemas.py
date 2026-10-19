@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from backend.constants import TicketCategory, TicketPriority, TicketState, UserRole
 
@@ -378,6 +378,9 @@ class AsistenteRequest(BaseModel):
     """Conversation sent by the chat: alternating turns ending in ``user``."""
 
     messages: list[AsistenteMensaje]
+    # Ticket abierto en pantalla (detalle.html?id=N): permite preguntar por
+    # «este ticket». El servidor comprueba que el usuario pueda verlo.
+    ticket_id: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def conversation_must_be_valid(self) -> "AsistenteRequest":

@@ -171,7 +171,8 @@ def test_provider_errors_become_502(client, session, fake_claude):
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
     resp = ask(client, headers)
     assert resp.status_code == 502
-    assert "Ollama" in resp.json()["detail"]
+    # La persona ve un aviso genérico; el detalle va al log del servidor.
+    assert resp.json()["detail"] == "La IA no está disponible en este momento"
 
 
 # --- Selección de proveedor ---
@@ -422,7 +423,7 @@ def test_named_ticket_details_reach_the_ai(client, session, fake_claude):
     system = fake_claude.system_text()
     assert f"Detalle del ticket #{ticket.id}:" in system
     assert "Descripción: Descripción" in system
-    assert "· Laura: Ya cambié el tóner" in system
+    assert "Laura: Ya cambié el tóner" in system
 
 
 # --- Respuesta por partes (streaming) ---
@@ -457,7 +458,7 @@ def test_stream_ai_answer_and_error(client, session, fake_claude):
 
     fake_claude.error = AsistenteNoDisponible("No se pudo conectar con Ollama")
     eventos = _eventos(client.post("/api/asistente/stream", json=cuerpo, headers=headers))
-    assert eventos == [{"error": "No se pudo conectar con Ollama"}]
+    assert eventos == [{"error": "La IA no está disponible en este momento"}]
 
 
 def test_qwen_stream_yields_chunks_without_think():

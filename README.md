@@ -538,8 +538,19 @@ Para que un modelo pequeño responda bien y rápido:
 - Las preguntas frecuentes («¿cuántos críticos hay?», «¿qué tickets están en
   proceso?», «¿mis tickets?», «¿en qué estado está el #5?») las responde el
   servidor al instante, sin IA, con datos exactos.
-- Si la pregunta nombra un ticket («explícame el #5»), el modelo recibe su
-  descripción, últimos comentarios y último cambio.
+- Las preguntas sobre el **contenido** de un ticket («¿cómo resuelvo el #5?»,
+  «¿qué hago con este ticket?», «resume el #5») van siempre a la IA, que
+  recibe el título, la descripción (hasta 1500 caracteres), la categoría, la
+  prioridad, el estado, el asignado y los últimos 5 comentarios. En el detalle
+  de un ticket, el chat envía su número: «este ticket» funciona sin escribir
+  «#N». La guía fija queda solo para cómo usar la app («¿cómo cierro un
+  ticket?»).
+- Si Ollama falla, tarda demasiado o responde vacío, el chat muestra «La IA
+  no está disponible en este momento» (nunca un texto inventado) y el detalle
+  queda en el registro: `docker compose logs ticketera | grep IA:`.
+- Tiempo máximo de respuesta: 90 s (`QWEN_TIMEOUT` en `.env` para cambiarlo;
+  conectar con Ollama, 5 s). Mientras espera, el chat muestra los puntos
+  animados y no deja enviar otra pregunta; el resto de la página sigue usable.
 - La respuesta aparece por partes (`POST /api/asistente/stream`, NDJSON) y
   los «#N» enlazan al detalle del ticket.
 - Al arrancar, la aplicación precarga el modelo en Ollama para que la primera

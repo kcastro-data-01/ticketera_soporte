@@ -7,6 +7,22 @@
 const API_ASISTENTE_URL = "/api/asistente/stream";
 const CHAT_KEY = "asistente_chat";
 const CHAT_MAX_MENSAJES = 20;
+/* Lo que se muestra si la IA falla o tarda demasiado (el servidor corta a
+   los 90 s; el navegador espera un poco más antes de rendirse). */
+const IA_NO_DISPONIBLE = "La IA no está disponible en este momento";
+const CHAT_LIMITE_MS = 100000;
+
+/* En el detalle de un ticket (detalle.html?id=N) se envía su número para
+   poder preguntar por «este ticket». */
+function ticketEnPantalla() {
+  try {
+    if (!/detalle\.html$/.test(window.location.pathname || "")) return null;
+    const id = Number(new URLSearchParams(window.location.search).get("id"));
+    return Number.isInteger(id) && id > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
 
 const SUGERENCIAS_POR_ROL = {
   Administrador: ["¿Cuántos tickets críticos hay sin resolver?", "¿Cómo desactivo a un usuario?"],
@@ -191,10 +207,17 @@ async function enviarPregunta(texto) {
   let respuesta;
   let acumulado = "";
   let fuente = "";
+  /* Si no termina a tiempo se corta, y la página sigue usable. */
+  const control = typeof AbortController === "function" ? new AbortController() : null;
+  const limite = control ? setTimeout(() => control.abort(), CHAT_LIMITE_MS) : null;
   try {
+    const cuerpo = { messages: recortarConversacion(historial) };
+    const ticketId = ticketEnPantalla();
+    if (ticketId !== null) cuerpo.ticket_id = ticketId;
     const response = await fetchWithAuth(API_ASISTENTE_URL, {
       method: "POST",
-      body: JSON.stringify({ messages: recortarConversacion(historial) }),
+      body: JSON.stringify(cuerpo),
+      signal: control ? control.signal : undefined,
     });
     if (!response.ok || !response.body) {
       const body = await response.json().catch(() => null);
@@ -234,24 +257,25 @@ async function enviarPregunta(texto) {
           }
         }
       }
-      respuesta = error
-        ? { role: "assistant", error: true, content: error }
-        : {
-            role: "assistant",
-            content: acumulado || "No tengo una respuesta para eso.",
-            fuente,
-          };
+      respuesta =
+        error || !acumulado
+          ? { role: "assistant", error: true, content: error || IA_NO_DISPONIBLE }
+          : { role: "assistant", content: acumulado, fuente };
     }
   } catch (error) {
     console.error("POST /api/asistente/stream:", error);
+    const cortado = error && error.name === "AbortError";
     respuesta = {
       role: "assistant",
       error: true,
-      content: "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      content: cortado
+        ? IA_NO_DISPONIBLE
+        : "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
     };
   }
 
   clearTimeout(aviso);
+  if (limite) clearTimeout(limite);
   /* Si falló, la pregunta se quita del historial para poder reintentarla. */
   const actualizado = respuesta.error ? historial.slice(0, -1) : historial;
   guardarChat([...actualizado, respuesta]);

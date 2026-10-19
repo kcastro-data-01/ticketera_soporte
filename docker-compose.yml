@@ -13,6 +13,8 @@ services:
       ASISTENTE_PROVEEDOR: ${ASISTENTE_PROVEEDOR:-qwen}
       OLLAMA_URL: http://ollama:11434
       QWEN_MODELO: ${QWEN_MODELO:-qwen3:0.6b}
+      # Segundos máximos que se espera la respuesta del modelo.
+      QWEN_TIMEOUT: ${QWEN_TIMEOUT:-90}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # Tickets por correo con Microsoft Graph (apagado por defecto).
       # Los datos van en .env; ver README → «Tickets por correo».
