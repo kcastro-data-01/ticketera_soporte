@@ -537,9 +537,19 @@ Para que un modelo pequeño responda bien y rápido:
 
 - Las preguntas frecuentes («¿cuántos críticos hay?», «¿qué tickets están en
   proceso?», «¿mis tickets?», «¿en qué estado está el #5?») las responde el
-  servidor al instante, sin IA, con datos exactos.
+  servidor al instante, sin IA, con datos exactos y la nota «Respuesta del
+  sistema».
+- También los conteos **por rol o por persona** (solo tickets sin resolver):
+  «¿cuántos tickets tienen los técnicos?», «¿qué tickets tiene Carlos?»,
+  «¿cuántos sin asignar?». La respuesta separa por persona y muestra su rol:
+  «Hay 3 tickets sin resolver asignados a técnicos: Carlos Solís (Técnico)
+  tiene 2 (#3, #5) y José Solano (Técnico) tiene 1 (#7).». Toleran errores
+  comunes («ticketes», «tiketes», «asigandos», «tecnico», sin tildes). Cada rol
+  cuenta solo lo que puede ver: el Solicitante, sus propios tickets.
+- A la IA, cada persona le llega con su rol: «asignado a Laura Méndez
+  (Administrador)».
 - Las preguntas sobre el **contenido** de un ticket («¿cómo resuelvo el #5?»,
-  «¿qué hago con este ticket?», «resume el #5») van siempre a la IA, que
+  «¿qué hago con este ticket?») van siempre a la IA, que
   recibe el título, la descripción (hasta 1500 caracteres), la categoría, la
   prioridad, el estado, el asignado y los últimos 5 comentarios. En el detalle
   de un ticket, el chat envía su número: «este ticket» funciona sin escribir
