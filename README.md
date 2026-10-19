@@ -541,12 +541,13 @@ correo en ticket.
 ### ¿Cómo se decide que un correo «pide ayuda»?
 
 Por **palabras clave** (`SEÑALES_SOPORTE` en `backend/services/correo_service.py`).
-Se buscan en el asunto **y** en el texto, en minúsculas y sin tildes; basta con
-que aparezca una:
+Se buscan en el asunto **y** en el texto **nuevo** del correo (el campo
+`uniqueBody` de Graph; lo citado o reenviado de mensajes anteriores no cuenta),
+en minúsculas y sin tildes; basta con que aparezca una:
 
 | Tipo | Frases |
 |---|---|
-| Pedido directo | soporte, ticket, ayuda, ayudarme / ayudarnos |
+| Pedido directo | soporte, ayuda, ayudarme / ayudarnos («ticket» no cuenta: aparece en los correos de la propia app) |
 | «No …» | no (me/nos/le) funciona, sirve, enciende, prende, arranca, abre, carga, imprime, conecta, deja, responde, aparece, llega, reconoce, suena |
 | «No puedo …» | no puedo / podemos / logro + entrar, ingresar, abrir, imprimir, conectar, acceder, enviar, iniciar, trabajar, instalar, usar, ver |
 | «Se …» | se (me/nos/le) dañó, dañaron, quebró, cayó, cayeron, trabó, pegó, congeló, apagó, reinicia, desconecta, bloqueó |
@@ -564,6 +565,8 @@ Si un correo de soporte real no se detecta, agrega la frase a la lista.
 | Alguien sin cuenta | **No se crea ticket.** Se le responde con el asunto «Registrate para crear tickets», que explica que primero cree su cuenta en `APP_URL/login.html?registro=1&email=…` y después vuelva a enviar su solicitud. Máximo un aviso cada 24 h por remitente; el correo igual se marca como leído y se mueve. En el registro: `Correo ignorado: remitente no registrado <correo>`. |
 | Cuenta desactivada | Se le avisa que hable con un administrador. |
 | Respuestas automáticas, rebotes, «noreply», o el propio buzón | Nunca se responden (evita bucles). |
+| Responde o reenvía un aviso de la app («Registrate para crear tickets», «No pudimos crear tu ticket»), con o sin `RE:`/`RV:`/`FW:`/`Fwd:` | Se ignora: nunca crea un ticket. Se marca como leído y se mueve. |
+| Responde a «Ticket #N creado» o «Comentario agregado al ticket #N» | Si es el dueño del ticket y escribió algo, se agrega como **comentario**; si no, se ignora. Nunca crea un ticket nuevo. |
 
 La app lee los correos **no leídos** de la bandeja de entrada con Microsoft
 Graph. Cada correo que procesa se responde **en el mismo hilo**, se marca como

@@ -95,7 +95,8 @@ PALABRAS_PRIORIDAD: list[tuple[TicketPriority, tuple[str, ...]]] = [
 # Frases que indican una solicitud de ayuda (en minúsculas y sin tildes).
 # Se buscan en el asunto y el texto del correo.
 SEÑALES_SOPORTE: tuple[str, ...] = (
-    r"\bsoporte\b", r"\bticket", r"\bayuda\b", r"\bayudar(me|nos)?\b",
+    # «ticket» no está: aparece en los propios correos de la app.
+    r"\bsoporte\b", r"\bayuda\b", r"\bayudar(me|nos)?\b",
     r"\bno (me |nos |le )?(funciona|sirve|enciende|prende|arranca|abre|carga|imprime|"
     r"conecta|deja|responde|aparece|llega|reconoce|suena)",
     r"\bno (puedo|podemos|logro) (entrar|ingresar|abrir|imprimir|conectar|acceder|enviar|"
@@ -110,6 +111,15 @@ SEÑALES_SOPORTE: tuple[str, ...] = (
 )
 
 PATRON_TICKET = re.compile(r"ticket\s*#\s*(\d+)", re.IGNORECASE)
+# «RE:», «RV:», «FW:», «Fwd:», «RE[2]:»… (también repetidos) al inicio del asunto.
+PREFIJOS_RESPUESTA = re.compile(r"^\s*((re|rv|fw|fwd|aw|tr|reenviar)\s*(\[\d+\])?\s*:\s*)+", re.IGNORECASE)
+ASUNTO_INACTIVO = "No pudimos crear tu ticket"
+# Asuntos que envía la app. Los avisos nunca se procesan; las confirmaciones
+# solo sirven para agregar un comentario al ticket de quien responde.
+AVISOS_APP = (re.compile(r"^registrate para crear tickets$", re.IGNORECASE),
+              re.compile(r"^no pudimos crear tu ticket$", re.IGNORECASE))
+CONFIRMACIONES_APP = (re.compile(r"^ticket\s*#\d+ creado:", re.IGNORECASE),
+                      re.compile(r"^comentario agregado al ticket\s*#\d+$", re.IGNORECASE))
 REMITENTES_AUTOMATICOS = ("noreply", "no-reply", "no_reply", "donotreply", "mailer-daemon",
                           "postmaster", "bounce")
 
@@ -179,22 +189,42 @@ def _html_a_texto(html: str) -> str:
     return unescape(texto)
 
 
+# Dónde empieza el correo anterior citado o reenviado: desde ahí no es parte
+# de la solicitud. «El lun, 19 oct … escribió:» puede venir en dos líneas.
+CORTES_CITA = (
+    r"^\s*(el|on)\b[^\n]{0,200}(\n[^\n]{0,200})?\b(escribió|escribio|wrote):\s*$",
+    r"^\s*(de|from):\s.+",
+    r"^\s*-{3,}\s*(original message|mensaje original|forwarded message|mensaje reenviado)",
+    r"^\s*(begin forwarded message|inicio del mensaje reenviado)",
+    r"^\s*_{10,}",
+)
+
+
 def _limpiar_cuerpo(texto: str) -> str:
-    """Quita el historial citado de respuestas y espacios de más."""
-    lineas = []
-    for linea in texto.replace("\r\n", "\n").split("\n"):
-        # Lo que viene después de «El ... escribió:» / «De: ...» es el correo
-        # anterior citado: no forma parte de la solicitud.
-        if re.match(r"^\s*(el .+ escribió:|on .+ wrote:|de:\s.+|from:\s.+|-----\s*original|_{10,})",
-                    linea, re.IGNORECASE):
-            break
-        if linea.lstrip().startswith(">"):
-            continue
-        lineas.append(linea.rstrip())
+    """Quita el historial citado/reenviado y espacios de más."""
+    texto = texto.replace("\r\n", "\n")
+    cortes = [m.start() for patron in CORTES_CITA
+              if (m := re.search(patron, texto, re.IGNORECASE | re.MULTILINE))]
+    if cortes:
+        texto = texto[:min(cortes)]
+    lineas = [linea.rstrip() for linea in texto.split("\n") if not linea.lstrip().startswith(">")]
     texto = "\n".join(lineas)
     texto = re.sub(r"[ \t]+", " ", texto)
     texto = re.sub(r"\n{3,}", "\n\n", texto)
     return texto.strip()
+
+
+def asunto_base(asunto: str) -> str:
+    """El asunto sin «RE:», «RV:», «FW:», «Fwd:»…"""
+    return PREFIJOS_RESPUESTA.sub("", asunto).strip()
+
+
+def _texto_graph(parte: dict | None) -> str:
+    parte = parte or {}
+    contenido = parte.get("content") or ""
+    if (parte.get("contentType") or "").lower() == "html":
+        contenido = _html_a_texto(contenido)
+    return _limpiar_cuerpo(contenido)
 
 
 def _es_automatico(cabeceras: dict[str, str], remitente: str) -> bool:
@@ -226,11 +256,8 @@ def correo_desde_graph(mensaje: dict) -> CorreoEntrante:
     remitente = (direccion.get("address") or "").strip().lower()
     asunto = " ".join((mensaje.get("subject") or "").split())
 
-    cuerpo_graph = mensaje.get("body") or {}
-    contenido = cuerpo_graph.get("content") or ""
-    if (cuerpo_graph.get("contentType") or "").lower() == "html":
-        contenido = _html_a_texto(contenido)
-    cuerpo = _limpiar_cuerpo(contenido)
+    # uniqueBody es solo lo nuevo de este correo (sin lo citado de antes).
+    cuerpo = _texto_graph(mensaje.get("uniqueBody")) or _texto_graph(mensaje.get("body"))
 
     cabeceras = {
         (c.get("name") or "").lower(): c.get("value") or ""
@@ -273,7 +300,7 @@ def clasificar(asunto: str, cuerpo: str) -> tuple[TicketCategory, TicketPriority
 
 
 def _titulo(asunto: str) -> str:
-    titulo = re.sub(r"^\s*((re|rv|fw|fwd)\s*:\s*)+", "", asunto, flags=re.IGNORECASE).strip()
+    titulo = asunto_base(asunto)
     if len(titulo) < 3:
         return TITULO_POR_DEFECTO
     return titulo[:MAX_TITULO].strip()
@@ -349,7 +376,7 @@ def _respuesta_registro(correo, config) -> Respuesta:
 def _respuesta_inactivo(correo, usuario) -> Respuesta:
     return Respuesta(
         para=correo.remitente,
-        asunto="No pudimos crear tu ticket",
+        asunto=ASUNTO_INACTIVO,
         texto=(
             f"{_saludo(usuario.name)}\n\n"
             "Tu cuenta en la ticketera de soporte está desactivada, por eso no "
@@ -406,7 +433,11 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
             ProcessedEmail.message_id == correo.message_id)) is not None:
         return "repetido", None
 
-    if not es_de_soporte(correo.asunto, correo.cuerpo, config):
+    base = asunto_base(correo.asunto)
+    es_aviso = any(p.search(base) for p in AVISOS_APP)
+    es_confirmacion = any(p.search(base) for p in CONFIRMACIONES_APP)
+    numero = PATRON_TICKET.search(correo.asunto)
+    if not (es_aviso or numero or es_de_soporte(correo.asunto, correo.cuerpo, config)):
         # Correo normal de la empresa: no se toca ni se guarda.
         return "otro", None
 
@@ -415,9 +446,20 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
         _registrar(session, correo, "ignorado")
         return "ignorado", None
 
+    if es_aviso:
+        # Respuesta o reenvío de un aviso de la app: nunca es una solicitud.
+        logger.info("Correo ignorado: es una respuesta a un aviso de la app «%s»", correo.asunto)
+        _registrar(session, correo, "ignorado")
+        return "ignorado", None
+
     usuario = session.scalar(select(User).where(func.lower(User.email) == correo.remitente))
 
     if usuario is None:
+        if es_confirmacion:
+            logger.info("Correo ignorado: respuesta a una confirmación de un remitente no "
+                        "registrado %s", correo.remitente)
+            _registrar(session, correo, "ignorado")
+            return "ignorado", None
         # No se crea ticket: se le pide registrarse (un aviso cada 24 h).
         if _ya_avisado(session, correo.remitente):
             logger.info("Correo ignorado: remitente no registrado %s "
@@ -434,9 +476,8 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
         return "inactivo", _respuesta_inactivo(correo, usuario)
 
     # ¿Responde a un ticket suyo? → comentario en vez de ticket nuevo.
-    coincidencia = PATRON_TICKET.search(correo.asunto)
-    if coincidencia:
-        ticket = session.get(Ticket, int(coincidencia.group(1)))
+    if numero:
+        ticket = session.get(Ticket, int(numero.group(1)))
         if ticket is not None and ticket.created_by_id == usuario.id and correo.cuerpo:
             ticket_service.create_comment(
                 session, ticket.id,
@@ -444,6 +485,14 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
             )
             _registrar(session, correo, "comentario", ticket.id)
             return "comentario", _respuesta_comentario(correo, usuario, ticket, config)
+
+    if es_confirmacion or not es_de_soporte(correo.asunto, correo.cuerpo, config):
+        # Responde a una confirmación de un ticket ajeno (o sin texto nuevo), o
+        # nombra un ticket sin pedir ayuda: nunca crea un ticket nuevo.
+        logger.info("Correo ignorado: «%s» de %s no es un comentario válido ni una solicitud nueva",
+                    correo.asunto, correo.remitente)
+        _registrar(session, correo, "ignorado")
+        return "ignorado", None
 
     categoria, prioridad = clasificar(correo.asunto, correo.cuerpo)
     descripcion = correo.cuerpo or "(El correo no traía texto.)"
@@ -512,7 +561,7 @@ class ClienteGraph:
         params = {
             "$filter": "isRead eq false",
             "$top": "50",
-            "$select": "id,internetMessageId,subject,from,body,receivedDateTime,"
+            "$select": "id,internetMessageId,subject,from,body,uniqueBody,receivedDateTime,"
                        "internetMessageHeaders",
         }
         for _ in range(MAX_PAGINAS):

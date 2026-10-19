@@ -173,7 +173,6 @@ def test_classification(asunto, cuerpo, categoria, prioridad):
     ("Olvidé mi contraseña", ""),
     ("Sin internet", "En el segundo piso estamos sin conexión"),
     ("Soporte", ""),
-    ("RE: Ticket #4 creado", "gracias"),
 ])
 def test_help_requests_are_detected(asunto, cuerpo):
     assert cs.es_de_soporte(asunto, cuerpo, CONFIG_FILTRO)
@@ -506,3 +505,108 @@ def test_not_a_help_request_is_logged_once(factory, usuario, log_correo):
     cs.revisar_buzon(factory, CONFIG_FILTRO, graph.cliente, avisados)
     cs.revisar_buzon(factory, CONFIG_FILTRO, graph.cliente, avisados)
     assert log_correo.text.count("Correo ignorado: no parece solicitud de ayuda «Reunión del viernes»") == 1
+
+
+
+# --- Avisos de la propia app y texto citado -------------------------------------
+
+
+@pytest.mark.parametrize("prefijo", ["RE: ", "RV: ", "FW: ", "Fwd: ", "Re: RE: ", "RE[2]: ", ""])
+def test_reply_to_register_notice_never_creates_a_ticket(session, usuario, prefijo, log_correo):
+    """El caso del ticket #6: el aviso de registro vuelve desde un usuario registrado."""
+    mensaje = crear_correo(asunto=f"{prefijo}Registrate para crear tickets",
+                           cuerpo="Ya me registré, no funciona la impresora, ayuda")
+    assert procesar(session, mensaje, CONFIG_FILTRO) == ("ignorado", None)
+    assert session.scalars(select(Ticket)).first() is None
+    assert "es una respuesta a un aviso de la app" in log_correo.text
+
+
+def test_reply_to_inactive_notice_is_ignored(session, usuario):
+    mensaje = crear_correo(asunto="RE: No pudimos crear tu ticket", cuerpo="no funciona")
+    assert procesar(session, mensaje, CONFIG_FILTRO) == ("ignorado", None)
+    assert session.scalars(select(Ticket)).first() is None
+
+
+def test_ticket_6_case_end_to_end(factory, session, usuario):
+    graph = FakeGraph([crear_correo(asunto="RE: Registrate para crear tickets",
+                                    cuerpo="Hola\n\nEl lun, 19 oct 2026 a las 10:00, Mesa de ayuda "
+                                           "<kcastro@data.cr>\nescribió:\n> Registrate para crear tickets")])
+    assert cs.revisar_buzon(factory, CONFIG_FILTRO, graph.cliente) == {"ignorado": 1}
+    assert session.scalars(select(Ticket)).first() is None
+    assert graph.respuestas == []
+    assert graph.no_leidos() == []  # se marca y se mueve igual
+
+
+def test_owner_reply_to_confirmation_adds_comment_without_keywords(session, usuario):
+    procesar(session, crear_correo())
+    ticket = session.scalars(select(Ticket)).one()
+    mensaje = crear_correo(asunto=f"RE: Ticket #{ticket.id} creado: {ticket.title}",
+                           cuerpo="Ya funciona, gracias", msg_id="<r1@x>")
+    resultado, respuesta = procesar(session, mensaje, CONFIG_FILTRO)
+    assert resultado == "comentario"
+    assert session.scalars(select(Comment)).one().content == "Ya funciona, gracias"
+    assert len(session.scalars(select(Ticket)).all()) == 1
+
+
+def test_reply_to_comment_notice_adds_another_comment(session, usuario):
+    procesar(session, crear_correo())
+    ticket = session.scalars(select(Ticket)).one()
+    mensaje = crear_correo(asunto=f"RE: Comentario agregado al ticket #{ticket.id}",
+                           cuerpo="Otra cosa: también falla el escáner", msg_id="<r2@x>")
+    assert procesar(session, mensaje, CONFIG_FILTRO)[0] == "comentario"
+
+
+def test_non_owner_reply_to_confirmation_creates_nothing(session, usuario):
+    otra = User(name="Otra", email="otra@data.cr", role="Solicitante", password_hash="x")
+    session.add(otra)
+    session.commit()
+    procesar(session, crear_correo())
+    ticket = session.scalars(select(Ticket)).one()
+    mensaje = crear_correo(remitente="otra@data.cr", msg_id="<r3@x>",
+                           asunto=f"FW: Ticket #{ticket.id} creado: {ticket.title}",
+                           cuerpo="La impresora no funciona tampoco en mi piso")
+    assert procesar(session, mensaje, CONFIG_FILTRO) == ("ignorado", None)
+    assert len(session.scalars(select(Ticket)).all()) == 1
+    assert session.scalars(select(Comment)).first() is None
+
+
+def test_unregistered_reply_to_confirmation_gets_no_notice(session):
+    mensaje = crear_correo(remitente="x@otro.com", asunto="RE: Ticket #3 creado: algo",
+                           cuerpo="no funciona")
+    assert procesar(session, mensaje, CONFIG_FILTRO) == ("ignorado", None)
+
+
+def test_keywords_in_quoted_text_do_not_count(session, usuario):
+    # Graph manda uniqueBody (solo lo nuevo) aparte del cuerpo completo.
+    mensaje = crear_correo(asunto="Viernes", cuerpo="Perfecto, nos vemos.\n\nDe: Ana\n"
+                                                    "La impresora no funciona, ayuda")
+    mensaje["uniqueBody"] = {"contentType": "text", "content": "Perfecto, nos vemos."}
+    assert procesar(session, mensaje, CONFIG_FILTRO) == ("otro", None)
+
+
+@pytest.mark.parametrize("cita", [
+    "El lun, 19 oct 2026 a las 10:00, Ana Pérez (<ana@data.cr>)\nescribió:\n> no funciona nada",
+    "On Mon, Oct 19, 2026 at 10:00 AM Ana <ana@data.cr> wrote:\n> no funciona",
+    "---------- Forwarded message ---------\nDe: Ana\nLa impresora no funciona",
+    "-----Mensaje original-----\nNo puedo entrar al VPN",
+    "________________________________\nFrom: Ana\nerror en el sistema",
+    "> no funciona la impresora\n> ayuda",
+])
+def test_quoted_or_forwarded_text_is_cut(session, usuario, cita):
+    mensaje = crear_correo(asunto="Hola", cuerpo=f"Gracias por todo.\n\n{cita}")
+    assert cs.correo_desde_graph(mensaje).cuerpo == "Gracias por todo."
+    assert procesar(session, mensaje, CONFIG_FILTRO) == ("otro", None)
+
+
+@pytest.mark.parametrize("asunto,cuerpo", [
+    ("Necesito tickets para el concierto", "¿Alguien tiene tickets?"),
+    ("Tickets de avión", "Adjunto los tickets del viaje."),
+])
+def test_ticket_word_alone_is_not_a_help_request(asunto, cuerpo):
+    assert not cs.es_de_soporte(asunto, cuerpo, CONFIG_FILTRO)
+
+
+def test_asunto_base_strips_reply_prefixes():
+    assert cs.asunto_base("RE: RV: Fwd: Registrate para crear tickets") == "Registrate para crear tickets"
+    assert cs.asunto_base("Re[3]: hola") == "hola"
+    assert cs.asunto_base("Reunión") == "Reunión"
