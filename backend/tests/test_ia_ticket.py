@@ -101,7 +101,6 @@ def test_two_tickets_give_two_different_prompts_with_full_content(client, sessio
     "¿Qué me recomiendas para el ticket #{id}?",
     "¿Por qué falla el ticket #{id}?",
     "Necesito ayuda con el ticket #{id}",
-    "Resume el ticket #{id}",
 ])
 def test_content_questions_go_to_the_ai_not_to_fixed_text(client, session, ollama, dos_tickets, pregunta):
     t1, _ = dos_tickets

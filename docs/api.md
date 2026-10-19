@@ -212,6 +212,7 @@ cambió; si cambió, o con `?regenerar=true`, la pide a la IA y la guarda.
   "claridad": "poco detalle",
   "motivo_claridad": "La descripción tiene 2 palabras y no dice: …",
   "explicacion": {
+    "explicacion": "En este ticket, Laura Méndez reporta que …",
     "resumen": "…",
     "informacion_faltante": ["…"],
     "preguntas_sugeridas": ["…"],
@@ -227,7 +228,9 @@ cambió; si cambió, o con `?regenerar=true`, la pide a la IA y la guarda.
 }
 ```
 
-`claridad` la calcula el servidor. `502` si la IA no está disponible o si
+`claridad` la calcula el servidor. `explicacion.explicacion` es el texto
+narrado (3 a 5 oraciones); viene vacío en explicaciones guardadas antes de que
+existiera, y el `POST` las genera de nuevo. `502` si la IA no está disponible o si
 devolvió dos veces un JSON inválido; `404` si el ticket no existe.
 
 ### `PATCH /api/tickets/{ticket_id}/state`

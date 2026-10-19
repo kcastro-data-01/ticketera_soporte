@@ -489,6 +489,8 @@ class SugerenciaIA(BaseModel):
 class ExplicacionContenido(BaseModel):
     """Lo que generó la IA (ya validado por el servidor)."""
 
+    # Explicación narrada; vacía en las guardadas antes de que existiera.
+    explicacion: str = ""
     resumen: str
     informacion_faltante: list[str]
     preguntas_sugeridas: list[str]

@@ -566,15 +566,18 @@ botón **«Explicar con IA»**. Sirve sobre todo para tickets con poco detalle o
 confusos. El panel muestra, con la nota «Generado por IA, revisalo antes de
 usarlo»:
 
+- Arriba de todo, la **explicación**: 3 a 5 oraciones con palabras de la IA,
+  como las diría un compañero (quién reporta, qué le pasa, qué quiere lograr,
+  qué falta saber y si la categoría o la prioridad no parecen correctas). Si la
+  IA copia los campos del ticket como lista («Título: …») se le pide de nuevo.
 - **Claridad** («poco detalle», «clara» o «confusa») y por qué. **La calcula el
   servidor, no la IA**:
   - *poco detalle*: menos de 15 palabras, o le faltan 3 o más de estos datos:
     qué equipo/programa, desde cuándo, qué error aparece, qué ya se intentó;
   - *confusa*: más de 120 palabras, u oraciones de más de 40 palabras en promedio;
   - *clara*: el resto.
-- **Qué pide** (resumen de 1 o 2 oraciones), **puntos clave** ordenados (si el
-  texto es largo), **información que falta** (máx. 4), **preguntas sugeridas**
-  (máx. 4) y **siguiente paso**.
+- **Preguntas sugeridas** (máx. 4), **puntos clave** ordenados (si el texto es
+  largo), **información que falta** (máx. 4) y **siguiente paso**.
 - **Categoría y prioridad sugeridas**, con su razón (opcionales; nunca se
   aplican solas).
 
@@ -600,6 +603,14 @@ Cómo se adapta a un modelo muy chico (`qwen3:0.6b`):
 - Si Ollama no responde: «La IA no está disponible en este momento» (detalle en
   `docker compose logs ticketera | grep IA:`).
 - El modelo se sigue eligiendo con `QWEN_MODELO`.
+
+**Desde el chat**: si el equipo escribe «explicame el ticket #3», «de qué
+trata este ticket», «resumí el #3» o «no entiendo el ticket #3» (también con
+«tickete», «tiket», «tikete» o sin tildes), el chat usa esta misma explicación
+y responde con el texto narrado y las preguntas sugeridas, con la nota
+«Generada con IA». Solo para tickets que la persona puede ver; el Solicitante
+sigue con el chat normal. Las respuestas que arma el servidor llevan «Respuesta
+del sistema», nunca «Generada con IA».
 
 API: `GET /api/tickets/{id}/explicacion` (la guardada, sin IA) y
 `POST /api/tickets/{id}/explicacion[?regenerar=true]`.

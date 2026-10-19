@@ -82,23 +82,21 @@ function iaRenderizar(datos) {
     );
   }
 
+  /* Arriba de todo, la explicación narrada; las guardadas antes de que
+     existiera no la traen y muestran el resumen en su lugar. */
+  if (e.explicacion) {
+    panel.appendChild(iaNodo("p", "ia-explicacion", e.explicacion));
+  } else {
+    panel.appendChild(iaNodo("h3", "", "Qué pide"));
+    panel.appendChild(iaNodo("p", "", e.resumen));
+  }
+
   const claridad = iaNodo("p");
   claridad.appendChild(iaNodo("strong", "", "Claridad: "));
   claridad.appendChild(iaNodo("span", `ia-claridad ${datos.claridad.replace(" ", "-")}`, datos.claridad));
   claridad.appendChild(document.createTextNode(` ${datos.motivo_claridad}`));
   panel.appendChild(claridad);
 
-  panel.appendChild(iaNodo("h3", "", "Qué pide"));
-  panel.appendChild(iaNodo("p", "", e.resumen));
-
-  if (e.puntos_clave.length) {
-    panel.appendChild(iaNodo("h3", "", "Puntos clave"));
-    panel.appendChild(iaLista(e.puntos_clave, true));
-  }
-  if (e.informacion_faltante.length) {
-    panel.appendChild(iaNodo("h3", "", "Información que falta"));
-    panel.appendChild(iaLista(e.informacion_faltante));
-  }
   if (e.preguntas_sugeridas.length) {
     panel.appendChild(iaNodo("h3", "", "Preguntas sugeridas"));
     panel.appendChild(iaLista(e.preguntas_sugeridas, true));
@@ -109,6 +107,14 @@ function iaRenderizar(datos) {
     const acciones = iaNodo("div", "acciones");
     acciones.appendChild(copiar);
     panel.appendChild(acciones);
+  }
+  if (e.puntos_clave.length) {
+    panel.appendChild(iaNodo("h3", "", "Puntos clave"));
+    panel.appendChild(iaLista(e.puntos_clave, true));
+  }
+  if (e.informacion_faltante.length) {
+    panel.appendChild(iaNodo("h3", "", "Información que falta"));
+    panel.appendChild(iaLista(e.informacion_faltante));
   }
 
   const sugerencias = [

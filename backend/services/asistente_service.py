@@ -230,8 +230,11 @@ def _recortar(texto: str, maximo: int) -> str:
 
 
 def tickets_mencionados(texto: str) -> list[int]:
-    """Números de ticket en la pregunta: «#5», «ticket 5», «ticket número 5»."""
-    encontrados = re.findall(r"#\s*(\d+)|\btickets?\s+(?:n[uú]mero\s+|nro\.?\s*)?(\d+)", texto, re.I)
+    """Números de ticket en la pregunta: «#5», «ticket 5», «ticket número 5».
+    Tolera errores comunes: «tickete», «tiket», «tikete»."""
+    encontrados = re.findall(
+        r"#\s*(\d+)|\b(?:tick|tik)e?t?e?s?\s+(?:n[uú]mero\s+|nro\.?\s*)?(\d+)", texto, re.I
+    )
     ids = []
     for con_numeral, con_palabra in encontrados:
         valor = int(con_numeral or con_palabra)
@@ -580,6 +583,34 @@ _PIDE_CONTENIDO = re.compile(
 _ESTE_TICKET = re.compile(r"\b(este|esta|aqui|aca)\b")
 
 
+# Pedidos de explicar o entender un ticket: van a «Explicar con IA».
+_PIDE_EXPLICACION = re.compile(
+    r"\b(explic\w*|resum\w*|de que (se )?trata|que (quiere|pide|necesita)|"
+    r"no (le )?entiendo)\b"
+)
+# «este ticket» con errores comunes («este tiket», «esta tikete»).
+_ESTE_TICKET_EXPLICITO = re.compile(r"\b(este|esta|el)\s+(tick|tik)e?t?e?\b|\b(este|aqui|aca)\b")
+
+
+def ticket_a_explicar(user: User, pregunta: str, ticket_actual: int | None = None) -> int | None:
+    """Ticket a explicar con «Explicar con IA» si la pregunta lo pide
+    («explicá el #3», «de qué trata este ticket»); si no, ``None``.
+
+    Solo para el equipo (como el botón): el Solicitante sigue con el chat.
+    """
+    if user.role == UserRole.REQUESTER.value:
+        return None
+    t = _normalizar(pregunta)
+    if not _PIDE_EXPLICACION.search(t):
+        return None
+    ids = tickets_mencionados(pregunta)
+    if len(ids) == 1:
+        return ids[0]
+    if not ids and ticket_actual is not None and _ESTE_TICKET_EXPLICITO.search(t):
+        return ticket_actual
+    return None
+
+
 def respuesta_directa(session, user: User, pregunta: str,
                       ticket_actual: int | None = None) -> str | None:
     """Respuesta exacta calculada por el servidor para las preguntas
@@ -804,7 +835,7 @@ class ProveedorQwen:
             "think": False,
             "format": esquema,
             # Temperatura baja: copia el formato del ejemplo y no inventa.
-            "options": {"temperature": temperature, "num_ctx": QWEN_CONTEXTO, "num_predict": 700},
+            "options": {"temperature": temperature, "num_ctx": QWEN_CONTEXTO, "num_predict": 900},
             "keep_alive": QWEN_MANTENER_CARGADO,
         }
         try:
@@ -910,13 +941,34 @@ def crear_proveedor():
 
 
 def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actual: int | None):
-    """Respuesta directa si la hay; si no, el prompt para la IA."""
+    """``(directa, system, ticket_a_explicar)``: la respuesta directa si la
+    hay; si la pregunta pide explicar un ticket visible, ese ticket; si no,
+    el prompt para la IA."""
     pregunta = messages[-1]["content"]
+    explicar_id = ticket_a_explicar(user, pregunta, ticket_actual)
+    if explicar_id is not None:
+        ticket = ticket_service.get_visible_ticket(session, explicar_id, user)
+        if ticket is None:
+            return f"No encontré el ticket #{explicar_id} entre los tickets que puedes ver.", None, None
+        return None, None, ticket
     directa = respuesta_directa(session, user, pregunta, ticket_actual)
     if directa is not None:
-        return directa, None
+        return directa, None, None
     max_tickets = getattr(proveedor, "max_tickets", MAX_TICKETS_IN_CONTEXT)
-    return None, build_system(session, user, max_tickets, pregunta, ticket_actual)
+    return None, build_system(session, user, max_tickets, pregunta, ticket_actual), None
+
+
+def _explicar_ticket(proveedor, session, user: User, ticket: Ticket) -> str:
+    """La explicación narrada (servicio «Explicar con IA») para el chat.
+    Si la IA falla lanza ``AsistenteNoDisponible`` con el mensaje genérico:
+    nunca se responde con una plantilla en su lugar."""
+    from backend.services import explicacion_service
+
+    try:
+        return explicacion_service.explicacion_para_chat(session, proveedor, ticket, user)
+    except explicacion_service.ExplicacionInvalida as error:
+        _registrar_falla(proveedor, user, ticket.id, error)
+        raise AsistenteNoDisponible(MENSAJE_NO_DISPONIBLE) from error
 
 
 def _registrar_falla(proveedor, user: User, ticket_actual, error: Exception) -> None:
@@ -935,9 +987,11 @@ def responder_completo(proveedor, session, user: User, messages: list[dict],
     se registra el detalle y se lanza ``AsistenteNoDisponible`` con
     :data:`MENSAJE_NO_DISPONIBLE` (nunca un texto inventado).
     """
-    directa, system = _preparar(proveedor, session, user, messages, ticket_actual)
+    directa, system, ticket = _preparar(proveedor, session, user, messages, ticket_actual)
     if directa is not None:
         return directa, "directa"
+    if ticket is not None:
+        return _explicar_ticket(proveedor, session, user, ticket), "ia"
     try:
         texto = proveedor.responder(system, messages)
     except AsistenteNoDisponible as error:
@@ -959,10 +1013,19 @@ def responder_stream(proveedor, session, user: User, messages: list[dict],
                      ticket_actual: int | None = None):
     """Eventos para el chat: ``{"t": texto}`` por partes, ``{"error": msg}``
     si el proveedor falla y ``{"fin": True, "fuente": …}`` al terminar."""
-    directa, system = _preparar(proveedor, session, user, messages, ticket_actual)
+    directa, system, ticket = _preparar(proveedor, session, user, messages, ticket_actual)
     if directa is not None:
         yield {"t": directa}
         yield {"fin": True, "fuente": "directa"}
+        return
+    if ticket is not None:
+        try:
+            texto = _explicar_ticket(proveedor, session, user, ticket)
+        except (AsistenteNoDisponible, AsistenteNoConfigurado, AsistenteOcupado):
+            yield {"error": MENSAJE_NO_DISPONIBLE}
+            return
+        yield {"t": texto}
+        yield {"fin": True, "fuente": "ia"}
         return
     stream = getattr(proveedor, "responder_stream", None)
 

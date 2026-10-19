@@ -388,7 +388,7 @@ def test_empty_group_answer(client, session, fake_claude):
 
 @pytest.mark.parametrize(
     "pregunta",
-    ["Resume la situación de mi trabajo", "Hola, ¿quién eres?", "Explícame el ticket #1"],
+    ["Resume la situación de mi trabajo", "Hola, ¿quién eres?", "¿Qué le pasa al ticket #1?"],
 )
 def test_how_to_and_open_questions_go_to_ai(client, session, fake_claude, pregunta):
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
@@ -419,7 +419,7 @@ def test_named_ticket_details_reach_the_ai(client, session, fake_claude):
     session.add(Comment(ticket_id=ticket.id, author="Laura", content="Ya cambié el tóner"))
     session.commit()
 
-    ask(client, headers, f"Explícame qué pasa con el ticket #{ticket.id}")
+    ask(client, headers, f"¿Qué pasa con el ticket #{ticket.id}?")
     system = fake_claude.system_text()
     assert f"Detalle del ticket #{ticket.id}:" in system
     assert "Descripción: Descripción" in system

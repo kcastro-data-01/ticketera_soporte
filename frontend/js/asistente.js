@@ -8,9 +8,10 @@ const API_ASISTENTE_URL = "/api/asistente/stream";
 const CHAT_KEY = "asistente_chat";
 const CHAT_MAX_MENSAJES = 20;
 /* Lo que se muestra si la IA falla o tarda demasiado (el servidor corta a
-   los 90 s; el navegador espera un poco más antes de rendirse). */
+   los 90 s por llamada; explicar un ticket puede reintentar una vez, así que
+   el navegador espera hasta ~3 min antes de rendirse, como el panel). */
 const IA_NO_DISPONIBLE = "La IA no está disponible en este momento";
-const CHAT_LIMITE_MS = 100000;
+const CHAT_LIMITE_MS = 200000;
 
 /* En el detalle de un ticket (detalle.html?id=N) se envía su número para
    poder preguntar por «este ticket». */

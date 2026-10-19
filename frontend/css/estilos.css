@@ -1858,6 +1858,16 @@ body.app {
   color: var(--color-vacio);
 }
 
+.ia-explicacion {
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid var(--color-primario-oscuro);
+  border-radius: var(--radio-medio);
+  background: var(--color-superficie);
+  font-size: var(--texto-md);
+  line-height: 1.55;
+}
+
 .ia-claridad {
   display: inline-block;
   padding: 0.15rem 0.6rem;

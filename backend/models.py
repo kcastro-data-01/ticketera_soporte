@@ -134,6 +134,8 @@ class Ticket(Base):
     assignee: Mapped[User | None] = relationship(
         back_populates="tickets", foreign_keys=[assigned_to_id]
     )
+    # Quien creó el ticket (solo lectura): la IA lo nombra al explicarlo.
+    creator: Mapped[User | None] = relationship(foreign_keys=[created_by_id], viewonly=True)
     comments: Mapped[list["Comment"]] = relationship(
         back_populates="ticket",
         cascade="all, delete-orphan",

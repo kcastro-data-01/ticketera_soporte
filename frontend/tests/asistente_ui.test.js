@@ -60,7 +60,7 @@ function crearChat({ pathname = "/detalle.html", search = "?id=7", fetchImpl, re
     URLSearchParams,
     AbortController,
     TextDecoder,
-    // Con relojRapido, los plazos (como el límite de 100 s) vencen enseguida.
+    // Con relojRapido, los plazos (como el límite de 200 s) vencen enseguida.
     setTimeout: relojRapido ? (fn) => setTimeout(fn, 1) : setTimeout,
     clearTimeout,
   };
@@ -119,7 +119,7 @@ test("si tarda demasiado se corta y muestra que la IA no está disponible", asyn
         rechazar(error);
       });
     }),
-    relojRapido: true,  // el límite real es de 100 s
+    relojRapido: true,  // el límite real es de 200 s
   });
   await chat.sandbox.enviarPregunta("hola");
   assert.match(texto(chat.ids["chat-lista"]), /La IA no está disponible en este momento/);
@@ -135,4 +135,22 @@ test("un error o una respuesta vacía no se reemplaza por un texto inventado", a
   const mostrado = texto(vacia.ids["chat-lista"]);
   assert.match(mostrado, /La IA no está disponible en este momento/);
   assert.doesNotMatch(mostrado, /No tengo una respuesta/);
+});
+
+test("«Generada con IA» solo cuando respondió el modelo, no en las respuestas del servidor", async () => {
+  const ia = crearChat({ fetchImpl: async () => ndjson([{ t: "En este ticket, Laura reporta…" }, { fin: true, fuente: "ia" }]) });
+  await ia.sandbox.enviarPregunta("explicar tickete #3");
+  assert.match(texto(ia.ids["chat-lista"]), /Generada con IA/);
+
+  const plantilla = crearChat({
+    fetchImpl: async () => ndjson([{ t: "El ticket #3 «Impresora» está en estado Nuevo." }, { fin: true, fuente: "directa" }]),
+  });
+  await plantilla.sandbox.enviarPregunta("¿en qué estado está el #3?");
+  const mostrado = texto(plantilla.ids["chat-lista"]);
+  assert.match(mostrado, /Respuesta del sistema/);
+  assert.doesNotMatch(mostrado, /Generada con IA/);
+
+  const error = crearChat({ fetchImpl: async () => ndjson([{ error: "La IA no está disponible en este momento" }]) });
+  await error.sandbox.enviarPregunta("explicar ticket #3");
+  assert.doesNotMatch(texto(error.ids["chat-lista"]), /Generada con IA/);
 });

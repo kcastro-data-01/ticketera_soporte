@@ -190,3 +190,30 @@ test("lo que llega de la IA se pinta como texto, no como HTML", async () => {
   const parrafo = buscar(ia.ids["ia-panel"], (n) => n.textContent === "<img src=x onerror=alert(1)>");
   assert.ok(parrafo && !("innerHTML" in parrafo && parrafo.innerHTML));
 });
+
+const NARRADA =
+  "En este ticket, Laura Méndez reporta que una impresora no enciende. Lo que busca es que la revisen.";
+
+test("la explicación narrada va arriba de todo y reemplaza «Qué pide»", async () => {
+  const datos = { ...DATOS, explicacion: { ...DATOS.explicacion, explicacion: NARRADA } };
+  const ia = crear({ fetchImpl: async () => respuesta(200, datos) });
+  await ia.sandbox.iniciarExplicacion();
+  const hijos = ia.ids["ia-panel"].children;
+  const primera = hijos.findIndex((n) => n.className === "ia-explicacion");
+  assert.equal(hijos[primera].textContent, NARRADA);
+  // Antes solo puede ir el aviso de que la generó la IA.
+  assert.deepEqual(hijos.slice(0, primera).map((n) => n.className), ["ia-aviso"]);
+  const titulos = hijos.filter((n) => n.tag === "h3").map((n) => n.textContent);
+  assert.equal(titulos[0], "Preguntas sugeridas");
+  assert.ok(titulos.indexOf("Siguiente paso") > titulos.indexOf("Preguntas sugeridas"));
+  assert.ok(!titulos.includes("Qué pide"));
+});
+
+test("una explicación guardada sin texto narrado muestra el resumen", async () => {
+  const datos = { ...DATOS, explicacion: { ...DATOS.explicacion, explicacion: "" } };
+  const ia = crear({ fetchImpl: async () => respuesta(200, datos) });
+  await ia.sandbox.iniciarExplicacion();
+  const hijos = ia.ids["ia-panel"].children;
+  assert.ok(!hijos.some((n) => n.className === "ia-explicacion"));
+  assert.match(texto(ia.ids["ia-panel"]), /Qué pide.*La persona dice que algo no sirve/s);
+});

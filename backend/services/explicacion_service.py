@@ -159,8 +159,10 @@ def resumir_descripcion(descripcion: str) -> str:
 
 def texto_del_ticket(ticket: Ticket, claridad: dict) -> str:
     comentarios = list(ticket.comments)[-MAX_COMENTARIOS:]
+    reporta = ticket.creator.name if ticket.creator is not None else "no se sabe"
     lineas = [
         f"Título: {ticket.title}",
+        f"Reporta: {reporta}",
         f"Categoría actual: {ticket.category} · Prioridad actual: {ticket.priority} · Estado: {ticket.state}",
         f"Descripción:\n{resumir_descripcion(ticket.description)}",
     ]
@@ -181,6 +183,7 @@ Reglas:
 - Usa SOLO lo que dice el ticket. Si un dato no está, escribe que no se sabe. No inventes equipos, fechas ni errores.
 - Si el texto es muy corto, no adivines: di qué no se entiende y propón preguntas.
 - Si el texto es largo o confuso, separa el problema real de lo que sobra y ordena los hechos en puntos_clave.
+- explicacion: de 3 a 5 oraciones, como se lo contarías a un compañero: quién reporta, qué le pasa, qué quiere lograr, qué falta saber y, si aplica, si la categoría o la prioridad no parecen correctas. Interpreta el ticket con tus palabras; no copies sus campos como lista (nada de «Título:» o «Categoría:»).
 - resumen: 1 o 2 oraciones sobre qué pide la persona.
 - informacion_faltante: hasta 4 datos que faltan para resolverlo.
 - preguntas_sugeridas: hasta 4 preguntas cortas y concretas para la persona.
@@ -191,29 +194,36 @@ Reglas:
 Responde solo con el JSON."""
 
 EJEMPLO_ENTRADA = """\
-Título: No sirve el correo
-Categoría actual: Software · Prioridad actual: Media · Estado: Nuevo
+Título: Impresora
+Reporta: Laura Méndez
+Categoría actual: Accesos · Prioridad actual: Media · Estado: Nuevo
 Descripción:
-desde esta mañana no me llegan los correos, ya cerré outlook y nada
+No prende
 Comentarios: ninguno.
-Datos que el sistema no encontró en el texto: El mensaje de error exacto (o qué se ve en pantalla)."""
+Datos que el sistema no encontró en el texto: Desde cuándo pasa; El mensaje de error exacto (o qué se ve en pantalla); Qué ya se intentó."""
 
 EJEMPLO_SALIDA = {
-    "resumen": "La persona no recibe correos en Outlook desde esta mañana.",
+    "explicacion": (
+        "En este ticket, Laura Méndez reporta que una impresora no enciende. Lo que busca es "
+        "que la revisen para poder volver a imprimir. El texto es muy corto: falta saber cuál "
+        "impresora es, dónde está y si está conectada. Además está en Accesos, pero parece un "
+        "problema de Hardware."
+    ),
+    "resumen": "Una impresora no enciende y la persona necesita volver a imprimir.",
     "informacion_faltante": [
-        "Si aparece algún mensaje de error",
-        "Si sí puede enviar correos",
-        "Si le pasa también en el celular o en la web",
+        "Cuál impresora es y dónde está",
+        "Si está conectada a la corriente",
+        "Desde cuándo no enciende",
     ],
     "preguntas_sugeridas": [
-        "¿Te aparece algún mensaje de error en Outlook?",
-        "¿Puedes enviar correos aunque no te lleguen?",
-        "¿Te llegan los correos si entras desde el navegador o el celular?",
+        "¿Cuál impresora es y en qué oficina o piso está?",
+        "¿Está enchufada? ¿Probaste con otro tomacorriente?",
+        "¿Desde cuándo no enciende? ¿Pasó algo antes, como un golpe o un corte de luz?",
     ],
     "puntos_clave": [],
-    "siguiente_paso": "Revisar si el buzón recibe correos desde la web; si sí, revisar la configuración de Outlook en su equipo.",
-    "categoria_sugerida": {"valor": "Software", "razon": "Es un problema del programa de correo."},
-    "prioridad_sugerida": {"valor": "Media", "razon": "Afecta a una persona y no dice que esté detenida."},
+    "siguiente_paso": "Preguntarle a Laura cuál impresora es y revisar en el lugar que esté enchufada y que el tomacorriente funcione.",
+    "categoria_sugerida": {"valor": "Hardware", "razon": "Es un equipo que no enciende, no un problema de accesos."},
+    "prioridad_sugerida": {"valor": "Media", "razon": "Afecta a una persona y no dice que el trabajo esté detenido."},
 }
 
 _SUGERENCIA = {
@@ -224,6 +234,7 @@ _SUGERENCIA = {
 ESQUEMA_IA = {
     "type": "object",
     "properties": {
+        "explicacion": {"type": "string"},
         "resumen": {"type": "string"},
         "informacion_faltante": {"type": "array", "items": {"type": "string"}, "maxItems": 4},
         "preguntas_sugeridas": {"type": "array", "items": {"type": "string"}, "maxItems": 4},
@@ -234,7 +245,7 @@ ESQUEMA_IA = {
         "prioridad_sugerida": {**_SUGERENCIA, "properties": {
             "valor": {"type": "string", "enum": list(TICKET_PRIORITIES)}, "razon": {"type": "string"}}},
     },
-    "required": ["resumen", "informacion_faltante", "preguntas_sugeridas", "puntos_clave", "siguiente_paso"],
+    "required": ["explicacion", "resumen", "informacion_faltante", "preguntas_sugeridas", "puntos_clave", "siguiente_paso"],
 }
 
 REINTENTO = ("Tu respuesta no fue un JSON válido con los campos pedidos. "
@@ -271,10 +282,33 @@ def _lista(valor, maximo: int) -> list[str]:
     return salida[:maximo]
 
 
-class ExplicacionIA(BaseModel):
-    """Lo que devuelve la IA, ya limpio. Resumen y siguiente paso son
-    obligatorios; las sugerencias, opcionales."""
+# Señales de que la IA copió los campos del ticket en vez de explicarlo.
+_COPIA_DE_CAMPOS = re.compile(r"\b(t[ií]tulo|categor[ií]a( actual)?|prioridad( actual)?|estado|descripci[oó]n|reporta)\s*:", re.I)
+_VINETA = re.compile(r"^\s*([-*•·]|\d+[.)])\s", re.M)
+EXPLICACION_MIN_PALABRAS = 15
+EXPLICACION_MAX = 900
 
+
+def validar_explicacion(valor) -> str:
+    """La explicación narrada: al menos 2 oraciones, sin listas ni campos
+    copiados («Título: …»). Si no, ``ValueError`` (y se reintenta)."""
+    texto = str(valor or "").strip()
+    if _COPIA_DE_CAMPOS.search(texto) or _VINETA.search(texto):
+        raise ValueError("copia los campos del ticket en vez de explicarlo")
+    texto = " ".join(texto.split())
+    oraciones = [o for o in re.split(r"[.!?]+", texto) if o.strip()]
+    if _palabras(texto) < EXPLICACION_MIN_PALABRAS or len(oraciones) < 2:
+        raise ValueError("la explicación es muy corta")
+    if len(texto) > EXPLICACION_MAX:
+        texto = texto[: EXPLICACION_MAX - 1].rstrip() + "…"
+    return texto
+
+
+class ExplicacionIA(BaseModel):
+    """Lo que devuelve la IA, ya limpio. Explicación, resumen y siguiente
+    paso son obligatorios; las sugerencias, opcionales."""
+
+    explicacion: str
     resumen: str
     informacion_faltante: list[str] = []
     preguntas_sugeridas: list[str] = []
@@ -282,6 +316,11 @@ class ExplicacionIA(BaseModel):
     siguiente_paso: str
     categoria_sugerida: Sugerencia | None = None
     prioridad_sugerida: Sugerencia | None = None
+
+    @field_validator("explicacion", mode="before")
+    @classmethod
+    def _narrada(cls, valor):
+        return validar_explicacion(valor)
 
     @field_validator("resumen", "siguiente_paso", mode="before")
     @classmethod
@@ -403,6 +442,15 @@ def _respuesta(ticket: Ticket, guardada: TicketExplanation | None, desde_cache: 
     }
 
 
+def _tiene_narrada(guardada: TicketExplanation) -> bool:
+    """Las explicaciones guardadas antes de la versión narrada no la tienen:
+    se generan de nuevo."""
+    try:
+        return bool(json.loads(guardada.content).get("explicacion"))
+    except (ValueError, AttributeError):
+        return False
+
+
 def obtener(session, ticket: Ticket) -> dict:
     """La explicación guardada (sin llamar a la IA)."""
     return _respuesta(ticket, ticket.explanation, desde_cache=True)
@@ -413,7 +461,8 @@ def explicar(session, proveedor, ticket: Ticket, user: User, regenerar: bool = F
     ``regenerar``), la pide a la IA y la guarda."""
     guardada = ticket.explanation
     actual = huella(ticket)
-    if guardada is not None and guardada.fingerprint == actual and not regenerar:
+    if (guardada is not None and guardada.fingerprint == actual and not regenerar
+            and _tiene_narrada(guardada)):
         return _respuesta(ticket, guardada, desde_cache=True)
 
     resultado = generar(proveedor, ticket, calcular_claridad(ticket))
@@ -430,3 +479,21 @@ def explicar(session, proveedor, ticket: Ticket, user: User, regenerar: bool = F
     session.refresh(ticket)
     logger.info("explicar ticket #%s: generada con %s para %s", ticket.id, modelo, user.name)
     return _respuesta(ticket, guardada, desde_cache=False)
+
+
+def texto_para_chat(datos: dict) -> str:
+    """La explicación narrada y las preguntas sugeridas, para el chat."""
+    explicacion = datos["explicacion"]
+    lineas = [explicacion["explicacion"]]
+    if explicacion["preguntas_sugeridas"]:
+        lineas.append("")
+        lineas.append("Preguntas que podés hacerle:")
+        lineas.extend(f"{i}. {p}" for i, p in enumerate(explicacion["preguntas_sugeridas"], 1))
+    return "\n".join(lineas)
+
+
+def explicacion_para_chat(session, proveedor, ticket: Ticket, user: User) -> str:
+    """Explica el ticket para el chat (reutiliza la guardada si sigue
+    vigente). Lanza ``AsistenteNoDisponible`` o ``ExplicacionInvalida``."""
+    session.expire(ticket)
+    return texto_para_chat(explicar(session, proveedor, ticket, user))
