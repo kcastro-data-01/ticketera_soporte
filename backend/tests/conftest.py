@@ -11,9 +11,11 @@ from backend.main import app
 
 @pytest.fixture(autouse=True)
 def respuestas_fijas(monkeypatch):
-    """Por defecto el chat responde los conteos con el texto fijo; las
-    pruebas de la redacción con IA la encienden."""
+    """Por defecto el chat responde los conteos con el texto fijo y no
+    interpreta con IA; las pruebas de la redacción y de la interpretación
+    las encienden."""
     monkeypatch.setenv("ASISTENTE_REDACTAR_CON_IA", "false")
+    monkeypatch.setenv("ASISTENTE_INTERPRETAR_CON_IA", "false")
 
 
 @pytest.fixture

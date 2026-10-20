@@ -18,6 +18,7 @@ services:
       # La IA redacta los conteos con los datos que calcula el servidor
       # (false: respuestas fijas del sistema, más rápidas en equipos lentos).
       ASISTENTE_REDACTAR_CON_IA: ${ASISTENTE_REDACTAR_CON_IA:-true}
+      ASISTENTE_INTERPRETAR_CON_IA: ${ASISTENTE_INTERPRETAR_CON_IA:-true}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # Tickets por correo con Microsoft Graph (apagado por defecto).
       # Los datos van en .env; ver README → «Tickets por correo».

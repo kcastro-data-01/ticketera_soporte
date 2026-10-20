@@ -308,6 +308,23 @@ def _tickets_de_la_pregunta(pregunta: str, ticket_actual: int | None) -> list[in
     return ids
 
 
+def _linea_conteos(session, user: User, base, total: int) -> str:
+    """Los conteos por estado con las palabras que usa la gente
+    («terminados»), para que la IA libre no diga «no tengo información»."""
+    grupos = _grupos(user)
+
+    def contar(clave: str) -> int:
+        statement = base.where(*grupos[clave][1])
+        return session.scalar(select(func.count()).select_from(statement.subquery()))
+
+    return (
+        "Conteos por estado (terminados, finalizados o solucionados = resueltos o cerrados; "
+        f"pendientes = nuevos + en proceso): nuevos {contar('nuevos')}; "
+        f"en proceso {contar('en_proceso')}; pendientes {contar('pendientes')}; "
+        f"resueltos o cerrados {contar('resueltos')}; cerrados {contar('cerrados')}; total {total}."
+    )
+
+
 def build_context(
     session, user: User, max_tickets: int = MAX_TICKETS_IN_CONTEXT, pregunta: str = "",
     ticket_actual: int | None = None,
@@ -328,6 +345,7 @@ def build_context(
     lines.append(
         f"{'Sus tickets' if solicitante else 'Tickets visibles'} en total: {total}."
     )
+    lines.append(_linea_conteos(session, user, base, total))
     for titulo, condiciones in _grupos(user).values():
         lines.extend(_grupo(session, base, titulo, max_tickets, *condiciones))
 
@@ -671,7 +689,10 @@ def respuesta_por_rol(session, user: User, t: str) -> Directa | None:
     rol = next(((r, plural) for patron, r, plural in ROLES_EN_PREGUNTA if re.search(patron, t)), None)
     if rol is None:
         return None
-    rol, plural = rol
+    return _conteo_rol(session, user, *rol)
+
+
+def _conteo_rol(session, user: User, rol: str, plural: str) -> Directa:
     solicitante = user.role == UserRole.REQUESTER.value
     tickets = _abiertos_asignados(session, user, Ticket.assignee.has(User.role == rol))
     tuyos = (" tuyo" if len(tickets) == 1 else " tuyos") if solicitante else ""
@@ -741,6 +762,10 @@ def respuesta_por_persona(session, user: User, t: str) -> Directa | None:
     personas = _personas_nombradas(session, user, t)
     if not personas:
         return None
+    return _conteo_persona(session, user, personas)
+
+
+def _conteo_persona(session, user: User, personas: list[User]) -> Directa:
     if len(personas) > 1:
         return Directa(f"Hay varias personas con ese nombre: {_unir([_persona(u) for u in personas])}. "
                        "¿De quién quieres saber?")
@@ -973,6 +998,15 @@ def respuesta_directa(session, user: User, pregunta: str,
     return directa.texto if directa is not None else None
 
 
+def _estado_ticket(ticket: Ticket) -> Directa:
+    asignado = _persona(ticket.assignee) if ticket.assignee is not None else "nadie (sin asignar)"
+    return Directa(
+        f"El ticket #{ticket.id} «{ticket.title}» está en estado {ticket.state}, "
+        f"con prioridad {ticket.priority}, y está asignado a {asignado}.",
+        ticket.id,
+    )
+
+
 def calcular_directa(session, user: User, pregunta: str,
                      ticket_actual: int | None = None) -> Directa | None:
     """Respuesta exacta calculada por el servidor para las preguntas
@@ -993,12 +1027,7 @@ def calcular_directa(session, user: User, pregunta: str,
         ticket = ticket_service.get_visible_ticket(session, ids[0], user)
         if ticket is None:
             return Directa(f"No encontré el ticket #{ids[0]} entre los tickets que puedes ver.")
-        asignado = _persona(ticket.assignee) if ticket.assignee is not None else "nadie (sin asignar)"
-        return Directa(
-            f"El ticket #{ticket.id} «{ticket.title}» está en estado {ticket.state}, "
-            f"con prioridad {ticket.priority}, y está asignado a {asignado}.",
-            ticket.id,
-        )
+        return _estado_ticket(ticket)
     if not ids:
         # Antes que la guía: «quiero ver los tickets asignados a técnicos» es
         # un conteo, no «cómo asignar».
@@ -1016,7 +1045,12 @@ def calcular_directa(session, user: User, pregunta: str,
         return None
     if clave == "no_entendi":
         return Directa(NO_ENTENDI)
-    periodo = _periodo(t)
+    return _conteo(session, user, clave, _periodo(t))
+
+
+def _conteo(session, user: User, clave: str, periodo) -> Directa | None:
+    """Conteo de un grupo (``clave`` de :func:`detectar_consulta`), en un
+    período (:func:`_periodo`) o en general."""
     if periodo is not None:
         return _respuesta_periodo(session, user, clave, periodo)
     base = _base_visible(user)
@@ -1172,6 +1206,189 @@ def _texto_directa(proveedor, pregunta: str, directa: Directa) -> tuple[str, str
         if resumen is not None:
             return "\n".join([resumen, *directa.lista]), "ia_datos"
     return directa.texto, "directa"
+
+
+# ---------- Interpretación con IA de las preguntas mal escritas ----------
+# Si las reglas no reconocen la pregunta («cuatos ticketes estan terminados»),
+# la IA solo la clasifica en un JSON con valores fijos; el servidor calcula
+# con las mismas funciones (mismos permisos y criterios). Si el JSON no sirve,
+# tarda o es «otra», sigue la IA libre.
+
+INTERPRETACION_TIMEOUT = 10.0
+
+TIPOS_INTERPRETACION = ("conteo", "estado_ticket", "explicar_ticket", "otra")
+ESTADOS_INTERPRETACION = ("nuevos", "en_proceso", "pendientes", "resueltos", "cerrados", "todos")
+# Período del JSON → el texto que entiende :func:`_periodo`.
+PERIODOS_INTERPRETACION = {
+    "hoy": "hoy", "ayer": "ayer", "semana": "esta semana", "mes": "este mes",
+    "ultimos_7": "ultimos 7 dias",
+}
+ROLES_INTERPRETACION = {r: plural for _, r, plural in ROLES_EN_PREGUNTA}
+
+ESQUEMA_INTERPRETACION = {
+    "type": "object",
+    "properties": {
+        "tipo": {"type": "string", "enum": list(TIPOS_INTERPRETACION)},
+        "estado": {"enum": [*ESTADOS_INTERPRETACION, None]},
+        "periodo": {"enum": [*PERIODOS_INTERPRETACION, None]},
+        "persona": {"type": ["string", "null"]},
+        "rol": {"enum": [*ROLES_INTERPRETACION, None]},
+        "ticket": {"type": ["integer", "null"]},
+    },
+    "required": ["tipo", "estado", "periodo", "persona", "rol", "ticket"],
+}
+
+INSTRUCCIONES_INTERPRETACION = """\
+Clasificá la pregunta de un sistema de tickets de soporte. Puede venir mal escrita \
+(«cuatos», «tikets», «pendinetes»): interpretá lo que quiso decir. Respondé solo el JSON.
+- tipo: «conteo» si pide contar o listar tickets; «estado_ticket» si pregunta el estado, \
+la prioridad o el responsable de un ticket con número; «explicar_ticket» si pide explicar \
+o resumir un ticket con número; «otra» para todo lo demás (cómo usar la app, definiciones, saludos).
+- estado: nuevos (sin atender), en_proceso, pendientes (sin resolver), resueltos (también \
+terminados, finalizados, solucionados), cerrados, todos (todos los tickets), o null.
+- periodo: hoy, ayer, semana (esta semana), mes (este mes), ultimos_7 (últimos 7 días), o null.
+- persona: el nombre de la persona tal como aparece, o null.
+- rol: Técnico, Supervisor o Administrador si pregunta por un rol, o null.
+- ticket: el número del ticket, o null."""
+
+
+def _interpretacion(tipo, estado=None, periodo=None, persona=None, rol=None, ticket=None) -> str:
+    return json.dumps({"tipo": tipo, "estado": estado, "periodo": periodo, "persona": persona,
+                       "rol": rol, "ticket": ticket}, ensure_ascii=False)
+
+
+EJEMPLOS_INTERPRETACION = [
+    ("cuatos tikets resueltos", _interpretacion("conteo", "resueltos")),
+    ("cuantos pendinetes esta semana", _interpretacion("conteo", "pendientes", "semana")),
+    ("tikets de maria", _interpretacion("conteo", persona="maria")),
+    ("cuantos tienen los tecnicos", _interpretacion("conteo", rol="Técnico")),
+    ("cuantos se cerraron hoy", _interpretacion("conteo", "cerrados", "hoy")),
+    ("cuantos nuebos ay", _interpretacion("conteo", "nuevos")),
+    ("cuantos se terminaron ayer", _interpretacion("conteo", "resueltos", "ayer")),
+    ("cuantos tikets hay en total", _interpretacion("conteo", "todos")),
+    ("tikets de los administradores", _interpretacion("conteo", rol="Administrador")),
+    ("q estado tiene el tiket 12", _interpretacion("estado_ticket", ticket=12)),
+    ("explicame el 7", _interpretacion("explicar_ticket", ticket=7)),
+    ("como cambio mi contraseña", _interpretacion("otra")),
+    ("que significa prioridad alta", _interpretacion("otra")),
+    ("buenas tardes", _interpretacion("otra")),
+]
+
+
+def interpretar_con_ia_activo() -> bool:
+    """``ASISTENTE_INTERPRETAR_CON_IA`` (encendida por defecto)."""
+    valor = os.environ.get("ASISTENTE_INTERPRETAR_CON_IA", "true").strip().lower()
+    return valor not in ("0", "false", "no", "off")
+
+
+def mensajes_interpretacion(pregunta: str) -> list[dict]:
+    mensajes = [{"role": "system", "content": INSTRUCCIONES_INTERPRETACION}]
+    for ejemplo, respuesta in EJEMPLOS_INTERPRETACION:
+        mensajes += [{"role": "user", "content": ejemplo}, {"role": "assistant", "content": respuesta}]
+    return [*mensajes, {"role": "user", "content": pregunta}]
+
+
+def leer_interpretacion(texto: str) -> dict:
+    """El JSON de la IA validado campo por campo; ``ValueError`` con el
+    motivo si no sirve."""
+    # Claude a veces lo envuelve en ```json … ```.
+    texto = re.sub(r"^```(?:json)?\s*|\s*```$", "", (texto or "").strip())
+    try:
+        datos = json.loads(texto)
+    except (TypeError, ValueError):
+        raise ValueError("no es JSON")
+    if not isinstance(datos, dict):
+        raise ValueError("no es un objeto JSON")
+    validos = {
+        "tipo": TIPOS_INTERPRETACION, "estado": ESTADOS_INTERPRETACION,
+        "periodo": tuple(PERIODOS_INTERPRETACION), "rol": tuple(ROLES_INTERPRETACION),
+    }
+    for campo, valores in validos.items():
+        valor = datos.get(campo)
+        if not (valor in valores or (valor is None and campo != "tipo")):
+            raise ValueError(f"{campo} inválido: {valor!r}")
+    persona = datos.get("persona")
+    if not (persona is None or isinstance(persona, str)):
+        raise ValueError(f"persona inválida: {persona!r}")
+    ticket = datos.get("ticket")
+    if not (ticket is None or (type(ticket) is int and ticket > 0)):
+        raise ValueError(f"ticket inválido: {ticket!r}")
+    return {
+        "tipo": datos["tipo"], "estado": datos.get("estado"), "periodo": datos.get("periodo"),
+        "persona": (persona or "").strip() or None, "rol": datos.get("rol"), "ticket": ticket,
+    }
+
+
+def interpretar(proveedor, pregunta: str) -> dict | None:
+    """La pregunta clasificada por la IA, o ``None`` (y queda en el log) si
+    el JSON no sirve, tarda más de :data:`INTERPRETACION_TIMEOUT` o falla."""
+    futuro = _redactores.submit(
+        proveedor.generar_json, mensajes_interpretacion(pregunta), ESQUEMA_INTERPRETACION, 0.0
+    )
+    try:
+        datos = leer_interpretacion(futuro.result(timeout=INTERPRETACION_TIMEOUT))
+    except TiempoAgotado:
+        motivo = f"tardó más de {INTERPRETACION_TIMEOUT:g} s"
+    except ValueError as error:
+        motivo = f"JSON inválido: {error}"
+    except Exception as error:  # noqa: BLE001 — cualquier falla sigue con la IA libre
+        motivo = f"falló: {error or type(error).__name__}"
+    else:
+        logger.info("interpretó «%s» como %s", pregunta, json.dumps(datos, ensure_ascii=False))
+        return datos
+    logger.info("interpretación descartada, se usó la IA libre (%s)", motivo)
+    return None
+
+
+def calcular_desde_interpretacion(session, user: User, datos: dict,
+                                  ticket_actual: int | None = None, pregunta: str = ""):
+    """``(directa, ticket a explicar)`` calculados por el servidor con la
+    interpretación de la IA, o ``None`` si la pregunta sigue a la IA libre
+    (tipo «otra», persona o ticket que no existen, o algo que no se cuenta)."""
+    tipo = datos["tipo"]
+    t = _normalizar(pregunta)
+    if tipo in ("estado_ticket", "explicar_ticket"):
+        # Un número que no está en la pregunta lo inventó el modelo (o lo
+        # copió de un ejemplo).
+        if datos["ticket"] is not None and str(datos["ticket"]) not in re.findall(r"\d+", pregunta):
+            return None
+        ticket_id = datos["ticket"] or ticket_actual
+        if ticket_id is None:
+            return None
+        ticket = ticket_service.get_visible_ticket(session, ticket_id, user)
+        if ticket is None:
+            return None
+        if tipo == "explicar_ticket":
+            # Como el botón «Explicar con IA»: solo el equipo.
+            return None if user.role == UserRole.REQUESTER.value else (None, ticket)
+        return _estado_ticket(ticket), None
+    if tipo != "conteo":
+        return None
+
+    estado, persona, rol = datos["estado"], datos["persona"], datos["rol"]
+    # «los supervisores» a veces llega también como persona.
+    if persona and rol and any(re.search(patron, _normalizar(persona))
+                               for patron, r, _ in ROLES_EN_PREGUNTA if r == rol):
+        persona = None
+    if persona or rol:
+        # Por persona o rol se cuentan los tickets sin resolver asignados.
+        if (persona and rol) or estado not in (None, "todos", "pendientes") or datos["periodo"]:
+            return None
+        if rol:
+            return _conteo_rol(session, user, rol, ROLES_INTERPRETACION[rol]), None
+        # El nombre tiene que estar en la pregunta (no copiado de un ejemplo).
+        if not all(re.search(rf"\b{re.escape(p)}\b", t) for p in _normalizar(persona).split()):
+            return None
+        personas = _personas_nombradas(session, user, _normalizar(persona))
+        return (_conteo_persona(session, user, personas), None) if personas else None
+    if estado in (None, "todos") and not (re.search(r"\b(total|todos)\b", t) or _solo_pide_el_total(t)):
+        # El modelo pudo perder el estado («cuantos tikets nuevos ai»): no
+        # se responde el total por error.
+        return None
+    clave = "total" if estado in (None, "todos") else estado
+    periodo = _periodo(PERIODOS_INTERPRETACION[datos["periodo"]]) if datos["periodo"] else None
+    directa = _conteo(session, user, clave, periodo)
+    return (directa, None) if directa is not None else None
 
 
 class _FiltroPensamiento:
@@ -1471,6 +1688,14 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
             return Directa(f"No encontré el ticket #{explicar_id} entre los tickets que puedes ver."), None, None
         return None, None, ticket
     directa = calcular_directa(session, user, pregunta, ticket_actual)
+    # Las reglas no la reconocieron: la IA la clasifica y el servidor calcula.
+    # Si no sirve, «No entendí…» se mantiene y lo demás va a la IA libre.
+    if (directa is None or directa.texto == NO_ENTENDI) and interpretar_con_ia_activo():
+        datos = interpretar(proveedor, pregunta)
+        calculado = datos and calcular_desde_interpretacion(session, user, datos, ticket_actual, pregunta)
+        if calculado:
+            interpretada, ticket = calculado
+            return interpretada, None, ticket
     if directa is not None:
         return directa, None, None
     max_tickets = getattr(proveedor, "max_tickets", MAX_TICKETS_IN_CONTEXT)
@@ -1576,9 +1801,9 @@ def responder_stream(proveedor, session, user: User, messages: list[dict],
 
 
 def precalentar(proveedor, intentos: int = 60, espera: float = 10) -> bool:
-    """Carga el modelo y, si la redacción con IA está encendida, hace una
-    redacción de prueba (el mismo prompt y los mismos ejemplos que las de
-    verdad): la primera pregunta ya no espera. Reintenta mientras Ollama
+    """Carga el modelo y, si la redacción o la interpretación con IA están
+    encendidas, hace una de prueba (el mismo prompt y los mismos ejemplos
+    que las de verdad): la primera pregunta ya no espera. Reintenta mientras Ollama
     arranca o el modelo se descarga; ``True`` si el modelo quedó cargado."""
     for _intento in range(intentos):
         if proveedor.precargar():
@@ -1595,6 +1820,17 @@ def precalentar(proveedor, intentos: int = 60, espera: float = 10) -> bool:
             logger.info("la redacción de prueba falló (%s)", error)
         else:
             logger.info("modelo listo: redacción de prueba en %.1f s", time.monotonic() - inicio)
+    if interpretar_con_ia_activo():
+        # El prompt de interpretación también queda procesado: la primera
+        # pregunta mal escrita no pasa del límite de 10 s.
+        inicio = time.monotonic()
+        try:
+            proveedor.generar_json(mensajes_interpretacion(EJEMPLOS_INTERPRETACION[0][0]),
+                                   ESQUEMA_INTERPRETACION, 0.0)
+        except Exception as error:  # noqa: BLE001 — solo es un precalentamiento
+            logger.info("la interpretación de prueba falló (%s)", error)
+        else:
+            logger.info("modelo listo: interpretación de prueba en %.1f s", time.monotonic() - inicio)
     return True
 
 

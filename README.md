@@ -583,6 +583,14 @@ Para que un modelo pequeño responda bien y rápido:
   tiene 2 (#3, #5) y José Solano (Técnico) tiene 1 (#7).». Toleran errores
   comunes («ticketes», «tiketes», «asigandos», «tecnico», sin tildes). Cada rol
   cuenta solo lo que puede ver: el Solicitante, sus propios tickets.
+- Si las reglas no reconocen la pregunta (por ejemplo, «cuatos ticketes estan
+  terminados ?»), la IA solo la **clasifica** en un JSON con valores fijos
+  (tipo, estado, período, persona, rol, ticket; `format` de Ollama) y el
+  servidor calcula con las mismas funciones y permisos. Si el JSON no sirve,
+  la persona o el ticket no existen, es otro tipo de pregunta o tarda más de
+  10 s, sigue la IA libre. Se apaga con `ASISTENTE_INTERPRETAR_CON_IA=false`.
+- La IA libre recibe igual los conteos por estado, con sus otros nombres
+  («terminados» = resueltos o cerrados; «pendientes» = nuevos + en proceso).
 - A la IA, cada persona le llega con su rol: «asignado a Laura Méndez
   (Administrador)».
 - Las preguntas sobre el **contenido** de un ticket («¿cómo resuelvo el #5?»,
