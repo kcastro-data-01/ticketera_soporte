@@ -308,9 +308,9 @@ function crearAsistente() {
   titulos.appendChild(crearElemento("strong", "chat-titulo", "Asistente"));
   const estado = crearElemento("span", "chat-subtitulo");
   estado.appendChild(crearElemento("span", "chat-punto-en-linea"));
-  estado.appendChild(
-    document.createTextNode(`En línea · ${user && user.role ? user.role : "según tu rol"}`)
-  );
+  estado.appendChild(document.createTextNode("En línea"));
+  /* El rol queda a la vista al pasar el mouse (y en el saludo del chat). */
+  estado.title = user && user.role ? `Respuestas según tu rol: ${user.role}` : "Respuestas según tu rol";
   titulos.appendChild(estado);
   identidad.append(avatar, titulos);
 
@@ -366,18 +366,41 @@ function crearAsistente() {
   contenedor.append(panel, abrir);
   document.body.appendChild(contenedor);
 
+  /* Al cerrar, el panel baja con una animación corta y después se oculta
+     (sin animación si el sistema pide reducir el movimiento). */
+  let abierto = false;
+  let cierre = null;
+  const ocultar = () => {
+    panel.hidden = true;
+    panel.classList.remove("cerrando");
+    contenedor.classList.remove("abierto");
+  };
   const alternar = (mostrar) => {
-    panel.hidden = !mostrar;
-    contenedor.classList.toggle("abierto", mostrar);
+    if (mostrar === abierto) return;
+    abierto = mostrar;
+    clearTimeout(cierre);
     abrir.setAttribute("aria-expanded", String(mostrar));
     abrir.setAttribute("aria-label", mostrar ? "Cerrar asistente" : "Abrir asistente");
     abrir.dataset.tooltip = mostrar ? "Cerrar" : "Asistente";
     if (mostrar) {
+      panel.classList.remove("cerrando");
+      panel.hidden = false;
+      contenedor.classList.add("abierto");
       pintarMensajes(lista, leerChat());
       entrada.focus();
+      return;
+    }
+    const sinMovimiento =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (sinMovimiento) {
+      ocultar();
+    } else {
+      panel.classList.add("cerrando");
+      cierre = setTimeout(ocultar, 180);
     }
   };
-  abrir.addEventListener("click", () => alternar(panel.hidden));
+  abrir.addEventListener("click", () => alternar(!abierto));
   cerrar.addEventListener("click", () => alternar(false));
   limpiar.addEventListener("click", () => {
     guardarChat([]);
@@ -396,7 +419,7 @@ function crearAsistente() {
     }
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !panel.hidden) alternar(false);
+    if (event.key === "Escape" && abierto) alternar(false);
   });
 }
 

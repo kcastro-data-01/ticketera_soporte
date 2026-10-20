@@ -164,3 +164,104 @@ test("«Generada con IA (datos del sistema)» cuando la IA redactó los datos de
   assert.match(mostrado, /Generada con IA \(datos del sistema\)/);
   assert.doesNotMatch(mostrado, /Respuesta del sistema/);
 });
+
+/* Abrir y cerrar el panel (solo lo visual: clases y animación). */
+
+function nodoCompleto(tag) {
+  const n = nodo(tag);
+  const clases = new Set();
+  n.dataset = {};
+  n.atributos = {};
+  n.listeners = {};
+  n.setAttribute = (k, v) => { n.atributos[k] = String(v); };
+  n.addEventListener = (t, fn) => { (n.listeners[t] = n.listeners[t] || []).push(fn); };
+  n.classList = {
+    add: (c) => clases.add(c),
+    remove: (c) => clases.delete(c),
+    toggle: (c, si) => (si ? clases.add(c) : clases.delete(c)),
+    contains: (c) => clases.has(c),
+  };
+  return n;
+}
+
+function montarChat({ reducirMovimiento = false } = {}) {
+  const creados = [];
+  const store = new Map([["access_token", "t"], ["user", JSON.stringify({ name: "José Solano", role: "Técnico" })]]);
+  const temporizadores = [];
+  const sandbox = {
+    document: {
+      getElementById: (id) => creados.find((n) => n.id === id) || null,
+      createElement: (tag) => { const n = nodoCompleto(tag); creados.push(n); return n; },
+      createTextNode: (t) => ({ textContent: t, children: [] }),
+      addEventListener() {},
+      body: nodoCompleto("body"),
+    },
+    window: {
+      location: { pathname: "/index.html", search: "", href: "" },
+      matchMedia: () => ({ matches: reducirMovimiento }),
+    },
+    localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) },
+    sessionStorage: { getItem: () => null, setItem() {} },
+    console: { error() {}, log() {} },
+    URLSearchParams,
+    setTimeout: (fn, ms) => { temporizadores.push({ fn, ms }); return temporizadores.length; },
+    clearTimeout: (id) => { if (temporizadores[id - 1]) temporizadores[id - 1].fn = () => {}; },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(authSource, sandbox);
+  vm.runInContext(chatSource, sandbox);
+  sandbox.crearAsistente();
+  const buscar = (clase) => creados.find((n) => n.className.split(" ").includes(clase));
+  return {
+    panel: buscar("chat-panel"),
+    contenedor: buscar("chat-asistente"),
+    boton: buscar("chat-boton"),
+    subtitulo: buscar("chat-subtitulo"),
+    temporizadores,
+  };
+}
+
+const clic = (n) => n.listeners.click.forEach((fn) => fn());
+
+test("cabecera: «Asistente» con el estado «En línea»", () => {
+  const chat = montarChat();
+  assert.equal(texto(chat.subtitulo), "En línea");
+  assert.match(chat.subtitulo.title, /Técnico/);
+});
+
+test("abrir muestra el panel; cerrar lo anima y después lo oculta", () => {
+  const chat = montarChat();
+  assert.equal(chat.panel.hidden, true);
+
+  clic(chat.boton);
+  assert.equal(chat.panel.hidden, false);
+  assert.equal(chat.contenedor.classList.contains("abierto"), true);
+  assert.equal(chat.boton.atributos["aria-expanded"], "true");
+
+  clic(chat.boton);
+  assert.equal(chat.panel.classList.contains("cerrando"), true, "animación de salida");
+  assert.equal(chat.panel.hidden, false, "sigue visible mientras se anima");
+  assert.equal(chat.boton.atributos["aria-expanded"], "false");
+  chat.temporizadores.at(-1).fn();
+  assert.equal(chat.panel.hidden, true);
+  assert.equal(chat.panel.classList.contains("cerrando"), false);
+  assert.equal(chat.contenedor.classList.contains("abierto"), false);
+});
+
+test("reabrir durante la animación de cierre deja el panel abierto", () => {
+  const chat = montarChat();
+  clic(chat.boton);
+  clic(chat.boton);
+  clic(chat.boton);
+  chat.temporizadores.forEach((t) => t.fn());
+  assert.equal(chat.panel.hidden, false);
+  assert.equal(chat.panel.classList.contains("cerrando"), false);
+});
+
+test("con «reducir movimiento» se cierra al instante", () => {
+  const chat = montarChat({ reducirMovimiento: true });
+  clic(chat.boton);
+  clic(chat.boton);
+  assert.equal(chat.panel.hidden, true);
+  assert.equal(chat.temporizadores.length, 0);
+});
