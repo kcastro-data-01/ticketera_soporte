@@ -22,13 +22,14 @@ import re
 import threading
 import time
 import unicodedata
+from datetime import timedelta
 
 import httpx
 from sqlalchemy import func, select
 
-from backend.constants import TicketPriority, TicketState, UserRole
+from backend.constants import TICKET_CATEGORIES, TICKET_PRIORITIES, TicketPriority, TicketState, UserRole
 from backend.models import Ticket, User
-from backend.services import ticket_service
+from backend.services import metricas_service, ticket_service
 
 logger = logging.getLogger(__name__)
 # Sale en «docker compose logs ticketera» (uvicorn no muestra los INFO de la app).
@@ -196,6 +197,7 @@ def _grupos(user: User) -> dict[str, tuple[str, tuple]]:
             "Tickets resueltos (estado Resuelto o Cerrado)",
             (Ticket.state.in_((TicketState.RESOLVED.value, TicketState.CLOSED.value)),),
         ),
+        "cerrados": ("Tickets en estado Cerrado", (Ticket.state == TicketState.CLOSED.value,)),
         "criticos": (
             "Tickets críticos sin resolver",
             (Ticket.priority == TicketPriority.CRITICAL.value, _abiertos()),
@@ -363,6 +365,7 @@ FRASES_GRUPO = {
     "nuevos": ("ticket nuevo", "tickets nuevos"),
     "en_proceso": ("ticket en proceso", "tickets en proceso"),
     "resueltos": ("ticket resuelto o cerrado", "tickets resueltos o cerrados"),
+    "cerrados": ("ticket cerrado", "tickets cerrados"),
     "criticos": ("ticket crítico sin resolver", "tickets críticos sin resolver"),
     "sin_asignar": ("ticket sin asignar sin resolver", "tickets sin asignar sin resolver"),
 }
@@ -373,16 +376,75 @@ def _normalizar(texto: str) -> str:
     return " ".join(sin_tildes.lower().split())
 
 
+# Formas de nombrar cada estado (texto normalizado, sin tildes), en el orden
+# en que se revisan: «sin atender» va antes que «atendido».
+ESTADOS_EN_PREGUNTA = [
+    ("en_proceso", r"\b(en proceso|en progreso|en curso|trabajando|atendiendo)\b"),
+    ("nuevos", r"\b(nuevos?|pendientes?|sin atender|sin revisar|no atendid\w*)\b"),
+    ("cerrados", r"\b(cerrad\w*|cerraron|cerro|finalizad\w*|finalizaron|terminad\w*|terminaron)\b"),
+    ("resueltos", r"\b(resuelt|resolv|solucionad|solucionaron|arreglad|arreglaron|atendid|atendieron)\w*"),
+]
+# Palabras que caben en «¿cuántos tickets hay en total?»: si la pregunta trae
+# otra cosa (un estado que no existe, una persona…), no se responde el total.
+_PALABRAS_DEL_TOTAL = {
+    "cuantos", "cuantas", "cuanto", "cuanta", "total", "totales", "en", "hay", "existen", "existe",
+    "son", "es", "el", "la", "los", "las", "de", "del", "y", "se", "han", "todos", "todo",
+    "sistema", "app", "aplicacion", "puedo", "ver", "veo", "visibles", "registrados", "numero",
+    "cantidad", "actualmente", "ahora", "momento", "este", "me", "dime",
+}
+# Categorías y prioridades: el servidor no las cuenta; va a la IA.
+_CATEGORIA_O_PRIORIDAD = re.compile(
+    r"\b(" + "|".join(
+        re.escape(_n) for _n in sorted({_normalizar(v) for v in (*TICKET_CATEGORIES, *TICKET_PRIORITIES)})
+    ) + r"|prioridad\w*|categoria\w*|urgentes?)\b"
+)
+# «¿cuánto tarda en resolverse un ticket?» no es un conteo.
+_PIDE_TIEMPO = re.compile(r"\b(tiempo|tarda\w*|demora\w*|promedio|duran?)\b")
+NO_ENTENDI = "No entendí qué tickets querés contar. ¿Nuevos, en proceso, resueltos o cerrados?"
+
+
+def _periodo(t: str):
+    """``(desde, hasta, frase)`` del período que nombra la pregunta
+    normalizada (días de Costa Rica, como el panel de métricas), o ``None``."""
+    hoy = metricas_service.hoy()
+    if re.search(r"\bhoy\b", t):
+        return hoy, hoy, "Hoy"
+    if re.search(r"\bayer\b", t):
+        ayer = hoy - timedelta(days=1)
+        return ayer, ayer, "Ayer"
+    if re.search(r"\besta semana\b", t):
+        return hoy - timedelta(days=hoy.weekday()), hoy, "Esta semana"
+    if re.search(r"\beste mes\b", t):
+        return hoy.replace(day=1), hoy, "Este mes"
+    dias = re.search(r"\bultim[oa]s (\d+) dias\b", t)
+    if dias or re.search(r"\bultima semana\b", t):
+        n = min(max(int(dias.group(1)) if dias else 7, 1), metricas_service.MAX_DIAS)
+        return hoy - timedelta(days=n - 1), hoy, f"En los últimos {n} días"
+    return None
+
+
+def _quitar_periodo(t: str) -> str:
+    return re.sub(r"\b(hoy|ayer|esta semana|este mes|ultima semana|ultim[oa]s \d+ dias)\b", " ", t)
+
+
+def _solo_pide_el_total(t: str) -> bool:
+    palabras = re.findall(r"\w+", _quitar_periodo(t))
+    return all(p in _PALABRAS_DEL_TOTAL or re.fullmatch(_TICKET, p) for p in palabras)
+
+
 def detectar_consulta(pregunta: str) -> str | None:
     """Grupo de tickets que pide la pregunta, o ``None`` si es otra cosa.
 
     Solo reconoce preguntas de listar o contar («¿cuántos…?», «¿hay…?»,
     «¿qué tickets…?»); las de cómo usar la app («¿cómo creo un ticket
-    nuevo?») van a la IA.
+    nuevo?») van a la IA. «total» solo si la pregunta no nombra nada más;
+    «no_entendi» si cuenta algo que no se reconoce.
     """
     t = _normalizar(pregunta)
     if re.search(r"\bcomo\s+(se\s+)?(creo|crear|hago|hacer|cambio|cambiar|asigno|asignar|"
                  r"cierro|cerrar|edito|editar|puedo|reabro|veo|desactivo|comento)\b", t):
+        return None
+    if _PIDE_TIEMPO.search(t):
         return None
     pide_lista = re.search(r"\b(cuant\w*|cuales|cual|que tickets|hay|lista\w*|muestra\w*|mostrar|"
                            r"dime|ver|tengo|pendientes?|abiertos?)\b", t)
@@ -396,17 +458,57 @@ def detectar_consulta(pregunta: str) -> str | None:
         return "sin_asignar"
     if re.search(rf"\b(mis {_TICKET}|mios|{_ASIGNADO} a mi|tengo|mis pendientes)\b", t):
         return "mios"
-    if "en proceso" in t or "en progreso" in t:
-        return "en_proceso"
-    if re.search(r"\bnuevos?\b", t):
-        return "nuevos"
-    if re.search(r"resuelt|cerrad", t):
-        return "resueltos"
-    # «¿cuántos tickets tiene Fernanda?» no pide el total (si la persona no
-    # existe, va a la IA, que dirá que no tiene ese dato).
-    if re.search(rf"\b(cuant\w*|total)\b.*\b{_TICKET}\b", t) and not re.search(r"\btienen?\b", t):
+    for clave, patron in ESTADOS_EN_PREGUNTA:
+        if re.search(patron, t):
+            return clave
+    if not re.search(r"\b(cuant\w*|total)\b", t):
+        return None
+    if _solo_pide_el_total(t):
         return "total"
-    return None
+    # «¿cuántos tickets tiene Fernanda?», «¿cuántos de Hardware?»: la IA.
+    if (re.search(r"\btienen?\b", t) or _CATEGORIA_O_PRIORIDAD.search(t)
+            or any(re.search(patron, t) for patron, _, _ in ROLES_EN_PREGUNTA)):
+        return None
+    return "no_entendi"
+
+
+# Con período: (verbo en singular, en plural) y desde cuándo se cuenta (el
+# primer paso a ese estado; para «nuevos» y el total, la creación).
+VERBOS_PERIODO = {
+    "resueltos": ("se resolvió", "se resolvieron"),
+    "cerrados": ("se cerró", "se cerraron"),
+    "en_proceso": ("pasó a En proceso", "pasaron a En proceso"),
+    "nuevos": ("se creó", "se crearon"),
+    "total": ("se creó", "se crearon"),
+}
+ESTADO_DEL_PASO = {
+    "resueltos": TicketState.RESOLVED.value,
+    "cerrados": TicketState.CLOSED.value,
+    "en_proceso": TicketState.IN_PROGRESS.value,
+}
+
+
+def _respuesta_periodo(session, user: User, clave: str, periodo) -> str | None:
+    """«Esta semana se resolvieron 4 tickets.», con el criterio del panel de
+    métricas; ``None`` para los grupos que no se cuentan por período."""
+    if clave not in VERBOS_PERIODO:
+        return None
+    desde, hasta, frase = periodo
+    inicio, fin = metricas_service.limites_utc(desde, hasta)
+    base = _base_visible(user)
+    if clave in ESTADO_DEL_PASO:
+        paso = metricas_service.primer_paso_a(ESTADO_DEL_PASO[clave])
+        statement = base.join(paso, paso.c.ticket_id == Ticket.id).where(paso.c.en >= inicio, paso.c.en < fin)
+    else:
+        statement = base.where(Ticket.created_at >= inicio, Ticket.created_at < fin)
+    total, tickets = _contar_y_listar(session, statement, DIRECTAS_MAX_TICKETS)
+    singular, plural = VERBOS_PERIODO[clave]
+    tuyo = user.role == UserRole.REQUESTER.value
+    if not total:
+        return f"{frase} no {singular} ningún ticket{' tuyo' if tuyo else ''}."
+    sustantivo = ("ticket tuyo" if tuyo else "ticket") if total == 1 else ("tickets tuyos" if tuyo else "tickets")
+    verbo = singular if total == 1 else plural
+    return "\n".join([f"{frase} {verbo} {total} {sustantivo}.", *_lista_tickets(tickets, total)])
 
 
 def _frase_grupo(clave: str, user: User, total: int) -> str:
@@ -781,7 +883,11 @@ def respuesta_directa(session, user: User, pregunta: str,
     frecuentes sobre tickets; ``None`` si la pregunta es para la IA."""
     t = _normalizar(pregunta)
     ids = tickets_mencionados(pregunta)
-    if not ids and ticket_actual is not None and (_ESTE_TICKET.search(t) or _PIDE_CONTENIDO.search(t)):
+    # «¿cuántos tickets se resolvieron?» cuenta: no habla del ticket en pantalla.
+    cuenta = re.search(r"\bcuant\w*", t)
+    if not ids and ticket_actual is not None and (
+        _ESTE_TICKET.search(t) or (_PIDE_CONTENIDO.search(t) and not cuenta)
+    ):
         ids = [ticket_actual]
     if ids and _PIDE_CONTENIDO.search(t):
         return None
@@ -811,6 +917,11 @@ def respuesta_directa(session, user: User, pregunta: str,
     clave = detectar_consulta(pregunta)
     if clave is None:
         return None
+    if clave == "no_entendi":
+        return NO_ENTENDI
+    periodo = _periodo(t)
+    if periodo is not None:
+        return _respuesta_periodo(session, user, clave, periodo)
     base = _base_visible(user)
     if clave == "total":
         total = session.scalar(select(func.count()).select_from(base.subquery()))

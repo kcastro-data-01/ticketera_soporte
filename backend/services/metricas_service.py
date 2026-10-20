@@ -44,12 +44,23 @@ def rango(desde: date | None, hasta: date | None) -> tuple[date, date]:
     return desde, hasta
 
 
-def _limites_utc(desde: date, hasta: date) -> tuple[datetime, datetime]:
+def limites_utc(desde: date, hasta: date) -> tuple[datetime, datetime]:
     """[inicio, fin) en UTC sin zona, como lo guarda la base."""
     inicio = datetime.combine(desde, time.min, COSTA_RICA)
     fin = datetime.combine(hasta + timedelta(days=1), time.min, COSTA_RICA)
     return (inicio.astimezone(timezone.utc).replace(tzinfo=None),
             fin.astimezone(timezone.utc).replace(tzinfo=None))
+
+
+def primer_paso_a(estado: str):
+    """Subconsulta ``(ticket_id, en)``: cuándo pasó cada ticket por primera
+    vez a ``estado`` (un ticket que vuelve a pasar no cuenta dos veces)."""
+    return (
+        select(History.ticket_id, func.min(History.created_at).label("en"))
+        .where(History.field == "state", History.new_value == estado)
+        .group_by(History.ticket_id)
+        .subquery()
+    )
 
 
 def _dia_local(instante: datetime) -> date:
@@ -63,7 +74,7 @@ def _como_utc(instante: datetime) -> datetime:
 
 
 def calcular(session, desde: date, hasta: date) -> dict:
-    inicio, fin = _limites_utc(desde, hasta)
+    inicio, fin = limites_utc(desde, hasta)
     en_rango = (Ticket.created_at >= inicio, Ticket.created_at < fin)
 
     # Hoy: la cola actual.
@@ -93,19 +104,14 @@ def calcular(session, desde: date, hasta: date) -> dict:
             dias[dia] += 1
 
     # Resueltos en el rango: primer paso a «Resuelto» de cada ticket.
-    primer_resuelto = (
-        select(History.ticket_id, func.min(History.created_at).label("resuelto_en"))
-        .where(History.field == "state", History.new_value == TicketState.RESOLVED.value)
-        .group_by(History.ticket_id)
-        .subquery()
-    )
+    primer_resuelto = primer_paso_a(TicketState.RESOLVED.value)
     resueltos = session.execute(
-        select(Ticket.id, Ticket.created_at, Ticket.assigned_to_id, primer_resuelto.c.resuelto_en)
+        select(Ticket.id, Ticket.created_at, Ticket.assigned_to_id, primer_resuelto.c.en)
         .join(primer_resuelto, primer_resuelto.c.ticket_id == Ticket.id)
-        .where(primer_resuelto.c.resuelto_en >= inicio, primer_resuelto.c.resuelto_en < fin)
+        .where(primer_resuelto.c.en >= inicio, primer_resuelto.c.en < fin)
     ).all()
     horas = [
-        (_como_utc(r.resuelto_en) - _como_utc(r.created_at)).total_seconds() / 3600
+        (_como_utc(r.en) - _como_utc(r.created_at)).total_seconds() / 3600
         for r in resueltos
     ]
     promedio = round(sum(horas) / len(horas), 1) if horas else None
