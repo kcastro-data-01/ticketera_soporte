@@ -602,7 +602,7 @@ function renderComentarios(comments) {
   if (!Array.isArray(comments) || comments.length === 0) {
     elements.listaComentarios.hidden = true;
     mostrarComentariosEstado(
-      "Este ticket todavía no tiene comentarios.",
+      "Todavía no hay comentarios.",
       "vacio"
     );
     return;

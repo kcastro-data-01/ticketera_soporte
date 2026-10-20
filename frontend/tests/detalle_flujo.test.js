@@ -282,7 +282,7 @@ test("init carga usuarios, ticket y comentarios con una petición por recurso", 
   /* Lista vacía: mensaje de vacío en su propio bloque de estado. */
   assert.equal(
     harness.node("comentarios-estado").textContent,
-    "Este ticket todavía no tiene comentarios."
+    "Todavía no hay comentarios."
   );
   assert.equal(harness.node("comentarios-estado").className, "estado vacio");
   assert.equal(harness.node("lista-comentarios").hidden, true);

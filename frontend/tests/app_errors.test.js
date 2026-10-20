@@ -304,3 +304,13 @@ test("cada ejecución de fetchTickets() realiza exactamente una petición HTTP",
     assertFetchCount(harness, 1, nombre);
   }
 });
+
+test("respuesta vacía con filtros: avisa que no hay coincidencias", async () => {
+  const harness = createHarness(async () => jsonResponse(200, []));
+  harness.setFilter("search", "impresora");
+
+  await harness.fetchTickets();
+
+  assert.equal(harness.estado().textContent, "No hay tickets que coincidan con los filtros.");
+  assert.equal(harness.estado().className, "estado vacio");
+});

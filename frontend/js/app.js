@@ -229,7 +229,14 @@ async function fetchTickets() {
   renderPaginacion(Number.isFinite(totalCabecera) ? totalCabecera : tickets.length);
 
   if (tickets.length === 0) {
-    showStatus("No hay tickets para mostrar.", "vacio");
+    const filtros = getFilters();
+    const conFiltros = Boolean(
+      filtros.search || filtros.category || filtros.priority || filtros.state || filtros.mios
+    );
+    showStatus(
+      conFiltros ? "No hay tickets que coincidan con los filtros." : "No hay tickets para mostrar.",
+      "vacio"
+    );
     return;
   }
 
