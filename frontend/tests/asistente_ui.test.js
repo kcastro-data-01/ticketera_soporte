@@ -154,3 +154,13 @@ test("«Generada con IA» solo cuando respondió el modelo, no en las respuestas
   await error.sandbox.enviarPregunta("explicar ticket #3");
   assert.doesNotMatch(texto(error.ids["chat-lista"]), /Generada con IA/);
 });
+
+test("«Generada con IA (datos del sistema)» cuando la IA redactó los datos del servidor", async () => {
+  const chat = crearChat({
+    fetchImpl: async () => ndjson([{ t: "Hay 2 tickets en proceso: el #4 y el #7." }, { fin: true, fuente: "ia_datos" }]),
+  });
+  await chat.sandbox.enviarPregunta("¿cuántos tickets en proceso hay?");
+  const mostrado = texto(chat.ids["chat-lista"]);
+  assert.match(mostrado, /Generada con IA \(datos del sistema\)/);
+  assert.doesNotMatch(mostrado, /Respuesta del sistema/);
+});

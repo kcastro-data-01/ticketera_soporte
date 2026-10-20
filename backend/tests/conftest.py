@@ -9,6 +9,13 @@ from backend.database import Base, enable_sqlite_foreign_keys, get_session
 from backend.main import app
 
 
+@pytest.fixture(autouse=True)
+def respuestas_fijas(monkeypatch):
+    """Por defecto el chat responde los conteos con el texto fijo; las
+    pruebas de la redacción con IA la encienden."""
+    monkeypatch.setenv("ASISTENTE_REDACTAR_CON_IA", "false")
+
+
 @pytest.fixture
 def engine(tmp_path):
     """Create a fresh SQLite engine with the full schema for each test."""

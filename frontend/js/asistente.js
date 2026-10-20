@@ -114,6 +114,7 @@ function filaAsistente() {
 
 const NOTA_FUENTE = {
   directa: "Respuesta del sistema",
+  ia_datos: "Generada con IA (datos del sistema)",
   ia: "Generada con IA",
 };
 

@@ -401,8 +401,9 @@ class AsistenteRequest(BaseModel):
 
 class AsistenteResponse(BaseModel):
     respuesta: str
-    # «directa»: calculada por el servidor; «ia»: generada por el modelo.
-    fuente: Literal["directa", "ia"] = "ia"
+    # «directa»: texto fijo del servidor; «ia_datos»: el modelo redactó los
+    # datos que calculó el servidor; «ia»: generada por el modelo.
+    fuente: Literal["directa", "ia_datos", "ia"] = "ia"
 
 
 class ChangePasswordRequest(BaseModel):
