@@ -272,10 +272,86 @@ function iniciarMenuPlegable(doc = document) {
   return boton;
 }
 
+/* ---------- Modo oscuro ----------
+   <html data-tema="oscuro"> activa las variables oscuras de estilos.css.
+   La preferencia se guarda en localStorage; cada página la aplica desde el
+   <head> (sin destello claro) y aquí se agrega el botón de luna/sol. */
+const TEMA_KEY = "tema";
+const ICONO_LUNA =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const ICONO_SOL =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/>' +
+  '<path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+
+function temaGuardado() {
+  try {
+    return localStorage.getItem(TEMA_KEY) === "oscuro" ? "oscuro" : "claro";
+  } catch {
+    return "claro";
+  }
+}
+
+function aplicarTema(tema, doc = document) {
+  if (tema === "oscuro") doc.documentElement.setAttribute("data-tema", "oscuro");
+  else doc.documentElement.removeAttribute("data-tema");
+}
+
+function iniciarBotonTema(doc = document) {
+  if (doc.querySelector(".boton-tema")) return null;
+  const boton = doc.createElement("button");
+  boton.type = "button";
+  boton.className = "boton-tema";
+
+  const pintar = () => {
+    const oscuro = doc.documentElement.getAttribute("data-tema") === "oscuro";
+    /* Muestra el ícono del modo al que se cambia. */
+    boton.innerHTML = oscuro ? ICONO_SOL : ICONO_LUNA;
+    const etiqueta = oscuro ? "Activar modo claro" : "Activar modo oscuro";
+    boton.setAttribute("aria-label", etiqueta);
+    boton.setAttribute("aria-pressed", String(oscuro));
+    boton.title = etiqueta;
+  };
+
+  boton.addEventListener("click", () => {
+    const nuevo = doc.documentElement.getAttribute("data-tema") === "oscuro" ? "claro" : "oscuro";
+    try {
+      localStorage.setItem(TEMA_KEY, nuevo);
+    } catch {
+      /* Sin almacenamiento solo vale para esta página. */
+    }
+    aplicarTema(nuevo, doc);
+    pintar();
+    /* Las gráficas de métricas leen los colores al dibujarse. */
+    if (typeof doc.dispatchEvent === "function" && typeof CustomEvent === "function") {
+      doc.dispatchEvent(new CustomEvent("tema-cambiado", { detail: { tema: nuevo } }));
+    }
+  });
+
+  const cabecera = doc.querySelector(".cabecera");
+  if (cabecera) {
+    let acciones = cabecera.querySelector(".cabecera-acciones");
+    if (!acciones) {
+      acciones = doc.createElement("div");
+      acciones.className = "cabecera-acciones";
+      cabecera.appendChild(acciones);
+    }
+    acciones.appendChild(boton);
+  } else if (doc.body) {
+    doc.body.appendChild(boton);
+  }
+  pintar();
+  return boton;
+}
+
+if (typeof document !== "undefined" && document.documentElement) {
+  aplicarTema(temaGuardado());
+}
+
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
   document.addEventListener("DOMContentLoaded", () => {
     aplicarPermisos();
     pintarUsuario();
     iniciarMenuPlegable();
+    iniciarBotonTema();
   });
 }

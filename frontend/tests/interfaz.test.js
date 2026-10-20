@@ -83,3 +83,76 @@ test("menú plegable: al abrir otra página se aplica lo guardado", () => {
   const m = montar("1");
   assert.equal(m.body.classList.contains("menu-plegado"), true);
 });
+
+/* --- Modo oscuro --- */
+
+function montarTema(guardado, { conAcciones = true } = {}) {
+  const store = new Map(guardado ? [["tema", guardado]] : []);
+  const html = nodo("html");
+  const acciones = nodo("div");
+  const cabecera = nodo("header");
+  cabecera.querySelector = (sel) => (sel === ".cabecera-acciones" && conAcciones ? acciones : null);
+  const eventos = [];
+  const doc = {
+    documentElement: html,
+    body: nodo("body"),
+    querySelector: (sel) => (sel === ".cabecera" ? cabecera : sel === ".boton-tema" ? null : null),
+    createElement: (tag) => nodo(tag),
+    dispatchEvent: (e) => eventos.push(e),
+    addEventListener() {},
+  };
+  class CustomEventFalso { constructor(tipo, init) { this.type = tipo; this.detail = init && init.detail; } }
+  const ctx = {
+    localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
+    window: { location: { href: "" } },
+    CustomEvent: CustomEventFalso,
+  };
+  vm.createContext(ctx);
+  vm.runInContext(authSource, ctx);
+  ctx.aplicarTema(ctx.temaGuardado(), doc);
+  const boton = ctx.iniciarBotonTema(doc);
+  return { boton, html, acciones, cabecera, store, eventos };
+}
+
+test("tema: sin preferencia empieza claro, con el ícono de luna", () => {
+  const t = montarTema();
+  assert.equal(t.html.getAttribute("data-tema"), null);
+  assert.equal(t.acciones.children[0], t.boton, "va en la barra superior");
+  assert.equal(t.boton.atributos["aria-label"], "Activar modo oscuro");
+  assert.match(t.boton.innerHTML, /M21 12\.8A9 9/, "luna");
+});
+
+test("tema: el botón cambia a oscuro, lo guarda y avisa a las gráficas", () => {
+  const t = montarTema();
+  clic(t.boton);
+  assert.equal(t.html.getAttribute("data-tema"), "oscuro");
+  assert.equal(t.store.get("tema"), "oscuro");
+  assert.equal(t.boton.atributos["aria-pressed"], "true");
+  assert.match(t.boton.innerHTML, /circle cx="12" cy="12" r="4"/, "sol");
+  assert.deepEqual(t.eventos.map((e) => [e.type, e.detail.tema]), [["tema-cambiado", "oscuro"]]);
+  clic(t.boton);
+  assert.equal(t.html.getAttribute("data-tema"), null);
+  assert.equal(t.store.get("tema"), "claro");
+});
+
+test("tema: se aplica lo guardado al abrir otra página", () => {
+  const t = montarTema("oscuro");
+  assert.equal(t.html.getAttribute("data-tema"), "oscuro");
+  assert.equal(t.boton.atributos["aria-label"], "Activar modo claro");
+});
+
+test("tema: si la cabecera no tiene zona de acciones, se crea", () => {
+  const t = montarTema(null, { conAcciones: false });
+  const creada = t.cabecera.children[0];
+  assert.equal(creada.className, "cabecera-acciones");
+  assert.equal(creada.children[0], t.boton);
+});
+
+test("todas las páginas aplican el tema guardado en el <head>", () => {
+  const dir = path.join(__dirname, "..");
+  for (const f of fs.readdirSync(dir).filter((n) => n.endsWith(".html"))) {
+    const html = fs.readFileSync(path.join(dir, f), "utf8");
+    const cabeza = html.slice(0, html.indexOf("</head>"));
+    assert.match(cabeza, /localStorage\.getItem\("tema"\)==="oscuro"/, f);
+  }
+});

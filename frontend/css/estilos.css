@@ -20,6 +20,9 @@
   --color-fondo-chat: #f7f8fa;
   --color-primario-foco: rgba(23, 70, 224, 0.28);
   --color-enlace: #1746e0;
+  /* Azul cuando es color de letra (en oscuro, más claro para contraste) */
+  --color-primario-texto: #1746e0;
+  --color-primario-texto-fuerte: #0f34b3;
 
   /* Fondos y superficies */
   --color-fondo: #f4f6fb;
@@ -32,6 +35,15 @@
   --color-tenue: #5d6880;
   --color-tenue-fuerte: #46516a;
   --color-texto-inverso: #ffffff;
+  /* Títulos de página y números de las tarjetas */
+  --color-titulo: #0b184d;
+  /* Notas muy secundarias (fuente de la respuesta del chat, avisos) */
+  --color-texto-suave: #9aa3b5;
+  /* Borde de la tarjeta «Críticos sin resolver» */
+  --color-alerta: #c62828;
+  /* Etiquetas emergentes (botón del chat) */
+  --tooltip-fondo: #1a2233;
+  --tooltip-texto: #ffffff;
 
   /* Navegación (menú lateral) */
   --color-marino: #0b184d;
@@ -99,6 +111,123 @@
   --texto-titulo: 1.4rem;
 }
 
+/* ---------- 1b. Modo oscuro ----------
+   Se activa con el botón de luna/sol de la barra superior
+   (<html data-tema="oscuro">, guardado en localStorage). Solo redefine
+   las variables: todas las pantallas usan estas mismas. */
+:root[data-tema="oscuro"] {
+  color-scheme: dark;
+
+  --color-primario: #3f63ea;
+  --color-primario-oscuro: #5577f2;
+  --color-primario-texto: #93acff;
+  --color-primario-texto-fuerte: #b3c5ff;
+  --color-primario-suave: #33447a;
+  --color-primario-tenue: #1d2647;
+  --color-primario-claro: #7d9bff;
+  --color-fondo-chat: #121826;
+  --color-primario-foco: rgba(125, 155, 255, 0.35);
+  --color-enlace: #93acff;
+
+  --color-fondo: #0f1420;
+  --color-superficie: #171d2b;
+  --color-superficie-alta: #1c2333;
+  --color-fondo-neutro: #232b3c;
+
+  --color-texto: #e6e9f0;
+  --color-tenue: #9aa4b8;
+  --color-tenue-fuerte: #bcc4d3;
+  --color-texto-inverso: #ffffff;
+  --color-titulo: #eef1f7;
+  --color-texto-suave: #7d879b;
+  --color-alerta: #f07373;
+  --tooltip-fondo: #e6e9f0;
+  --tooltip-texto: #0f1420;
+
+  --color-marino: #0a0f1d;
+  --color-marino-claro: #121a33;
+  --color-menu-texto: #c4cff5;
+  --color-menu-tenue: #8fa3e8;
+
+  --color-borde: #2c3549;
+  --color-borde-fuerte: #3b4660;
+
+  --color-error: #ff9a9a;
+  --color-error-fondo: #3a1d22;
+  --color-vacio: #f2c983;
+  --color-vacio-fondo: #382c18;
+  --color-exito: #86dba5;
+  --color-exito-fondo: #173326;
+
+  --etiqueta-rojo-fondo: #3d1f25;
+  --etiqueta-rojo-texto: #ffa3a3;
+  --etiqueta-naranja-fondo: #3d2b1a;
+  --etiqueta-naranja-texto: #ffbd80;
+  --etiqueta-amarillo-fondo: #37321b;
+  --etiqueta-amarillo-texto: #f0d470;
+  --etiqueta-gris-fondo: #283042;
+  --etiqueta-gris-texto: #b8c0d0;
+  --etiqueta-azul-fondo: #1e2a52;
+  --etiqueta-azul-texto: #a3b8ff;
+  --etiqueta-violeta-fondo: #2c2249;
+  --etiqueta-violeta-texto: #c9b0ff;
+  --etiqueta-verde-fondo: #17352a;
+  --etiqueta-verde-texto: #8ddcaa;
+
+  --login-fondo: #0f1420;
+  --login-card-borde: #2c3549;
+  --login-card-sombra: 0 12px 40px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --login-icon-color: #93acff;
+  --login-link-color: #93acff;
+
+  --sombra-tarjeta: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 18px rgba(0, 0, 0, 0.25);
+  --sombra-suave: 0 1px 2px rgba(0, 0, 0, 0.35);
+
+  /* Gráficos de métricas: tonos más claros sobre fondo oscuro. */
+  --color-serie-1: #5aa2ff;
+  --color-serie-2: #ff8f61;
+}
+
+/* Botón de luna/sol en la barra superior. */
+.boton-tema {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-suave);
+  background: var(--color-superficie);
+  color: var(--color-tenue-fuerte);
+  box-shadow: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.boton-tema:hover {
+  border-color: var(--color-borde-fuerte);
+  background: var(--color-fondo-neutro);
+  color: var(--color-texto);
+}
+
+.boton-tema svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* En el login no hay barra superior: va arriba a la derecha. */
+.pagina-login .boton-tema {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+}
+
 /* ---------- 2. Base y tipografía ---------- */
 
 * {
@@ -146,7 +275,7 @@ h2 {
 .cabecera h1 {
   margin: 0;
   font-size: var(--texto-titulo);
-  color: var(--color-primario-oscuro);
+  color: var(--color-primario-texto-fuerte);
 }
 
 .cabecera p {
@@ -1070,7 +1199,7 @@ body.pagina-login {
   padding: 0.5rem 0;
   text-align: center;
   font-size: 1.5rem;
-  color: var(--color-primario-oscuro);
+  color: var(--color-primario-texto-fuerte);
   font-weight: 700;
 }
 
@@ -1179,7 +1308,7 @@ body.pagina-login {
 }
 
 .toggle-password:hover {
-  color: var(--color-primario);
+  color: var(--color-primario-texto);
 }
 
 .remember-me {
@@ -1519,7 +1648,7 @@ body.app {
 }
 
 .app .cabecera h1 {
-  color: var(--color-marino);
+  color: var(--color-titulo);
 }
 
 .cabecera-acciones {
@@ -1530,7 +1659,7 @@ body.app {
 
 .enlace-boton.secundario {
   background: var(--color-superficie-alta);
-  color: var(--color-primario);
+  color: var(--color-primario-texto);
   border: 1px solid var(--color-borde-fuerte);
 }
 
@@ -1576,7 +1705,7 @@ body.app {
 }
 
 .tarjeta-resumen.alerta {
-  border-left-color: #c62828;
+  border-left-color: var(--color-alerta);
 }
 
 .tarjeta-resumen.destacada {
@@ -1588,7 +1717,7 @@ body.app {
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.1;
-  color: var(--color-marino);
+  color: var(--color-titulo);
 }
 
 .tarjeta-etiqueta {
@@ -1641,7 +1770,7 @@ body.app {
   border: 1px solid var(--color-borde-fuerte);
   border-radius: var(--radio-suave);
   background: var(--color-superficie-alta);
-  color: var(--color-primario);
+  color: var(--color-primario-texto);
   font-size: 0.8rem;
   font-weight: 600;
   box-shadow: none;
@@ -1650,7 +1779,7 @@ body.app {
 .btn-accion:hover {
   border-color: var(--color-primario-suave);
   background: var(--color-primario-tenue);
-  color: var(--color-primario-oscuro);
+  color: var(--color-primario-texto-fuerte);
 }
 
 .btn-accion:active {
@@ -1891,8 +2020,8 @@ body.app {
   top: 50%;
   padding: 0.3rem 0.65rem;
   border-radius: var(--radio-suave);
-  background: var(--color-texto);
-  color: var(--color-texto-inverso);
+  background: var(--tooltip-fondo);
+  color: var(--tooltip-texto);
   font-size: 0.78rem;
   font-weight: 600;
   white-space: nowrap;
@@ -2134,7 +2263,7 @@ body.app {
 .chat-nota {
   padding-left: 0.4rem;
   font-size: 11px;
-  color: #9aa3b5;
+  color: var(--color-texto-suave);
 }
 
 /* «Escribiendo…»: tres puntos en una burbuja blanca. */
@@ -2191,7 +2320,7 @@ body.app {
   border: 1px solid var(--color-primario-suave);
   border-radius: var(--radio-pill);
   background: var(--color-superficie);
-  color: var(--color-primario);
+  color: var(--color-primario-texto);
   font-size: 0.86rem;
   font-weight: 600;
   text-align: left;
@@ -2280,7 +2409,7 @@ body.app {
 .chat-aviso {
   margin: 0.45rem 0 0;
   font-size: 11px;
-  color: #9aa3b5;
+  color: var(--color-texto-suave);
   text-align: center;
 }
 
@@ -2348,7 +2477,7 @@ body.app {
   margin: 0 0 0.75rem;
   font-size: var(--texto-sm, 0.85rem);
   font-weight: 600;
-  color: var(--color-primario-oscuro);
+  color: var(--color-primario-texto-fuerte);
 }
 
 .ia-desactualizada {

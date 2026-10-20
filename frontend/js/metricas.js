@@ -302,11 +302,22 @@ function pintarGraficos(s) {
   return true;
 }
 
+let ultimasSeries = null;
+
 function pintar(datos) {
   pintarTarjetas(datos);
   const s = series(datos);
+  ultimasSeries = s;
   pintarTablas(s);
   return pintarGraficos(s);
+}
+
+/* Al cambiar entre modo claro y oscuro se vuelven a dibujar los gráficos
+   con los colores nuevos (los datos son los mismos). */
+if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+  document.addEventListener("tema-cambiado", () => {
+    if (ultimasSeries) pintarGraficos(ultimasSeries);
+  });
 }
 
 /* --- Carga ------------------------------------------------------------- */
