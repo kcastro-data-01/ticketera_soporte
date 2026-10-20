@@ -16,7 +16,9 @@ from backend.services import asistente_service
 from backend.services.asistente_service import (
     ESQUEMA_INTERPRETACION,
     NO_ENTENDI,
+    MENSAJE_IA_OCUPADA,
     AsistenteNoDisponible,
+    IATardo,
     calcular_desde_interpretacion,
     calcular_directa,
     leer_interpretacion,
@@ -31,7 +33,8 @@ def _json(tipo="conteo", estado=None, periodo=None, persona=None, rol=None, tick
 
 class IASimulada:
     """``generar_json`` devuelve ``json`` (o lanza ``error``, o tarda
-    ``demora`` segundos); ``responder`` es la IA libre."""
+    ``demora`` segundos; como httpx, si pasa el ``timeout`` de la petición
+    corta ahí y lanza ``IATardo``); ``responder`` es la IA libre."""
 
     def __init__(self):
         self.interpretaciones = []
@@ -40,15 +43,18 @@ class IASimulada:
         self.error = None
         self.demora = 0
 
-    def generar_json(self, messages, esquema, temperature=0.1):
-        self.interpretaciones.append({"messages": messages, "esquema": esquema})
+    def generar_json(self, messages, esquema, temperature=0.1, timeout=None):
+        self.interpretaciones.append({"messages": messages, "esquema": esquema, "timeout": timeout})
+        if timeout is not None and self.demora > timeout:
+            time.sleep(timeout)
+            raise IATardo("timeout")
         if self.demora:
             time.sleep(self.demora)
         if self.error is not None:
             raise self.error
         return self.json
 
-    def responder(self, system, messages):
+    def responder(self, system, messages, timeout=None):
         self.calls.append({"system": system, "messages": messages})
         return "Respuesta de la IA libre."
 
@@ -96,15 +102,16 @@ def test_misspelled_finished_is_counted_by_the_server(client, ia, log, tickets):
     headers, t = tickets
     ia.json = _json(estado="resueltos")
 
-    respuesta = _respuesta(ask(client, headers, "cuatos ticketes estan terminados ?"), "directa")
+    respuesta = _respuesta(ask(client, headers, "tikets terminaos ?"), "directa")
 
     assert respuesta.startswith("Hay 2 tickets resueltos o cerrados:")
     assert f"#{t['Resuelto'].id}" in respuesta and f"#{t['Cerrado'].id}" in respuesta
     assert ia.calls == []
     enviado = ia.interpretaciones[0]
     assert enviado["esquema"] == ESQUEMA_INTERPRETACION
-    assert enviado["messages"][-1] == {"role": "user", "content": "cuatos ticketes estan terminados ?"}
-    assert "interpretó «cuatos ticketes estan terminados ?»" in log[0]
+    assert enviado["timeout"] == 10.0
+    assert enviado["messages"][-1] == {"role": "user", "content": "tikets terminaos ?"}
+    assert "interpretó «tikets terminaos ?»" in log[0]
 
 
 def test_rules_go_first_and_answer_without_interpreting(client, ia, tickets):
@@ -142,10 +149,10 @@ def test_role_counts_its_tickets(client, ia, tickets, persona):
 def test_total_only_when_the_question_asks_for_it(client, ia, tickets, estado):
     headers, _ = tickets
     ia.json = _json(estado=estado)
-    assert _respuesta(ask(client, headers, "cuatos tikets ai en total"), "directa") == \
+    assert _respuesta(ask(client, headers, "todos los tikets q ai registrados"), "directa") == \
         "Hay 4 tickets visibles para ti en total."
     # El modelo perdió «nuevos»: no se responde el total por error.
-    _respuesta(ask(client, headers, "cuatos tikets nuebos ai en el sistema"), "ia")
+    _respuesta(ask(client, headers, "tikets nuebos q ai registrados"), "ia")
 
 
 def test_what_the_rules_did_not_understand_is_interpreted(client, ia, tickets):
@@ -198,24 +205,50 @@ def test_requester_cannot_name_anyone(client, session, ia, tickets):
 def test_invalid_json_goes_to_the_free_ai(client, ia, log, tickets, texto, motivo):
     headers, _ = tickets
     ia.json = texto
-    _respuesta(ask(client, headers, "cuatos ticketes estan terminados ?"), "ia")
+    _respuesta(ask(client, headers, "tikets terminaos ?"), "ia")
     assert "interpretación descartada, se usó la IA libre (JSON inválido" in log[0]
     assert motivo in log[0]
 
 
-def test_slow_interpretation_goes_to_the_free_ai(client, ia, log, tickets, monkeypatch):
+def test_slow_interpretation_is_cancelled_and_does_not_call_the_free_ai(client, ia, log, tickets, monkeypatch):
     headers, _ = tickets
     monkeypatch.setattr(asistente_service, "INTERPRETACION_TIMEOUT", 0.05)
     ia.json = _json(estado="resueltos")
     ia.demora = 0.5
-    _respuesta(ask(client, headers, "cuatos ticketes estan terminados ?"), "ia")
-    assert "tardó más de 0.05 s" in log[0]
+
+    inicio = time.monotonic()
+    respuesta = _respuesta(ask(client, headers, "tikets terminaos ?"), "directa")
+
+    assert time.monotonic() - inicio < 0.5
+    assert respuesta == MENSAJE_IA_OCUPADA
+    assert ia.interpretaciones[0]["timeout"] == 0.05
+    assert ia.calls == []  # la IA libre no se llamó detrás
+    assert "interpretación cancelada: tardó más de 0.05 s" in log[0]
+
+
+def test_slow_interpretation_keeps_the_rules_answer(client, ia, tickets, monkeypatch):
+    headers, _ = tickets
+    monkeypatch.setattr(asistente_service, "INTERPRETACION_TIMEOUT", 0.05)
+    ia.demora = 0.5
+    assert _respuesta(ask(client, headers, "cuantos tikets ai q nadie atendio"), "directa") == NO_ENTENDI
+    assert ia.calls == []
+
+
+def test_slow_interpretation_in_the_stream(client, ia, tickets, monkeypatch):
+    headers, _ = tickets
+    monkeypatch.setattr(asistente_service, "INTERPRETACION_TIMEOUT", 0.05)
+    ia.demora = 0.5
+    resp = client.post("/api/asistente/stream", headers=headers,
+                       json={"messages": [{"role": "user", "content": "tikets terminaos ?"}]})
+    eventos = [json.loads(linea) for linea in resp.text.splitlines() if linea]
+    assert eventos == [{"t": MENSAJE_IA_OCUPADA}, {"fin": True, "fuente": "directa"}]
+    assert ia.calls == []
 
 
 def test_failed_interpretation_goes_to_the_free_ai(client, ia, log, tickets):
     headers, _ = tickets
     ia.error = AsistenteNoDisponible("Ollama no responde")
-    _respuesta(ask(client, headers, "cuatos ticketes estan terminados ?"), "ia")
+    _respuesta(ask(client, headers, "tikets terminaos ?"), "ia")
     assert "falló: Ollama no responde" in log[0]
 
 
@@ -239,7 +272,7 @@ def test_explain_ticket_uses_explain_with_ai(client, ia, tickets, monkeypatch):
 
 def test_free_ai_gets_the_counts_by_state(client, ia, tickets):
     headers, _ = tickets
-    _respuesta(ask(client, headers, "cuatos ticketes estan terminados ?"), "ia")
+    _respuesta(ask(client, headers, "tikets terminaos ?"), "ia")
     assert ("Conteos por estado (terminados, finalizados o solucionados = resueltos o cerrados; "
             "pendientes = nuevos + en proceso): nuevos 1; en proceso 1; pendientes 2; "
             "resueltos o cerrados 2; cerrados 1; total 4.") in ia.calls[0]["system"]
@@ -249,8 +282,8 @@ def test_interpreted_count_is_drafted_like_the_others(client, ia, monkeypatch, t
     headers, _ = tickets
     monkeypatch.setenv("ASISTENTE_REDACTAR_CON_IA", "true")
     ia.json = _json(estado="cerrados")
-    ia.responder = lambda system, messages: "Hay 1 ticket cerrado en este momento."
-    respuesta = _respuesta(ask(client, headers, "cuatos ticketes serrados ?"), "ia_datos")
+    ia.responder = lambda system, messages, timeout=None: "Hay 1 ticket cerrado en este momento."
+    respuesta = _respuesta(ask(client, headers, "tikets serrados ?"), "ia_datos")
     assert respuesta.splitlines()[0] == "Hay 1 ticket cerrado en este momento."
 
 
@@ -258,7 +291,7 @@ def test_stream_also_interprets(client, ia, tickets):
     headers, _ = tickets
     ia.json = _json(estado="resueltos")
     resp = client.post("/api/asistente/stream", headers=headers,
-                       json={"messages": [{"role": "user", "content": "cuatos ticketes estan terminados ?"}]})
+                       json={"messages": [{"role": "user", "content": "tikets terminaos ?"}]})
     eventos = [json.loads(linea) for linea in resp.text.splitlines() if linea]
     assert eventos[0]["t"].startswith("Hay 2 tickets resueltos o cerrados:")
     assert eventos[-1] == {"fin": True, "fuente": "directa"}
@@ -267,7 +300,7 @@ def test_stream_also_interprets(client, ia, tickets):
 def test_can_be_turned_off(client, ia, tickets, monkeypatch):
     headers, _ = tickets
     monkeypatch.setenv("ASISTENTE_INTERPRETAR_CON_IA", "false")
-    _respuesta(ask(client, headers, "cuatos ticketes estan terminados ?"), "ia")
+    _respuesta(ask(client, headers, "tikets terminaos ?"), "ia")
     assert ia.interpretaciones == []
 
 

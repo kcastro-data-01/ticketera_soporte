@@ -16,13 +16,16 @@ from backend.services import asistente_service
 from backend.services.asistente_service import (
     INSTRUCCIONES_REDACCION,
     AsistenteNoDisponible,
+    IATardo,
     verificar_redaccion,
 )
 from backend.tests.test_asistente import add_ticket, ask, login_as
 
 
 class IASimulada:
-    """Devuelve ``texto`` (o lanza ``error``, o tarda ``demora`` segundos)."""
+    """Devuelve ``texto`` (o lanza ``error``, o tarda ``demora`` segundos).
+    Como httpx: si ``demora`` pasa el ``timeout`` de la petición, corta ahí
+    y lanza ``IATardo``."""
 
     def __init__(self):
         self.calls = []
@@ -30,8 +33,11 @@ class IASimulada:
         self.error = None
         self.demora = 0
 
-    def responder(self, system, messages):
-        self.calls.append({"system": system, "messages": messages})
+    def responder(self, system, messages, timeout=None):
+        self.calls.append({"system": system, "messages": messages, "timeout": timeout})
+        if timeout is not None and self.demora > timeout:
+            time.sleep(timeout)
+            raise IATardo("timeout")
         if self.demora:
             time.sleep(self.demora)
         if self.error is not None:
@@ -201,7 +207,8 @@ def test_slow_ai_falls_back(client, ia, log, en_proceso, monkeypatch):
 
     assert time.monotonic() - inicio < 1
     assert resp.json() == {"respuesta": fijo, "fuente": "directa"}
-    assert "tardó más de 0.2 s" in log[0]
+    assert ia.calls[0]["timeout"] == 0.2  # el límite va en la propia petición
+    assert "tardó más de 0.2 s, se canceló" in log[0]
 
 
 def test_zero_count_accepts_saying_there_are_none(client, ia, log, en_proceso):

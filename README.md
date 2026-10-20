@@ -583,14 +583,27 @@ Para que un modelo pequeño responda bien y rápido:
   tiene 2 (#3, #5) y José Solano (Técnico) tiene 1 (#7).». Toleran errores
   comunes («ticketes», «tiketes», «asigandos», «tecnico», sin tildes). Cada rol
   cuenta solo lo que puede ver: el Solicitante, sus propios tickets.
-- Si las reglas no reconocen la pregunta (por ejemplo, «cuatos ticketes estan
-  terminados ?»), la IA solo la **clasifica** en un JSON con valores fijos
-  (tipo, estado, período, persona, rol, ticket; `format` de Ollama) y el
-  servidor calcula con las mismas funciones y permisos. Si el JSON no sirve,
-  la persona o el ticket no existen, es otro tipo de pregunta o tarda más de
-  10 s, sigue la IA libre. Se apaga con `ASISTENTE_INTERPRETAR_CON_IA=false`.
+- Las reglas toleran errores comunes en «cuántos» y «hay» («cuatos», «cunatos»,
+  «cauntos», «ai», «ay»): «cuatos ticketes hay ?» da el total al instante.
+- Si las reglas no reconocen la pregunta (por ejemplo, «tikets terminaos ?»),
+  la IA solo la **clasifica** en un JSON con valores fijos (tipo, estado,
+  período, persona, rol, ticket; `format` de Ollama) y el servidor calcula con
+  las mismas funciones y permisos. Si el JSON no sirve, la persona o el ticket
+  no existen o es otro tipo de pregunta, sigue la IA libre. Se apaga con
+  `ASISTENTE_INTERPRETAR_CON_IA=false`.
+- Los límites de la interpretación (10 s) y de la redacción (20 s) van en la
+  propia petición a Ollama: al vencerse se cierra la conexión y el modelo deja
+  de generar (Ollama atiende una petición a la vez; una abandonada haría
+  esperar a la siguiente). Si la interpretación se pasa del tiempo, no se
+  llama a la IA libre: se responde con la regla si había una o «La IA está
+  ocupada, probá de nuevo en unos segundos.».
 - La IA libre recibe igual los conteos por estado, con sus otros nombres
-  («terminados» = resueltos o cerrados; «pendientes» = nuevos + en proceso).
+  («terminados» = resueltos o cerrados; «pendientes» = nuevos + en proceso),
+  y hasta 2 tickets de ejemplo por grupo para que el prompt sea corto.
+- Con poca memoria (por ejemplo, WSL con 2 GB) el sistema manda parte del
+  modelo al swap y todo se vuelve mucho más lento. En Windows, subí la memoria
+  de WSL en `%UserProfile%\.wslconfig` (`[wsl2]` y `memory=4GB`) y corré
+  `wsl --shutdown`.
 - A la IA, cada persona le llega con su rol: «asignado a Laura Méndez
   (Administrador)».
 - Las preguntas sobre el **contenido** de un ticket («¿cómo resuelvo el #5?»,

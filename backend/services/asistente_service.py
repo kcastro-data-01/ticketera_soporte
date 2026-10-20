@@ -22,8 +22,6 @@ import re
 import threading
 import time
 import unicodedata
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as TiempoAgotado
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -45,6 +43,7 @@ if not logger.handlers:
 
 # Lo único que ve la persona cuando el modelo falla; el detalle va al log.
 MENSAJE_NO_DISPONIBLE = "La IA no está disponible en este momento"
+MENSAJE_IA_OCUPADA = "La IA está ocupada, probá de nuevo en unos segundos."
 
 CLAUDE_MODEL = "claude-opus-5-5"
 # El modelo más liviano (≈0,5 GB): funciona en computadoras sin GPU y con
@@ -67,7 +66,7 @@ DETALLE_MAX_COMENTARIO = 400
 # Tickets por grupo (por estado, críticos, sin asignar, asignados a mí).
 MAX_TICKETS_IN_CONTEXT = 15
 # Un modelo local en CPU lee el prompt despacio: se le envían menos tickets.
-QWEN_MAX_TICKETS = 5
+QWEN_MAX_TICKETS = 2
 
 # Qué puede hacer cada rol (espejo de la tabla de permisos de ayuda.html).
 PERMISOS_POR_ROL = {
@@ -161,6 +160,11 @@ class AsistenteNoDisponible(Exception):
     """El proveedor no respondió; el mensaje explica qué revisar."""
 
 
+class IATardo(AsistenteNoDisponible):
+    """Se venció el tiempo de la petición: la conexión se cerró y el modelo
+    dejó de generar (Ollama aborta al cerrarse la conexión)."""
+
+
 def _persona(user: User) -> str:
     """«Laura Méndez (Administrador)»: el nombre siempre con su rol."""
     return f"{user.name} ({user.role})"
@@ -251,6 +255,9 @@ def _recortar(texto: str, maximo: int) -> str:
 # Errores de escritura comunes: «ticketes», «tiket», «tikete»; «asigandos»,
 # «asingados». Se aplican sobre el texto normalizado (sin tildes).
 _TICKET = r"(?:tick|tik)e?t?e?s?"
+# «cuántos» y «hay» con errores comunes («cuatos», «cunatos», «cauntos», «ai»).
+_CUANTOS = r"(?:cuant\w*|cuat[oa]s?|cunat[oa]s?|caunt[oa]s?|cuan[oa]s)"
+_HAY = r"(?:hay|ai|ay)"
 _ASIGNADO = r"(?:asig|asing|asga)\w*"
 
 
@@ -452,7 +459,7 @@ ESTADOS_EN_PREGUNTA = [
 # Palabras que caben en «¿cuántos tickets hay en total?»: si la pregunta trae
 # otra cosa (un estado que no existe, una persona…), no se responde el total.
 _PALABRAS_DEL_TOTAL = {
-    "cuantos", "cuantas", "cuanto", "cuanta", "total", "totales", "en", "hay", "existen", "existe",
+    "total", "totales", "en", "existen", "existe",
     "son", "es", "el", "la", "los", "las", "de", "del", "y", "se", "han", "todos", "todo",
     "sistema", "app", "aplicacion", "puedo", "ver", "veo", "visibles", "registrados", "numero",
     "cantidad", "actualmente", "ahora", "momento", "este", "me", "dime",
@@ -494,7 +501,7 @@ def _quitar_periodo(t: str) -> str:
 
 def _solo_pide_el_total(t: str) -> bool:
     palabras = re.findall(r"\w+", _quitar_periodo(t))
-    return all(p in _PALABRAS_DEL_TOTAL or re.fullmatch(_TICKET, p) for p in palabras)
+    return all(p in _PALABRAS_DEL_TOTAL or re.fullmatch(f"{_TICKET}|{_CUANTOS}|{_HAY}", p) for p in palabras)
 
 
 def detectar_consulta(pregunta: str) -> str | None:
@@ -511,7 +518,7 @@ def detectar_consulta(pregunta: str) -> str | None:
         return None
     if _PIDE_TIEMPO.search(t):
         return None
-    pide_lista = re.search(r"\b(cuant\w*|cuales|cual|que tickets|hay|lista\w*|muestra\w*|mostrar|"
+    pide_lista = re.search(rf"\b({_CUANTOS}|cuales|cual|que tickets|{_HAY}|lista\w*|muestra\w*|mostrar|"
                            r"dime|ver|tengo|pendientes?|abiertos?)\b", t)
     # Preguntas cortas de seguimiento («¿en proceso?», «y los críticos?»).
     corta = len(t.split()) <= 4 and not re.search(r"\b(crear|creo|nuevo ticket)\b", t)
@@ -526,7 +533,7 @@ def detectar_consulta(pregunta: str) -> str | None:
     for clave, patron in ESTADOS_EN_PREGUNTA:
         if re.search(patron, t):
             return clave
-    if not re.search(r"\b(cuant\w*|total)\b", t):
+    if not re.search(rf"\b({_CUANTOS}|total)\b", t):
         return None
     if _solo_pide_el_total(t):
         return "total"
@@ -640,7 +647,7 @@ ROLES_EN_PREGUNTA = [
     (r"\b(administrador\w*|admins?)\b", UserRole.ADMIN.value, "administradores"),
 ]
 _PIDE_CONTEO = re.compile(
-    rf"\b(cuant\w*|cuales|cual|que {_TICKET}|hay|lista\w*|muestra\w*|mostrar|dime|ver|tienen?|carga)\b"
+    rf"\b({_CUANTOS}|cuales|cual|que {_TICKET}|{_HAY}|lista\w*|muestra\w*|mostrar|dime|ver|tienen?|carga)\b"
 )
 _HABLA_DE_TICKETS = re.compile(rf"\b({_TICKET}|{_ASIGNADO})\b")
 _PIDE_UBICACION = re.compile(r"\b(como|donde)\b")
@@ -1014,7 +1021,7 @@ def calcular_directa(session, user: User, pregunta: str,
     t = _normalizar(pregunta)
     ids = tickets_mencionados(pregunta)
     # «¿cuántos tickets se resolvieron?» cuenta: no habla del ticket en pantalla.
-    cuenta = re.search(r"\bcuant\w*", t)
+    cuenta = re.search(rf"\b{_CUANTOS}\b", t)
     if not ids and ticket_actual is not None and (
         _ESTE_TICKET.search(t) or (_PIDE_CONTENIDO.search(t) and not cuenta)
     ):
@@ -1076,8 +1083,8 @@ def _conteo(session, user: User, clave: str, periodo) -> Directa | None:
 # El servidor calcula los datos; la IA solo los redacta. Si cambia un número,
 # inventa un ticket, tarda o falla, se usa el texto fijo.
 
+# Va en la propia petición: al vencerse se cancela (no queda generando).
 REDACCION_TIMEOUT = 20.0
-_redactores = ThreadPoolExecutor(max_workers=2, thread_name_prefix="redactar")
 
 INSTRUCCIONES_REDACCION = """\
 Eres el asistente del Sistema de Tickets de American Data Networks. Recibes una \
@@ -1180,13 +1187,11 @@ def redactar(proveedor, pregunta: str, directa: Directa) -> str | None:
     """El resumen redactado por la IA con los datos de ``directa``, o
     ``None`` (y queda en el log) si no se puede usar."""
     datos = directa.resumen or directa.texto
-    futuro = _redactores.submit(
-        proveedor.responder, INSTRUCCIONES_REDACCION, mensajes_redaccion(pregunta, datos)
-    )
     try:
-        texto = futuro.result(timeout=REDACCION_TIMEOUT)
-    except TiempoAgotado:
-        motivo = f"tardó más de {REDACCION_TIMEOUT:g} s"
+        texto = proveedor.responder(INSTRUCCIONES_REDACCION, mensajes_redaccion(pregunta, datos),
+                                    timeout=REDACCION_TIMEOUT)
+    except IATardo:
+        motivo = f"tardó más de {REDACCION_TIMEOUT:g} s, se canceló"
     except Exception as error:  # noqa: BLE001 — cualquier falla usa el respaldo
         motivo = f"falló: {error or type(error).__name__}"
     else:
@@ -1321,14 +1326,17 @@ def leer_interpretacion(texto: str) -> dict:
 
 def interpretar(proveedor, pregunta: str) -> dict | None:
     """La pregunta clasificada por la IA, o ``None`` (y queda en el log) si
-    el JSON no sirve, tarda más de :data:`INTERPRETACION_TIMEOUT` o falla."""
-    futuro = _redactores.submit(
-        proveedor.generar_json, mensajes_interpretacion(pregunta), ESQUEMA_INTERPRETACION, 0.0
-    )
+    el JSON no sirve o falla. Si tarda más de :data:`INTERPRETACION_TIMEOUT`
+    la petición se cancela y lanza ``IATardo``: el modelo está ocupado y no
+    conviene mandarle enseguida el prompt largo de la IA libre."""
     try:
-        datos = leer_interpretacion(futuro.result(timeout=INTERPRETACION_TIMEOUT))
-    except TiempoAgotado:
-        motivo = f"tardó más de {INTERPRETACION_TIMEOUT:g} s"
+        datos = leer_interpretacion(proveedor.generar_json(
+            mensajes_interpretacion(pregunta), ESQUEMA_INTERPRETACION, 0.0,
+            timeout=INTERPRETACION_TIMEOUT,
+        ))
+    except IATardo:
+        logger.info("interpretación cancelada: tardó más de %g s", INTERPRETACION_TIMEOUT)
+        raise
     except ValueError as error:
         motivo = f"JSON inválido: {error}"
     except Exception as error:  # noqa: BLE001 — cualquier falla sigue con la IA libre
@@ -1493,9 +1501,17 @@ class ProveedorQwen:
         )
 
     @staticmethod
+    def _limite(timeout: float | None) -> dict:
+        """``timeout`` de httpx para una petición: al vencerse se cierra la
+        conexión y Ollama deja de generar. Sin él, el del cliente."""
+        if timeout is None:
+            return {}
+        return {"timeout": httpx.Timeout(timeout, connect=min(QWEN_TIMEOUT_CONEXION, timeout))}
+
+    @staticmethod
     def _error_conexion(error: httpx.HTTPError) -> AsistenteNoDisponible:
         if isinstance(error, httpx.TimeoutException):
-            return AsistenteNoDisponible(
+            return IATardo(
                 f"El modelo tardó demasiado en responder (timeout); si tu computadora tiene "
                 "poca memoria, usa un modelo más pequeño (QWEN_MODELO=qwen3:0.6b) o sube QWEN_TIMEOUT"
             )
@@ -1503,10 +1519,11 @@ class ProveedorQwen:
             "No se pudo conectar con Ollama: comprueba que el servicio está en ejecución"
         )
 
-    def responder(self, system: str, messages: list[dict]) -> str:
+    def responder(self, system: str, messages: list[dict], timeout: float | None = None) -> str:
         try:
             response = self.http.post(
-                f"{self.url}/api/chat", json=self._cuerpo(system, messages, stream=False)
+                f"{self.url}/api/chat", json=self._cuerpo(system, messages, stream=False),
+                **self._limite(timeout),
             )
         except httpx.HTTPError as error:
             raise self._error_conexion(error)
@@ -1557,7 +1574,8 @@ class ProveedorQwen:
         if not emitido:
             raise AsistenteNoDisponible("el modelo devolvió una respuesta vacía")
 
-    def generar_json(self, messages: list[dict], esquema: dict, temperature: float = 0.1) -> str:
+    def generar_json(self, messages: list[dict], esquema: dict, temperature: float = 0.1,
+                     timeout: float | None = None) -> str:
         """Pide una respuesta JSON con la forma de ``esquema`` (``format`` de
         Ollama: el modelo solo puede escribir JSON con esos campos).
 
@@ -1575,7 +1593,7 @@ class ProveedorQwen:
             "keep_alive": QWEN_MANTENER_CARGADO,
         }
         try:
-            response = self.http.post(f"{self.url}/api/chat", json=cuerpo)
+            response = self.http.post(f"{self.url}/api/chat", json=cuerpo, **self._limite(timeout))
         except httpx.HTTPError as error:
             raise self._error_conexion(error)
         if response.status_code >= 400:
@@ -1608,11 +1626,12 @@ class ProveedorClaude:
     def __init__(self, client):
         self.client = client
 
-    def responder(self, system: str, messages: list[dict]) -> str:
+    def responder(self, system: str, messages: list[dict], timeout: float | None = None) -> str:
         import anthropic
 
         try:
             response = self.client.beta.messages.create(
+                **({"timeout": timeout} if timeout is not None else {}),
                 model=CLAUDE_MODEL,
                 max_tokens=16000,
                 system=system,
@@ -1628,6 +1647,8 @@ class ProveedorClaude:
             raise AsistenteNoConfigurado("La clave ANTHROPIC_API_KEY del servidor no es válida")
         except anthropic.RateLimitError:
             raise AsistenteOcupado()
+        except anthropic.APITimeoutError:
+            raise IATardo("Claude tardó demasiado en responder")
         except (anthropic.APIStatusError, anthropic.APIConnectionError):
             raise AsistenteNoDisponible(
                 "El asistente no está disponible en este momento; intenta más tarde"
@@ -1644,10 +1665,11 @@ class ProveedorClaude:
     def responder_stream(self, system: str, messages: list[dict]):
         yield self.responder(system, messages)
 
-    def generar_json(self, messages: list[dict], esquema: dict, temperature: float = 0.1) -> str:
+    def generar_json(self, messages: list[dict], esquema: dict, temperature: float = 0.1,
+                     timeout: float | None = None) -> str:
         """Misma interfaz que Qwen: el JSON se pide en las instrucciones."""
         system = messages[0]["content"] + "\nResponde solo con el objeto JSON, sin texto alrededor."
-        return self.responder(system, messages[1:])
+        return self.responder(system, messages[1:], timeout=timeout)
 
 
 def crear_proveedor():
@@ -1691,7 +1713,11 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
     # Las reglas no la reconocieron: la IA la clasifica y el servidor calcula.
     # Si no sirve, «No entendí…» se mantiene y lo demás va a la IA libre.
     if (directa is None or directa.texto == NO_ENTENDI) and interpretar_con_ia_activo():
-        datos = interpretar(proveedor, pregunta)
+        try:
+            datos = interpretar(proveedor, pregunta)
+        except IATardo:
+            # No se llama a la IA libre detrás: también se pasaría del tiempo.
+            return directa or Directa(MENSAJE_IA_OCUPADA), None, None
         calculado = datos and calcular_desde_interpretacion(session, user, datos, ticket_actual, pregunta)
         if calculado:
             interpretada, ticket = calculado
