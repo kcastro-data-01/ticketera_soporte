@@ -71,7 +71,7 @@
   /* ---------- Login ---------- */
   --login-fondo: #f4f6fb;
   --login-card-borde: #dde3ee;
-  --login-card-sombra: 0 10px 30px rgba(11, 24, 77, 0.12);
+  --login-card-sombra: 0 12px 40px rgba(11, 24, 77, 0.08), 0 2px 6px rgba(11, 24, 77, 0.04);
   --login-icon-color: #1746e0;
   --login-link-color: #0f34b3;
 

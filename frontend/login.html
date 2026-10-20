@@ -19,12 +19,12 @@
       gap: 0;
       align-items: stretch;
       padding: 0;
-      width: 100%;
+      width: calc(100% - 2rem);
       max-width: 900px;
-      background: #ffffff;
-      border: 1px solid #dde3ee;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(11, 24, 77, 0.12);
+      background: var(--color-superficie);
+      border: 1px solid var(--color-borde);
+      border-radius: 18px;
+      box-shadow: var(--login-card-sombra);
       margin: 3rem auto;
       overflow: hidden;
     }
@@ -59,13 +59,46 @@
       padding: 3rem 2.5rem;
       width: 100%;
     }
+    /* Nombre del sistema arriba del formulario (logo y textos del menú). */
+    .login-marca {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      width: 100%;
+      margin-bottom: 1.75rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--color-borde);
+    }
+    .login-marca img {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex: none;
+    }
+    .login-marca-nombre {
+      display: block;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--color-texto);
+      line-height: 1.25;
+    }
+    .login-marca-sub {
+      display: block;
+      margin-top: 0.1rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-tenue);
+    }
     .auth-container .login-der .login-titulo {
       width: 100%;
-      text-align: center;
-      font-size: 1.4rem;
-      color: var(--color-primario-oscuro);
+      text-align: left;
+      font-size: 1.35rem;
+      color: var(--color-texto);
       font-weight: 700;
-      margin-bottom: 1.5rem;
+      margin: 0 0 1.25rem;
     }
     .auth-container .login-der .campo {
       position: relative;
@@ -74,16 +107,19 @@
     }
     .auth-container .login-der .campo .form-input {
       width: 100%;
-      padding: 0.875rem 1rem;
-      border: 1px solid #dde3ee;
-      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      border: 1px solid var(--color-borde-fuerte);
+      border-radius: 12px;
       font-size: 1rem;
-      background: #fff;
-      transition: border-color 0.2s;
+      color: var(--color-texto);
+      background: var(--color-fondo-neutro);
+      transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
     }
     .auth-container .login-der .campo .form-input:focus {
       outline: none;
-      border-color: #1746e0;
+      border-color: var(--color-primario);
+      background: var(--color-superficie);
+      box-shadow: 0 0 0 3px var(--color-primario-foco);
     }
     .auth-container .login-der .toggle-password {
       position: absolute;
@@ -91,7 +127,7 @@
       top: 50%;
       transform: translateY(-50%);
       cursor: pointer;
-      color: #1746e0;
+      color: var(--color-tenue);
     }
     .auth-container .login-der .btn-grp {
       display: flex;
@@ -186,13 +222,14 @@
       background: var(--color-primario);
       color: #fff;
       border: none;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
+      padding: 0.8rem 1rem;
+      border-radius: 12px;
       font-weight: 600;
       font-size: var(--texto-sm);
       cursor: pointer;
-      transition: background-color 0.2s;
+      transition: background-color 0.2s, box-shadow 0.2s;
       width: 100%;
+      box-shadow: 0 4px 12px rgba(23, 70, 224, 0.22);
     }
     .btn-primario:hover {
       background: var(--color-primario-oscuro);
@@ -205,8 +242,8 @@
       background: transparent;
       color: var(--color-primario);
       border: 1px solid var(--color-primario);
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
+      padding: 0.8rem 1rem;
+      border-radius: 12px;
       font-weight: 600;
       font-size: var(--texto-sm);
       cursor: pointer;
@@ -233,7 +270,7 @@
     .nota-registro {
       margin: 0 0 1rem;
       font-size: 0.85rem;
-      color: #5d6880;
+      color: var(--color-tenue);
     }
     .role-selector {
       display: none;
@@ -288,6 +325,13 @@
       <img src="images/login-sistema-tickets.jpg" alt="American Data Networks" class="login-imagen">
     </div>
     <div class="login-der">
+      <div class="login-marca">
+        <img src="images/logo-circular.jpg" alt="">
+        <span>
+          <span class="login-marca-nombre">American Data Networks</span>
+          <span class="login-marca-sub">Sistema de tickets</span>
+        </span>
+      </div>
       <h2 class="login-titulo">Iniciar sesión</h2>
       <div id="auth-error" class="auth-error" role="alert"></div>
       <div id="auth-success" class="auth-success" role="status"></div>
