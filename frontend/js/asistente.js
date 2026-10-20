@@ -43,25 +43,6 @@ const SUGERENCIAS_POR_ROL = {
   ],
 };
 const SALUDO = "¡Hola! Soy tu asistente. Podés preguntarme cosas como:";
-/* El botón «late» hasta que la persona abre el chat por primera vez en
-   este navegador. */
-const CHAT_VISTO_KEY = "asistente_visto";
-
-function chatYaVisto() {
-  try {
-    return localStorage.getItem(CHAT_VISTO_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function marcarChatVisto() {
-  try {
-    localStorage.setItem(CHAT_VISTO_KEY, "1");
-  } catch {
-    /* Sin almacenamiento solo deja de latir en esta página. */
-  }
-}
 
 /* Íconos (trazos con currentColor, sin dependencias externas). */
 const ICONOS = {
@@ -378,18 +359,14 @@ function crearAsistente() {
 
   panel.append(cabecera, lista, formulario);
 
-  /* Píldora con chispas y «¿Necesitás ayuda?» (en el celular, solo el
-     círculo); al abrir el panel queda un círculo con una «X». */
-  const abrir = crearElemento("button", `chat-boton${chatYaVisto() ? "" : " latido"}`);
+  /* Cuadrado redondeado con las chispas; al abrir el panel cambia a una «X». */
+  const abrir = crearElemento("button", "chat-boton");
   abrir.type = "button";
   abrir.setAttribute("aria-expanded", "false");
   abrir.setAttribute("aria-label", "Abrir asistente");
   abrir.dataset.tooltip = "Asistente";
   abrir.innerHTML =
-    '<span class="chat-boton-iconos">' +
-    icono("chispa", "chat-boton-icono icono-chat") +
-    icono("cerrar", "chat-boton-icono icono-cerrar") +
-    '</span><span class="chat-boton-texto">¿Necesitás ayuda?</span>';
+    icono("chispa", "chat-boton-icono icono-chat") + icono("cerrar", "chat-boton-icono icono-cerrar");
 
   contenedor.append(panel, abrir);
   document.body.appendChild(contenedor);
@@ -411,8 +388,6 @@ function crearAsistente() {
     abrir.setAttribute("aria-label", mostrar ? "Cerrar asistente" : "Abrir asistente");
     abrir.dataset.tooltip = mostrar ? "Cerrar" : "Asistente";
     if (mostrar) {
-      abrir.classList.remove("latido");
-      marcarChatVisto();
       panel.classList.remove("cerrando");
       panel.hidden = false;
       contenedor.classList.add("abierto");

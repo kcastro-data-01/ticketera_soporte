@@ -184,10 +184,9 @@ function nodoCompleto(tag) {
   return n;
 }
 
-function montarChat({ reducirMovimiento = false, rol = "Técnico", visto = false } = {}) {
+function montarChat({ reducirMovimiento = false, rol = "Técnico" } = {}) {
   const creados = [];
   const store = new Map([["access_token", "t"], ["user", JSON.stringify({ name: "José Solano", role: rol })]]);
-  if (visto) store.set("asistente_visto", "1");
   const temporizadores = [];
   const sandbox = {
     document: {
@@ -269,22 +268,15 @@ test("con «reducir movimiento» se cierra al instante", () => {
   assert.equal(chat.temporizadores.length, 0);
 });
 
-test("botón: chispas + «¿Necesitás ayuda?» (no el globo de chat)", () => {
+test("botón: solo el ícono de chispas, sin texto ni latido", () => {
   const chat = montarChat();
-  assert.match(chat.boton.innerHTML, /chat-boton-texto">¿Necesitás ayuda\?</);
+  assert.equal(chat.boton.className, "chat-boton");
   assert.match(chat.boton.innerHTML, /M12 3l1\.8 4\.9/, "ícono de chispas");
   assert.doesNotMatch(chat.boton.innerHTML, /M21 12a8 8 0 0 1-11\.6/, "sin el globo de chat");
-});
-
-test("el botón late hasta que se abre por primera vez en este navegador", () => {
-  const chat = montarChat();
-  assert.equal(chat.boton.className, "chat-boton latido");
+  assert.doesNotMatch(chat.boton.innerHTML, /Necesitás ayuda|chat-boton-texto/);
+  assert.equal(chat.boton.atributos["aria-label"], "Abrir asistente");
   clic(chat.boton);
-  assert.equal(chat.boton.classList.contains("latido"), false);
-  assert.equal(chat.store.get("asistente_visto"), "1");
-
-  const otraVez = montarChat({ visto: true });
-  assert.equal(otraVez.boton.className, "chat-boton");
+  assert.equal(chat.boton.className, "chat-boton");
 });
 
 test("sin mensajes: saludo y 3 preguntas de ejemplo", () => {
