@@ -198,6 +198,7 @@ def _grupos(user: User) -> dict[str, tuple[str, tuple]]:
             (Ticket.state.in_((TicketState.RESOLVED.value, TicketState.CLOSED.value)),),
         ),
         "cerrados": ("Tickets en estado Cerrado", (Ticket.state == TicketState.CLOSED.value,)),
+        "pendientes": ("Tickets pendientes (estado Nuevo o En proceso)", (_abiertos(),)),
         "criticos": (
             "Tickets críticos sin resolver",
             (Ticket.priority == TicketPriority.CRITICAL.value, _abiertos()),
@@ -366,6 +367,7 @@ FRASES_GRUPO = {
     "en_proceso": ("ticket en proceso", "tickets en proceso"),
     "resueltos": ("ticket resuelto o cerrado", "tickets resueltos o cerrados"),
     "cerrados": ("ticket cerrado", "tickets cerrados"),
+    "pendientes": ("ticket pendiente", "tickets pendientes"),
     "criticos": ("ticket crítico sin resolver", "tickets críticos sin resolver"),
     "sin_asignar": ("ticket sin asignar sin resolver", "tickets sin asignar sin resolver"),
 }
@@ -380,9 +382,12 @@ def _normalizar(texto: str) -> str:
 # en que se revisan: «sin atender» va antes que «atendido».
 ESTADOS_EN_PREGUNTA = [
     ("en_proceso", r"\b(en proceso|en progreso|en curso|trabajando|atendiendo)\b"),
-    ("nuevos", r"\b(nuevos?|pendientes?|sin atender|sin revisar|no atendid\w*)\b"),
-    ("cerrados", r"\b(cerrad\w*|cerraron|cerro|finalizad\w*|finalizaron|terminad\w*|terminaron)\b"),
-    ("resueltos", r"\b(resuelt|resolv|solucionad|solucionaron|arreglad|arreglaron|atendid|atendieron)\w*"),
+    ("nuevos", r"\b(nuevos?|sin atender|sin revisar|no atendid\w*)\b"),
+    # Pendiente = sin resolver: Nuevo o En proceso.
+    ("pendientes", r"\bpendientes?\b"),
+    ("cerrados", r"\b(cerrad\w*|cerraron|cerro)\b"),
+    ("resueltos", r"\b(resuelt|resolv|solucionad|solucionaron|arreglad|arreglaron|atendid|atendieron|"
+                  r"finalizad|finalizaron|terminad|terminaron)\w*"),
 ]
 # Palabras que caben en «¿cuántos tickets hay en total?»: si la pregunta trae
 # otra cosa (un estado que no existe, una persona…), no se responde el total.
@@ -488,9 +493,46 @@ ESTADO_DEL_PASO = {
 }
 
 
+def _desglose_pendientes(session, statement) -> str:
+    """«(4 nuevos y 3 en proceso)», sin los estados que no tienen tickets."""
+    filas = statement.subquery()
+    por_estado = dict(session.execute(
+        select(filas.c.state, func.count()).group_by(filas.c.state)
+    ).all())
+    partes = []
+    nuevos = por_estado.get(TicketState.NEW.value, 0)
+    if nuevos:
+        partes.append(f"{nuevos} {'nuevo' if nuevos == 1 else 'nuevos'}")
+    en_proceso = por_estado.get(TicketState.IN_PROGRESS.value, 0)
+    if en_proceso:
+        partes.append(f"{en_proceso} en proceso")
+    return f"({_unir(partes)})"
+
+
+def _respuesta_pendientes_periodo(session, user: User, periodo) -> str:
+    """«Esta semana se crearon 2 tickets que siguen pendientes (…).»"""
+    desde, hasta, frase = periodo
+    inicio, fin = metricas_service.limites_utc(desde, hasta)
+    statement = _base_visible(user).where(
+        Ticket.created_at >= inicio, Ticket.created_at < fin, _abiertos()
+    )
+    total, tickets = _contar_y_listar(session, statement, DIRECTAS_MAX_TICKETS)
+    tuyo = user.role == UserRole.REQUESTER.value
+    if not total:
+        return f"{frase} no se creó ningún ticket{' tuyo' if tuyo else ''} que siga pendiente."
+    if total == 1:
+        cabecera = f"{frase} se creó 1 ticket{' tuyo' if tuyo else ''} que sigue pendiente"
+    else:
+        cabecera = f"{frase} se crearon {total} tickets{' tuyos' if tuyo else ''} que siguen pendientes"
+    return "\n".join([f"{cabecera} {_desglose_pendientes(session, statement)}.",
+                      *_lista_tickets(tickets, total)])
+
+
 def _respuesta_periodo(session, user: User, clave: str, periodo) -> str | None:
     """«Esta semana se resolvieron 4 tickets.», con el criterio del panel de
     métricas; ``None`` para los grupos que no se cuentan por período."""
+    if clave == "pendientes":
+        return _respuesta_pendientes_periodo(session, user, periodo)
     if clave not in VERBOS_PERIODO:
         return None
     desde, hasta, frase = periodo
@@ -933,6 +975,8 @@ def respuesta_directa(session, user: User, pregunta: str,
     frase = _frase_grupo(clave, user, total)
     if not total:
         return f"No hay {frase}."
+    if clave == "pendientes":
+        frase += " " + _desglose_pendientes(session, base.where(*condiciones))
     return "\n".join([f"Hay {total} {frase}:", *_lista_tickets(tickets, total)])
 
 

@@ -81,10 +81,26 @@ def test_closed_counts_only_closed(client, tickets, fake_claude):
                         "(Red, prioridad Media, estado Cerrado, asignado a sin asignar)"
 
 
-def test_pending_counts_new_tickets(client, tickets, fake_claude):
+def test_pending_counts_new_and_in_progress(client, tickets, fake_claude):
     headers, t = tickets
-    respuesta = _directa(client, headers, "cuantos hay pendientes")
-    assert respuesta.startswith(f"Hay 1 ticket nuevo:\n- #{t['nuevo'].id} «Monitor nuevo»")
+    lineas = _directa(client, headers, "cuantos hay pendientes").splitlines()
+    assert lineas[0] == "Hay 2 tickets pendientes (1 nuevo y 1 en proceso):"
+    assert {l.split()[1] for l in lineas[1:]} == {f"#{t['nuevo'].id}", f"#{t['en_proceso'].id}"}
+
+
+def test_pending_this_week_are_created_this_week_and_still_open(client, tickets, fake_claude):
+    headers, t = tickets
+    respuesta = _directa(client, headers, "cuantos pendientes esta semana")
+    # El «En proceso» se creó el sábado 10: no cuenta.
+    assert respuesta == (f"Esta semana se creó 1 ticket que sigue pendiente (1 nuevo).\n"
+                         f"- #{t['nuevo'].id} «Monitor nuevo» (Red, prioridad Media, estado Nuevo, "
+                         "asignado a sin asignar)")
+
+
+def test_finished_counts_as_resolved(client, tickets, fake_claude):
+    headers, _ = tickets
+    respuesta = _directa(client, headers, "cuantos tickets terminados")
+    assert respuesta.startswith("Hay 4 tickets resueltos o cerrados:")
 
 
 def test_solved_today(client, tickets, fake_claude):
@@ -156,8 +172,12 @@ def test_requester_only_counts_own_tickets_in_a_period(client, session, tickets,
         ("cuantos se resolvieron", "resueltos"),
         ("cuantos tickets arreglados hay", "resueltos"),
         ("cuantos fueron atendidos", "resueltos"),
-        ("cuantos estan finalizados", "cerrados"),
-        ("cuantos tickets terminados", "cerrados"),
+        ("cuantos estan finalizados", "resueltos"),
+        ("cuantos tickets terminados", "resueltos"),
+        ("cuantos se terminaron", "resueltos"),
+        ("cuantos estan cerrados", "cerrados"),
+        ("cuantos hay pendientes", "pendientes"),
+        ("tengo pendientes?", "mios"),
         ("en que estan trabajando?", "en_proceso"),
         ("cuantos estan atendiendo", "en_proceso"),
         ("cuantos tickets en curso", "en_proceso"),
