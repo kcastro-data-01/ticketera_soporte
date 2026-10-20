@@ -25,12 +25,43 @@ function ticketEnPantalla() {
   }
 }
 
+/* Preguntas de ejemplo del saludo. El Solicitante no tiene tickets
+   asignados ni usa «Explicá», así que recibe otras. */
+const SUGERENCIAS_EQUIPO = [
+  "¿Cuántos tickets pendientes hay?",
+  "¿Qué tickets tengo asignados?",
+  "Explicá el ticket #1",
+];
 const SUGERENCIAS_POR_ROL = {
-  Administrador: ["¿Cuántos tickets críticos hay sin resolver?", "¿Cómo desactivo a un usuario?"],
-  Supervisor: ["¿Qué tickets están sin asignar?", "¿Cómo reasigno un ticket?"],
-  Técnico: ["¿Qué tickets tengo pendientes?", "¿Cómo cambio el estado de un ticket?"],
-  Solicitante: ["¿En qué estado están mis tickets?", "¿Cómo creo un ticket?"],
+  Administrador: SUGERENCIAS_EQUIPO,
+  Supervisor: SUGERENCIAS_EQUIPO,
+  Técnico: SUGERENCIAS_EQUIPO,
+  Solicitante: [
+    "¿Cuántos tickets pendientes tengo?",
+    "¿En qué estado están mis tickets?",
+    "¿Cómo creo un ticket?",
+  ],
 };
+const SALUDO = "¡Hola! Soy tu asistente. Podés preguntarme cosas como:";
+/* El botón «late» hasta que la persona abre el chat por primera vez en
+   este navegador. */
+const CHAT_VISTO_KEY = "asistente_visto";
+
+function chatYaVisto() {
+  try {
+    return localStorage.getItem(CHAT_VISTO_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function marcarChatVisto() {
+  try {
+    localStorage.setItem(CHAT_VISTO_KEY, "1");
+  } catch {
+    /* Sin almacenamiento solo deja de latir en esta página. */
+  }
+}
 
 /* Íconos (trazos con currentColor, sin dependencias externas). */
 const ICONOS = {
@@ -139,16 +170,8 @@ function pintarMensajes(lista, mensajes) {
   lista.replaceChildren();
   const user = getUser();
   if (mensajes.length === 0) {
-    const nombre = user && user.name ? `, ${user.name.split(" ")[0]}` : "";
-    const rol = user && user.role ? user.role : "usuario";
-    lista.appendChild(
-      burbuja({
-        role: "assistant",
-        content: `¡Hola${nombre}! Soy el asistente del Sistema de Tickets. Puedo ayudarte a usar la aplicación y a consultar los tickets que puedes ver como ${rol}.`,
-      })
-    );
+    lista.appendChild(burbuja({ role: "assistant", content: SALUDO }));
     const sugerencias = crearElemento("div", "chat-sugerencias");
-    sugerencias.appendChild(crearElemento("span", "chat-sugerencias-titulo", "Prueba con"));
     (SUGERENCIAS_POR_ROL[user && user.role] || []).forEach((texto) => {
       const chip = crearElemento("button", "chat-sugerencia", texto);
       chip.type = "button";
@@ -355,13 +378,18 @@ function crearAsistente() {
 
   panel.append(cabecera, lista, formulario);
 
-  /* Botón redondo con ícono de chat; al abrir el panel cambia a una «X». */
-  const abrir = crearElemento("button", "chat-boton");
+  /* Píldora con chispas y «¿Necesitás ayuda?» (en el celular, solo el
+     círculo); al abrir el panel queda un círculo con una «X». */
+  const abrir = crearElemento("button", `chat-boton${chatYaVisto() ? "" : " latido"}`);
   abrir.type = "button";
   abrir.setAttribute("aria-expanded", "false");
   abrir.setAttribute("aria-label", "Abrir asistente");
   abrir.dataset.tooltip = "Asistente";
-  abrir.innerHTML = icono("chat", "chat-boton-icono icono-chat") + icono("cerrar", "chat-boton-icono icono-cerrar");
+  abrir.innerHTML =
+    '<span class="chat-boton-iconos">' +
+    icono("chispa", "chat-boton-icono icono-chat") +
+    icono("cerrar", "chat-boton-icono icono-cerrar") +
+    '</span><span class="chat-boton-texto">¿Necesitás ayuda?</span>';
 
   contenedor.append(panel, abrir);
   document.body.appendChild(contenedor);
@@ -383,6 +411,8 @@ function crearAsistente() {
     abrir.setAttribute("aria-label", mostrar ? "Cerrar asistente" : "Abrir asistente");
     abrir.dataset.tooltip = mostrar ? "Cerrar" : "Asistente";
     if (mostrar) {
+      abrir.classList.remove("latido");
+      marcarChatVisto();
       panel.classList.remove("cerrando");
       panel.hidden = false;
       contenedor.classList.add("abierto");

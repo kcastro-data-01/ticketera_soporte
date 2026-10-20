@@ -184,9 +184,10 @@ function nodoCompleto(tag) {
   return n;
 }
 
-function montarChat({ reducirMovimiento = false } = {}) {
+function montarChat({ reducirMovimiento = false, rol = "Técnico", visto = false } = {}) {
   const creados = [];
-  const store = new Map([["access_token", "t"], ["user", JSON.stringify({ name: "José Solano", role: "Técnico" })]]);
+  const store = new Map([["access_token", "t"], ["user", JSON.stringify({ name: "José Solano", role: rol })]]);
+  if (visto) store.set("asistente_visto", "1");
   const temporizadores = [];
   const sandbox = {
     document: {
@@ -213,6 +214,8 @@ function montarChat({ reducirMovimiento = false } = {}) {
   sandbox.crearAsistente();
   const buscar = (clase) => creados.find((n) => n.className.split(" ").includes(clase));
   return {
+    store,
+    lista: buscar("chat-lista"),
     panel: buscar("chat-panel"),
     contenedor: buscar("chat-asistente"),
     boton: buscar("chat-boton"),
@@ -264,4 +267,40 @@ test("con «reducir movimiento» se cierra al instante", () => {
   clic(chat.boton);
   assert.equal(chat.panel.hidden, true);
   assert.equal(chat.temporizadores.length, 0);
+});
+
+test("botón: chispas + «¿Necesitás ayuda?» (no el globo de chat)", () => {
+  const chat = montarChat();
+  assert.match(chat.boton.innerHTML, /chat-boton-texto">¿Necesitás ayuda\?</);
+  assert.match(chat.boton.innerHTML, /M12 3l1\.8 4\.9/, "ícono de chispas");
+  assert.doesNotMatch(chat.boton.innerHTML, /M21 12a8 8 0 0 1-11\.6/, "sin el globo de chat");
+});
+
+test("el botón late hasta que se abre por primera vez en este navegador", () => {
+  const chat = montarChat();
+  assert.equal(chat.boton.className, "chat-boton latido");
+  clic(chat.boton);
+  assert.equal(chat.boton.classList.contains("latido"), false);
+  assert.equal(chat.store.get("asistente_visto"), "1");
+
+  const otraVez = montarChat({ visto: true });
+  assert.equal(otraVez.boton.className, "chat-boton");
+});
+
+test("sin mensajes: saludo y 3 preguntas de ejemplo", () => {
+  const chat = montarChat();
+  clic(chat.boton);
+  assert.match(texto(chat.lista), /¡Hola! Soy tu asistente\. Podés preguntarme cosas como:/);
+  const chips = [];
+  const juntar = (n) => { if (n.className === "chat-sugerencia") chips.push(n.textContent); (n.children || []).forEach(juntar); };
+  juntar(chat.lista);
+  assert.deepEqual(chips, ["¿Cuántos tickets pendientes hay?", "¿Qué tickets tengo asignados?", "Explicá el ticket #1"]);
+
+  const solicitante = montarChat({ rol: "Solicitante" });
+  clic(solicitante.boton);
+  const otros = [];
+  const juntar2 = (n) => { if (n.className === "chat-sugerencia") otros.push(n.textContent); (n.children || []).forEach(juntar2); };
+  juntar2(solicitante.lista);
+  assert.equal(otros.length, 3);
+  assert.ok(!otros.includes("¿Qué tickets tengo asignados?"));
 });

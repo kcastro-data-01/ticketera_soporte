@@ -14,6 +14,10 @@
   --color-primario-oscuro: #0f34b3;
   --color-primario-suave: #c7d4fd;
   --color-primario-tenue: #e9effe;
+  /* Tono más claro del principal (degradados del chat). */
+  --color-primario-claro: #5b82f5;
+  /* Fondo de la conversación del chat. */
+  --color-fondo-chat: #f7f8fa;
   --color-primario-foco: rgba(23, 70, 224, 0.28);
   --color-enlace: #1746e0;
 
@@ -1389,45 +1393,48 @@ body.app {
 }
 
 /* ---------- Asistente de IA (chat flotante) ---------- */
-/* Estilo limpio: superficies claras, sombras suaves y el color principal
-   solo en el botón flotante, las preguntas y el botón de enviar. */
+/* Botón en forma de píldora con degradado, ventana blanca con conversación
+   sobre gris muy claro y burbujas con «cola». */
 
 .chat-asistente {
   position: fixed;
-  right: 1.25rem;
-  bottom: 1.25rem;
+  right: 1.5rem;
+  bottom: 1.5rem;
   z-index: 50;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.85rem;
+  gap: 0.9rem;
 }
 
-/* Botón flotante: círculo con ícono de chat que cambia a «X». */
+/* --- Botón flotante: píldora con chispas + «¿Necesitás ayuda?» --- */
 .chat-boton {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: 56px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
   height: 56px;
-  padding: 0;
+  padding: 0 1.4rem 0 1.1rem;
   border: 0;
-  border-radius: 50%;
-  background: var(--color-primario);
+  border-radius: var(--radio-pill);
+  background: linear-gradient(135deg, var(--color-primario) 0%, var(--color-primario-claro) 100%);
   color: var(--color-texto-inverso);
-  box-shadow: 0 6px 18px rgba(23, 70, 224, 0.28);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  box-shadow: 0 10px 28px rgba(23, 70, 224, 0.42), 0 3px 8px rgba(23, 70, 224, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, padding 0.2s ease;
 }
 
 .chat-boton:hover {
-  background: var(--color-primario);
-  transform: scale(1.08);
-  box-shadow: 0 10px 24px rgba(23, 70, 224, 0.32);
+  background: linear-gradient(135deg, var(--color-primario) 0%, var(--color-primario-claro) 100%);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 14px 34px rgba(23, 70, 224, 0.5), 0 4px 10px rgba(23, 70, 224, 0.28);
 }
 
 .chat-boton:active {
-  background: var(--color-primario-oscuro);
-  transform: scale(1.02);
+  transform: scale(0.98);
 }
 
 .chat-boton:focus-visible {
@@ -1435,10 +1442,19 @@ body.app {
   outline-offset: 3px;
 }
 
-.chat-boton-icono {
-  grid-area: 1 / 1;
+/* Los dos íconos (chispas y «X») ocupan el mismo lugar. */
+.chat-boton-iconos {
+  display: grid;
+  place-items: center;
   width: 26px;
   height: 26px;
+  flex-shrink: 0;
+}
+
+.chat-boton-icono {
+  grid-area: 1 / 1;
+  width: 24px;
+  height: 24px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -1452,6 +1468,17 @@ body.app {
   transform: rotate(-90deg);
 }
 
+/* Abierto: círculo con la «X». */
+.chat-boton[aria-expanded="true"] {
+  width: 56px;
+  padding: 0;
+  justify-content: center;
+}
+
+.chat-boton[aria-expanded="true"] .chat-boton-texto {
+  display: none;
+}
+
 .chat-boton[aria-expanded="true"] .icono-chat {
   opacity: 0;
   transform: rotate(90deg);
@@ -1462,7 +1489,7 @@ body.app {
   transform: none;
 }
 
-/* Etiqueta «Asistente» al pasar el mouse. */
+/* Etiqueta «Cerrar» solo cuando el botón es un círculo. */
 .chat-boton::before {
   content: attr(data-tooltip);
   position: absolute;
@@ -1474,24 +1501,56 @@ body.app {
   color: var(--color-texto-inverso);
   font-size: 0.78rem;
   font-weight: 600;
-  white-space: nowrap;
   opacity: 0;
   pointer-events: none;
   transform: translate(4px, -50%);
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-.chat-boton:hover::before,
-.chat-boton:focus-visible::before {
+.chat-boton[aria-expanded="true"]:hover::before,
+.chat-boton[aria-expanded="true"]:focus-visible::before {
   opacity: 1;
   transform: translate(0, -50%);
 }
 
-/* Panel: aparece desde abajo al abrir y baja al cerrar. */
+/* «Latido» cada pocos segundos hasta que se abre por primera vez. */
+@keyframes chat-latido {
+  0%, 70%, 100% {
+    transform: scale(1);
+  }
+  76% {
+    transform: scale(1.07);
+  }
+  82% {
+    transform: scale(0.98);
+  }
+  88% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes chat-onda {
+  0%, 70% {
+    box-shadow: 0 10px 28px rgba(23, 70, 224, 0.42), 0 0 0 0 rgba(91, 130, 245, 0.55);
+  }
+  100% {
+    box-shadow: 0 10px 28px rgba(23, 70, 224, 0.42), 0 0 0 16px rgba(91, 130, 245, 0);
+  }
+}
+
+.chat-boton.latido {
+  animation: chat-latido 4s ease-in-out infinite, chat-onda 4s ease-out infinite;
+}
+
+.chat-boton.latido:hover {
+  animation-play-state: paused;
+}
+
+/* --- Ventana --- */
 @keyframes chat-aparecer {
   from {
     opacity: 0;
-    transform: translateY(16px) scale(0.98);
+    transform: translateY(20px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -1506,37 +1565,39 @@ body.app {
   }
   to {
     opacity: 0;
-    transform: translateY(16px) scale(0.98);
+    transform: translateY(20px) scale(0.97);
   }
 }
 
 .chat-panel {
   display: flex;
   flex-direction: column;
-  width: min(380px, calc(100vw - 2rem));
-  height: min(580px, calc(100vh - 7rem));
+  width: 380px;
+  max-width: calc(100vw - 2rem);
+  height: 560px;
+  max-height: calc(100vh - 7rem);
   overflow: hidden;
-  border: 0;
-  border-radius: 16px;
-  background: var(--color-superficie);
-  box-shadow: 0 12px 32px rgba(26, 34, 51, 0.12), 0 2px 6px rgba(26, 34, 51, 0.06);
+  border: 1px solid var(--color-borde);
+  border-radius: 20px;
+  background: var(--color-fondo-chat);
+  box-shadow: 0 20px 50px rgba(26, 34, 51, 0.18), 0 4px 12px rgba(26, 34, 51, 0.08);
   transform-origin: bottom right;
-  animation: chat-aparecer 0.22s ease-out;
+  animation: chat-aparecer 0.24s ease-out;
 }
 
 .chat-panel.cerrando {
   animation: chat-desaparecer 0.18s ease-in forwards;
 }
 
-/* Cabecera clara con un degradado suave del color principal. */
+/* Encabezado blanco con una línea fina abajo. */
 .chat-cabecera {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.85rem 0.9rem 0.85rem 1rem;
+  padding: 0.85rem 0.8rem 0.85rem 1rem;
   border-bottom: 1px solid var(--color-borde);
-  background: linear-gradient(135deg, var(--color-primario-tenue) 0%, var(--color-superficie) 100%);
+  background: var(--color-superficie);
   color: var(--color-texto);
 }
 
@@ -1549,8 +1610,8 @@ body.app {
 
 .chat-titulo {
   display: block;
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 1.02rem;
+  font-weight: 800;
   line-height: 1.2;
   color: var(--color-texto);
 }
@@ -1559,8 +1620,9 @@ body.app {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  margin-top: 0.1rem;
-  font-size: 0.75rem;
+  margin-top: 0.15rem;
+  font-size: 0.76rem;
+  font-weight: 500;
   color: var(--color-tenue);
 }
 
@@ -1568,32 +1630,32 @@ body.app {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--color-exito);
-  box-shadow: 0 0 0 3px var(--color-exito-fondo);
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
 }
 
+/* Avatar del asistente: redondo con degradado. */
 .chat-avatar {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: var(--color-primario-tenue);
-  color: var(--color-primario);
+  background: linear-gradient(135deg, var(--color-primario) 0%, var(--color-primario-claro) 100%);
+  color: var(--color-texto-inverso);
+  box-shadow: 0 2px 6px rgba(23, 70, 224, 0.25);
 }
 
 .chat-avatar.grande {
-  width: 40px;
-  height: 40px;
-  background: var(--color-primario);
-  color: var(--color-texto-inverso);
-  box-shadow: 0 4px 10px rgba(23, 70, 224, 0.22);
+  width: 42px;
+  height: 42px;
+  box-shadow: 0 4px 12px rgba(23, 70, 224, 0.3);
 }
 
 .chat-svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.9;
@@ -1606,9 +1668,10 @@ body.app {
   height: 22px;
 }
 
+/* Reiniciar y cerrar, en gris. */
 .chat-acciones {
   display: flex;
-  gap: 0.2rem;
+  gap: 0.15rem;
 }
 
 .chat-icono {
@@ -1629,15 +1692,15 @@ body.app {
   color: var(--color-texto);
 }
 
-/* Mensajes */
+/* --- Conversación --- */
 .chat-lista {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 1rem;
-  padding: 1.1rem 1rem;
+  padding: 1.1rem 1rem 1.25rem;
   overflow-y: auto;
-  background: var(--color-superficie);
+  background: var(--color-fondo-chat);
   scroll-behavior: smooth;
 }
 
@@ -1652,47 +1715,47 @@ body.app {
   justify-content: flex-end;
 }
 
-.chat-fila.asistente {
-  align-items: flex-start;
-}
-
 .chat-contenido {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
   min-width: 0;
-  max-width: 82%;
+  max-width: 80%;
 }
 
 .chat-mensaje {
-  padding: 0.65rem 0.95rem;
+  padding: 0.7rem 0.95rem;
   font-size: 0.95rem;
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-/* Respuestas: a la izquierda, gris muy claro. */
+/* Respuestas: blancas con sombra muy suave y la esquina de abajo a la
+   izquierda casi recta (apunta al avatar). */
 .chat-mensaje.asistente {
   border: 0;
-  border-radius: 16px 16px 16px 6px;
-  background: var(--color-fondo-neutro);
+  border-radius: 18px 18px 18px 4px;
+  background: var(--color-superficie);
   color: var(--color-texto);
+  box-shadow: 0 1px 3px rgba(26, 34, 51, 0.08), 0 1px 2px rgba(26, 34, 51, 0.04);
 }
 
-/* Preguntas: a la derecha, color principal y texto blanco. */
+/* Mis mensajes: degradado del color principal, esquina de abajo a la
+   derecha casi recta. */
 .chat-mensaje.usuario {
-  max-width: 82%;
-  border-radius: 16px 16px 6px 16px;
-  background: var(--color-primario);
+  max-width: 80%;
+  border-radius: 18px 18px 4px 18px;
+  background: linear-gradient(135deg, var(--color-primario) 0%, var(--color-primario-claro) 100%);
   color: var(--color-texto-inverso);
+  box-shadow: 0 4px 12px rgba(23, 70, 224, 0.22);
 }
 
-/* Avisos de error en tono suave (no rojo fuerte). */
+/* Avisos de error en tono suave. */
 .chat-mensaje.error {
-  border: 1px solid rgba(146, 64, 14, 0.18);
   background: var(--color-vacio-fondo);
   color: var(--color-vacio);
+  box-shadow: none;
 }
 
 .chat-enlace {
@@ -1705,16 +1768,14 @@ body.app {
   text-decoration: underline;
 }
 
-/* Etiqueta «Generada con IA» / «Respuesta del sistema»: chica y discreta. */
+/* Fuente de la respuesta: gris claro, 11 px. */
 .chat-nota {
-  padding-left: 0.35rem;
-  font-size: 0.68rem;
-  letter-spacing: 0.01em;
-  color: var(--color-tenue);
-  opacity: 0.85;
+  padding-left: 0.4rem;
+  font-size: 11px;
+  color: #9aa3b5;
 }
 
-/* «Escribiendo…»: tres puntos animados dentro de una burbuja gris. */
+/* «Escribiendo…»: tres puntos en una burbuja blanca. */
 @keyframes chat-punto {
   0%, 80%, 100% {
     opacity: 0.3;
@@ -1727,7 +1788,7 @@ body.app {
 }
 
 .chat-mensaje.escribiendo {
-  padding: 0.75rem 1rem;
+  padding: 0.8rem 1rem;
 }
 
 .chat-puntos {
@@ -1741,7 +1802,7 @@ body.app {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--color-tenue);
+  background: var(--color-primario-claro);
   animation: chat-punto 1.2s infinite ease-in-out;
 }
 
@@ -1753,69 +1814,64 @@ body.app {
   animation-delay: 0.3s;
 }
 
-/* Sugerencias */
+/* Preguntas de ejemplo del saludo. */
 .chat-sugerencias {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.4rem;
-  padding-left: 2.4rem;
-}
-
-.chat-sugerencias-titulo {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-tenue);
+  gap: 0.45rem;
+  margin-top: -0.4rem;
+  padding-left: 2.25rem;
 }
 
 .chat-sugerencia {
-  padding: 0.45rem 0.85rem;
-  border: 1px solid var(--color-borde);
+  padding: 0.5rem 0.95rem;
+  border: 1px solid var(--color-primario-suave);
   border-radius: var(--radio-pill);
   background: var(--color-superficie);
   color: var(--color-primario);
-  font-size: 0.82rem;
-  font-weight: 500;
+  font-size: 0.86rem;
+  font-weight: 600;
   text-align: left;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 1px 2px rgba(26, 34, 51, 0.05);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .chat-sugerencia:hover {
-  border-color: var(--color-primario-suave);
+  border-color: var(--color-primario);
   background: var(--color-primario-tenue);
+  transform: translateX(3px);
 }
 
-/* Caja para escribir: píldora con el botón de enviar adentro, a la derecha. */
+/* --- Caja para escribir: píldora blanca con el botón redondo adentro --- */
 .chat-formulario {
-  padding: 0.7rem 0.85rem 0.55rem;
+  padding: 0.75rem 0.85rem 0.55rem;
   border-top: 1px solid var(--color-borde);
-  background: var(--color-superficie);
+  background: var(--color-fondo-chat);
 }
 
 .chat-caja {
   display: flex;
   align-items: flex-end;
   gap: 0.4rem;
-  padding: 0.3rem 0.3rem 0.3rem 1rem;
-  border: 1px solid var(--color-borde);
-  border-radius: 24px;
-  background: var(--color-fondo-neutro);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  padding: 0.3rem 0.3rem 0.3rem 1.05rem;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: var(--radio-pill);
+  background: var(--color-superficie);
+  box-shadow: 0 1px 3px rgba(26, 34, 51, 0.06);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .chat-caja:focus-within {
-  border-color: var(--color-primario-suave);
+  border-color: var(--color-primario);
   box-shadow: 0 0 0 3px var(--color-primario-foco);
-  background: var(--color-superficie);
 }
 
 .chat-entrada {
   flex: 1;
   min-height: 24px;
   max-height: 120px;
-  padding: 0.5rem 0;
+  padding: 0.55rem 0;
   border: 0;
   background: transparent;
   color: var(--color-texto);
@@ -1834,13 +1890,14 @@ body.app {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: var(--color-primario);
   color: var(--color-texto-inverso);
+  box-shadow: 0 3px 8px rgba(23, 70, 224, 0.3);
   transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
@@ -1851,24 +1908,36 @@ body.app {
 
 .chat-enviar:disabled,
 .chat-enviar:disabled:hover {
-  background: var(--color-borde-fuerte);
+  background: var(--color-primario-suave);
   color: var(--color-texto-inverso);
+  box-shadow: none;
   opacity: 1;
   cursor: default;
 }
 
 .chat-aviso {
   margin: 0.45rem 0 0;
-  font-size: 0.68rem;
-  color: var(--color-tenue);
+  font-size: 11px;
+  color: #9aa3b5;
   text-align: center;
 }
 
-/* En el celular el chat ocupa casi toda la pantalla. */
+/* --- Celular --- */
 @media (max-width: 600px) {
   .chat-asistente {
     right: 1rem;
     bottom: 1rem;
+  }
+
+  /* Solo el círculo con las chispas. */
+  .chat-boton {
+    width: 56px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .chat-boton-texto {
+    display: none;
   }
 
   .chat-asistente.abierto {
@@ -1878,6 +1947,7 @@ body.app {
 
   .chat-asistente.abierto .chat-panel {
     width: 100%;
+    max-width: none;
     height: 100%;
     max-height: none;
   }
@@ -1888,7 +1958,7 @@ body.app {
 
   .chat-contenido,
   .chat-mensaje.usuario {
-    max-width: 88%;
+    max-width: 86%;
   }
 
   /* 16 px evita que el celular acerque la pantalla al escribir. */
@@ -1900,7 +1970,8 @@ body.app {
 @media (prefers-reduced-motion: reduce) {
   .chat-panel,
   .chat-panel.cerrando,
-  .chat-puntos i {
+  .chat-puntos i,
+  .chat-boton.latido {
     animation: none;
   }
 
