@@ -284,3 +284,82 @@ def test_verify_draft_keywords(texto, valido):
     datos = "Hay 2 tickets resueltos o cerrados. Hay 1 ticket resuelto o cerrado."
     principal = 1 if "1 ticket" in texto else 2
     assert (verificar_redaccion(texto, datos, principal, CERRADOS) is None) == valido
+
+
+# --- Verbo de estado ---
+
+
+@pytest.mark.parametrize(
+    "texto, datos, valido",
+    [
+        ("Esta semana se crearon 2 tickets que siguen pendientes.",
+         "Esta semana se crearon 2 tickets que siguen pendientes (1 nuevo y 1 en proceso).", True),
+        ("Esta semana se resuelven 2 tickets pendientes.",
+         "Esta semana se crearon 2 tickets que siguen pendientes (1 nuevo y 1 en proceso).", False),
+        ("Hoy se cerraron 2 tickets.", "Hoy se resolvieron 2 tickets.", False),
+        ("Hoy se resolvieron 2 tickets.", "Hoy se cerraron 2 tickets.", False),
+        ("Hoy pasaron a en proceso 2 tickets.", "Hoy se crearon 2 tickets.", False),
+        ("Hoy se crearon 2 tickets.", "Hoy pasaron a En proceso 2 tickets.", False),
+        ("Hoy 2 tickets pasaron a En proceso.", "Hoy pasaron a En proceso 2 tickets.", True),
+        ("Hay 2 tickets resueltos o cerrados.", "Hay 2 tickets resueltos o cerrados.", True),
+        ("Carlos Solís tiene 2 tickets no resueltos.", "Carlos Solís (Técnico) tiene 2 tickets sin resolver asignados.", True),
+    ],
+)
+def test_verify_draft_state_verb(texto, datos, valido):
+    motivo = verificar_redaccion(texto, datos, 2)
+    assert (motivo is None) == valido, motivo
+    if not valido:
+        assert motivo.startswith("usa el verbo")
+
+
+def test_wrong_state_verb_falls_back(client, ia, log, varios):
+    headers, _ = varios
+    ia.texto = "Hoy se resolvieron 5 tickets."
+    resp = ask(client, headers, "cuantos tickets hay hoy").json()
+    assert resp["fuente"] == "directa"
+    assert resp["respuesta"].startswith("Hoy se crearon 5 tickets.")
+    assert "usa el verbo «resolver»" in log[0]
+
+
+# --- Precalentamiento al arrancar ---
+
+
+class OllamaSimulado(IASimulada):
+    def __init__(self, cargas):
+        super().__init__()
+        self.cargas = list(cargas)
+        self.texto = "Hay 4 tickets pendientes: 3 nuevos y 1 en proceso."
+
+    def precargar(self):
+        return self.cargas.pop(0)
+
+
+def test_warm_up_loads_the_model_and_drafts_once(monkeypatch, log):
+    monkeypatch.setenv("ASISTENTE_REDACTAR_CON_IA", "true")
+    ollama = OllamaSimulado([False, True])
+
+    assert asistente_service.precalentar(ollama, espera=0) is True
+
+    assert ollama.cargas == []  # reintentó hasta que cargó
+    assert len(ollama.calls) == 1
+    assert ollama.calls[0]["system"] == INSTRUCCIONES_REDACCION
+    assert ollama.calls[0]["messages"][-1]["content"].startswith("Pregunta: cuantos hay pendientes")
+    assert log[0].startswith("modelo listo: redacción de prueba en")
+
+
+def test_warm_up_without_drafting_only_loads(log):
+    ollama = OllamaSimulado([True])  # conftest: ASISTENTE_REDACTAR_CON_IA=false
+    assert asistente_service.precalentar(ollama, espera=0) is True
+    assert ollama.calls == []
+
+
+def test_warm_up_failures_do_not_raise(monkeypatch, log):
+    monkeypatch.setenv("ASISTENTE_REDACTAR_CON_IA", "true")
+    ollama = OllamaSimulado([True])
+    ollama.error = AsistenteNoDisponible("timeout")
+    assert asistente_service.precalentar(ollama, espera=0) is True
+    assert "la redacción de prueba falló" in log[0]
+
+    sin_ollama = OllamaSimulado([False, False])
+    assert asistente_service.precalentar(sin_ollama, intentos=2, espera=0) is False
+    assert sin_ollama.calls == []

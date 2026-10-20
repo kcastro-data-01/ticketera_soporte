@@ -53,8 +53,9 @@ QWEN_MODELO_POR_DEFECTO = "qwen3:0.6b"
 # Ventana de contexto para Ollama: la misma que usa por defecto, así el modelo
 # no se recarga y no reserva memoria de más en equipos modestos.
 QWEN_CONTEXTO = 4096
-# Mantiene el modelo cargado entre preguntas (cargarlo puede tardar ~1 minuto).
-QWEN_MANTENER_CARGADO = "30m"
+# El modelo queda siempre cargado (cargarlo puede tardar ~1 minuto);
+# qwen3:0.6b ocupa poca memoria.
+QWEN_MANTENER_CARGADO = -1
 OLLAMA_URL_POR_DEFECTO = "http://localhost:11434"
 # Segundos para que Qwen responda (QWEN_TIMEOUT); conectar con Ollama, 5 s.
 QWEN_TIMEOUT_POR_DEFECTO = 90.0
@@ -1084,6 +1085,14 @@ _NUMEROS_EN_LETRAS = {
     "veinte": 20,
 }
 _DICE_NINGUNO = re.compile(r"\b(no|ningun\w*|cero|0)\b")
+# Verbos de estado (texto normalizado): la redacción no puede usar uno que no
+# esté en los datos («se resuelven» cuando los datos dicen «se crearon»).
+VERBOS_DE_ESTADO = [
+    ("resolver", r"\b(resuel\w*|resolv\w*|solucion\w*)"),
+    ("cerrar", r"\b(cerr\w*|cierr\w*)"),
+    ("crear", r"\bcre(o|a\w*)\b"),
+    ("pasar a En proceso", r"\bpas\w* a en proceso\b"),
+]
 
 
 def redactar_con_ia_activo() -> bool:
@@ -1108,7 +1117,8 @@ def mensajes_redaccion(pregunta: str, datos: str) -> list[dict]:
 def verificar_redaccion(texto: str, datos: str, principal: int, claves=()) -> str | None:
     """Motivo por el que la redacción no sirve, o ``None`` si respeta los
     datos: cada número y cada #ticket está en ``datos``, aparece el número
-    principal (si es 0, que diga que no hay ninguno) y conserva ``claves``."""
+    principal (si es 0, que diga que no hay ninguno), no usa un verbo de
+    estado distinto al de los datos y conserva ``claves``."""
     if not texto or not texto.strip():
         return "respuesta vacía"
     t = _normalizar(texto)
@@ -1127,6 +1137,10 @@ def verificar_redaccion(texto: str, datos: str, principal: int, claves=()) -> st
             return "no dice que no hay ninguno"
     elif principal not in numeros:
         return f"falta el número principal ({principal})"
+    en_datos = _normalizar(datos)
+    for verbo, patron in VERBOS_DE_ESTADO:
+        if re.search(patron, t) and not re.search(patron, en_datos):
+            return f"usa el verbo «{verbo}», que no está en los datos"
     for nombre, patron in claves:
         if not re.search(patron, t):
             return f"falta «{nombre}»"
@@ -1566,23 +1580,38 @@ def responder_stream(proveedor, session, user: User, messages: list[dict],
     yield {"fin": True, "fuente": "ia"}
 
 
+def precalentar(proveedor, intentos: int = 60, espera: float = 10) -> bool:
+    """Carga el modelo y, si la redacción con IA está encendida, hace una
+    redacción de prueba (el mismo prompt y los mismos ejemplos que las de
+    verdad): la primera pregunta ya no espera. Reintenta mientras Ollama
+    arranca o el modelo se descarga; ``True`` si el modelo quedó cargado."""
+    for _intento in range(intentos):
+        if proveedor.precargar():
+            break
+        time.sleep(espera)
+    else:
+        return False
+    if redactar_con_ia_activo():
+        pregunta, datos, _ = EJEMPLOS_REDACCION[0]
+        inicio = time.monotonic()
+        try:
+            proveedor.responder(INSTRUCCIONES_REDACCION, mensajes_redaccion(pregunta, datos))
+        except Exception as error:  # noqa: BLE001 — solo es un precalentamiento
+            logger.info("la redacción de prueba falló (%s)", error)
+        else:
+            logger.info("modelo listo: redacción de prueba en %.1f s", time.monotonic() - inicio)
+    return True
+
+
 def iniciar_precarga() -> threading.Thread | None:
-    """Al arrancar, carga Qwen en Ollama en segundo plano para que la primera
-    pregunta no espere ~1 minuto. Reintenta mientras Ollama arranca o el
-    modelo se descarga. Solo actúa con Qwen y ``OLLAMA_URL`` definido (como
-    en docker-compose)."""
+    """Al arrancar, carga Qwen en Ollama en segundo plano y lo precalienta
+    (:func:`precalentar`) para que la primera pregunta no espere ~1 minuto.
+    Solo actúa con Qwen y ``OLLAMA_URL`` definido (como en docker-compose)."""
     if os.environ.get("ASISTENTE_PROVEEDOR", "qwen").strip().lower() not in ("", "qwen"):
         return None
     if not os.environ.get("OLLAMA_URL", "").strip():
         return None
 
-    def trabajo():
-        proveedor = crear_proveedor()
-        for _intento in range(60):  # hasta ~10 minutos
-            if proveedor.precargar():
-                return
-            time.sleep(10)
-
-    hilo = threading.Thread(target=trabajo, name="precarga-qwen", daemon=True)
+    hilo = threading.Thread(target=lambda: precalentar(crear_proveedor()), name="precarga-qwen", daemon=True)
     hilo.start()
     return hilo

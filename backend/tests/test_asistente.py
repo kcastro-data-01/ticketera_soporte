@@ -226,7 +226,7 @@ def test_qwen_calls_ollama_chat_with_system_and_no_thinking():
     assert body["model"] == "qwen3:4b"
     assert body["stream"] is False and body["think"] is False
     assert body["options"]["num_ctx"] == 4096
-    assert body["keep_alive"] == "30m"
+    assert body["keep_alive"] == -1
     assert body["messages"] == [
         {"role": "system", "content": "SISTEMA"},
         {"role": "user", "content": "hola"},
@@ -489,7 +489,7 @@ def test_qwen_warm_up_loads_the_model():
         return httpx.Response(200, json={"done": True})
 
     assert qwen_con(handler).precargar() is True
-    assert pedidos == [("http://ollama:11434/api/generate", {"model": "qwen3:4b", "keep_alive": "30m"})]
+    assert pedidos == [("http://ollama:11434/api/generate", {"model": "qwen3:4b", "keep_alive": -1})]
 
 
 def test_warm_up_only_runs_with_qwen_and_ollama_url(monkeypatch):

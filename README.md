@@ -600,8 +600,9 @@ Para que un modelo pequeño responda bien y rápido:
   animados y no deja enviar otra pregunta; el resto de la página sigue usable.
 - La respuesta aparece por partes (`POST /api/asistente/stream`, NDJSON) y
   los «#N» enlazan al detalle del ticket.
-- Al arrancar, la aplicación precarga el modelo en Ollama para que la primera
-  pregunta no espere.
+- Al arrancar, la aplicación carga el modelo en Ollama y hace una redacción de
+  prueba para que la primera pregunta no espere. El modelo queda siempre
+  cargado (`keep_alive` -1; qwen3:0.6b ocupa poca memoria).
 
 En ambos casos la restricción por rol la aplica el servidor: el modelo solo
 recibe los datos que el rol ya puede ver en la aplicación.
