@@ -144,19 +144,18 @@ def test_pending_summary_must_keep_the_breakdown(client, ia, log, varios, redact
         assert "falta" in log[0]
 
 
-def test_person_summary_gets_the_ticket_list_below(client, session, ia, varios):
+@pytest.mark.parametrize("pregunta", ["cuantos tickets tiene José Solano", "cuantos tickets tienen los tecnicos"])
+def test_person_and_role_counts_skip_the_ai(client, session, ia, varios, pregunta):
     headers, t = varios
     jose = session.query(User).filter_by(email="tec@tec.local").one()
     t["VPN"].assigned_to_id = jose.id
     session.commit()
-    ia.texto = "José Solano (Técnico) tiene 1 ticket sin resolver."
 
-    resp = ask(client, headers, "cuantos tickets tiene José Solano").json()
+    resp = ask(client, headers, pregunta).json()
 
-    assert resp == {"respuesta": f"{ia.texto}\n{_linea(t['VPN'], 'En proceso')}", "fuente": "ia_datos"}
-    assert ia.calls[0]["messages"][-1]["content"].endswith(
-        "Datos verificados:\nJosé Solano (Técnico) tiene 1 ticket sin resolver asignado."
-    )
+    assert resp["fuente"] == "directa"
+    assert f"#{t['VPN'].id}" in resp["respuesta"]
+    assert ia.calls == []
 
 
 @pytest.mark.parametrize(

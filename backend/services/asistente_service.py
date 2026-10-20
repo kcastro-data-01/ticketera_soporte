@@ -373,7 +373,8 @@ class Directa:
 
     ``texto`` es la respuesta fija (el respaldo). ``principal`` es el número
     que la respuesta no puede perder (el total contado o el ticket del que se
-    habla); sin él, la IA no la redacta (guía, aclaraciones). La IA solo
+    habla); sin él, la IA no la redacta (guía, aclaraciones y conteos por
+    persona o rol, que muestran la respuesta del sistema). La IA solo
     resume ``resumen`` (o ``texto``) y el servidor agrega debajo ``lista``, la
     misma lista de tickets del texto fijo. ``claves``: (nombre, patrón) de las
     palabras que el resumen tiene que conservar («cerrados», «nuevos»…).
@@ -684,7 +685,7 @@ def respuesta_por_rol(session, user: User, t: str) -> Directa | None:
             lista = [f"#{o.id} a {_persona(o.assignee)}" for o in otros[:CONTEO_MAX_OTROS]]
             extra = f" y {len(otros) - CONTEO_MAX_OTROS} más" if len(otros) > CONTEO_MAX_OTROS else ""
             respuesta += f" Los que están asignados: {', '.join(lista)}{extra}."
-        return Directa(respuesta, 0)
+        return Directa(respuesta)
 
     grupos = _por_persona(tickets)
     detalle = _unir([f"{_persona(u)} tiene {len(ts)} ({_ids(ts)})" for u, ts in grupos])
@@ -692,7 +693,6 @@ def respuesta_por_rol(session, user: User, t: str) -> Directa | None:
     asignado = "asignado" if len(tickets) == 1 else "asignados"
     cabecera = f"Hay {len(tickets)} {sustantivo}{tuyos} sin resolver {asignado} a {plural}: "
     respuesta = cabecera + f"{detalle}."
-    resumen = cabecera + _unir([f"{_persona(u)} tiene {len(ts)}" for u, ts in grupos]) + "."
     if not solicitante:
         con_tickets = {u.id for u, _ in grupos}
         sin_tickets = session.scalars(
@@ -701,11 +701,8 @@ def respuesta_por_rol(session, user: User, t: str) -> Directa | None:
         ).all()
         if sin_tickets:
             verbo = "no tiene" if len(sin_tickets) == 1 else "no tienen"
-            ninguno = f" {_unir([_persona(u) for u in sin_tickets])} {verbo} ninguno."
-            respuesta += ninguno
-            resumen += ninguno
-    return Directa(respuesta, len(tickets), resumen=resumen,
-                   lista=tuple(_lista_tickets(tickets[:DIRECTAS_MAX_TICKETS], len(tickets))))
+            respuesta += f" {_unir([_persona(u) for u in sin_tickets])} {verbo} ninguno."
+    return Directa(respuesta)
 
 
 def _palabras_nombre(nombre: str) -> list[str]:
@@ -752,7 +749,7 @@ def respuesta_por_persona(session, user: User, t: str) -> Directa | None:
     solicitante = user.role == UserRole.REQUESTER.value
     if not tickets:
         return Directa(
-            f"{_persona(persona)} no tiene tickets{' tuyos' if solicitante else ''} sin resolver asignados.", 0
+            f"{_persona(persona)} no tiene tickets{' tuyos' if solicitante else ''} sin resolver asignados."
         )
     tuyos = (" tuyo" if len(tickets) == 1 else " tuyos") if solicitante else ""
     sustantivo = "ticket" if len(tickets) == 1 else "tickets"
@@ -760,10 +757,8 @@ def respuesta_por_persona(session, user: User, t: str) -> Directa | None:
     lista = ", ".join(f"#{x.id} «{x.title}»" for x in tickets[:CONTEO_MAX_IDS])
     if len(tickets) > CONTEO_MAX_IDS:
         lista += f" y {len(tickets) - CONTEO_MAX_IDS} más"
-    cabecera = f"{_persona(persona)} tiene {len(tickets)} {sustantivo}{tuyos} sin resolver {asignado}"
     return Directa(
-        f"{cabecera}: {lista}.", len(tickets), resumen=f"{cabecera}.",
-        lista=tuple(_lista_tickets(tickets[:DIRECTAS_MAX_TICKETS], len(tickets))),
+        f"{_persona(persona)} tiene {len(tickets)} {sustantivo}{tuyos} sin resolver {asignado}: {lista}."
     )
 
 
