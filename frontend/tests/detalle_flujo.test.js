@@ -251,7 +251,10 @@ test("formatFecha del listado muestra la hora de Costa Rica", () => {
 
   const formatted = sandbox.formatFecha("2026-10-08T16:00:00Z");
 
-  assert.match(formatted, /10:00:00/);
+  /* Formato corto en el listado: 08/10/26, 10:00 (sin segundos). */
+  assert.match(formatted, /08\/10\/26/);
+  assert.match(formatted, /10:00/);
+  assert.ok(!formatted.includes("10:00:00"), "sin segundos");
   assert.ok(!formatted.includes("16:00"), "no debe mostrar la hora UTC");
 });
 

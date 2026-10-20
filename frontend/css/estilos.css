@@ -52,6 +52,22 @@
   --color-exito: #166534;
   --color-exito-fondo: #e6f6ec;
 
+  /* Etiquetas de prioridad y estado: fondo suave + texto del mismo tono */
+  --etiqueta-rojo-fondo: #fdecec;
+  --etiqueta-rojo-texto: #a61b1b;
+  --etiqueta-naranja-fondo: #fdf0e3;
+  --etiqueta-naranja-texto: #9a4a0b;
+  --etiqueta-amarillo-fondo: #fdf7dc;
+  --etiqueta-amarillo-texto: #7a5c00;
+  --etiqueta-gris-fondo: #eef1f5;
+  --etiqueta-gris-texto: #4f5868;
+  --etiqueta-azul-fondo: #e9effe;
+  --etiqueta-azul-texto: #1d3fae;
+  --etiqueta-violeta-fondo: #f1ebfd;
+  --etiqueta-violeta-texto: #5b32b4;
+  --etiqueta-verde-fondo: #e6f6ec;
+  --etiqueta-verde-texto: #1b6b36;
+
   /* ---------- Login ---------- */
   --login-fondo: #f4f6fb;
   --login-card-borde: #dde3ee;
@@ -414,18 +430,24 @@ button.peligro:disabled:hover {
 
 .listado th,
 .listado td {
-  padding: 0.7rem 0.8rem;
+  padding: 0.85rem 1rem;
   text-align: left;
   border-bottom: 1px solid var(--color-borde);
 }
 
+.listado td {
+  vertical-align: middle;
+}
+
 .listado th {
-  background: var(--color-primario-tenue);
-  font-size: var(--texto-sm);
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+  background: var(--color-fondo-neutro);
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-tenue-fuerte);
+  letter-spacing: 0.05em;
+  color: var(--color-tenue);
 }
 
 .listado thead th:first-child {
@@ -441,7 +463,7 @@ button.peligro:disabled:hover {
 }
 
 .listado tbody tr:hover {
-  background: var(--color-primario-tenue);
+  background: var(--color-fondo);
 }
 
 .listado tbody tr:last-child td {
@@ -524,63 +546,66 @@ button.peligro:disabled:hover {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.2rem 0.65rem;
+  padding: 0.15rem 0.55rem;
   border: 1px solid transparent;
   border-radius: var(--radio-pill);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
   line-height: 1.4;
   white-space: nowrap;
 }
 
-/* Estados de ticket (Nuevo / En proceso / Resuelto / Cerrado) */
+/* Punto del mismo color antes del texto (el texto da la información). */
+.badge[class*="estado-"]::before,
+.badge[class*="prioridad-"]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.75;
+}
+
+/* Estados: Nuevo azul, En proceso violeta, Resuelto verde, Cerrado gris */
 .estado-nuevo {
-  background: #e9eefc;
-  border-color: #c7d3f5;
-  color: #35477e;
+  background: var(--etiqueta-azul-fondo);
+  color: var(--etiqueta-azul-texto);
 }
 
 .estado-proceso {
-  background: #fcf1dc;
-  border-color: #f0dcae;
-  color: #7a5312;
+  background: var(--etiqueta-violeta-fondo);
+  color: var(--etiqueta-violeta-texto);
 }
 
 .estado-resuelto {
-  background: #e3f5e8;
-  border-color: #bfe5cc;
-  color: #1b6b36;
+  background: var(--etiqueta-verde-fondo);
+  color: var(--etiqueta-verde-texto);
 }
 
 .estado-cerrado {
-  background: #ece9f1;
-  border-color: #d6d0e0;
-  color: #4f4a59;
+  background: var(--etiqueta-gris-fondo);
+  color: var(--etiqueta-gris-texto);
 }
 
-/* Prioridades (Baja / Media / Alta / Crítica) */
+/* Prioridades: Crítica rojo, Alta naranja, Media amarillo, Baja gris */
 .prioridad-baja {
-  background: #edeff2;
-  border-color: #d8dde4;
-  color: #4a5560;
+  background: var(--etiqueta-gris-fondo);
+  color: var(--etiqueta-gris-texto);
 }
 
 .prioridad-media {
-  background: #e8effb;
-  border-color: #c6d4f0;
-  color: #2f4f8f;
+  background: var(--etiqueta-amarillo-fondo);
+  color: var(--etiqueta-amarillo-texto);
 }
 
 .prioridad-alta {
-  background: #fdebdc;
-  border-color: #f4d5b5;
-  color: #8c3b0e;
+  background: var(--etiqueta-naranja-fondo);
+  color: var(--etiqueta-naranja-texto);
 }
 
 .prioridad-critica {
-  background: #fbe4e4;
-  border-color: #f3c4c4;
-  color: #a61b1b;
+  background: var(--etiqueta-rojo-fondo);
+  color: var(--etiqueta-rojo-texto);
 }
 
 /* Usuario desactivado */
@@ -1272,10 +1297,32 @@ body.app {
   color: var(--color-tenue-fuerte);
 }
 
-.btn-accion.secundario {
+/* Botones de las tablas («Ver», «Editar»): chicos, con borde y sin
+   relleno fuerte. */
+.btn-accion {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: var(--radio-suave);
   background: var(--color-superficie-alta);
   color: var(--color-primario);
-  border-color: var(--color-borde-fuerte);
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.btn-accion:hover {
+  border-color: var(--color-primario-suave);
+  background: var(--color-primario-tenue);
+  color: var(--color-primario-oscuro);
+}
+
+.btn-accion:active {
+  border-color: var(--color-primario);
+  background: var(--color-primario-tenue);
+}
+
+.btn-accion.secundario {
+  color: var(--color-tenue-fuerte);
 }
 
 /* ---------- Detalle del ticket en dos columnas ---------- */
@@ -1324,6 +1371,24 @@ body.app {
 
 .celda-fecha {
   white-space: nowrap;
+  color: var(--color-tenue);
+  font-size: var(--texto-sm);
+}
+
+/* ID del listado: en gris, con «#». */
+#lista-tickets .enlace-tabla {
+  color: var(--color-tenue);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+#lista-tickets .enlace-tabla::before {
+  content: "#";
+  opacity: 0.7;
+}
+
+#lista-tickets .enlace-tabla:hover {
+  color: var(--color-enlace);
 }
 
 .pie {
