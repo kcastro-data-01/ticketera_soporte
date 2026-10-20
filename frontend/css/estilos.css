@@ -1279,16 +1279,24 @@ body.app {
 }
 
 .menu-enlace {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.6rem 0.75rem;
+  gap: 0.75rem;
+  min-height: 40px;
+  padding: 0.55rem 0.8rem;
   border-radius: var(--radio-suave);
   color: var(--color-menu-texto);
   font-size: 0.92rem;
   font-weight: 500;
   text-decoration: none;
+  white-space: nowrap;
   transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.menu-enlace .icono {
+  width: 20px;
+  height: 20px;
 }
 
 .menu-enlace:hover {
@@ -1296,11 +1304,97 @@ body.app {
   color: var(--color-texto-inverso);
 }
 
+/* Página actual: fondo suave y barra de color a la izquierda. */
 .menu-enlace.activo {
-  background: var(--color-marca);
+  background: rgba(255, 255, 255, 0.1);
   color: var(--color-texto-inverso);
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0, 65, 255, 0.35);
+}
+
+.menu-enlace.activo::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-primario-claro);
+}
+
+/* Botón para achicar el menú (solo íconos). */
+.boton-plegar {
+  display: grid;
+  place-items: center;
+  align-self: flex-end;
+  width: 28px;
+  height: 28px;
+  margin: -0.35rem 0.2rem 0.6rem 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radio-suave);
+  background: transparent;
+  color: var(--color-menu-tenue);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.2s ease;
+}
+
+.boton-plegar:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-texto-inverso);
+}
+
+.boton-plegar:focus-visible {
+  outline: 2px solid var(--color-texto-inverso);
+  outline-offset: 2px;
+}
+
+.boton-plegar .icono {
+  width: 16px;
+  height: 16px;
+}
+
+@media (min-width: 901px) {
+  /* Solo se anima al pulsar el botón, no al abrir cada página. */
+  body.menu-animando .barra-lateral {
+    transition: width 0.2s ease, padding 0.2s ease;
+  }
+
+  body.menu-plegado .barra-lateral {
+    width: 76px;
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+  }
+
+  body.menu-plegado .marca {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  body.menu-plegado .marca-texto,
+  body.menu-plegado .menu-enlace span,
+  body.menu-plegado .usuario-datos {
+    display: none;
+  }
+
+  body.menu-plegado .boton-plegar {
+    align-self: center;
+    margin-right: 0;
+    transform: rotate(180deg);
+  }
+
+  body.menu-plegado .menu-enlace {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  body.menu-plegado .barra-usuario {
+    flex-direction: column;
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 .menu-enlace:focus-visible,
@@ -1654,6 +1748,21 @@ body.app {
 
   .menu-enlace {
     white-space: nowrap;
+  }
+
+  /* En pantallas chicas el menú ya va arriba: no se pliega. */
+  .boton-plegar {
+    display: none;
+  }
+
+  .menu-enlace.activo::before {
+    top: auto;
+    bottom: 0;
+    left: 22%;
+    right: 22%;
+    width: auto;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
   }
 
   .app .cabecera,

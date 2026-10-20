@@ -218,9 +218,64 @@ function describirHistorial(entry) {
   }
 }
 
+/* ---------- Menú lateral plegable ----------
+   Un botón con flecha deja el menú solo con los íconos; la preferencia se
+   recuerda en este navegador (localStorage). */
+const MENU_PLEGADO_KEY = "menu_plegado";
+
+function menuPlegadoGuardado() {
+  try {
+    return localStorage.getItem(MENU_PLEGADO_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function iniciarMenuPlegable(doc = document) {
+  const barra = doc.querySelector(".barra-lateral");
+  if (!barra || barra.querySelector(".boton-plegar")) return null;
+  const boton = doc.createElement("button");
+  boton.type = "button";
+  boton.className = "boton-plegar";
+  boton.innerHTML =
+    '<svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
+  const enlaces = Array.from(barra.querySelectorAll(".menu-enlace"));
+
+  const aplicar = (plegado) => {
+    doc.body.classList.toggle("menu-plegado", plegado);
+    const etiqueta = plegado ? "Expandir menú" : "Achicar menú";
+    boton.setAttribute("aria-label", etiqueta);
+    boton.setAttribute("aria-expanded", String(!plegado));
+    boton.title = etiqueta;
+    /* Plegado solo se ven los íconos: el nombre queda como tooltip. */
+    enlaces.forEach((enlace) => {
+      if (plegado) enlace.title = enlace.textContent.trim();
+      else enlace.removeAttribute("title");
+    });
+  };
+
+  boton.addEventListener("click", () => {
+    const plegado = !doc.body.classList.contains("menu-plegado");
+    doc.body.classList.add("menu-animando");
+    try {
+      localStorage.setItem(MENU_PLEGADO_KEY, plegado ? "1" : "0");
+    } catch {
+      /* Sin almacenamiento solo vale para esta página. */
+    }
+    aplicar(plegado);
+  });
+
+  const marca = barra.querySelector(".marca");
+  if (marca && marca.nextSibling) barra.insertBefore(boton, marca.nextSibling);
+  else barra.appendChild(boton);
+  aplicar(menuPlegadoGuardado());
+  return boton;
+}
+
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
   document.addEventListener("DOMContentLoaded", () => {
     aplicarPermisos();
     pintarUsuario();
+    iniciarMenuPlegable();
   });
 }
