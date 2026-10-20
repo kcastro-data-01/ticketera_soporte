@@ -40,6 +40,7 @@ function getElements() {
       priority: document.getElementById("ver-priority"),
       state: document.getElementById("ver-state"),
       assigned: document.getElementById("ver-assigned"),
+      creator: document.getElementById("ver-creator"),
       created: document.getElementById("ver-created"),
       updated: document.getElementById("ver-updated"),
     },
@@ -122,6 +123,17 @@ function nombreAsignado(ticket) {
   return usersById.get(ticket.assigned_to_id) || `Usuario #${ticket.assigned_to_id}`;
 }
 
+/* Quien creó el ticket: el nombre si se conoce (lista de usuarios o la
+   propia sesión); si no, «Usuario #id». */
+function nombreSolicitante(ticket) {
+  const id = ticket.created_by_id;
+  if (id === null || id === undefined) return "—";
+  if (usersById.has(id)) return usersById.get(id);
+  const user = typeof getUser === "function" ? getUser() : null;
+  if (user && user.id === id && user.name) return user.name;
+  return `Usuario #${id}`;
+}
+
 function validarTexto(payload) {
   if (!payload.title && !payload.description) {
     return "El título y la descripción son obligatorios.";
@@ -164,6 +176,7 @@ function renderTicket(ticket) {
   elements.ver.state.textContent = ticket.state;
   elements.ver.state.className = claseBadge(ticket.state);
   elements.ver.assigned.textContent = nombreAsignado(ticket);
+  if (elements.ver.creator) elements.ver.creator.textContent = nombreSolicitante(ticket);
   elements.ver.created.textContent = formatFecha(ticket.created_at);
   elements.ver.updated.textContent = formatFecha(ticket.updated_at);
 

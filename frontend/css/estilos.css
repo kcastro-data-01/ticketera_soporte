@@ -728,19 +728,51 @@ button.peligro:disabled:hover {
    Solo componentes nuevos construidos con los tokens existentes:
    no cambia la paleta ni la identidad de la Tarea 20.1. */
 
+/* Comentarios como línea de tiempo: punto y línea vertical a la izquierda;
+   autor y fecha en gris arriba del texto. */
 .comentarios {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  margin: 0 0 1rem;
+  gap: 0.9rem;
+  margin: 0 0 1.1rem;
+  padding-left: 1.6rem;
+}
+
+.comentarios::before,
+#historial-cuerpo::before {
+  content: "";
+  position: absolute;
+  left: 0.42rem;
+  top: 0.55rem;
+  bottom: 0.55rem;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-borde);
 }
 
 .comentario {
+  position: relative;
   background: var(--color-superficie-alta);
   border: 1px solid var(--color-borde);
-  border-radius: var(--radio-suave);
-  padding: 0.65rem 0.9rem;
+  border-radius: var(--radio-medio);
+  padding: 0.7rem 0.95rem;
   box-shadow: var(--sombra-suave);
+}
+
+.comentario::before,
+#historial-cuerpo tr::before {
+  content: "";
+  position: absolute;
+  left: -1.6rem;
+  top: 0.95rem;
+  width: 10px;
+  height: 10px;
+  margin-left: 0.18rem;
+  border-radius: 50%;
+  background: var(--color-superficie-alta);
+  border: 2px solid var(--color-primario-claro);
+  box-sizing: border-box;
 }
 
 .comentario-cabecera {
@@ -750,19 +782,194 @@ button.peligro:disabled:hover {
   gap: 0.5rem;
   flex-wrap: wrap;
   margin: 0;
-  font-size: var(--texto-sm);
-  color: var(--color-tenue-fuerte);
+  font-size: 0.8rem;
+  color: var(--color-tenue);
 }
 
 .comentario-autor {
   font-weight: 600;
-  color: var(--color-texto);
+  color: var(--color-tenue-fuerte);
+}
+
+.comentario-fecha {
+  font-variant-numeric: tabular-nums;
 }
 
 .comentario-contenido {
-  margin: 0.35rem 0 0;
+  margin: 0.3rem 0 0;
   font-size: var(--texto-md);
+  line-height: 1.55;
+  color: var(--color-texto);
   white-space: pre-wrap;
+}
+
+/* Historial del ticket como línea de tiempo (misma tabla, otra forma):
+   acción y detalle arriba; persona y fecha en gris abajo. */
+#tabla-historial,
+#tabla-historial tbody {
+  display: block;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#tabla-historial {
+  margin-top: 0.9rem;
+}
+
+#tabla-historial thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+#historial-cuerpo {
+  position: relative;
+  padding-left: 1.6rem;
+}
+
+#historial-cuerpo tr {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "accion accion"
+    "detalle detalle"
+    "persona fecha";
+  column-gap: 0.4rem;
+  padding: 0.55rem 0 0.85rem;
+}
+
+#historial-cuerpo tr:hover {
+  background: transparent;
+}
+
+#historial-cuerpo tr::before {
+  top: 0.8rem;
+}
+
+#tabla-historial td {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+#historial-cuerpo td:nth-child(1) {
+  grid-area: fecha;
+  font-size: 0.8rem;
+  color: var(--color-tenue);
+}
+
+#historial-cuerpo td:nth-child(1)::before {
+  content: "· ";
+}
+
+#historial-cuerpo td:nth-child(2) {
+  grid-area: persona;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-tenue-fuerte);
+}
+
+#historial-cuerpo td:nth-child(3) {
+  grid-area: accion;
+  font-weight: 600;
+  color: var(--color-texto);
+}
+
+#historial-cuerpo td:nth-child(4) {
+  grid-area: detalle;
+  margin: 0.1rem 0 0.25rem;
+  color: var(--color-tenue-fuerte);
+  font-size: var(--texto-md);
+}
+
+#historial-cuerpo td:nth-child(4):empty {
+  display: none;
+}
+
+/* Tarjeta del ticket (detalle). */
+.tarjeta-ticket {
+  padding: 1.35rem 1.5rem 1.25rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-medio);
+  background: var(--color-superficie);
+  box-shadow: var(--sombra-tarjeta);
+}
+
+.tarjeta-ticket-cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tarjeta-ticket-titulos {
+  min-width: 0;
+}
+
+.tarjeta-ticket-id {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-tenue);
+  font-variant-numeric: tabular-nums;
+}
+
+.tarjeta-ticket-titulo {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-texto);
+  overflow-wrap: anywhere;
+}
+
+.tarjeta-ticket-etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tarjeta-ticket-descripcion {
+  margin: 0.9rem 0 0;
+  font-size: var(--texto-md);
+  line-height: 1.6;
+  color: var(--color-tenue-fuerte);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tarjeta-ticket-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.9rem 1.25rem;
+  margin: 1.15rem 0 0;
+  padding-top: 1.05rem;
+  border-top: 1px solid var(--color-borde);
+}
+
+.tarjeta-ticket-datos .dato {
+  min-width: 0;
+}
+
+.tarjeta-ticket-datos dt {
+  margin-bottom: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-tenue);
+}
+
+.tarjeta-ticket-datos dd {
+  margin: 0;
+  font-size: var(--texto-md);
+  color: var(--color-texto);
+  overflow-wrap: anywhere;
 }
 
 

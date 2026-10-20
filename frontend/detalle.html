@@ -57,43 +57,42 @@
             <button type="button" id="eliminar" class="peligro" data-permiso="eliminar">Eliminar</button>
           </div>
   
-          <section id="panel-ticket" class="filtros detalle" aria-label="Datos del ticket">
-            <div class="campo-dato">
-              <span class="etiqueta">ID</span>
-              <span id="ver-id">—</span>
+          <!-- Tarjeta del ticket: título grande con estado y prioridad arriba,
+               la descripción y los datos en una grilla. -->
+          <section id="panel-ticket" class="tarjeta-ticket" aria-label="Datos del ticket">
+            <div class="tarjeta-ticket-cabecera">
+              <div class="tarjeta-ticket-titulos">
+                <span class="tarjeta-ticket-id">#<span id="ver-id">—</span></span>
+                <h2 id="ver-title" class="tarjeta-ticket-titulo">—</h2>
+              </div>
+              <div class="tarjeta-ticket-etiquetas">
+                <span id="ver-state">—</span>
+                <span id="ver-priority">—</span>
+              </div>
             </div>
-            <div class="campo-dato ancho">
-              <span class="etiqueta">Título</span>
-              <span id="ver-title">—</span>
-            </div>
-            <div class="campo-dato ancho">
-              <span class="etiqueta">Descripción</span>
-              <span id="ver-description">—</span>
-            </div>
-            <div class="campo-dato">
-              <span class="etiqueta">Categoría</span>
-              <span id="ver-category">—</span>
-            </div>
-            <div class="campo-dato">
-              <span class="etiqueta">Prioridad</span>
-              <span id="ver-priority">—</span>
-            </div>
-            <div class="campo-dato">
-              <span class="etiqueta">Estado</span>
-              <span id="ver-state">—</span>
-            </div>
-            <div class="campo-dato">
-              <span class="etiqueta">Asignado a</span>
-              <span id="ver-assigned">—</span>
-            </div>
-            <div class="campo-dato">
-              <span class="etiqueta">Fecha de creación</span>
-              <span id="ver-created">—</span>
-            </div>
-            <div class="campo-dato">
-              <span class="etiqueta">Fecha de actualización</span>
-              <span id="ver-updated">—</span>
-            </div>
+            <p id="ver-description" class="tarjeta-ticket-descripcion">—</p>
+            <dl class="tarjeta-ticket-datos">
+              <div class="dato">
+                <dt>Categoría</dt>
+                <dd id="ver-category">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Asignado a</dt>
+                <dd id="ver-assigned">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Solicitante</dt>
+                <dd id="ver-creator">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Fecha de creación</dt>
+                <dd id="ver-created">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Fecha de actualización</dt>
+                <dd id="ver-updated">—</dd>
+              </div>
+            </dl>
           </section>
   
           <section id="seccion-edicion" class="seccion" aria-label="Edición del ticket" hidden>

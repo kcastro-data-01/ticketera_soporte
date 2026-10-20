@@ -61,6 +61,7 @@ const ELEMENT_IDS = [
   "ver-priority",
   "ver-state",
   "ver-assigned",
+  "ver-creator",
   "ver-created",
   "ver-updated",
   "form-editar",
