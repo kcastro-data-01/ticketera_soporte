@@ -3101,3 +3101,31 @@ td.con-avatar {
     animation: none;
   }
 }
+
+/* ===== Métricas: cambio frente al período anterior ===== */
+.metrica-cambio {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 0.45rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: var(--etiqueta-gris-fondo);
+  color: var(--etiqueta-gris-texto);
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.metrica-cambio.bueno {
+  background: var(--etiqueta-verde-fondo);
+  color: var(--etiqueta-verde-texto);
+}
+
+.metrica-cambio.malo {
+  background: var(--etiqueta-rojo-fondo);
+  color: var(--etiqueta-rojo-texto);
+}
+
+.esqueleto-activo .metrica-cambio {
+  visibility: hidden;
+}

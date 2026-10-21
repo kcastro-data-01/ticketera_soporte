@@ -51,7 +51,8 @@ const DATOS = {
 function crear({ rol = "Supervisor", fetchImpl, conChart = true }) {
   const ids = {};
   for (const id of ["form-rango", "desde", "hasta", "aplicar", "estado-carga", "m-abiertos", "m-en-proceso",
-    "m-resueltos", "m-promedio", "m-origen", "m-origen-nota"]) {
+    "m-resueltos", "m-promedio", "m-origen", "m-origen-nota",
+    "c-abiertos", "c-en-proceso", "c-resueltos", "c-promedio", "c-origen"]) {
     ids[id] = nodo(id === "form-rango" ? "form" : "span");
   }
   const figuras = ["g-estado", "g-categoria", "g-persona", "g-dia"].map((id) => {
@@ -115,7 +116,10 @@ test("al abrir pide el rango por defecto y al aplicar el elegido", async () => {
   m.ids.hasta.value = "2026-10-05";
   m.ids["form-rango"].listeners.submit[0]({ preventDefault() {} });
   await new Promise((r) => setImmediate(r));
-  assert.equal(m.llamadas[1], "/api/metricas?desde=2026-10-01&hasta=2026-10-05");
+  // Cada carga pide también el período anterior de la misma duración.
+  assert.equal(m.llamadas[1], `/api/metricas?desde=${m.sandbox.rangoAnterior(desde, hoy).desde}&hasta=${m.sandbox.sumarDias(desde, -1)}`);
+  assert.equal(m.llamadas[2], "/api/metricas?desde=2026-10-01&hasta=2026-10-05");
+  assert.equal(m.llamadas[3], "/api/metricas?desde=2026-09-26&hasta=2026-09-30");
   // Los gráficos anteriores se destruyen antes de crear los nuevos.
   assert.equal(m.charts.length, 8);
   assert.ok(m.charts.slice(0, 4).every((c) => c.destroyed));
@@ -183,4 +187,49 @@ test("el permiso «metricas» es solo para Supervisor y Administrador", () => {
     const { sandbox } = crear({ rol, fetchImpl: async () => ok(DATOS) });
     assert.equal(sandbox.puede("metricas"), puede, rol);
   }
+});
+
+
+// --- Comparación con el período anterior ------------------------------------
+
+test("período anterior: misma duración, justo antes del rango", () => {
+  const { sandbox } = crear({ fetchImpl: async () => ok(DATOS) });
+  assert.deepEqual({ ...sandbox.rangoAnterior("2026-10-01", "2026-10-05") }, { desde: "2026-09-26", hasta: "2026-09-30" });
+  assert.deepEqual({ ...sandbox.rangoAnterior("2026-03-01", "2026-03-01") }, { desde: "2026-02-28", hasta: "2026-02-28" });
+  assert.deepEqual({ ...sandbox.rangoAnterior("2026-09-20", "2026-10-19") }, { desde: "2026-08-21", hasta: "2026-09-19" });
+});
+
+test("texto y color del cambio según si es bueno o malo", () => {
+  const { sandbox } = crear({ fetchImpl: async () => ok(DATOS) });
+  const c = (...a) => ({ ...sandbox.cambioVsAnterior(...a) });
+  assert.deepEqual(c(28, 25, "subir"), { texto: "▲ 12 % vs. período anterior", tono: "bueno" });
+  assert.deepEqual(c(20, 25, "subir"), { texto: "▼ 20 % vs. período anterior", tono: "malo" });
+  assert.deepEqual(c(10, 20, "bajar"), { texto: "▼ 50 % vs. período anterior", tono: "bueno" });
+  assert.deepEqual(c(30, 20, "bajar"), { texto: "▲ 50 % vs. período anterior", tono: "malo" });
+  assert.deepEqual(c(48, 40, "neutro", " creados"), { texto: "▲ 20 % creados vs. período anterior", tono: "neutro" });
+  assert.deepEqual(c(5, 5, "subir"), { texto: "= igual vs. período anterior", tono: "neutro" });
+  assert.deepEqual(c(3, 0, "subir"), { texto: "▲ desde 0 en el período anterior", tono: "bueno" });
+  assert.deepEqual(c(null, 4, "bajar"), { texto: "Sin datos del período anterior", tono: "neutro" });
+});
+
+test("las tarjetas muestran la comparación con la segunda consulta", async () => {
+  const ANTES = { ...DATOS, tarjetas: { ...DATOS.tarjetas, resueltos_periodo: 25, tiempo_promedio_horas: 20, creados_periodo: 40 } };
+  const m = crear({ fetchImpl: async (url) => ok(url === m.llamadas[0] ? DATOS : ANTES) });
+  await m.sandbox.iniciarMetricas();
+  assert.equal(m.ids["c-resueltos"].textContent, "▲ 20 % vs. período anterior");
+  assert.equal(m.ids["c-resueltos"].className, "metrica-cambio bueno");
+  assert.equal(m.ids["c-promedio"].textContent, "▲ 41 % vs. período anterior");
+  assert.equal(m.ids["c-promedio"].className, "metrica-cambio malo", "tardar más es malo");
+  assert.equal(m.ids["c-origen"].textContent, "= igual vs. período anterior");
+  assert.equal(m.ids["c-abiertos"].hidden, false, "aclara que es el valor de hoy");
+});
+
+test("si falla la consulta del período anterior, las métricas se ven igual", async () => {
+  const m = crear({
+    fetchImpl: async () => (m.llamadas.length === 2 ? { ok: false, status: 500, json: async () => ({}) } : ok(DATOS)),
+  });
+  await m.sandbox.iniciarMetricas();
+  assert.equal(m.ids["m-resueltos"].textContent, "30");
+  assert.equal(m.ids["c-resueltos"].hidden, true);
+  assert.equal(m.ids["c-abiertos"].hidden, true);
 });

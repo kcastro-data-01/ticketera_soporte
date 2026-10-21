@@ -37,6 +37,19 @@ function rangoPorDefecto(hoy = fechaLocal()) {
   return { desde: sumarDias(hoy, -(DIAS_POR_DEFECTO - 1)), hasta: hoy };
 }
 
+/* Días entre dos fechas YYYY-MM-DD, contando las dos. */
+function diasDelRango(desde, hasta) {
+  const ms = Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`);
+  return Math.round(ms / 86400000) + 1;
+}
+
+/* El período anterior de la misma duración, justo antes de «desde»:
+   del 01/10 al 05/10 (5 días) → del 26/09 al 30/09. */
+function rangoAnterior(desde, hasta) {
+  const dias = diasDelRango(desde, hasta);
+  return { desde: sumarDias(desde, -dias), hasta: sumarDias(desde, -1) };
+}
+
 function urlMetricas(desde, hasta) {
   const params = new URLSearchParams({ desde, hasta });
   return `${API_METRICAS_URL}?${params.toString()}`;
@@ -103,6 +116,52 @@ function pintarTarjetas(datos) {
       ? `${t.creados_periodo} creados en el período · ${porcentaje}% por correo`
       : "Ningún ticket creado en el período"
   );
+}
+
+/* --- Comparación con el período anterior --------------------------------
+   Cada tarjeta del período muestra «▲ 12 % vs. período anterior», en verde
+   si el cambio es bueno y en rojo si es malo. «Abiertos» y «En proceso»
+   son el valor de hoy (no dependen del rango), así que no se comparan. */
+
+const COMPARACIONES = [
+  { id: "c-resueltos", campo: "resueltos_periodo", mejor: "subir" },
+  { id: "c-promedio", campo: "tiempo_promedio_horas", mejor: "bajar" },
+  { id: "c-origen", campo: "creados_periodo", mejor: "neutro", sufijo: " creados" },
+];
+const SIN_COMPARACION = ["c-abiertos", "c-en-proceso"];
+
+/* Devuelve { texto, tono } con tono «bueno», «malo» o «neutro». */
+function cambioVsAnterior(actual, anterior, mejor = "subir", sufijo = "") {
+  const fin = " vs. período anterior";
+  if (actual === null || actual === undefined || anterior === null || anterior === undefined) {
+    return { texto: "Sin datos del período anterior", tono: "neutro" };
+  }
+  if (actual === anterior) return { texto: `= igual${fin}`, tono: "neutro" };
+  const sube = actual > anterior;
+  const flecha = sube ? "▲" : "▼";
+  const tono = mejor === "neutro" ? "neutro" : sube === (mejor === "subir") ? "bueno" : "malo";
+  if (!anterior) return { texto: `${flecha} desde 0${sufijo} en el período anterior`, tono };
+  const porcentaje = Math.round((Math.abs(actual - anterior) * 100) / Math.abs(anterior));
+  return { texto: `${flecha} ${porcentaje} %${sufijo}${fin}`, tono };
+}
+
+function pintarComparacion(tarjetas, anteriores) {
+  COMPARACIONES.forEach(({ id, campo, mejor, sufijo }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!anteriores) {
+      el.hidden = true;
+      return;
+    }
+    const { texto, tono } = cambioVsAnterior(tarjetas[campo], anteriores[campo], mejor, sufijo);
+    el.textContent = texto;
+    el.className = `metrica-cambio ${tono}`;
+    el.hidden = false;
+  });
+  SIN_COMPARACION.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = !anteriores;
+  });
 }
 
 /* Tabla simple: encabezados + filas de texto. */
@@ -322,6 +381,18 @@ if (typeof document !== "undefined" && typeof document.addEventListener === "fun
 
 /* --- Carga ------------------------------------------------------------- */
 
+async function cargarTarjetasAnteriores({ desde, hasta }) {
+  try {
+    const response = await fetchWithAuth(urlMetricas(desde, hasta));
+    if (!response.ok) return null;
+    const datos = await response.json();
+    return datos && datos.tarjetas ? datos.tarjetas : null;
+  } catch (error) {
+    console.error("GET /api/metricas (período anterior):", error);
+    return null;
+  }
+}
+
 async function cargarMetricas() {
   const { desde, hasta, aplicar } = elementos();
   if (!desde.value || !hasta.value) {
@@ -332,11 +403,18 @@ async function cargarMetricas() {
   mostrarEstado("");
   const zonas = [document.querySelector(".metricas-tarjetas"), document.querySelector(".metricas-graficos")];
   zonas.forEach((zona) => marcarCargando(zona, true));
+  const previo = rangoAnterior(desde.value, hasta.value);
   try {
-    const response = await fetchWithAuth(urlMetricas(desde.value, hasta.value));
+    /* Las dos consultas salen juntas; si falla la del período anterior,
+       la página se muestra igual, sin comparación. */
+    const [response, anteriores] = await Promise.all([
+      fetchWithAuth(urlMetricas(desde.value, hasta.value)),
+      cargarTarjetasAnteriores(previo),
+    ]);
     const datos = await response.json().catch(() => null);
     if (response.ok && datos) {
       const conGraficos = pintar(datos);
+      pintarComparacion(datos.tarjetas, anteriores);
       mostrarEstado(
         conGraficos ? "" : "No se pudieron cargar los gráficos (¿sin internet?). Se muestran los datos en tablas.",
         conGraficos ? "" : "vacio"
