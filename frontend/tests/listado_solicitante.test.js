@@ -164,3 +164,11 @@ test("la categoría lleva su ícono (clase por categoría)", async () => {
   const css = leer("css/estilos.css");
   for (const cat of ["hardware", "software", "red", "accesos"]) assert.match(css, new RegExp(`\\.cat-${cat} \\{ --icono-categoria`));
 });
+
+test("filas Críticas y Altas destacadas solo en la vista del equipo", async () => {
+  const conCritica = [...TICKETS, { ...TICKETS[1], id: 9, priority: "Crítica" }];
+  const equipo = await montar("Supervisor", conCritica);
+  assert.deepEqual(equipo.filas.map((f) => f.className), ["fila-alta", "", "fila-critica"]);
+  const solicitante = await montar("Solicitante", conCritica);
+  assert.ok(solicitante.filas.every((f) => !f.className), "el Solicitante no ve la prioridad");
+});

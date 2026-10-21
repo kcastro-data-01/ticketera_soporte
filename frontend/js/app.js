@@ -150,6 +150,8 @@ function assignedText(ticket) {
   return name || `Usuario #${ticket.assigned_to_id}`;
 }
 
+const FILAS_DESTACADAS = { "Crítica": "fila-critica", Alta: "fila-alta" };
+
 /* Ícono de línea de cada categoría (lo dibuja el CSS). */
 const CATEGORIAS_ICONO = { Hardware: "hardware", Software: "software", Red: "red", Accesos: "accesos" };
 
@@ -198,6 +200,9 @@ function renderTickets(tickets) {
   clearRows();
   tickets.forEach((ticket) => {
     const row = document.createElement("tr");
+    /* Línea de color a la izquierda en las filas Críticas y Altas (el
+       Solicitante no ve la prioridad, así que no se le marca). */
+    if (!vistaSolicitante) row.className = FILAS_DESTACADAS[ticket.priority] || "";
     appendIdCell(row, ticket.id);
     appendCell(row, ticket.title);
     if (!vistaSolicitante) {
