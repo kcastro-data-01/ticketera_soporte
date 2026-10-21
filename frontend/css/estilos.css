@@ -3169,3 +3169,123 @@ td.con-avatar {
 .migas [aria-current="page"] {
   color: var(--color-tenue-fuerte);
 }
+
+/* ===== Usuario en la barra superior ===== */
+/* Con el menú arriba, el bloque de usuario del menú lateral sobra. */
+body:has(.menu-usuario) .barra-usuario {
+  display: none;
+}
+
+.menu-usuario {
+  position: relative;
+}
+
+.menu-usuario-boton {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.3rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-suave);
+  background: var(--color-superficie-alta);
+  color: var(--color-texto);
+  font-weight: 400;
+  text-align: left;
+}
+
+.menu-usuario-boton:hover,
+.menu-usuario-boton[aria-expanded="true"] {
+  border-color: var(--color-borde-fuerte);
+  background: var(--color-fondo-neutro);
+}
+
+.menu-usuario-avatar {
+  width: 30px;
+  height: 30px;
+  color: var(--color-texto-inverso);
+  font-size: 0.72rem;
+}
+
+.menu-usuario-datos {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.menu-usuario-nombre {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.menu-usuario-rol {
+  font-size: 0.72rem;
+  color: var(--color-tenue);
+}
+
+.menu-usuario-flecha {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--color-tenue);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.menu-usuario-lista {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 0.3rem;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: var(--radio-suave);
+  background: var(--color-superficie-alta);
+  box-shadow: 0 4px 16px rgba(26, 34, 51, 0.1);
+}
+
+.menu-usuario-opcion {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-texto);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  text-align: left;
+  text-decoration: none;
+}
+
+.menu-usuario-opcion:hover,
+.menu-usuario-opcion:focus-visible {
+  background: var(--color-fondo-neutro);
+}
+
+.menu-usuario-opcion.salir {
+  border-top: 1px solid var(--color-borde);
+  border-radius: 0 0 4px 4px;
+  color: var(--color-error);
+}
+
+.menu-usuario-opcion.salir:hover {
+  background: var(--color-error-fondo);
+}
+
+/* En el celular solo el círculo con las iniciales. */
+@media (max-width: 600px) {
+  .menu-usuario-datos,
+  .menu-usuario-flecha {
+    display: none;
+  }
+
+  /* El botón queda a la izquierda: el menú se abre hacia la derecha. */
+  .menu-usuario-lista {
+    right: auto;
+    left: 0;
+  }
+}

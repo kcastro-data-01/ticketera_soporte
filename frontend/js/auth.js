@@ -171,6 +171,78 @@ function pintarPersona(el, nombre) {
   }
 }
 
+/* Usuario en la barra superior: iniciales, nombre y rol; al pulsarlo se
+   abre un menú con «Mi cuenta» y «Cerrar sesión». Solo en las páginas
+   con menú lateral (no en el login). */
+const ICONO_FLECHA_ABAJO =
+  '<svg class="menu-usuario-flecha" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+
+function crearMenuUsuario(doc = document) {
+  if (!doc || typeof doc.querySelector !== "function") return null;
+  const user = getUser();
+  const cabecera = doc.querySelector(".cabecera");
+  if (!user || !cabecera || !doc.querySelector(".barra-lateral") || doc.querySelector(".menu-usuario")) return null;
+
+  const nodo = (tag, clase, texto) => {
+    const el = doc.createElement(tag);
+    if (clase) el.className = clase;
+    if (texto !== undefined) el.textContent = texto;
+    return el;
+  };
+  const nombre = user.name || user.email || "";
+  const menu = nodo("div", "menu-usuario");
+  const boton = nodo("button", "menu-usuario-boton");
+  boton.type = "button";
+  boton.setAttribute("aria-haspopup", "menu");
+  boton.setAttribute("aria-expanded", "false");
+  boton.setAttribute("aria-label", `Menú de ${nombre}`);
+  const avatar = nodo("span", "usuario-avatar menu-usuario-avatar", inicialesDe(nombre || "?"));
+  avatar.setAttribute("aria-hidden", "true");
+  const datos = nodo("span", "menu-usuario-datos");
+  datos.append(nodo("span", "menu-usuario-nombre", nombre), nodo("span", "menu-usuario-rol", user.role || ""));
+  boton.append(avatar, datos);
+  boton.insertAdjacentHTML("beforeend", ICONO_FLECHA_ABAJO);
+
+  const lista = nodo("div", "menu-usuario-lista");
+  lista.setAttribute("role", "menu");
+  lista.hidden = true;
+  const cuenta = nodo("a", "menu-usuario-opcion", "Mi cuenta");
+  cuenta.href = "cuenta.html";
+  cuenta.setAttribute("role", "menuitem");
+  const salir = nodo("button", "menu-usuario-opcion salir", "Cerrar sesión");
+  salir.type = "button";
+  salir.setAttribute("role", "menuitem");
+  salir.addEventListener("click", logout);
+  lista.append(cuenta, salir);
+  menu.append(boton, lista);
+
+  const alternar = (abrir) => {
+    lista.hidden = !abrir;
+    boton.setAttribute("aria-expanded", String(abrir));
+  };
+  boton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    alternar(lista.hidden);
+  });
+  doc.addEventListener("click", (event) => {
+    if (!lista.hidden && !menu.contains(event.target)) alternar(false);
+  });
+  doc.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !lista.hidden) {
+      alternar(false);
+      boton.focus();
+    }
+  });
+
+  let acciones = cabecera.querySelector(".cabecera-acciones");
+  if (!acciones) {
+    acciones = nodo("div", "cabecera-acciones");
+    cabecera.appendChild(acciones);
+  }
+  acciones.appendChild(menu);
+  return menu;
+}
+
 /* Ruta de navegación: para el Solicitante el listado se llama
    «Mis solicitudes». */
 function pintarMigas(doc = document) {
@@ -449,6 +521,7 @@ if (typeof document !== "undefined" && typeof document.addEventListener === "fun
     pintarMigas();
     iniciarMenuPlegable();
     iniciarBotonTema();
+    crearMenuUsuario();
     mostrarAvisoPendiente();
   });
 }
