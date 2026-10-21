@@ -171,6 +171,15 @@ function pintarPersona(el, nombre) {
   }
 }
 
+/* Ruta de navegación: para el Solicitante el listado se llama
+   «Mis solicitudes». */
+function pintarMigas(doc = document) {
+  if (!doc || typeof doc.querySelector !== "function") return;
+  const inicio = doc.querySelector(".migas-inicio");
+  const user = getUser();
+  if (inicio && user && user.role === "Solicitante") inicio.textContent = "Mis solicitudes";
+}
+
 /* Clase CSS de la etiqueta de color para un estado o una prioridad
    («En proceso» → "badge estado-proceso", «Crítica» → "badge prioridad-critica"). */
 const CLASES_BADGE = {
@@ -437,6 +446,7 @@ if (typeof document !== "undefined" && typeof document.addEventListener === "fun
   document.addEventListener("DOMContentLoaded", () => {
     aplicarPermisos();
     pintarUsuario();
+    pintarMigas();
     iniciarMenuPlegable();
     iniciarBotonTema();
     mostrarAvisoPendiente();

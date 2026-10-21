@@ -3138,3 +3138,34 @@ td.con-avatar {
 .listado tbody tr.fila-alta td:first-child {
   box-shadow: inset 3px 0 0 var(--etiqueta-naranja-texto);
 }
+
+/* ===== Ruta de navegación (Tickets › Ticket #11) ===== */
+.migas ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0 0 0.3rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+  color: var(--color-tenue);
+}
+
+.migas li + li::before {
+  content: "›";
+  margin: 0 0.45rem;
+  color: var(--color-texto-suave);
+}
+
+.migas a {
+  color: var(--color-enlace);
+  text-decoration: none;
+}
+
+.migas a:hover {
+  text-decoration: underline;
+}
+
+.migas [aria-current="page"] {
+  color: var(--color-tenue-fuerte);
+}

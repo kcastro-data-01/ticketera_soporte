@@ -816,6 +816,8 @@ async function init() {
   elements.historial.addEventListener("click", () => cargarHistorial());
 
   ticketId = getTicketId();
+  const migaActual = document.getElementById("migas-actual");
+  if (migaActual && ticketId !== null) migaActual.textContent = `Ticket #${ticketId}`;
   if (ticketId === null) {
     showStatus(
       "Identificador de ticket no válido. Regrese al listado y abra un ticket.",
