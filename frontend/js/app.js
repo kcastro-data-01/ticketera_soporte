@@ -170,14 +170,16 @@ function appendCell(row, text, className) {
 /* Celda con el nombre y el círculo de iniciales de la persona. */
 function appendPersonaCell(row, nombre) {
   const cell = document.createElement("td");
+  cell.className = nombre === "—" ? "celda-asignado sin-asignar" : "celda-asignado";
   pintarPersona(cell, nombre);
   row.appendChild(cell);
 }
 
 /* El ID del listado abre la pantalla de detalle (Tarea 13). */
 /* Celda con etiqueta de color para prioridad o estado. */
-function appendBadgeCell(row, text) {
+function appendBadgeCell(row, text, className) {
   const cell = document.createElement("td");
+  if (className) cell.className = className;
   const badge = document.createElement("span");
   badge.className = claseBadge(text);
   badge.textContent = text;
@@ -187,6 +189,7 @@ function appendBadgeCell(row, text) {
 
 function appendIdCell(row, ticketId) {
   const cell = document.createElement("td");
+  cell.className = "celda-id";
   const link = document.createElement("a");
   link.className = "enlace-tabla";
   link.href = `detalle.html?id=${ticketId}`;
@@ -204,14 +207,16 @@ function renderTickets(tickets) {
        Solicitante no ve la prioridad, así que no se le marca). */
     if (!vistaSolicitante) row.className = FILAS_DESTACADAS[ticket.priority] || "";
     appendIdCell(row, ticket.id);
-    appendCell(row, ticket.title);
+    /* Cada celda lleva su clase: en el celular la fila se dibuja como
+       tarjeta y cada dato va en su lugar (estilos.css). */
+    appendCell(row, ticket.title, "celda-titulo");
     if (!vistaSolicitante) {
       appendCell(row, ticket.category, claseCategoria(ticket.category));
-      appendBadgeCell(row, ticket.priority);
+      appendBadgeCell(row, ticket.priority, "celda-prioridad");
     }
-    appendBadgeCell(row, ticket.state);
+    appendBadgeCell(row, ticket.state, "celda-estado");
     if (vistaSolicitante && (ticket.assigned_to_id === null || ticket.assigned_to_id === undefined)) {
-      appendCell(row, "Pendiente de asignar", "celda-pendiente");
+      appendCell(row, "Pendiente de asignar", "celda-pendiente celda-asignado");
     } else {
       appendPersonaCell(row, assignedText(ticket));
     }
@@ -478,6 +483,7 @@ if (typeof document !== "undefined") {
    «Ver» para el resto; ambos abren el detalle. */
 function appendActionCell(row, ticketId) {
   const cell = document.createElement("td");
+  cell.className = "celda-accion";
   const button = document.createElement("button");
   button.type = "button";
   button.className = "btn-accion";

@@ -3534,3 +3534,121 @@ body.pagina-error {
   color: var(--color-tenue-fuerte);
   line-height: 1.5;
 }
+
+/* ===== Listado en celular: cada ticket como tarjeta =====
+   Menos de 700 px: la tabla se dibuja como tarjetas (ID y título arriba;
+   estado, prioridad, categoría y asignado como etiquetas; fecha y botón
+   abajo). La vista del Solicitante no tiene categoría ni prioridad. */
+@media (max-width: 700px) {
+  #tabla-tickets {
+    overflow: visible;
+  }
+
+  #tabla-tickets .listado,
+  #tabla-tickets .listado tbody {
+    display: block;
+    border: 0;
+    background: transparent;
+  }
+
+  #tabla-tickets .listado thead {
+    display: none;
+  }
+
+  /* Flex con orden fijo: fila 1 ID y título; fila 2 las etiquetas; una
+     línea fina; fila 3 la fecha y el botón. */
+  #lista-tickets tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.4rem;
+    margin-bottom: 0.65rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-suave);
+    background: var(--color-superficie-alta);
+  }
+
+  /* Separador entre las etiquetas y la fecha. */
+  #lista-tickets tr::before {
+    content: "";
+    order: 7;
+    flex-basis: 100%;
+    height: 1px;
+    margin: 0.2rem 0;
+    background: var(--color-borde);
+  }
+
+  #lista-tickets tr:hover {
+    background: var(--color-superficie-alta);
+  }
+
+  #lista-tickets td {
+    padding: 0;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* La línea de Críticas y Altas pasa al borde izquierdo de la tarjeta. */
+  #lista-tickets tr.fila-critica {
+    border-left: 3px solid var(--etiqueta-rojo-texto);
+  }
+
+  #lista-tickets tr.fila-alta {
+    border-left: 3px solid var(--etiqueta-naranja-texto);
+  }
+
+  #lista-tickets .celda-id { order: 1; flex: 0 0 2.6rem; align-self: flex-start; }
+  #lista-tickets .celda-titulo { order: 2; flex: 1 1 calc(100% - 3.2rem); font-weight: 600; color: var(--color-titulo); }
+  #lista-tickets .celda-estado { order: 3; }
+  #lista-tickets .celda-prioridad { order: 4; }
+  #lista-tickets .celda-categoria { order: 5; }
+  #lista-tickets .celda-asignado { order: 6; }
+  #lista-tickets .celda-fecha { order: 8; flex: 1 1 auto; }
+  #lista-tickets .celda-accion { order: 9; }
+
+  /* Categoría y asignado como etiquetas, igual que estado y prioridad. */
+  #lista-tickets .celda-categoria,
+  #lista-tickets .celda-asignado {
+    padding: 0.1rem 0.45rem;
+    border: 1px solid var(--color-borde) !important;
+    border-radius: 3px;
+    color: var(--color-tenue-fuerte);
+    font-size: 0.75rem;
+  }
+
+  /* Sin responsable en la vista del equipo: no se muestra la etiqueta «—». */
+  #lista-tickets .celda-asignado.sin-asignar {
+    display: none;
+  }
+
+  #lista-tickets .celda-asignado.con-avatar::before {
+    width: 1.2rem;
+    height: 1.2rem;
+    margin-right: 0.35rem;
+    font-size: 0.55rem;
+  }
+
+  #lista-tickets .celda-fecha {
+    color: var(--color-tenue);
+    font-size: 0.75rem;
+  }
+
+  #lista-tickets .celda-fecha::before {
+    content: "Creado el ";
+  }
+
+  /* Esqueleto de carga: bloques simples en lugar de columnas. */
+  #lista-tickets tr.fila-esqueleto {
+    display: block;
+  }
+
+  #lista-tickets tr.fila-esqueleto::before {
+    display: none;
+  }
+
+  #lista-tickets tr.fila-esqueleto td {
+    display: block;
+    margin-bottom: 0.45rem;
+  }
+}

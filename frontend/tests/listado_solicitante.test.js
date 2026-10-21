@@ -113,7 +113,7 @@ test("Solicitante: tabla con ID, Título, Estado, Atendido por, Fecha y Ver", as
   const [id, titulo, estado, atendido, , accion] = textos(filas[0]);
   assert.deepEqual([id, titulo, estado, atendido, accion], ["7", "VPN", "En proceso", "José Solano", "Ver"]);
   assert.equal(textos(filas[1])[3], "Pendiente de asignar");
-  assert.equal(filas[1].children[3].className, "celda-pendiente", "sin círculo de iniciales");
+  assert.equal(filas[1].children[3].className, "celda-pendiente celda-asignado", "sin círculo de iniciales");
   assert.ok(!textos(filas[0]).includes("Red") && !textos(filas[0]).includes("Alta"));
 });
 
@@ -171,4 +171,13 @@ test("filas Críticas y Altas destacadas solo en la vista del equipo", async () 
   assert.deepEqual(equipo.filas.map((f) => f.className), ["fila-alta", "", "fila-critica"]);
   const solicitante = await montar("Solicitante", conCritica);
   assert.ok(solicitante.filas.every((f) => !f.className), "el Solicitante no ve la prioridad");
+});
+
+test("cada celda lleva su clase para la tarjeta del celular", async () => {
+  const equipo = await montar("Técnico");
+  assert.deepEqual(equipo.filas[0].children.map((c) => c.className.split(" ")[0]),
+    ["celda-id", "celda-titulo", "celda-categoria", "celda-prioridad", "celda-estado", "celda-asignado", "celda-fecha", "celda-accion"]);
+  const solicitante = await montar("Solicitante");
+  assert.deepEqual(solicitante.filas[0].children.map((c) => c.className.split(" ")[0]),
+    ["celda-id", "celda-titulo", "celda-estado", "celda-asignado", "celda-fecha", "celda-accion"]);
 });
