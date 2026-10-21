@@ -92,10 +92,17 @@
   --sombra-tarjeta: 0 1px 2px rgba(11, 24, 77, 0.04);
   --sombra-suave: none;
 
-  /* Radios */
+  /* Radios: 6 px en tarjetas, botones y campos; 8 px en las ventanas que
+     flotan (chat, confirmación, botón del asistente). */
   --radio-suave: 6px;
   --radio-medio: 6px;
+  --radio-ventana: 8px;
   --radio-pill: 999px;
+
+  /* Alturas: todos los botones y campos miden lo mismo en todas las
+     pantallas; los botones de las filas de la tabla, la versión chica. */
+  --alto-control: 2.25rem;
+  --alto-control-chico: 1.75rem;
 
   /* Espaciado */
   --espaciado-xs: 0.25rem;
@@ -103,6 +110,8 @@
   --espaciado-md: 0.75rem;
   --espaciado-lg: 1rem;
   --espaciado-xl: 1.5rem;
+  /* Separación entre secciones de una misma pantalla. */
+  --espaciado-seccion: 1.75rem;
 
   /* Tipografía */
   --texto-sm: 0.8125rem;
@@ -292,13 +301,17 @@ h3 {
 }
 
 .enlace-boton {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--alto-control);
   background: var(--color-primario);
   color: var(--color-texto-inverso);
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 1rem;
+  border: 1px solid transparent;
   border-radius: var(--radio-suave);
   text-decoration: none;
-  font-size: var(--texto-sm);
+  font-size: var(--texto-md);
   font-weight: 600;
   transition: background-color 0.15s ease;
 }
@@ -362,7 +375,7 @@ h3 {
 .campo textarea,
 .campo select {
   width: 100%;
-  min-height: 2.25rem;
+  min-height: var(--alto-control);
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--color-borde-fuerte);
   border-radius: var(--radio-suave);
@@ -408,7 +421,12 @@ h3 {
 }
 
 button {
-  padding: 0.5rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: var(--alto-control);
+  padding: 0.4rem 1rem;
   border: 1px solid transparent;
   border-radius: var(--radio-suave);
   background: var(--color-primario);
@@ -683,7 +701,14 @@ button.peligro:disabled:hover {
 }
 
 .seccion {
-  margin-top: 1.75rem;
+  margin-top: var(--espaciado-seccion);
+}
+
+/* La primera sección de la pantalla arranca a la misma distancia del
+   encabezado que en el resto de las pantallas. */
+.contenido > .seccion:first-child,
+.contenido > .estado[hidden]:first-child + .seccion {
+  margin-top: 0;
 }
 
 .seccion h2 {
@@ -1479,6 +1504,7 @@ body.app {
 
 /* Botón para achicar el menú (solo íconos). */
 .boton-plegar {
+  min-height: 0;
   display: grid;
   place-items: center;
   align-self: flex-end;
@@ -1644,6 +1670,7 @@ body.app {
 .cabecera-acciones {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--espaciado-sm);
 }
 
@@ -1820,7 +1847,8 @@ body.app {
 }
 
 .vista-tabs .vista-tab {
-  padding: 0.35rem 0.9rem;
+  min-height: var(--alto-control-chico);
+  padding: 0.2rem 0.9rem;
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -1850,7 +1878,8 @@ body.app {
 /* Botones de las tablas («Ver», «Editar»): chicos, con borde y sin
    relleno fuerte. */
 .btn-accion {
-  padding: 0.3rem 0.8rem;
+  min-height: var(--alto-control-chico);
+  padding: 0.2rem 0.8rem;
   border: 1px solid var(--color-borde-fuerte);
   border-radius: var(--radio-suave);
   background: var(--color-superficie-alta);
@@ -2047,7 +2076,7 @@ body.app {
   height: 52px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radio-ventana);
   background: var(--color-primario);
   color: var(--color-texto-inverso);
   box-shadow: 0 2px 8px rgba(26, 34, 51, 0.1);
@@ -2123,7 +2152,7 @@ body.app {
   max-height: calc(100vh - 7rem);
   overflow: hidden;
   border: 1px solid var(--color-borde-fuerte);
-  border-radius: 8px;
+  border-radius: var(--radio-ventana);
   background: var(--color-superficie);
   box-shadow: 0 4px 16px rgba(26, 34, 51, 0.1);
 }
@@ -3306,7 +3335,7 @@ body:has(.menu-usuario) .barra-usuario {
   max-width: 420px;
   padding: 1.25rem 1.25rem 1rem;
   border: 1px solid var(--color-borde-fuerte);
-  border-radius: 8px;
+  border-radius: var(--radio-ventana);
   background: var(--color-superficie-alta);
   color: var(--color-texto);
   box-shadow: 0 8px 24px rgba(26, 34, 51, 0.16);
@@ -3314,7 +3343,7 @@ body:has(.menu-usuario) .barra-usuario {
 
 .dialogo-titulo {
   margin: 0 0 0.5rem;
-  font-size: 1rem;
+  font-size: var(--texto-lg);
   color: var(--color-titulo);
 }
 
@@ -3475,7 +3504,7 @@ body.pagina-error {
   max-width: 440px;
   padding: 2rem 1.75rem;
   border: 1px solid var(--color-borde);
-  border-radius: 8px;
+  border-radius: var(--radio-suave);
   background: var(--color-superficie-alta);
   box-shadow: var(--sombra-tarjeta);
   text-align: center;
@@ -3526,7 +3555,12 @@ body.pagina-error {
 .pagina-error-tarjeta h2 {
   margin: 0 0 0.5rem;
   color: var(--color-titulo);
-  font-size: 1.25rem;
+  font-size: var(--texto-titulo);
+}
+
+/* Dentro del detalle es un título de sección. */
+.pagina-error-tarjeta h2 {
+  font-size: var(--texto-lg);
 }
 
 .pagina-error-mensaje {
@@ -3658,6 +3692,7 @@ body.pagina-error {
 .orden-columna,
 .orden-columna:hover,
 .orden-columna:active {
+  min-height: 0;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
