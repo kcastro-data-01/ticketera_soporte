@@ -74,6 +74,13 @@
                 <span id="ver-priority">—</span>
               </div>
             </div>
+            <!-- Avance del estado: los pasos ya hechos, el actual y los que faltan. -->
+            <ol id="pasos-estado" class="pasos-estado" aria-label="Avance del ticket">
+              <li data-paso="Nuevo"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Nuevo</span></li>
+              <li data-paso="En proceso"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">En proceso</span></li>
+              <li data-paso="Resuelto"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Resuelto</span></li>
+              <li data-paso="Cerrado"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Cerrado</span></li>
+            </ol>
             <p id="ver-description" class="tarjeta-ticket-descripcion">—</p>
             <dl class="tarjeta-ticket-datos">
               <div class="dato">

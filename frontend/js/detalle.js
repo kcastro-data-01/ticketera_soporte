@@ -172,6 +172,21 @@ async function mensajeDeDetalle(response, mensajePorDefecto) {
   return body && body.detail ? String(body.detail) : mensajePorDefecto;
 }
 
+/* Barra de pasos: marca como hechos los estados anteriores al actual. */
+const PASOS_ESTADO = ["Nuevo", "En proceso", "Resuelto", "Cerrado"];
+
+function pintarPasos(estado) {
+  const lista = document.getElementById("pasos-estado");
+  if (!lista || typeof lista.querySelectorAll !== "function") return;
+  const actual = PASOS_ESTADO.indexOf(estado);
+  lista.querySelectorAll("li").forEach((paso) => {
+    const indice = PASOS_ESTADO.indexOf(paso.dataset.paso);
+    paso.className = indice < actual ? "hecho" : indice === actual ? "actual" : "";
+    if (indice === actual) paso.setAttribute("aria-current", "step");
+    else paso.removeAttribute("aria-current");
+  });
+}
+
 function renderTicket(ticket) {
   const elements = getElements();
   ticketActual = ticket;
@@ -183,6 +198,7 @@ function renderTicket(ticket) {
   elements.ver.priority.className = claseBadge(ticket.priority);
   elements.ver.state.textContent = ticket.state;
   elements.ver.state.className = claseBadge(ticket.state);
+  pintarPasos(ticket.state);
   pintarPersona(elements.ver.assigned, nombreAsignado(ticket));
   pintarPersona(elements.ver.creator, nombreSolicitante(ticket));
   elements.ver.created.textContent = formatFecha(ticket.created_at);
