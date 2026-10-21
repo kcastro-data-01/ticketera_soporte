@@ -12,7 +12,7 @@ function mostrarEstadoPassword(mensaje, tipo) {
 
 /* Mensaje de error del formulario, o "" si se puede enviar. */
 function validarCambioPassword(actual, nueva, confirmar) {
-  if (!actual) return "Escribe tu contraseña actual.";
+  if (!actual) return "Ingrese su contraseña actual.";
   if (nueva.length < 6) return "La nueva contraseña debe tener al menos 6 caracteres.";
   if (nueva.length > 72) return "La nueva contraseña debe tener como máximo 72 caracteres.";
   if (nueva !== confirmar) return "Las contraseñas nuevas no coinciden.";
@@ -46,7 +46,7 @@ async function cambiarPassword(event) {
       actual.value = "";
       nueva.value = "";
       confirmar.value = "";
-      mostrarEstadoPassword("Contraseña cambiada. Úsala la próxima vez que inicies sesión.", "exito");
+      mostrarEstadoPassword("Contraseña actualizada correctamente. Utilícela la próxima vez que inicie sesión.", "exito");
       return;
     }
     const body = await response.json().catch(() => null);
@@ -55,7 +55,7 @@ async function cambiarPassword(event) {
   } catch (err) {
     console.error("POST /api/auth/change-password:", err);
     mostrarEstadoPassword(
-      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );
   } finally {

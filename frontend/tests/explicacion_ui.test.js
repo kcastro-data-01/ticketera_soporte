@@ -97,7 +97,7 @@ test("al abrir el ticket muestra la explicación guardada sin generar una nueva"
   assert.deepEqual(ia.llamadas, [{ url: "/api/tickets/7/explicacion", method: "GET" }]);
   const panel = texto(ia.ids["ia-panel"]);
   assert.equal(ia.ids["ia-panel"].hidden, false);
-  assert.match(panel, /Generado por IA, revisalo antes de usarlo/);
+  assert.match(panel, /Contenido generado automáticamente\. Revíselo antes de utilizarlo\./);
   assert.match(panel, /poco detalle/);
   assert.match(panel, /La persona dice que algo no sirve/);
   assert.match(panel, /Categoría sugerida: Hardware — Parece un equipo/);
@@ -157,14 +157,14 @@ test("las preguntas se copian al comentario, sin publicarlo", async () => {
   );
   assert.equal(ia.ids.contenido.focused, true);
   assert.equal(ia.llamadas.length, 1, "no se hizo ningún POST de comentario");
-  assert.match(ia.ids["ia-estado"].textContent, /Revisalas y pulsá «Agregar comentario»/);
+  assert.match(ia.ids["ia-estado"].textContent, /Revíselas y seleccione «Agregar comentario»/);
 });
 
 test("errores: IA caída, JSON inválido y rol sin permiso", async () => {
   for (const [status, detail, esperado] of [
     [502, "La IA no está disponible en este momento", /La IA no está disponible/],
     [502, "La IA no pudo generar una explicación válida. Intenta de nuevo.", /explicación válida/],
-    [403, "No autorizado", /Tu rol no puede usar/],
+    [403, "No autorizado", /Su rol no tiene permiso para usar/],
   ]) {
     const ia = crear({
       fetchImpl: async (url, o) => (o.method === "POST" ? respuesta(status, { detail }) : respuesta(200, { ...DATOS, explicacion: null })),

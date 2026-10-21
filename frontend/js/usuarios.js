@@ -79,7 +79,7 @@ function validarUsuario() {
   const errorPassword = validarPassword(elements.password ? elements.password.value : "");
   if (errorPassword) return errorPassword;
   if (!ROLES_VALIDOS.includes(elements.rol.value)) {
-    return "Selecciona un rol válido.";
+    return "Seleccione un rol válido.";
   }
   return "";
 }
@@ -101,7 +101,7 @@ function mensajeDeError(response, payload) {
       });
       return messages.join(" | ");
     }
-    return "La API rechazó los datos enviados. Revisa el formulario.";
+    return "El servidor rechazó los datos enviados. Revise el formulario.";
   }
   if (payload && typeof payload.detail === "string") {
     return `Error de API (${response.status}): ${payload.detail}`;
@@ -214,7 +214,7 @@ async function cambiarActivo(user, activar) {
   } catch (error) {
     console.error("PATCH /api/users (is_active):", error);
     showStatus(
-      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );
   } finally {
@@ -306,7 +306,7 @@ async function guardarEdicion(event) {
   } catch (error) {
     console.error("PATCH /api/users:", error);
     mostrarEdicionEstado(
-      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );
   } finally {
@@ -335,7 +335,7 @@ async function cargarUsuarios() {
   } catch (error) {
     console.error("GET /api/users:", error);
     mostrarUsuariosEstado(
-      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );
   }
@@ -383,7 +383,7 @@ async function crearUsuario(event) {
   } catch (error) {
     console.error("POST /api/users:", error);
     showStatus(
-      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );
   } finally {

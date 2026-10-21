@@ -30,7 +30,7 @@ function ticketEnPantalla() {
 const SUGERENCIAS_EQUIPO = [
   "¿Cuántos tickets pendientes hay?",
   "¿Qué tickets tengo asignados?",
-  "Explicá el ticket #1",
+  "Explique el ticket #1",
 ];
 const SUGERENCIAS_POR_ROL = {
   Administrador: SUGERENCIAS_EQUIPO,
@@ -42,7 +42,7 @@ const SUGERENCIAS_POR_ROL = {
     "¿Cómo creo un ticket?",
   ],
 };
-const SALUDO = "¡Hola! Soy tu asistente. Podés preguntarme cosas como:";
+const SALUDO = "Buen día. ¿En qué le puedo ayudar? Puede consultar, por ejemplo:";
 
 /* Íconos (trazos con currentColor, sin dependencias externas). */
 const ICONOS = {
@@ -191,7 +191,7 @@ async function enviarPregunta(texto) {
   const pista = crearElemento(
     "span",
     "chat-nota",
-    "Pensando… la primera respuesta puede tardar hasta un minuto mientras se carga el modelo."
+    "La primera respuesta puede tardar hasta un minuto. Gracias por su paciencia."
   );
   const aviso = setTimeout(() => {
     contenido.appendChild(pista);
@@ -269,7 +269,7 @@ async function enviarPregunta(texto) {
       error: true,
       content: cortado
         ? IA_NO_DISPONIBLE
-        : "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+        : "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
     };
   }
 
@@ -305,7 +305,7 @@ function crearAsistente() {
   estado.appendChild(crearElemento("span", "chat-punto-en-linea"));
   estado.appendChild(document.createTextNode("En línea"));
   /* El rol queda a la vista al pasar el mouse (y en el saludo del chat). */
-  estado.title = user && user.role ? `Respuestas según tu rol: ${user.role}` : "Respuestas según tu rol";
+  estado.title = user && user.role ? `Respuestas según su rol: ${user.role}` : "Respuestas según su rol";
   titulos.appendChild(estado);
   identidad.append(titulos);
 
@@ -334,8 +334,8 @@ function crearAsistente() {
   entrada.id = "chat-entrada";
   entrada.rows = 1;
   entrada.maxLength = 2000;
-  entrada.placeholder = "Escribe tu pregunta…";
-  entrada.setAttribute("aria-label", "Tu pregunta");
+  entrada.placeholder = "Ingrese su consulta…";
+  entrada.setAttribute("aria-label", "Su consulta");
   const enviar = crearElemento("button", "chat-enviar");
   enviar.id = "chat-enviar";
   enviar.type = "submit";

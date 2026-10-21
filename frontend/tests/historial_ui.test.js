@@ -287,7 +287,7 @@ test("sin conexión muestra el aviso del servidor", async () => {
 
   assert.equal(
     harness.estado().textContent,
-    "No se pudo conectar con el servidor. Comprueba que está en ejecución."
+    "No se pudo conectar con el servidor. Verifique que esté en funcionamiento."
   );
 });
 
@@ -308,6 +308,6 @@ test("un 401 limpia la sesión y redirige a login (auth.js)", async () => {
   );
   assert.equal(
     harness.estado().textContent,
-    "No se pudo conectar con el servidor. Comprueba que está en ejecución."
+    "No se pudo conectar con el servidor. Verifique que esté en funcionamiento."
   );
 });

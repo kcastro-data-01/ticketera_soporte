@@ -273,11 +273,11 @@ test("aviso de abajo con el texto formal", () => {
 test("sin mensajes: saludo y 3 preguntas de ejemplo", () => {
   const chat = montarChat();
   clic(chat.boton);
-  assert.match(texto(chat.lista), /¡Hola! Soy tu asistente\. Podés preguntarme cosas como:/);
+  assert.match(texto(chat.lista), /Buen día\. ¿En qué le puedo ayudar\? Puede consultar, por ejemplo:/);
   const chips = [];
   const juntar = (n) => { if (n.className === "chat-sugerencia") chips.push(n.textContent); (n.children || []).forEach(juntar); };
   juntar(chat.lista);
-  assert.deepEqual(chips, ["¿Cuántos tickets pendientes hay?", "¿Qué tickets tengo asignados?", "Explicá el ticket #1"]);
+  assert.deepEqual(chips, ["¿Cuántos tickets pendientes hay?", "¿Qué tickets tengo asignados?", "Explique el ticket #1"]);
 
   const solicitante = montarChat({ rol: "Solicitante" });
   clic(solicitante.boton);

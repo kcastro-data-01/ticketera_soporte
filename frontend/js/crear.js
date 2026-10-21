@@ -61,13 +61,13 @@ function validatePayload(payload) {
 /* Convierte el detalle de validación de FastAPI (422) en un mensaje legible. */
 function formatValidation(detail) {
   if (!detail || !Array.isArray(detail.detail)) {
-    return "La API rechazó los datos enviados. Revisa el formulario.";
+    return "El servidor rechazó los datos enviados. Revise el formulario.";
   }
   const messages = detail.detail.map((error) => {
     const field = Array.isArray(error.loc) ? error.loc.slice(1).join(".") : "";
     return field ? `${field}: ${error.msg}` : error.msg;
   });
-  return `Revisa los datos enviados. ${messages.join(" | ")}`;
+  return `Revise los datos enviados. ${messages.join(" | ")}`;
 }
 
 async function createTicket() {
@@ -99,14 +99,14 @@ async function createTicket() {
     }
 
     if (!response.ok) {
-      avisarError(`No se pudo crear el ticket (HTTP ${response.status}). Inténtalo de nuevo.`);
+      avisarError(`No se pudo crear el ticket (HTTP ${response.status}). Inténtelo de nuevo.`);
       return;
     }
 
     const ticket = await response.json();
     redirigiendo = true;
     /* El aviso se ve al llegar al listado. */
-    if (typeof avisoPendiente === "function") avisoPendiente(`Ticket #${ticket.id} guardado.`);
+    if (typeof avisoPendiente === "function") avisoPendiente(`Ticket #${ticket.id} guardado correctamente.`);
     showStatus(
       `Ticket #${ticket.id} creado correctamente. Redirigiendo al listado...`,
       "exito"

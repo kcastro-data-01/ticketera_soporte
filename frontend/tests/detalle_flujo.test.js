@@ -350,7 +350,7 @@ test("comentarios: error de conexión informa que el servidor no responde", asyn
 
   assert.equal(
     harness.node("comentarios-estado").textContent,
-    "No se pudo conectar con el servidor. Comprueba que está en ejecución."
+    "No se pudo conectar con el servidor. Verifique que esté en funcionamiento."
   );
   assert.equal(harness.node("comentarios-estado").className, "estado error");
   assert.ok(harness.consoleErrors.length > 0);
@@ -736,7 +736,7 @@ test("Eliminar: confirma con el número del ticket, borra y vuelve al listado", 
   await clickEliminar(harness);
 
   assert.deepEqual(harness.confirmaciones, [
-    "¿Seguro que querés eliminar el ticket #1? Esta acción no se puede deshacer.",
+    "¿Está seguro de que desea eliminar el ticket #1? Esta acción no se puede deshacer.",
   ]);
   assert.equal(harness.fetchCalls.length, 1);
   assert.equal(harness.fetchCalls[0].url, "/api/tickets/1");
@@ -778,5 +778,5 @@ test("Eliminar: un 404 avisa que el ticket ya no existe", async () => {
 
   await clickEliminar(harness);
 
-  assert.equal(harness.node("estado-carga").textContent, "El ticket ya no existe. Vuelve al listado.");
+  assert.equal(harness.node("estado-carga").textContent, "El ticket ya no existe. Regrese al listado.");
 });

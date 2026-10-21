@@ -72,10 +72,10 @@ test("los errores usan el mismo aviso en rojo", () => {
 
 test("un aviso pendiente se muestra una sola vez en la página siguiente", () => {
   const { s, doc, almacen } = cargar();
-  s.avisoPendiente("Ticket #4 eliminado.");
+  s.avisoPendiente("Ticket #4 eliminado correctamente.");
   assert.ok(almacen.has("aviso_pendiente"));
   s.mostrarAvisoPendiente();
-  assert.equal(doc.getElementById("avisos").children[0].textContent, "Ticket #4 eliminado.");
+  assert.equal(doc.getElementById("avisos").children[0].textContent, "Ticket #4 eliminado correctamente.");
   assert.equal(almacen.has("aviso_pendiente"), false);
   s.mostrarAvisoPendiente();
   assert.equal(doc.getElementById("avisos").children.length, 1);
@@ -86,8 +86,8 @@ test("los avisos reemplazan los mensajes de éxito de las acciones", () => {
   for (const texto of ["Cambios guardados correctamente.", "Comentario agregado correctamente.", "Estado actualizado a"]) {
     assert.match(detalle, new RegExp(`avisar\\(\\s*\`?"?${texto}`), texto);
   }
-  assert.match(detalle, /avisoPendiente\(`Ticket #\$\{ticketId\} eliminado.`\)/);
+  assert.match(detalle, /avisoPendiente\(`Ticket #\$\{ticketId\} eliminado correctamente.`\)/);
   const crear = fs.readFileSync(path.join(__dirname, "..", "js", "crear.js"), "utf8");
-  assert.match(crear, /avisoPendiente\(`Ticket #\$\{ticket\.id\} guardado.`\)/);
+  assert.match(crear, /avisoPendiente\(`Ticket #\$\{ticket\.id\} guardado correctamente.`\)/);
   assert.doesNotMatch(detalle + crear, /\balert\(/);
 });

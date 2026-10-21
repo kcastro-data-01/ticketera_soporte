@@ -9,7 +9,7 @@
 
 /* El servidor puede reintentar una vez si el JSON viene mal: hasta ~3 min. */
 const IA_LIMITE_MS = 200000;
-const IA_NOTA = "Generado por IA, revisalo antes de usarlo";
+const IA_NOTA = "Contenido generado automáticamente. Revíselo antes de utilizarlo.";
 const IA_NO_DISPONIBLE_TXT = "La IA no está disponible en este momento";
 
 let iaOcupada = false;
@@ -78,7 +78,7 @@ function iaRenderizar(datos) {
   if (!datos.vigente) {
     panel.appendChild(
       iaNodo("p", "ia-desactualizada",
-        "El ticket cambió desde la última explicación. Pulsá «Volver a explicar» para actualizarla.")
+        "El ticket cambió desde la última explicación. Seleccione «Volver a explicar» para actualizarla.")
     );
   }
 
@@ -153,7 +153,7 @@ function iaUsarPreguntas() {
   comentario.focus();
   if (typeof comentario.scrollIntoView === "function") comentario.scrollIntoView({ block: "center" });
   iaEstado(
-    "Las preguntas se copiaron al comentario. Revisalas y pulsá «Agregar comentario» para publicarlas.",
+    "Las preguntas se copiaron al comentario. Revíselas y seleccione «Agregar comentario» para publicarlas.",
     "exito"
   );
 }
@@ -184,7 +184,7 @@ async function iaExplicar(regenerar = false) {
       iaEstado("");
       iaRenderizar(datos);
     } else if (response.status === 403) {
-      iaEstado("Tu rol no puede usar «Explicar con IA».", "error");
+      iaEstado("Su rol no tiene permiso para usar «Explicar con IA».", "error");
     } else if (response.status === 404) {
       iaEstado("El ticket ya no existe.", "error");
     } else {

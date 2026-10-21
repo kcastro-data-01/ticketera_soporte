@@ -166,13 +166,13 @@ test("sin Chart.js (sin internet) se muestran las tablas abiertas", async () => 
     assert.equal(m.ids[id].datos.open, true);
   }
   assert.match(texto(m.ids["g-dia"].datos.cuerpo), /19\/101/);
-  assert.match(m.ids["estado-carga"].textContent, /Se muestran los datos en tablas/);
+  assert.match(m.ids["estado-carga"].textContent, /Los datos se muestran en tablas/);
 });
 
 test("errores: rango inválido y rol sin permiso", async () => {
   for (const [status, detail, esperado] of [
     [422, "La fecha «desde» no puede ser posterior a «hasta».", /posterior/],
-    [403, "No autorizado", /Tu rol no puede ver las métricas/],
+    [403, "No autorizado", /Su rol no tiene permiso para ver las métricas/],
   ]) {
     const m = crear({ fetchImpl: async () => ({ ok: false, status, json: async () => ({ detail }) }) });
     await m.sandbox.iniciarMetricas();

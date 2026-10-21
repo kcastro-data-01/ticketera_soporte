@@ -352,7 +352,7 @@
       <div id="auth-success" class="auth-success" role="status"></div>
       <form id="form-login" class="auth-form activo">
         <div class="campo">
-          <input type="email" id="login-email" name="email" required autocomplete="email" class="form-input" placeholder="tu@correo.com">
+          <input type="email" id="login-email" name="email" required autocomplete="email" class="form-input" placeholder="nombre@empresa.com">
           <span class="field-icon email-icon"></span>
         </div>
         <div class="campo">
@@ -388,8 +388,8 @@
           <span>Recordar sesión</span>
         </div>
         <p class="nota-registro" id="nota-registro">
-          Usa tu correo de la empresa. Tu cuenta se crea como <b>Solicitante</b>
-          para que puedas reportar y seguir tus tickets.
+          Utilice su correo de la empresa. Su cuenta se crea como <b>Solicitante</b>
+          para que pueda registrar sus solicitudes y darles seguimiento.
         </p>
         <div class="btn-grp">
           <button type="submit" id="btn-register" class="btn-primario">Crear cuenta</button>
@@ -397,7 +397,7 @@
         </div>
       </form>
 
-      <a href="index.html" class="forgot-link">¿Has olvidado tu contraseña? Contacta al administrador</a>
+      <a href="index.html" class="forgot-link">¿Olvidó su contraseña? Comuníquese con el administrador.</a>
       <div class="login-footer">
       </div>
     </div>
@@ -516,17 +516,17 @@
           });
 
           if (resp.status === 401) {
-            showError("Credenciales inválidas. Verifica tu correo y contraseña.");
+            showError("Credenciales inválidas. Verifique su correo y contraseña.");
             return;
           }
 
           if (resp.status === 403) {
-            showError("Tu cuenta está desactivada. Contacta al administrador.");
+            showError("Su cuenta está desactivada. Comuníquese con el administrador.");
             return;
           }
 
           if (!resp.ok) {
-            showError(`Error del servidor (${resp.status}). Intenta de nuevo.`);
+            showError(`Error del servidor (${resp.status}). Inténtelo de nuevo.`);
             return;
           }
 
@@ -543,10 +543,10 @@
             saveSession(data.access_token, { email });
           }
 
-          showSuccess("¡Inicio de sesión exitoso! Redirigiendo...");
+          showSuccess("Inicio de sesión correcto. Redirigiendo…");
           setTimeout(redirectToIndex, 800);
         } catch (err) {
-          showError("No se pudo conectar con el servidor. Verifica tu conexión.");
+          showError("No se pudo conectar con el servidor. Verifique su conexión.");
         } finally {
           setLoading(btnLogin, false);
         }
@@ -586,7 +586,7 @@
           });
 
           if (resp.status === 409) {
-            showError("Este correo ya está registrado. Inicia sesión en su lugar.");
+            showError("Este correo ya está registrado. Inicie sesión con esa cuenta.");
             return;
           }
 
@@ -598,13 +598,13 @@
                 : detail.detail;
               showError(`Datos inválidos: ${msg}`);
             } else {
-              showError("Datos inválidos. Verifica la información.");
+              showError("Datos inválidos. Verifique la información.");
             }
             return;
           }
 
           if (!resp.ok) {
-            showError(`Error del servidor (${resp.status}). Intenta de nuevo.`);
+            showError(`Error del servidor (${resp.status}). Inténtelo de nuevo.`);
             return;
           }
 
@@ -621,10 +621,10 @@
             saveSession(data.access_token, { name, email });
           }
 
-          showSuccess("¡Cuenta creada exitosamente! Redirigiendo...");
+          showSuccess("Cuenta creada correctamente. Redirigiendo…");
           setTimeout(redirectToIndex, 800);
         } catch (err) {
-          showError("No se pudo conectar con el servidor. Verifica tu conexión.");
+          showError("No se pudo conectar con el servidor. Verifique su conexión.");
         } finally {
           setLoading(btnRegister, false);
         }

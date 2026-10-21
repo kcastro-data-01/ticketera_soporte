@@ -225,7 +225,7 @@ test("init con error de conexión informa que el servidor no responde", async ()
 
   assert.equal(
     harness.node("usuarios-estado").textContent,
-    "No se pudo conectar con el servidor. Comprueba que está en ejecución."
+    "No se pudo conectar con el servidor. Verifique que esté en funcionamiento."
   );
   assert.equal(harness.node("usuarios-estado").className, "estado error");
   assert.ok(harness.consoleErrors.length > 0);
@@ -350,7 +350,7 @@ test("rol inválido devuelve error sin enviar", async () => {
       h.node("email").value = "ana@soporte.local";
       h.node("rol").value = "SuperUsuario";
     },
-    "Selecciona un rol válido."
+    "Seleccione un rol válido."
   );
 });
 
@@ -466,7 +466,7 @@ test("error de conexión al crear informa que el servidor no responde", async ()
   assert.equal(harness.fetchCalls.length, 1, "solo el POST");
   assert.equal(
     harness.node("estado-usuario").textContent,
-    "No se pudo conectar con el servidor. Comprueba que está en ejecución."
+    "No se pudo conectar con el servidor. Verifique que esté en funcionamiento."
   );
   assert.equal(harness.node("estado-usuario").className, "estado error");
   assert.ok(harness.consoleErrors.length > 0);

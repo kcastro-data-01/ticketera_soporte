@@ -247,7 +247,7 @@ test("error de conexión: se informa que el servidor no responde", async () => {
   assertFetchCount(harness, 1);
   assert.equal(
     harness.estado().textContent,
-    "No se pudo conectar con el servidor. Comprueba que está en ejecución."
+    "No se pudo conectar con el servidor. Verifique que esté en funcionamiento."
   );
   assert.equal(harness.estado().className, "estado error");
   assert.ok(harness.consoleErrors.length > 0);

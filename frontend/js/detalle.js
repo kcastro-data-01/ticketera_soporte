@@ -158,13 +158,13 @@ function validarTexto(payload) {
 /* Convierte el detalle de validación de FastAPI (422) en un mensaje legible. */
 function formatValidation(detail) {
   if (!detail || !Array.isArray(detail.detail)) {
-    return "La API rechazó los datos enviados. Revisa el formulario.";
+    return "El servidor rechazó los datos enviados. Revise el formulario.";
   }
   const messages = detail.detail.map((error) => {
     const field = Array.isArray(error.loc) ? error.loc.slice(1).join(".") : "";
     return field ? `${field}: ${error.msg}` : error.msg;
   });
-  return `Revisa los datos enviados. ${messages.join(" | ")}`;
+  return `Revise los datos enviados. ${messages.join(" | ")}`;
 }
 
 async function mensajeDeDetalle(response, mensajePorDefecto) {
@@ -339,7 +339,7 @@ function cancelarEdicion() {
 async function eliminarTicket() {
   if (ocupado || ticketId === null) return;
   const confirmado = window.confirm(
-    `¿Seguro que querés eliminar el ticket #${ticketId}? Esta acción no se puede deshacer.`
+    `¿Está seguro de que desea eliminar el ticket #${ticketId}? Esta acción no se puede deshacer.`
   );
   if (!confirmado) return;
 
@@ -349,14 +349,14 @@ async function eliminarTicket() {
   try {
     const response = await fetchWithAuth(`/api/tickets/${ticketId}`, { method: "DELETE" });
     if (response.status === 204) {
-      if (typeof avisoPendiente === "function") avisoPendiente(`Ticket #${ticketId} eliminado.`);
+      if (typeof avisoPendiente === "function") avisoPendiente(`Ticket #${ticketId} eliminado correctamente.`);
       window.location.href = "index.html";
       return;
     }
     if (response.status === 403) {
       avisar("Solo un Administrador puede eliminar tickets.", "error");
     } else if (response.status === 404) {
-      avisar("El ticket ya no existe. Vuelve al listado.", "error");
+      avisar("El ticket ya no existe. Regrese al listado.", "error");
     } else {
       avisar(await mensajeDeDetalle(response, "No se pudo eliminar el ticket."), "error");
     }
@@ -432,7 +432,7 @@ async function guardarAsignacion() {
   const elements = getElements();
   if (elements.usuario.disabled) {
     avisar(
-      "No hay usuarios disponibles: crea uno desde la página de Usuarios.",
+      "No hay usuarios disponibles. Puede crear uno desde la página de Usuarios.",
       "error"
     );
     return;
@@ -684,7 +684,7 @@ async function cargarComentarios() {
   } catch (error) {
     console.error("GET comentarios:", error);
     mostrarComentariosEstado(
-      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );
   }
@@ -802,7 +802,7 @@ async function init() {
   ticketId = getTicketId();
   if (ticketId === null) {
     showStatus(
-      "Identificador de ticket no válido. Vuelve al listado y abre un ticket.",
+      "Identificador de ticket no válido. Regrese al listado y abra un ticket.",
       "error"
     );
     ocupado = true;

@@ -217,7 +217,7 @@ async function fetchTickets() {
   } catch (error) {
     console.error("No se pudo conectar con el servidor:", error);
     showStatus(
-      "No se pudo conectar con el servidor. Comprueba que está en ejecución.",
+      "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );
     return;

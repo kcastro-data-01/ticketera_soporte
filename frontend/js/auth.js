@@ -72,7 +72,7 @@ async function fetchWithAuth(url, options = {}) {
   if (response.status === 401 && token) {
     clearSession();
     window.location.href = "login.html";
-    throw new Error("Sesión expirada. Inicia sesión de nuevo.");
+    throw new Error("La sesión expiró. Inicie sesión nuevamente.");
   }
 
   return response;

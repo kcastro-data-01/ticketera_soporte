@@ -396,7 +396,7 @@ async function cargarTarjetasAnteriores({ desde, hasta }) {
 async function cargarMetricas() {
   const { desde, hasta, aplicar } = elementos();
   if (!desde.value || !hasta.value) {
-    mostrarEstado("Elegí las dos fechas.", "error");
+    mostrarEstado("Seleccione las dos fechas.", "error");
     return;
   }
   aplicar.disabled = true;
@@ -416,11 +416,11 @@ async function cargarMetricas() {
       const conGraficos = pintar(datos);
       pintarComparacion(datos.tarjetas, anteriores);
       mostrarEstado(
-        conGraficos ? "" : "No se pudieron cargar los gráficos (¿sin internet?). Se muestran los datos en tablas.",
+        conGraficos ? "" : "No se pudieron cargar los gráficos. Los datos se muestran en tablas.",
         conGraficos ? "" : "vacio"
       );
     } else if (response.status === 403) {
-      mostrarEstado("Tu rol no puede ver las métricas.", "error");
+      mostrarEstado("Su rol no tiene permiso para ver las métricas.", "error");
     } else {
       const detalle = datos && typeof datos.detail === "string" ? datos.detail : "";
       mostrarEstado(detalle || `No se pudieron cargar las métricas (${response.status}).`, "error");
