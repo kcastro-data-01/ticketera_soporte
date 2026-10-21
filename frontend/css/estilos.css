@@ -83,18 +83,18 @@
   /* ---------- Login ---------- */
   --login-fondo: #f4f6fb;
   --login-card-borde: #dde3ee;
-  --login-card-sombra: 0 12px 40px rgba(11, 24, 77, 0.08), 0 2px 6px rgba(11, 24, 77, 0.04);
+  --login-card-sombra: 0 1px 2px rgba(11, 24, 77, 0.04);
   --login-icon-color: #1746e0;
   --login-link-color: #0f34b3;
 
   /* ---------- 2. Base y tipografía ---------- */
-  --sombra-tarjeta: 0 1px 2px rgba(11, 24, 77, 0.05),
-    0 6px 18px rgba(11, 24, 77, 0.06);
-  --sombra-suave: 0 1px 2px rgba(11, 24, 77, 0.06);
+  /* Sombras mínimas: la separación la dan los bordes de 1 px. */
+  --sombra-tarjeta: 0 1px 2px rgba(11, 24, 77, 0.04);
+  --sombra-suave: none;
 
   /* Radios */
-  --radio-suave: 8px;
-  --radio-medio: 12px;
+  --radio-suave: 6px;
+  --radio-medio: 6px;
   --radio-pill: 999px;
 
   /* Espaciado */
@@ -105,8 +105,8 @@
   --espaciado-xl: 1.5rem;
 
   /* Tipografía */
-  --texto-sm: 0.85rem;
-  --texto-md: 0.95rem;
+  --texto-sm: 0.8125rem;
+  --texto-md: 0.875rem;
   --texto-lg: 1.05rem;
   --texto-titulo: 1.4rem;
 }
@@ -176,12 +176,12 @@
 
   --login-fondo: #0f1420;
   --login-card-borde: #2c3549;
-  --login-card-sombra: 0 12px 40px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --login-card-sombra: 0 1px 2px rgba(0, 0, 0, 0.3);
   --login-icon-color: #93acff;
   --login-link-color: #93acff;
 
-  --sombra-tarjeta: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 18px rgba(0, 0, 0, 0.25);
-  --sombra-suave: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --sombra-tarjeta: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sombra-suave: none;
 
   /* Gráficos de métricas: tonos más claros sobre fondo oscuro. */
   --color-serie-1: #5aa2ff;
@@ -236,8 +236,8 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 1rem;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 0.875rem;
   line-height: 1.55;
   background: var(--color-fondo);
   color: var(--color-texto);
@@ -245,8 +245,9 @@ body {
 }
 
 h1,
-h2 {
-  font-weight: 700;
+h2,
+h3 {
+  font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.25;
 }
@@ -609,7 +610,7 @@ button.peligro:disabled:hover {
   padding-bottom: 0.7rem;
   background: var(--color-fondo-neutro);
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-tenue);
@@ -669,7 +670,7 @@ button.peligro:disabled:hover {
 
 .campo-dato .etiqueta {
   font-size: 0.74rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-tenue-fuerte);
@@ -1087,7 +1088,7 @@ button.peligro:disabled:hover {
 .tarjeta-ticket-titulo {
   margin: 0;
   font-size: 1.4rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
   color: var(--color-texto);
   overflow-wrap: anywhere;
@@ -1124,7 +1125,7 @@ button.peligro:disabled:hover {
 .tarjeta-ticket-datos dt {
   margin-bottom: 0.2rem;
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-tenue);
@@ -1190,8 +1191,7 @@ body.pagina-login {
   left: 0;
   right: 0;
   height: 40px;
-  background: linear-gradient(var(--login-card-borde), transparent);
-  border-radius: var(--radio-suave) var(--radio-suave) 0 0;
+  display: none;
 }
 
 .auth-container h1 {
@@ -1200,7 +1200,7 @@ body.pagina-login {
   text-align: center;
   font-size: 1.5rem;
   color: var(--color-primario-texto-fuerte);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .auth-container .subtle-text {
@@ -1396,7 +1396,7 @@ body.app {
   width: 248px;
   height: 100vh;
   padding: 1.25rem 0.9rem;
-  background: linear-gradient(180deg, var(--color-marino) 0%, var(--color-marino-claro) 100%);
+  background: var(--color-marino);
   color: var(--color-texto-inverso);
   overflow-y: auto;
 }
@@ -1422,7 +1422,7 @@ body.app {
 .marca-nombre {
   display: block;
   font-size: 0.92rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -1501,7 +1501,7 @@ body.app {
   background: transparent;
   color: var(--color-menu-tenue);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, transform 0.2s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .boton-plegar:hover {
@@ -1597,7 +1597,7 @@ body.app {
   border-radius: 50%;
   background: var(--color-marca);
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .usuario-datos {
@@ -1695,13 +1695,12 @@ body.app {
   box-shadow: var(--sombra-suave);
   text-align: left;
   cursor: pointer;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .tarjeta-resumen:hover {
   background: var(--color-superficie-alta);
-  box-shadow: var(--sombra-tarjeta);
-  transform: translateY(-1px);
+  border-color: var(--color-borde-fuerte);
 }
 
 .tarjeta-resumen.alerta {
@@ -1715,7 +1714,7 @@ body.app {
 
 .tarjeta-numero {
   font-size: 1.75rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.1;
   color: var(--color-titulo);
 }
@@ -1778,7 +1777,7 @@ body.app {
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radio-suave);
   background: var(--tono-fondo);
   color: var(--tono-texto);
 }
@@ -2836,7 +2835,7 @@ body.app {
 
 .grafico figcaption {
   margin-bottom: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-texto);
 }
 
@@ -2909,7 +2908,7 @@ body.app {
   background: var(--avatar-fondo, var(--etiqueta-gris-fondo));
   color: var(--avatar-texto, var(--etiqueta-gris-texto));
   font-size: 0.66rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1;
   vertical-align: middle;
@@ -2951,22 +2950,28 @@ td.con-avatar {
   padding: 0.65rem 0.9rem;
   border: 1px solid var(--etiqueta-verde-texto);
   border-left-width: 4px;
-  border-radius: 10px;
+  border-radius: var(--radio-suave);
   background: var(--etiqueta-verde-fondo);
   color: var(--etiqueta-verde-texto);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
-  font-size: 0.88rem;
-  font-weight: 600;
-  line-height: 1.35;
+  box-shadow: var(--sombra-tarjeta);
+  font-size: var(--texto-sm);
+  font-weight: 500;
+  line-height: 1.4;
   pointer-events: auto;
-  animation: aviso-entra 0.22s ease-out;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transition: opacity 0.2s ease;
 }
 
+/* Ícono de línea (círculo con tilde o con «!») dibujado con una máscara:
+   toma el color del texto del aviso. */
 .aviso::before {
-  content: "✓";
+  content: "";
   flex-shrink: 0;
-  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12.5l2.5 2.5L16 9.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12.5l2.5 2.5L16 9.5'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .aviso.error {
@@ -2976,25 +2981,12 @@ td.con-avatar {
 }
 
 .aviso.error::before {
-  content: "!";
-  display: inline-grid;
-  place-items: center;
-  width: 1.1rem;
-  height: 1.1rem;
-  border-radius: 50%;
-  background: var(--etiqueta-rojo-texto);
-  color: var(--etiqueta-rojo-fondo);
-  font-size: 0.75rem;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7.5v5.5M12 16.5h.01'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7.5v5.5M12 16.5h.01'/%3E%3C/svg%3E");
 }
 
 .aviso.saliendo {
   opacity: 0;
-  transform: translateY(6px);
-}
-
-@keyframes aviso-entra {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
 }
 
 /* Con el menú lateral a la vista, el aviso queda al lado y no lo tapa. */
@@ -3004,7 +2996,7 @@ td.con-avatar {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .aviso { animation: none; transition: none; }
+  .aviso { transition: none; }
 }
 
 @media (max-width: 600px) {
@@ -3028,9 +3020,7 @@ td.con-avatar {
   color: transparent !important;
   border-color: transparent !important;
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--color-fondo-neutro) 25%, var(--color-borde) 50%, var(--color-fondo-neutro) 75%) !important;
-  background-size: 200% 100% !important;
-  animation: esqueleto-brillo 1.3s ease-in-out infinite;
+  background: var(--color-fondo-neutro) !important;
   user-select: none;
 }
 
@@ -3086,21 +3076,7 @@ td.con-avatar {
 #panel-ticket.esqueleto-activo .tarjeta-ticket-etiquetas > span { display: inline-block; width: 4.5rem; }
 #panel-ticket.esqueleto-activo dd { width: 7rem; }
 
-@keyframes esqueleto-brillo {
-  from { background-position: 100% 0; }
-  to { background-position: -100% 0; }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .esqueleto-barra,
-  .esqueleto-activo .tarjeta-numero,
-  .esqueleto-activo .tarjeta-etiqueta,
-  .esqueleto-activo .metrica-nota,
-  .esqueleto-activo .grafico-lienzo,
-  #panel-ticket.esqueleto-activo :is(.tarjeta-ticket-titulo, .tarjeta-ticket-descripcion, .tarjeta-ticket-id, .tarjeta-ticket-etiquetas > span, dd) {
-    animation: none;
-  }
-}
 
 /* ===== Métricas: cambio frente al período anterior ===== */
 .metrica-cambio {

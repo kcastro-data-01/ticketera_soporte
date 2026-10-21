@@ -77,5 +77,8 @@ test("el listado muestra filas grises mientras carga y las quita al llegar los d
 test("detalle y métricas usan el esqueleto", () => {
   assert.match(leer("js/detalle.js"), /marcarCargando\(panel, true\)/);
   assert.match(leer("js/metricas.js"), /marcarCargando\(zona, true\)/);
-  assert.match(leer("css/estilos.css"), /@keyframes esqueleto-brillo/);
+  // Bloques grises fijos, sin brillo animado (estilo sobrio).
+  const css = leer("css/estilos.css");
+  assert.match(css, /\.esqueleto-barra,/);
+  assert.doesNotMatch(css, /esqueleto-brillo/);
 });

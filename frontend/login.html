@@ -27,7 +27,7 @@
       max-width: 900px;
       background: var(--color-superficie);
       border: 1px solid var(--color-borde);
-      border-radius: 18px;
+      border-radius: var(--radio-suave);
       box-shadow: var(--login-card-sombra);
       margin: 3rem auto;
       overflow: hidden;
@@ -83,7 +83,7 @@
     .login-marca-nombre {
       display: block;
       font-size: 1rem;
-      font-weight: 700;
+      font-weight: 600;
       color: var(--color-texto);
       line-height: 1.25;
     }
@@ -101,7 +101,7 @@
       text-align: left;
       font-size: 1.35rem;
       color: var(--color-texto);
-      font-weight: 700;
+      font-weight: 600;
       margin: 0 0 1.25rem;
     }
     .auth-container .login-der .campo {
@@ -113,7 +113,7 @@
       width: 100%;
       padding: 0.85rem 1rem;
       border: 1px solid var(--color-borde-fuerte);
-      border-radius: 12px;
+      border-radius: var(--radio-suave);
       font-size: 1rem;
       color: var(--color-texto);
       background: var(--color-fondo-neutro);
@@ -227,13 +227,13 @@
       color: #fff;
       border: none;
       padding: 0.8rem 1rem;
-      border-radius: 12px;
+      border-radius: var(--radio-suave);
       font-weight: 600;
       font-size: var(--texto-sm);
       cursor: pointer;
       transition: background-color 0.2s, box-shadow 0.2s;
       width: 100%;
-      box-shadow: 0 4px 12px rgba(23, 70, 224, 0.22);
+      box-shadow: none;
     }
     .btn-primario:hover {
       background: var(--color-primario-oscuro);
@@ -247,7 +247,7 @@
       color: var(--color-primario-texto);
       border: 1px solid var(--color-primario);
       padding: 0.8rem 1rem;
-      border-radius: 12px;
+      border-radius: var(--radio-suave);
       font-weight: 600;
       font-size: var(--texto-sm);
       cursor: pointer;
