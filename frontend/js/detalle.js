@@ -354,9 +354,12 @@ function cancelarEdicion() {
    confirmación y, si se elimina, vuelve al listado. */
 async function eliminarTicket() {
   if (ocupado || ticketId === null) return;
-  const confirmado = window.confirm(
-    `¿Está seguro de que desea eliminar el ticket #${ticketId}? Esta acción no se puede deshacer.`
-  );
+  const confirmado = await confirmarAccion({
+    titulo: "Eliminar ticket",
+    mensaje: `¿Está seguro de que desea eliminar el ticket #${ticketId}? Esta acción no se puede deshacer.`,
+    aceptar: "Eliminar",
+    peligro: true,
+  });
   if (!confirmado) return;
 
   ocupado = true;

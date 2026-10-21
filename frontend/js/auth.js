@@ -171,6 +171,70 @@ function pintarPersona(el, nombre) {
   }
 }
 
+/* Ventana de confirmación propia (en lugar de window.confirm). Devuelve
+   una promesa con true (Aceptar) o false (Cancelar, Escape o clic
+   afuera). El foco empieza en «Cancelar», la opción segura. Sin DOM
+   disponible usa window.confirm. */
+function confirmarAccion({ titulo, mensaje, aceptar = "Aceptar", cancelar = "Cancelar", peligro = false } = {}) {
+  const doc = typeof document !== "undefined" ? document : null;
+  if (!doc || !doc.body || typeof doc.createElement !== "function") {
+    const confirmar = typeof window !== "undefined" && typeof window.confirm === "function" ? window.confirm : null;
+    return Promise.resolve(confirmar ? Boolean(confirmar(mensaje)) : false);
+  }
+  return new Promise((resolver) => {
+    const anterior = doc.activeElement;
+    const nodo = (tag, clase, texto) => {
+      const el = doc.createElement(tag);
+      if (clase) el.className = clase;
+      if (texto !== undefined) el.textContent = texto;
+      return el;
+    };
+    const fondo = nodo("div", "dialogo-fondo");
+    const caja = nodo("div", "dialogo");
+    caja.setAttribute("role", "alertdialog");
+    caja.setAttribute("aria-modal", "true");
+    caja.setAttribute("aria-labelledby", "dialogo-titulo");
+    caja.setAttribute("aria-describedby", "dialogo-mensaje");
+    const h = nodo("h2", "dialogo-titulo", titulo || "Confirmar");
+    h.id = "dialogo-titulo";
+    const p = nodo("p", "dialogo-mensaje", mensaje || "");
+    p.id = "dialogo-mensaje";
+    const acciones = nodo("div", "dialogo-acciones");
+    const no = nodo("button", "secundario", cancelar);
+    no.type = "button";
+    const si = nodo("button", peligro ? "boton-peligro" : "", aceptar);
+    si.type = "button";
+    acciones.append(no, si);
+    caja.append(h, p, acciones);
+    fondo.appendChild(caja);
+
+    const cerrar = (valor) => {
+      doc.removeEventListener("keydown", teclas, true);
+      fondo.remove();
+      if (anterior && typeof anterior.focus === "function") anterior.focus();
+      resolver(valor);
+    };
+    /* Escape cancela; Tab queda entre los dos botones. */
+    const teclas = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        cerrar(false);
+      } else if (event.key === "Tab") {
+        event.preventDefault();
+        (doc.activeElement === no ? si : no).focus();
+      }
+    };
+    no.addEventListener("click", () => cerrar(false));
+    si.addEventListener("click", () => cerrar(true));
+    fondo.addEventListener("click", (event) => {
+      if (event.target === fondo) cerrar(false);
+    });
+    doc.addEventListener("keydown", teclas, true);
+    doc.body.appendChild(fondo);
+    no.focus();
+  });
+}
+
 /* Usuario en la barra superior: iniciales, nombre y rol; al pulsarlo se
    abre un menú con «Mi cuenta» y «Cerrar sesión». Solo en las páginas
    con menú lateral (no en el login). */

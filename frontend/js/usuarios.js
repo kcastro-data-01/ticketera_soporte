@@ -186,10 +186,12 @@ async function cambiarActivo(user, activar) {
   if (ocupado) return;
   if (
     !activar &&
-    typeof window.confirm === "function" &&
-    !window.confirm(
-      `¿Desactivar a ${user.name}? No podrá iniciar sesión ni recibir tickets.`
-    )
+    !(await confirmarAccion({
+      titulo: "Desactivar usuario",
+      mensaje: `¿Desactivar a ${user.name}? No podrá iniciar sesión ni recibir tickets.`,
+      aceptar: "Desactivar",
+      peligro: true,
+    }))
   ) {
     return;
   }

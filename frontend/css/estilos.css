@@ -3289,3 +3289,52 @@ body:has(.menu-usuario) .barra-usuario {
     left: 0;
   }
 }
+
+/* ===== Ventana de confirmación ===== */
+.dialogo-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(11, 24, 77, 0.35);
+}
+
+.dialogo {
+  width: 100%;
+  max-width: 420px;
+  padding: 1.25rem 1.25rem 1rem;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: 8px;
+  background: var(--color-superficie-alta);
+  color: var(--color-texto);
+  box-shadow: 0 8px 24px rgba(26, 34, 51, 0.16);
+}
+
+.dialogo-titulo {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: var(--color-titulo);
+}
+
+.dialogo-mensaje {
+  margin: 0;
+  color: var(--color-tenue-fuerte);
+  line-height: 1.5;
+}
+
+.dialogo-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--espaciado-sm);
+  margin-top: 1.25rem;
+}
+
+/* Acción destructiva: rojo sólido; el texto usa el fondo suave de error
+   para leerse bien en modo claro y oscuro. */
+.dialogo .boton-peligro,
+.dialogo .boton-peligro:hover {
+  background: var(--color-error);
+  color: var(--color-error-fondo);
+}
