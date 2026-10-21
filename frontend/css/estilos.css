@@ -2321,7 +2321,7 @@ body.app {
 /* Nota debajo de la respuesta: gris claro, 11 px. */
 .chat-nota {
   font-size: 11px;
-  color: var(--color-texto-suave);
+  color: var(--color-tenue);
 }
 
 /* Preguntas de ejemplo del saludo: botones rectangulares con borde. */
@@ -2421,7 +2421,7 @@ body.app {
 .chat-aviso {
   margin: 0.45rem 0 0;
   font-size: 11px;
-  color: var(--color-texto-suave);
+  color: var(--color-tenue);
   text-align: center;
 }
 
@@ -3154,7 +3154,7 @@ td.con-avatar {
 .migas li + li::before {
   content: "›";
   margin: 0 0.45rem;
-  color: var(--color-texto-suave);
+  color: var(--color-tenue);
 }
 
 .migas a {
@@ -3831,4 +3831,60 @@ th[aria-sort="descending"] .orden-columna::after {
 
 .campo :is(input, select, textarea)[aria-invalid="true"]:focus {
   box-shadow: 0 0 0 3px var(--color-error-fondo);
+  outline-color: var(--color-error);
+}
+
+/* ===== Accesibilidad =====
+   Contraste: los textos grises usan --color-tenue (AA en claro y oscuro);
+   --color-texto-suave queda solo para líneas y adornos. */
+
+/* Foco visible con teclado también en campos, resúmenes y enlaces de tabla
+   (además del anillo general de :focus-visible). */
+.campo :is(input, select, textarea):focus-visible,
+.form-input:focus-visible,
+.chat-caja:has(.chat-entrada:focus-visible) {
+  outline: 2px solid var(--color-primario);
+  outline-offset: 1px;
+}
+
+summary:focus-visible,
+.enlace-tabla:focus-visible,
+.orden-columna:focus-visible,
+.menu-usuario-opcion:focus-visible {
+  outline: 2px solid var(--color-primario);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Tamaños táctiles: en el celular botones, íconos y campos miden al menos
+   40 x 40 px. */
+@media (max-width: 700px) {
+  button,
+  .enlace-boton,
+  .btn-accion,
+  .boton-tema,
+  .boton-salir,
+  .chat-icono,
+  .chat-enviar,
+  .menu-usuario-boton,
+  .menu-usuario-opcion,
+  .toggle-password {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .campo :is(input, select),
+  .form-input {
+    min-height: 40px;
+  }
+
+  .enlace-boton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ayuda-tema > summary {
+    min-height: 44px;
+  }
 }

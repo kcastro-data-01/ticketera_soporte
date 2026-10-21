@@ -132,8 +132,16 @@
       transform: translateY(-50%);
       display: grid;
       place-items: center;
+      padding: 0.25rem;
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
       cursor: pointer;
       color: var(--color-tenue);
+    }
+    .auth-container .login-der .toggle-password:hover {
+      background: transparent;
+      color: var(--color-texto);
     }
     .auth-container .login-der .toggle-password svg {
       width: 18px;
@@ -357,7 +365,7 @@
         </div>
         <div class="campo">
           <input type="password" id="login-password" name="password" required autocomplete="current-password" class="form-input" placeholder="••••••••">
-          <span class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+          <button type="button" class="toggle-password" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
         <div class="remember-me">
           <input type="checkbox" id="remember-me" name="remember-me">
@@ -381,7 +389,7 @@
         </div>
         <div class="campo">
           <input type="password" id="register-password" name="password" required class="form-input" placeholder="Mínimo 6 caracteres">
-          <span class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+          <button type="button" class="toggle-password" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
         <div class="remember-me">
           <input type="checkbox" id="register-memory" name="remember-memory">
@@ -632,7 +640,16 @@
 
       formLogin.addEventListener("submit", handleLogin);
       formRegister.addEventListener("submit", handleRegister);
-      document.querySelectorAll(".toggle-password").forEach(el => el.addEventListener("click", () => { const i = el.parentElement.querySelector("input"); i.type = i.type === "password" ? "text" : "password"; }));
+      // Botón con aria-label y aria-pressed: también se usa con el teclado.
+      document.querySelectorAll(".toggle-password").forEach(el => el.addEventListener("click", () => {
+        const i = el.parentElement.querySelector("input");
+        const mostrar = i.type === "password";
+        i.type = mostrar ? "text" : "password";
+        const etiqueta = mostrar ? "Ocultar contraseña" : "Mostrar contraseña";
+        el.setAttribute("aria-label", etiqueta);
+        el.setAttribute("aria-pressed", String(mostrar));
+        el.title = etiqueta;
+      }));
       // --- Inicialización ---
 
       // Primera vez (ningún usuario puede iniciar sesión): la cuenta que se
