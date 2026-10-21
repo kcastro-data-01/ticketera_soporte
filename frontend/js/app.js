@@ -64,6 +64,8 @@ function buildTicketsUrl(filters, pagina = 0) {
 
 function showStatus(message, type) {
   const elements = getElements();
+  /* Un error o el aviso de «sin tickets» reemplazan al esqueleto de carga. */
+  if (type !== "cargando") clearRows();
   elements.estado.textContent = message;
   elements.estado.className = `estado ${type}`;
   elements.estado.hidden = false;
@@ -181,9 +183,29 @@ async function readApiDetail(response) {
   return "";
 }
 
+/* Filas grises con la forma de la tabla mientras carga el listado. */
+const FILAS_ESQUELETO = 6;
+function pintarFilasEsqueleto() {
+  const elements = getElements();
+  const columnas = 8;
+  for (let i = 0; i < FILAS_ESQUELETO; i += 1) {
+    const row = document.createElement("tr");
+    row.className = "fila-esqueleto";
+    for (let c = 0; c < columnas; c += 1) {
+      const cell = document.createElement("td");
+      const barra = document.createElement("span");
+      barra.className = `esqueleto-barra col-${c}`;
+      cell.appendChild(barra);
+      row.appendChild(cell);
+    }
+    elements.tbody.appendChild(row);
+  }
+}
+
 async function fetchTickets() {
-  showStatus("Cargando...", "cargando");
+  hideStatus();
   clearRows();
+  pintarFilasEsqueleto();
 
   /* 1) La URL se construye una sola vez. 2) Una única petición HTTP por
      ejecución de fetchTickets(). */
@@ -313,6 +335,8 @@ async function cargarResumen() {
     "res-criticos": "criticos_abiertos",
     "res-mios": "mios_abiertos",
   };
+  const zona = typeof document.querySelector === "function" ? document.querySelector(".resumen") : null;
+  marcarCargando(zona, true);
   try {
     const response = await fetchWithAuth(API_SUMMARY_URL);
     if (!response.ok) return;
@@ -329,6 +353,8 @@ async function cargarResumen() {
     }
   } catch (error) {
     console.error("No se pudo cargar el resumen:", error);
+  } finally {
+    marcarCargando(zona, false);
   }
 }
 

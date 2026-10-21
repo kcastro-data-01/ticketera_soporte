@@ -372,6 +372,15 @@ function iniciarBotonTema(doc = document) {
   return boton;
 }
 
+/* Esqueleto de carga: mientras llegan los datos, el contenedor muestra
+   rectángulos grises animados (estilos .esqueleto-activo) en lugar de
+   quedar vacío. */
+function marcarCargando(el, activo) {
+  if (!el || !el.classList) return;
+  el.classList.toggle("esqueleto-activo", Boolean(activo));
+  if (typeof el.setAttribute === "function") el.setAttribute("aria-busy", activo ? "true" : "false");
+}
+
 /* Avisos flotantes abajo a la izquierda: confirman una acción
    («Comentario agregado») y se van solos a los 3 segundos. Los errores
    usan el mismo aviso en rojo suave. */

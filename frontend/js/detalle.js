@@ -273,7 +273,8 @@ async function cargarUsuarios() {
 }
 
 async function cargarTicket({ silencioso = false } = {}) {
-  if (!silencioso) showStatus("Cargando...", "cargando");
+  const panel = document.getElementById("panel-ticket");
+  if (!silencioso) marcarCargando(panel, true);
   try {
     const response = await fetchWithAuth(`/api/tickets/${ticketId}`);
     if (response.status === 404) {
@@ -288,6 +289,8 @@ async function cargarTicket({ silencioso = false } = {}) {
   } catch (error) {
     showStatus("Error al comunicarse con la API.", "error");
     return false;
+  } finally {
+    marcarCargando(panel, false);
   }
 }
 

@@ -3014,3 +3014,89 @@ td.con-avatar {
     max-width: none;
   }
 }
+
+/* ===== Esqueletos de carga =====
+   marcarCargando() (auth.js) pone .esqueleto-activo en el contenedor;
+   el listado agrega filas .fila-esqueleto. Mismo brillo en los tres. */
+.esqueleto-barra,
+.esqueleto-activo .tarjeta-numero,
+.metricas-tarjetas.esqueleto-activo .tarjeta-etiqueta,
+.esqueleto-activo .metrica-nota,
+.esqueleto-activo .grafico-lienzo,
+#panel-ticket.esqueleto-activo :is(.tarjeta-ticket-titulo, .tarjeta-ticket-descripcion, .tarjeta-ticket-id, .tarjeta-ticket-etiquetas > span, dd) {
+  color: transparent !important;
+  border-color: transparent !important;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--color-fondo-neutro) 25%, var(--color-borde) 50%, var(--color-fondo-neutro) 75%) !important;
+  background-size: 200% 100% !important;
+  animation: esqueleto-brillo 1.3s ease-in-out infinite;
+  user-select: none;
+}
+
+.esqueleto-activo .grafico-lienzo canvas,
+#panel-ticket.esqueleto-activo .con-avatar::before {
+  visibility: hidden;
+}
+
+.esqueleto-barra {
+  display: block;
+  height: 0.8rem;
+  width: 70%;
+}
+
+.fila-esqueleto td {
+  padding-top: 1.05rem;
+  padding-bottom: 1.05rem;
+}
+
+.fila-esqueleto:hover td {
+  background: transparent;
+}
+
+.esqueleto-barra.col-0 { width: 1.6rem; }
+.esqueleto-barra.col-1 { width: 85%; }
+.esqueleto-barra.col-3,
+.esqueleto-barra.col-4 { width: 4rem; height: 1.1rem; border-radius: 999px; }
+.esqueleto-barra.col-7 { width: 3.2rem; height: 1.4rem; }
+
+/* Bloques de tamaño fijo: el texto oculto no los deforma. */
+.esqueleto-activo .tarjeta-numero {
+  display: block;
+  width: 2.6rem;
+  height: 1.6rem;
+  overflow: hidden;
+}
+
+.metricas-tarjetas.esqueleto-activo .tarjeta-numero { width: 4.5rem; }
+
+.metricas-tarjetas.esqueleto-activo .tarjeta-etiqueta,
+.esqueleto-activo .metrica-nota {
+  display: block;
+  width: 75%;
+  height: 0.8rem;
+  margin-top: 0.55rem;
+  overflow: hidden;
+}
+
+.esqueleto-activo .metrica-nota { width: 55%; }
+
+#panel-ticket.esqueleto-activo .tarjeta-ticket-titulo { width: 60%; }
+#panel-ticket.esqueleto-activo .tarjeta-ticket-descripcion { width: 90%; min-height: 2.6rem; }
+#panel-ticket.esqueleto-activo .tarjeta-ticket-etiquetas > span { display: inline-block; width: 4.5rem; }
+#panel-ticket.esqueleto-activo dd { width: 7rem; }
+
+@keyframes esqueleto-brillo {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto-barra,
+  .esqueleto-activo .tarjeta-numero,
+  .esqueleto-activo .tarjeta-etiqueta,
+  .esqueleto-activo .metrica-nota,
+  .esqueleto-activo .grafico-lienzo,
+  #panel-ticket.esqueleto-activo :is(.tarjeta-ticket-titulo, .tarjeta-ticket-descripcion, .tarjeta-ticket-id, .tarjeta-ticket-etiquetas > span, dd) {
+    animation: none;
+  }
+}

@@ -329,7 +329,9 @@ async function cargarMetricas() {
     return;
   }
   aplicar.disabled = true;
-  mostrarEstado("Calculando métricas…");
+  mostrarEstado("");
+  const zonas = [document.querySelector(".metricas-tarjetas"), document.querySelector(".metricas-graficos")];
+  zonas.forEach((zona) => marcarCargando(zona, true));
   try {
     const response = await fetchWithAuth(urlMetricas(desde.value, hasta.value));
     const datos = await response.json().catch(() => null);
@@ -349,6 +351,7 @@ async function cargarMetricas() {
     console.error("GET /api/metricas:", error);
     mostrarEstado("Error al comunicarse con la API.", "error");
   } finally {
+    zonas.forEach((zona) => marcarCargando(zona, false));
     aplicar.disabled = false;
   }
 }
