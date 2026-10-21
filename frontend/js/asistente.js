@@ -1,4 +1,4 @@
-/* Asistente de IA: botón flotante y panel de chat en las páginas internas.
+/* Asistente virtual: botón flotante y panel de chat en las páginas internas.
    Envía la conversación a POST /api/asistente/stream; el servidor decide qué
    datos puede usar según el rol de la sesión y responde por partes (NDJSON).
    La conversación se guarda en sessionStorage (se pierde al cerrar la
@@ -46,12 +46,11 @@ const SALUDO = "¡Hola! Soy tu asistente. Podés preguntarme cosas como:";
 
 /* Íconos (trazos con currentColor, sin dependencias externas). */
 const ICONOS = {
-  chispa:
-    '<path d="M12 3l1.8 4.9L19 9.7l-5.2 1.8L12 16.4l-1.8-4.9L5 9.7l5.2-1.8z"/>' +
-    '<path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
-  chat:
-    '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/>' +
-    '<path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/>',
+  /* Auricular de soporte. */
+  auricular:
+    '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/>' +
+    '<rect x="3" y="14" width="4" height="6" rx="1"/><rect x="17" y="14" width="4" height="6" rx="1"/>' +
+    '<path d="M19 20a3 3 0 0 1-3 3h-3"/>',
   cerrar: '<path d="M6 6l12 12M18 6L6 18"/>',
   nueva: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
   enviar: '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
@@ -114,13 +113,11 @@ function pintarTexto(elemento, texto) {
   });
 }
 
-/* Fila del asistente: avatar + contenido (burbuja y, opcional, una nota). */
+/* Fila del asistente: el mensaje y, opcional, una nota debajo. */
 function filaAsistente() {
   const fila = crearElemento("div", "chat-fila asistente");
-  const avatar = crearElemento("div", "chat-avatar");
-  avatar.innerHTML = icono("chispa");
   const contenido = crearElemento("div", "chat-contenido");
-  fila.append(avatar, contenido);
+  fila.append(contenido);
   return { fila, contenido };
 }
 
@@ -183,10 +180,9 @@ async function enviarPregunta(texto) {
   chatOcupado = true;
   ajustarEntrada(entrada, boton);
 
-  /* Mientras llega la respuesta: tres puntos animados. */
+  /* Mientras llega la respuesta: «Escribiendo…» en gris. */
   const { fila, contenido } = filaAsistente();
-  const escribiendo = crearElemento("div", "chat-mensaje asistente escribiendo");
-  escribiendo.innerHTML = '<span class="chat-puntos"><i></i><i></i><i></i></span>';
+  const escribiendo = crearElemento("div", "chat-mensaje asistente escribiendo", "Escribiendo…");
   contenido.appendChild(escribiendo);
   lista.appendChild(fila);
   lista.scrollTop = lista.scrollHeight;
@@ -298,22 +294,20 @@ function crearAsistente() {
   const panel = crearElemento("section", "chat-panel");
   panel.id = "chat-panel";
   panel.hidden = true;
-  panel.setAttribute("aria-label", "Asistente de IA");
+  panel.setAttribute("aria-label", "Asistente virtual");
 
-  /* Cabecera: avatar, título con estado y acciones con ícono. */
+  /* Cabecera: título con estado y acciones con ícono. */
   const cabecera = crearElemento("header", "chat-cabecera");
   const identidad = crearElemento("div", "chat-identidad");
-  const avatar = crearElemento("div", "chat-avatar grande");
-  avatar.innerHTML = icono("chispa");
   const titulos = crearElemento("div");
-  titulos.appendChild(crearElemento("strong", "chat-titulo", "Asistente"));
+  titulos.appendChild(crearElemento("strong", "chat-titulo", "Asistente virtual"));
   const estado = crearElemento("span", "chat-subtitulo");
   estado.appendChild(crearElemento("span", "chat-punto-en-linea"));
   estado.appendChild(document.createTextNode("En línea"));
   /* El rol queda a la vista al pasar el mouse (y en el saludo del chat). */
   estado.title = user && user.role ? `Respuestas según tu rol: ${user.role}` : "Respuestas según tu rol";
   titulos.appendChild(estado);
-  identidad.append(avatar, titulos);
+  identidad.append(titulos);
 
   const acciones = crearElemento("div", "chat-acciones");
   const limpiar = crearElemento("button", "chat-icono");
@@ -333,7 +327,7 @@ function crearAsistente() {
   lista.id = "chat-lista";
   lista.setAttribute("aria-live", "polite");
 
-  /* Campo en forma de píldora con botón redondo de enviar. */
+  /* Campo rectangular con el botón de enviar a la derecha. */
   const formulario = crearElemento("form", "chat-formulario");
   const caja = crearElemento("div", "chat-caja");
   const entrada = crearElemento("textarea", "chat-entrada");
@@ -351,55 +345,40 @@ function crearAsistente() {
   caja.append(entrada, enviar);
   formulario.append(
     caja,
-    crearElemento("p", "chat-aviso", "Las respuestas generadas con IA pueden contener errores.")
+    crearElemento(
+      "p",
+      "chat-aviso",
+      "Las respuestas automáticas pueden contener errores. Verifique la información importante."
+    )
   );
 
   panel.append(cabecera, lista, formulario);
 
-  /* Cuadrado redondeado con las chispas; al abrir el panel cambia a una «X». */
+  /* Cuadrado de esquinas suaves con un auricular; al abrir cambia a una «X». */
   const abrir = crearElemento("button", "chat-boton");
   abrir.type = "button";
   abrir.setAttribute("aria-expanded", "false");
-  abrir.setAttribute("aria-label", "Abrir asistente");
-  abrir.dataset.tooltip = "Asistente";
+  abrir.setAttribute("aria-label", "Abrir asistente virtual");
+  abrir.dataset.tooltip = "Asistente virtual";
   abrir.innerHTML =
-    icono("chispa", "chat-boton-icono icono-chat") + icono("cerrar", "chat-boton-icono icono-cerrar");
+    icono("auricular", "chat-boton-icono icono-chat") + icono("cerrar", "chat-boton-icono icono-cerrar");
 
   contenedor.append(panel, abrir);
   document.body.appendChild(contenedor);
 
-  /* Al cerrar, el panel baja con una animación corta y después se oculta
-     (sin animación si el sistema pide reducir el movimiento). */
+  /* Abre y cierra al instante, sin animaciones. */
   let abierto = false;
-  let cierre = null;
-  const ocultar = () => {
-    panel.hidden = true;
-    panel.classList.remove("cerrando");
-    contenedor.classList.remove("abierto");
-  };
   const alternar = (mostrar) => {
     if (mostrar === abierto) return;
     abierto = mostrar;
-    clearTimeout(cierre);
     abrir.setAttribute("aria-expanded", String(mostrar));
-    abrir.setAttribute("aria-label", mostrar ? "Cerrar asistente" : "Abrir asistente");
-    abrir.dataset.tooltip = mostrar ? "Cerrar" : "Asistente";
+    abrir.setAttribute("aria-label", mostrar ? "Cerrar asistente virtual" : "Abrir asistente virtual");
+    abrir.dataset.tooltip = mostrar ? "Cerrar" : "Asistente virtual";
+    panel.hidden = !mostrar;
+    contenedor.classList.toggle("abierto", mostrar);
     if (mostrar) {
-      panel.classList.remove("cerrando");
-      panel.hidden = false;
-      contenedor.classList.add("abierto");
       pintarMensajes(lista, leerChat());
       entrada.focus();
-      return;
-    }
-    const sinMovimiento =
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (sinMovimiento) {
-      ocultar();
-    } else {
-      panel.classList.add("cerrando");
-      cierre = setTimeout(ocultar, 180);
     }
   };
   abrir.addEventListener("click", () => alternar(!abierto));

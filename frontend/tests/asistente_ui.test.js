@@ -223,13 +223,18 @@ function montarChat({ reducirMovimiento = false, rol = "Técnico" } = {}) {
 
 const clic = (n) => n.listeners.click.forEach((fn) => fn());
 
-test("cabecera: «Asistente» con el estado «En línea»", () => {
+test("cabecera: «Asistente virtual» con el estado «En línea», sin avatar", () => {
   const chat = montarChat();
   assert.equal(texto(chat.subtitulo), "En línea");
   assert.match(chat.subtitulo.title, /Técnico/);
+  const titulo = chat.panel.children[0].children[0].children[0].children[0];
+  assert.equal(titulo.className, "chat-titulo");
+  assert.equal(titulo.textContent, "Asistente virtual");
+  assert.equal(chat.panel.atributos["aria-label"], "Asistente virtual");
+  assert.doesNotMatch(JSON.stringify(chat.panel, (k, v) => (k === "listeners" ? undefined : v)), /chat-avatar/);
 });
 
-test("abrir muestra el panel; cerrar lo anima y después lo oculta", () => {
+test("abrir muestra el panel y cerrar lo oculta al instante, sin animación", () => {
   const chat = montarChat();
   assert.equal(chat.panel.hidden, true);
 
@@ -239,42 +244,30 @@ test("abrir muestra el panel; cerrar lo anima y después lo oculta", () => {
   assert.equal(chat.boton.atributos["aria-expanded"], "true");
 
   clic(chat.boton);
-  assert.equal(chat.panel.classList.contains("cerrando"), true, "animación de salida");
-  assert.equal(chat.panel.hidden, false, "sigue visible mientras se anima");
+  assert.equal(chat.panel.hidden, true);
   assert.equal(chat.boton.atributos["aria-expanded"], "false");
-  chat.temporizadores.at(-1).fn();
-  assert.equal(chat.panel.hidden, true);
-  assert.equal(chat.panel.classList.contains("cerrando"), false);
   assert.equal(chat.contenedor.classList.contains("abierto"), false);
+  assert.equal(chat.temporizadores.length, 0, "no espera ninguna animación");
 });
 
-test("reabrir durante la animación de cierre deja el panel abierto", () => {
-  const chat = montarChat();
-  clic(chat.boton);
-  clic(chat.boton);
-  clic(chat.boton);
-  chat.temporizadores.forEach((t) => t.fn());
-  assert.equal(chat.panel.hidden, false);
-  assert.equal(chat.panel.classList.contains("cerrando"), false);
-});
-
-test("con «reducir movimiento» se cierra al instante", () => {
-  const chat = montarChat({ reducirMovimiento: true });
-  clic(chat.boton);
-  clic(chat.boton);
-  assert.equal(chat.panel.hidden, true);
-  assert.equal(chat.temporizadores.length, 0);
-});
-
-test("botón: solo el ícono de chispas, sin texto ni latido", () => {
+test("botón: ícono de auricular, sin chispas ni texto", () => {
   const chat = montarChat();
   assert.equal(chat.boton.className, "chat-boton");
-  assert.match(chat.boton.innerHTML, /M12 3l1\.8 4\.9/, "ícono de chispas");
-  assert.doesNotMatch(chat.boton.innerHTML, /M21 12a8 8 0 0 1-11\.6/, "sin el globo de chat");
+  assert.match(chat.boton.innerHTML, /M4 15v-3a8 8 0 0 1 16 0v3/, "ícono de auricular");
+  assert.doesNotMatch(chat.boton.innerHTML, /M12 3l1\.8 4\.9/, "sin chispas de IA");
   assert.doesNotMatch(chat.boton.innerHTML, /Necesitás ayuda|chat-boton-texto/);
-  assert.equal(chat.boton.atributos["aria-label"], "Abrir asistente");
+  assert.equal(chat.boton.atributos["aria-label"], "Abrir asistente virtual");
+  assert.equal(chat.boton.dataset.tooltip, "Asistente virtual");
   clic(chat.boton);
   assert.equal(chat.boton.className, "chat-boton");
+});
+
+test("aviso de abajo con el texto formal", () => {
+  const chat = montarChat();
+  const juntar = (n, out = []) => { if (n.className === "chat-aviso") out.push(n.textContent); (n.children || []).forEach((h) => juntar(h, out)); return out; };
+  assert.deepEqual(juntar(chat.panel), [
+    "Las respuestas automáticas pueden contener errores. Verifique la información importante.",
+  ]);
 });
 
 test("sin mensajes: saludo y 3 preguntas de ejemplo", () => {
@@ -293,4 +286,9 @@ test("sin mensajes: saludo y 3 preguntas de ejemplo", () => {
   juntar2(solicitante.lista);
   assert.equal(otros.length, 3);
   assert.ok(!otros.includes("¿Qué tickets tengo asignados?"));
+});
+
+test("indicador de espera: texto «Escribiendo…», sin puntos animados", () => {
+  assert.match(chatSource, /"chat-mensaje asistente escribiendo", "Escribiendo…"/);
+  assert.doesNotMatch(chatSource, /chat-puntos/);
 });
