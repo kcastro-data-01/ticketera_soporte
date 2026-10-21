@@ -27,6 +27,13 @@ function showStatus(message, type) {
   elements.estado.hidden = false;
 }
 
+/* Los errores se muestran como aviso flotante en rojo suave. */
+function avisarError(message) {
+  showStatus(message, "error");
+  getElements().estado.hidden = true;
+  if (typeof mostrarAviso === "function") mostrarAviso(message, "error");
+}
+
 function getPayload() {
   const elements = getElements();
   return {
@@ -69,7 +76,7 @@ async function createTicket() {
   const payload = getPayload();
   const clientError = validatePayload(payload);
   if (clientError) {
-    showStatus(clientError, "error");
+    avisarError(clientError);
     return;
   }
 
@@ -87,20 +94,19 @@ async function createTicket() {
 
     if (response.status === 422) {
       const body = await response.json().catch(() => null);
-      showStatus(formatValidation(body), "error");
+      avisarError(formatValidation(body));
       return;
     }
 
     if (!response.ok) {
-      showStatus(
-        `No se pudo crear el ticket (HTTP ${response.status}). Inténtalo de nuevo.`,
-        "error"
-      );
+      avisarError(`No se pudo crear el ticket (HTTP ${response.status}). Inténtalo de nuevo.`);
       return;
     }
 
     const ticket = await response.json();
     redirigiendo = true;
+    /* El aviso se ve al llegar al listado. */
+    if (typeof avisoPendiente === "function") avisoPendiente(`Ticket #${ticket.id} guardado.`);
     showStatus(
       `Ticket #${ticket.id} creado correctamente. Redirigiendo al listado...`,
       "exito"
@@ -109,7 +115,7 @@ async function createTicket() {
       window.location.href = "index.html";
     }, REDIRECT_DELAY_MS);
   } catch (error) {
-    showStatus("Error al comunicarse con la API.", "error");
+    avisarError("Error al comunicarse con la API.");
   } finally {
     if (!redirigiendo) {
       enviando = false;

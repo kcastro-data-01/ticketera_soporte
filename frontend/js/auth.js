@@ -372,6 +372,54 @@ function iniciarBotonTema(doc = document) {
   return boton;
 }
 
+/* Avisos flotantes abajo a la izquierda: confirman una acción
+   («Comentario agregado») y se van solos a los 3 segundos. Los errores
+   usan el mismo aviso en rojo suave. */
+const AVISO_MS = 3000;
+const AVISO_PENDIENTE_KEY = "aviso_pendiente";
+
+function mostrarAviso(mensaje, tipo = "exito", doc = typeof document !== "undefined" ? document : null) {
+  if (!mensaje || !doc || !doc.body || typeof doc.createElement !== "function") return null;
+  let zona = doc.getElementById("avisos");
+  if (!zona) {
+    zona = doc.createElement("div");
+    zona.id = "avisos";
+    zona.className = "avisos";
+    zona.setAttribute("role", "status");
+    zona.setAttribute("aria-live", "polite");
+    doc.body.appendChild(zona);
+  }
+  const aviso = doc.createElement("div");
+  aviso.className = `aviso ${tipo === "error" ? "error" : "exito"}`;
+  aviso.textContent = mensaje;
+  zona.appendChild(aviso);
+  setTimeout(() => {
+    aviso.classList.add("saliendo");
+    setTimeout(() => aviso.remove(), 250);
+  }, AVISO_MS);
+  return aviso;
+}
+
+/* Para un aviso que se tiene que ver en la página siguiente (por
+   ejemplo, después de eliminar un ticket se vuelve al listado). */
+function avisoPendiente(mensaje, tipo = "exito") {
+  try {
+    sessionStorage.setItem(AVISO_PENDIENTE_KEY, JSON.stringify({ mensaje, tipo }));
+  } catch (error) {
+    /* Sin sessionStorage el aviso simplemente no se muestra. */
+  }
+}
+
+function mostrarAvisoPendiente() {
+  try {
+    const guardado = JSON.parse(sessionStorage.getItem(AVISO_PENDIENTE_KEY) || "null");
+    sessionStorage.removeItem(AVISO_PENDIENTE_KEY);
+    if (guardado && guardado.mensaje) mostrarAviso(guardado.mensaje, guardado.tipo);
+  } catch (error) {
+    /* Nada que mostrar. */
+  }
+}
+
 if (typeof document !== "undefined" && document.documentElement) {
   aplicarTema(temaGuardado());
 }
@@ -382,5 +430,6 @@ if (typeof document !== "undefined" && typeof document.addEventListener === "fun
     pintarUsuario();
     iniciarMenuPlegable();
     iniciarBotonTema();
+    mostrarAvisoPendiente();
   });
 }

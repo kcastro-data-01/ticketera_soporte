@@ -2929,3 +2929,88 @@ td.con-avatar {
   display: inline-flex;
   align-items: center;
 }
+
+/* ===== Avisos flotantes ===== */
+.avisos {
+  position: fixed;
+  left: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(360px, calc(100vw - 2.5rem));
+  pointer-events: none;
+}
+
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--etiqueta-verde-texto);
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: var(--etiqueta-verde-fondo);
+  color: var(--etiqueta-verde-texto);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+  pointer-events: auto;
+  animation: aviso-entra 0.22s ease-out;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.aviso::before {
+  content: "✓";
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.aviso.error {
+  border-color: var(--etiqueta-rojo-texto);
+  background: var(--etiqueta-rojo-fondo);
+  color: var(--etiqueta-rojo-texto);
+}
+
+.aviso.error::before {
+  content: "!";
+  display: inline-grid;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: var(--etiqueta-rojo-texto);
+  color: var(--etiqueta-rojo-fondo);
+  font-size: 0.75rem;
+}
+
+.aviso.saliendo {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+@keyframes aviso-entra {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Con el menú lateral a la vista, el aviso queda al lado y no lo tapa. */
+@media (min-width: 901px) {
+  body:has(.barra-lateral) .avisos { left: calc(248px + 1.25rem); }
+  body.menu-plegado:has(.barra-lateral) .avisos { left: calc(76px + 1.25rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aviso { animation: none; transition: none; }
+}
+
+@media (max-width: 600px) {
+  .avisos {
+    left: 0.75rem;
+    right: 5rem; /* deja libre el botón del asistente */
+    bottom: 0.9rem;
+    max-width: none;
+  }
+}

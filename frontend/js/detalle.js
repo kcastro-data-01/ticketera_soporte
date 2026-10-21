@@ -87,6 +87,14 @@ function showStatus(message, type) {
   elements.estado.hidden = false;
 }
 
+/* Resultado de una acción (guardar, asignar, comentar, cambiar estado,
+   eliminar): se muestra como aviso flotante en lugar del cartel fijo. */
+function avisar(message, type) {
+  showStatus(message, type);
+  getElements().estado.hidden = true;
+  if (typeof mostrarAviso === "function") mostrarAviso(message, type);
+}
+
 function hideStatus() {
   const elements = getElements();
   elements.estado.textContent = "";
@@ -338,19 +346,20 @@ async function eliminarTicket() {
   try {
     const response = await fetchWithAuth(`/api/tickets/${ticketId}`, { method: "DELETE" });
     if (response.status === 204) {
+      if (typeof avisoPendiente === "function") avisoPendiente(`Ticket #${ticketId} eliminado.`);
       window.location.href = "index.html";
       return;
     }
     if (response.status === 403) {
-      showStatus("Solo un Administrador puede eliminar tickets.", "error");
+      avisar("Solo un Administrador puede eliminar tickets.", "error");
     } else if (response.status === 404) {
-      showStatus("El ticket ya no existe. Vuelve al listado.", "error");
+      avisar("El ticket ya no existe. Vuelve al listado.", "error");
     } else {
-      showStatus(await mensajeDeDetalle(response, "No se pudo eliminar el ticket."), "error");
+      avisar(await mensajeDeDetalle(response, "No se pudo eliminar el ticket."), "error");
     }
   } catch (error) {
     console.error(`DELETE /api/tickets/${ticketId}:`, error);
-    showStatus("Error al comunicarse con la API.", "error");
+    avisar("Error al comunicarse con la API.", "error");
   }
   ocupado = false;
   bloquearBotones(false);
@@ -367,7 +376,7 @@ async function guardarEdicion() {
   };
   const errorCliente = validarTexto(payload);
   if (errorCliente) {
-    showStatus(errorCliente, "error");
+    avisar(errorCliente, "error");
     return;
   }
 
@@ -380,28 +389,28 @@ async function guardarEdicion() {
       body: JSON.stringify(payload),
     });
     if (response.status === 404) {
-      showStatus(`No se encontró el ticket #${ticketId}.`, "error");
+      avisar(`No se encontró el ticket #${ticketId}.`, "error");
       return;
     }
     if (response.status === 422) {
       const body = await response.json().catch(() => null);
-      showStatus(formatValidation(body), "error");
+      avisar(formatValidation(body), "error");
       return;
     }
     if (!response.ok) {
-      showStatus(
+      avisar(
         `No se pudieron guardar los cambios (HTTP ${response.status}).`,
         "error"
       );
       return;
     }
-    showStatus("Cambios guardados correctamente.", "exito");
+    avisar("Cambios guardados correctamente.", "exito");
     await cargarTicket({ silencioso: true });
     /* Guardado correcto: se vuelve al modo consulta (Tarea 20.4). */
     salirModoEdicion();
     getElements().editar.focus();
   } catch (error) {
-    showStatus("Error al comunicarse con la API.", "error");
+    avisar("Error al comunicarse con la API.", "error");
   } finally {
     ocupado = false;
     bloquearBotones(false);
@@ -411,7 +420,7 @@ async function guardarEdicion() {
 async function guardarAsignacion() {
   if (ocupado || ticketId === null) return;
   if (!usuariosCargados) {
-    showStatus(
+    avisar(
       "No se pudo cargar la lista de usuarios: recarga la página para intentarlo de nuevo.",
       "error"
     );
@@ -419,7 +428,7 @@ async function guardarAsignacion() {
   }
   const elements = getElements();
   if (elements.usuario.disabled) {
-    showStatus(
+    avisar(
       "No hay usuarios disponibles: crea uno desde la página de Usuarios.",
       "error"
     );
@@ -437,7 +446,7 @@ async function guardarAsignacion() {
       body: JSON.stringify({ assigned_to_id: assignedToId }),
     });
     if (response.status === 404) {
-      showStatus(
+      avisar(
         await mensajeDeDetalle(
           response,
           `No se encontró el ticket #${ticketId}.`
@@ -448,17 +457,17 @@ async function guardarAsignacion() {
     }
     if (response.status === 422) {
       const body = await response.json().catch(() => null);
-      showStatus(formatValidation(body), "error");
+      avisar(formatValidation(body), "error");
       return;
     }
     if (!response.ok) {
-      showStatus(
+      avisar(
         `No se pudo guardar la asignación (HTTP ${response.status}).`,
         "error"
       );
       return;
     }
-    showStatus(
+    avisar(
       assignedToId === null
         ? "El ticket quedó sin asignar."
         : "Asignación guardada correctamente.",
@@ -466,7 +475,7 @@ async function guardarAsignacion() {
     );
     await cargarTicket({ silencioso: true });
   } catch (error) {
-    showStatus("Error al comunicarse con la API.", "error");
+    avisar("Error al comunicarse con la API.", "error");
   } finally {
     ocupado = false;
     bloquearBotones(false);
@@ -488,7 +497,7 @@ async function cambiarEstado() {
       body: JSON.stringify({ state: destino }),
     });
     if (response.status === 404) {
-      showStatus(
+      avisar(
         await mensajeDeDetalle(
           response,
           `No se encontró el ticket #${ticketId}.`
@@ -498,7 +507,7 @@ async function cambiarEstado() {
       return;
     }
     if (response.status === 409) {
-      showStatus(
+      avisar(
         await mensajeDeDetalle(
           response,
           "La transición de estado no está permitida."
@@ -509,20 +518,20 @@ async function cambiarEstado() {
     }
     if (response.status === 422) {
       const body = await response.json().catch(() => null);
-      showStatus(formatValidation(body), "error");
+      avisar(formatValidation(body), "error");
       return;
     }
     if (!response.ok) {
-      showStatus(
+      avisar(
         `No se pudo cambiar el estado (HTTP ${response.status}).`,
         "error"
       );
       return;
     }
-    showStatus(`Estado actualizado a «${destino}».`, "exito");
+    avisar(`Estado actualizado a «${destino}».`, "exito");
     await cargarTicket({ silencioso: true });
   } catch (error) {
-    showStatus("Error al comunicarse con la API.", "error");
+    avisar("Error al comunicarse con la API.", "error");
   } finally {
     ocupado = false;
     bloquearBotones(false);
@@ -534,7 +543,7 @@ async function agregarComentario() {
   const elements = getElements();
   const content = elements.contenido.value.trim();
   if (!content) {
-    showStatus("El comentario no puede estar vacío.", "error");
+    avisar("El comentario no puede estar vacío.", "error");
     return;
   }
 
@@ -548,7 +557,7 @@ async function agregarComentario() {
       body: JSON.stringify({ content }),
     });
     if (response.status === 404) {
-      showStatus(
+      avisar(
         await mensajeDeDetalle(
           response,
           `No se encontró el ticket #${ticketId}.`
@@ -559,22 +568,22 @@ async function agregarComentario() {
     }
     if (response.status === 422) {
       const body = await response.json().catch(() => null);
-      showStatus(formatValidation(body), "error");
+      avisar(formatValidation(body), "error");
       return;
     }
     if (!response.ok) {
-      showStatus(
+      avisar(
         `No se pudo agregar el comentario (HTTP ${response.status}).`,
         "error"
       );
       return;
     }
     elements.contenido.value = "";
-    showStatus("Comentario agregado correctamente.", "exito");
+    avisar("Comentario agregado correctamente.", "exito");
     /* El comentario nuevo aparece en la lista sin recargar la página. */
     await cargarComentarios();
   } catch (error) {
-    showStatus("Error al comunicarse con la API.", "error");
+    avisar("Error al comunicarse con la API.", "error");
   } finally {
     ocupado = false;
     bloquearBotones(false);
