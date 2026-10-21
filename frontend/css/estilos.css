@@ -2892,3 +2892,40 @@ body.app {
     height: 200px;
   }
 }
+
+/* ===== Avatares con iniciales =====
+   pintarPersona() (auth.js) pone data-iniciales y un tono fijo por nombre. */
+.con-avatar::before {
+  content: attr(data-iniciales);
+  content: attr(data-iniciales) / "";
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  background: var(--avatar-fondo, var(--etiqueta-gris-fondo));
+  color: var(--avatar-texto, var(--etiqueta-gris-texto));
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.tono-avatar-0 { --avatar-fondo: var(--etiqueta-azul-fondo); --avatar-texto: var(--etiqueta-azul-texto); }
+.tono-avatar-1 { --avatar-fondo: var(--etiqueta-violeta-fondo); --avatar-texto: var(--etiqueta-violeta-texto); }
+.tono-avatar-2 { --avatar-fondo: var(--etiqueta-verde-fondo); --avatar-texto: var(--etiqueta-verde-texto); }
+.tono-avatar-3 { --avatar-fondo: var(--etiqueta-naranja-fondo); --avatar-texto: var(--etiqueta-naranja-texto); }
+.tono-avatar-4 { --avatar-fondo: var(--etiqueta-rojo-fondo); --avatar-texto: var(--etiqueta-rojo-texto); }
+.tono-avatar-5 { --avatar-fondo: var(--etiqueta-amarillo-fondo); --avatar-texto: var(--etiqueta-amarillo-texto); }
+
+td.con-avatar {
+  white-space: nowrap;
+}
+
+.comentario-autor.con-avatar {
+  display: inline-flex;
+  align-items: center;
+}

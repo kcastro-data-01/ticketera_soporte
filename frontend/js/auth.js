@@ -128,17 +128,46 @@ function pintarUsuario(doc = document) {
   const iniciales = doc.getElementById("usuario-iniciales");
   if (user && nombre) nombre.textContent = user.name || user.email || "";
   if (user && rol) rol.textContent = user.role || "";
-  if (user && iniciales) {
-    const base = (user.name || user.email || "?").trim();
-    iniciales.textContent = base
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((parte) => parte.charAt(0).toUpperCase())
-      .join("");
-  }
+  if (user && iniciales) iniciales.textContent = inicialesDe(user.name || user.email || "?");
   const salir = doc.getElementById("btn-logout");
   if (salir && typeof salir.addEventListener === "function") {
     salir.addEventListener("click", logout);
+  }
+}
+
+/* Iniciales de un nombre: «Carlos Solano» → «CS». */
+function inicialesDe(nombre) {
+  return String(nombre || "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("");
+}
+
+/* Tono del avatar (0 a 5): sale del nombre, así la misma persona tiene
+   siempre el mismo color en todas las pantallas. */
+const AVATAR_TONOS = 6;
+function tonoAvatar(nombre) {
+  const base = String(nombre || "").trim().toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < base.length; i += 1) hash = (hash * 31 + base.charCodeAt(i)) >>> 0;
+  return hash % AVATAR_TONOS;
+}
+
+/* Escribe el nombre en el elemento y le agrega el círculo con las
+   iniciales (lo dibuja el CSS con data-iniciales). Sin persona real
+   («—», «Usuario #5») queda solo el texto. */
+function pintarPersona(el, nombre) {
+  if (!el) return;
+  const texto = nombre || "—";
+  el.textContent = texto;
+  const clase = String(el.className || "").replace(/\s*\bcon-avatar\b|\s*\btono-avatar-\d\b/g, "").trim();
+  const real = texto !== "—" && !/^Usuario #/.test(texto);
+  el.className = real ? `${clase} con-avatar tono-avatar-${tonoAvatar(texto)}`.trim() : clase;
+  if (el.dataset) {
+    if (real) el.dataset.iniciales = inicialesDe(texto);
+    else delete el.dataset.iniciales;
   }
 }
 

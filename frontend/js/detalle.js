@@ -175,8 +175,8 @@ function renderTicket(ticket) {
   elements.ver.priority.className = claseBadge(ticket.priority);
   elements.ver.state.textContent = ticket.state;
   elements.ver.state.className = claseBadge(ticket.state);
-  elements.ver.assigned.textContent = nombreAsignado(ticket);
-  if (elements.ver.creator) elements.ver.creator.textContent = nombreSolicitante(ticket);
+  pintarPersona(elements.ver.assigned, nombreAsignado(ticket));
+  pintarPersona(elements.ver.creator, nombreSolicitante(ticket));
   elements.ver.created.textContent = formatFecha(ticket.created_at);
   elements.ver.updated.textContent = formatFecha(ticket.updated_at);
 
@@ -615,7 +615,7 @@ function renderComentarios(comments) {
     header.className = "comentario-cabecera";
     const author = document.createElement("span");
     author.className = "comentario-autor";
-    author.textContent = comment.author || "Anónimo";
+    pintarPersona(author, comment.author || "Anónimo");
     const fecha = document.createElement("span");
     fecha.className = "comentario-fecha";
     fecha.textContent = formatFecha(comment.created_at);

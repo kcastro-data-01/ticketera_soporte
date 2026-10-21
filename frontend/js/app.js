@@ -109,6 +109,13 @@ function appendCell(row, text, className) {
   row.appendChild(cell);
 }
 
+/* Celda con el nombre y el círculo de iniciales de la persona. */
+function appendPersonaCell(row, nombre) {
+  const cell = document.createElement("td");
+  pintarPersona(cell, nombre);
+  row.appendChild(cell);
+}
+
 /* El ID del listado abre la pantalla de detalle (Tarea 13). */
 /* Celda con etiqueta de color para prioridad o estado. */
 function appendBadgeCell(row, text) {
@@ -140,7 +147,7 @@ function renderTickets(tickets) {
     appendCell(row, ticket.category);
     appendBadgeCell(row, ticket.priority);
     appendBadgeCell(row, ticket.state);
-    appendCell(row, assignedText(ticket));
+    appendPersonaCell(row, assignedText(ticket));
     appendCell(row, formatFecha(ticket.created_at), "celda-fecha");
     appendActionCell(row, ticket.id);
     elements.tbody.appendChild(row);
