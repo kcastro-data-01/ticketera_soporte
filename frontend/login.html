@@ -130,8 +130,19 @@
       right: 1rem;
       top: 50%;
       transform: translateY(-50%);
+      display: grid;
+      place-items: center;
       cursor: pointer;
       color: var(--color-tenue);
+    }
+    .auth-container .login-der .toggle-password svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
     .auth-container .login-der .btn-grp {
       display: flex;
@@ -346,7 +357,7 @@
         </div>
         <div class="campo">
           <input type="password" id="login-password" name="password" required autocomplete="current-password" class="form-input" placeholder="••••••••">
-          <span class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña">⊘</span>
+          <span class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
         </div>
         <div class="remember-me">
           <input type="checkbox" id="remember-me" name="remember-me">
@@ -370,7 +381,7 @@
         </div>
         <div class="campo">
           <input type="password" id="register-password" name="password" required class="form-input" placeholder="Mínimo 6 caracteres">
-          <span class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña">⊘</span>
+          <span class="toggle-password" aria-label="Mostrar contraseña" title="Mostrar contraseña"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
         </div>
         <div class="remember-me">
           <input type="checkbox" id="register-memory" name="remember-memory">
