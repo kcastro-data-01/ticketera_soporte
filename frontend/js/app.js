@@ -262,7 +262,26 @@ function renderPaginacion(total) {
 
 function irAPagina(pagina) {
   paginaActual = Math.max(0, pagina);
+  marcarTarjetaActiva();
   fetchTickets();
+}
+
+/* Resalta la tarjeta cuyo filtro es el que está aplicado (si hay una). */
+function marcarTarjetaActiva() {
+  if (typeof document.querySelectorAll !== "function") return;
+  const filtros = getFilters();
+  const soloTarjeta = !filtros.search && !filtros.category;
+  document.querySelectorAll(".tarjeta-resumen").forEach((tarjeta) => {
+    const d = tarjeta.dataset || {};
+    const activa =
+      soloTarjeta &&
+      (d.estado || "") === filtros.state &&
+      (d.prioridad || "") === filtros.priority &&
+      (d.mios === "true") === Boolean(filtros.mios) &&
+      Boolean(d.estado || d.prioridad || d.mios);
+    tarjeta.classList.toggle("activa", activa);
+    tarjeta.setAttribute("aria-pressed", String(activa));
+  });
 }
 
 /* Cambia entre «Todos» y «Mis tickets» y vuelve a la primera página. */
@@ -295,6 +314,12 @@ async function cargarResumen() {
       const nodo = document.getElementById(id);
       if (nodo) nodo.textContent = String(resumen[campo] ?? "—");
     });
+    /* Pendientes = sin resolver (Nuevo + En proceso). */
+    const pendientes = document.getElementById("res-pendientes");
+    if (pendientes) {
+      const total = Number(resumen.nuevos) + Number(resumen.en_proceso);
+      pendientes.textContent = Number.isFinite(total) ? String(total) : "—";
+    }
   } catch (error) {
     console.error("No se pudo cargar el resumen:", error);
   }

@@ -1726,6 +1726,99 @@ body.app {
   color: var(--color-tenue);
 }
 
+/* Tarjetas del listado: ícono, número grande y color suave por estado. */
+.resumen:has(.tarjeta-icono) {
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+}
+
+.resumen .tarjeta-resumen {
+  padding: 0.85rem 0.9rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "icono numero"
+    "icono etiqueta";
+  align-items: center;
+  column-gap: 0.7rem;
+  row-gap: 0.05rem;
+  border-left-width: 1px;
+  border-left-color: var(--color-borde);
+  --tono-fondo: var(--etiqueta-azul-fondo);
+  --tono-texto: var(--etiqueta-azul-texto);
+}
+
+.resumen .tarjeta-resumen.tono-violeta {
+  --tono-fondo: var(--etiqueta-violeta-fondo);
+  --tono-texto: var(--etiqueta-violeta-texto);
+}
+
+.resumen .tarjeta-resumen.tono-naranja {
+  --tono-fondo: var(--etiqueta-naranja-fondo);
+  --tono-texto: var(--etiqueta-naranja-texto);
+}
+
+.resumen .tarjeta-resumen.tono-verde {
+  --tono-fondo: var(--etiqueta-verde-fondo);
+  --tono-texto: var(--etiqueta-verde-texto);
+}
+
+.resumen .tarjeta-resumen.tono-rojo {
+  --tono-fondo: var(--etiqueta-rojo-fondo);
+  --tono-texto: var(--etiqueta-rojo-texto);
+}
+
+.resumen .tarjeta-resumen.destacada {
+  background: var(--color-superficie-alta);
+}
+
+.tarjeta-icono {
+  grid-area: icono;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--tono-fondo);
+  color: var(--tono-texto);
+}
+
+.tarjeta-icono svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.resumen .tarjeta-numero {
+  grid-area: numero;
+  font-size: 1.65rem;
+}
+
+.resumen .tarjeta-etiqueta {
+  grid-area: etiqueta;
+  font-size: 0.8rem;
+  line-height: 1.25;
+}
+
+/* La tarjeta del filtro aplicado: borde y fondo de su color. */
+.resumen .tarjeta-resumen.activa {
+  border-color: var(--tono-texto);
+  box-shadow: 0 0 0 1px var(--tono-texto), var(--sombra-suave);
+}
+
+.resumen .tarjeta-resumen.activa .tarjeta-icono {
+  background: var(--tono-texto);
+  color: var(--color-superficie);
+}
+
+.resumen .tarjeta-resumen:focus-visible {
+  outline: 2px solid var(--tono-texto);
+  outline-offset: 2px;
+}
+
 .vista-tabs {
   display: inline-flex;
   gap: 0.25rem;
