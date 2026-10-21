@@ -152,6 +152,80 @@ function assignedText(ticket) {
 
 const FILAS_DESTACADAS = { "Crítica": "fila-critica", Alta: "fila-alta" };
 
+/* --- Orden de columnas ------------------------------------------------
+   La API ya entrega los tickets de la página (20) del más nuevo al más
+   viejo; al hacer clic en un encabezado se reordenan en pantalla. El orden
+   elegido se recuerda en este navegador (localStorage). */
+const ORDEN_KEY = "orden_listado";
+/* Prioridad y estado no se ordenan alfabéticamente. */
+const RANGO_PRIORIDAD = { "Crítica": 0, Alta: 1, Media: 2, Baja: 3 };
+const RANGO_ESTADO = { Nuevo: 0, "En proceso": 1, Resuelto: 2, Cerrado: 3 };
+const CAMPOS_ORDEN = ["id", "title", "priority", "state", "created_at"];
+
+let orden = leerOrden();
+let ticketsActuales = [];
+
+function leerOrden() {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(ORDEN_KEY) || "null");
+    if (guardado && CAMPOS_ORDEN.includes(guardado.campo) && ["asc", "desc"].includes(guardado.dir)) {
+      return guardado;
+    }
+  } catch (error) {
+    /* Sin almacenamiento: orden de la API. */
+  }
+  return null;
+}
+
+function guardarOrden(valor) {
+  try {
+    localStorage.setItem(ORDEN_KEY, JSON.stringify(valor));
+  } catch (error) {
+    /* El orden vale solo para esta visita. */
+  }
+}
+
+function valorOrden(ticket, campo) {
+  if (campo === "priority") return RANGO_PRIORIDAD[ticket.priority] ?? 9;
+  if (campo === "state") return RANGO_ESTADO[ticket.state] ?? 9;
+  if (campo === "created_at") return Date.parse(ticket.created_at) || 0;
+  if (campo === "title") return String(ticket.title || "");
+  return Number(ticket.id) || 0;
+}
+
+/* Ascendente: ID y fecha de menor a mayor, título de A a Z, prioridad de
+   Crítica a Baja y estado según el flujo (Nuevo → Cerrado). */
+function ordenarTickets(tickets, criterio = orden) {
+  if (!criterio) return tickets.slice();
+  const signo = criterio.dir === "desc" ? -1 : 1;
+  return tickets.slice().sort((a, b) => {
+    const x = valorOrden(a, criterio.campo);
+    const y = valorOrden(b, criterio.campo);
+    const comparacion =
+      typeof x === "string" ? x.localeCompare(y, "es", { sensitivity: "base" }) : x - y;
+    return comparacion * signo || (Number(b.id) - Number(a.id));
+  });
+}
+
+/* Clic en un encabezado: la primera vez ascendente; otra vez, descendente. */
+function cambiarOrden(campo) {
+  const dir = orden && orden.campo === campo && orden.dir === "asc" ? "desc" : "asc";
+  orden = { campo, dir };
+  guardarOrden(orden);
+  marcarOrden();
+  if (ticketsActuales.length) renderTickets(ticketsActuales);
+}
+
+/* Flechita del encabezado ordenado (aria-sort la lee el lector de pantalla). */
+function marcarOrden() {
+  if (typeof document.querySelectorAll !== "function") return;
+  document.querySelectorAll(".orden-columna").forEach((boton) => {
+    const th = boton.parentElement;
+    const activo = orden && orden.campo === boton.dataset.orden;
+    if (th) th.setAttribute("aria-sort", activo ? (orden.dir === "asc" ? "ascending" : "descending") : "none");
+  });
+}
+
 /* Ícono de línea de cada categoría (lo dibuja el CSS). */
 const CATEGORIAS_ICONO = { Hardware: "hardware", Software: "software", Red: "red", Accesos: "accesos" };
 
@@ -201,7 +275,8 @@ function appendIdCell(row, ticketId) {
 function renderTickets(tickets) {
   const elements = getElements();
   clearRows();
-  tickets.forEach((ticket) => {
+  ticketsActuales = tickets;
+  ordenarTickets(tickets).forEach((ticket) => {
     const row = document.createElement("tr");
     /* Línea de color a la izquierda en las filas Críticas y Altas (el
        Solicitante no ve la prioridad, así que no se le marca). */
@@ -276,6 +351,7 @@ function pintarFilasEsqueleto() {
 async function fetchTickets() {
   hideStatus();
   mostrarSinSolicitudes(false);
+  ticketsActuales = [];
   clearRows();
   pintarFilasEsqueleto();
 
@@ -469,7 +545,11 @@ function init() {
     document.querySelectorAll(".tarjeta-resumen").forEach((tarjeta) => {
       tarjeta.addEventListener("click", () => aplicarTarjeta(tarjeta));
     });
+    document.querySelectorAll(".orden-columna").forEach((boton) => {
+      boton.addEventListener("click", () => cambiarOrden(boton.dataset.orden));
+    });
   }
+  marcarOrden();
 
   cargarResumen();
   loadUsers().then(fetchTickets);

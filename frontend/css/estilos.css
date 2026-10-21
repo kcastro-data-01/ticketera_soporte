@@ -3652,3 +3652,66 @@ body.pagina-error {
     margin-bottom: 0.45rem;
   }
 }
+
+/* ===== Listado: ordenar columnas y encabezado fijo ===== */
+/* El encabezado del botón se ve como el resto de los encabezados. */
+.orden-columna,
+.orden-columna:hover,
+.orden-columna:active {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.orden-columna:hover {
+  color: var(--color-texto);
+}
+
+/* Flechita: doble en gris sin ordenar; hacia arriba o abajo al ordenar. */
+.orden-columna::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+  opacity: 0.45;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 9l5-5 5 5M7 15l5 5 5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 9l5-5 5 5M7 15l5 5 5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+th[aria-sort="ascending"] .orden-columna,
+th[aria-sort="descending"] .orden-columna {
+  color: var(--color-primario-texto);
+}
+
+th[aria-sort="ascending"] .orden-columna::after,
+th[aria-sort="descending"] .orden-columna::after {
+  opacity: 1;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 15l6-6 6 6'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 15l6-6 6 6'/%3E%3C/svg%3E");
+}
+
+th[aria-sort="descending"] .orden-columna::after {
+  transform: rotate(180deg);
+}
+
+/* Encabezado fijo: con muchas filas la tabla baja dentro de su caja y los
+   títulos de las columnas quedan siempre a la vista. */
+@media (min-width: 701px) {
+  #tabla-tickets {
+    max-height: calc(100vh - 160px);
+    overflow: auto;
+  }
+
+  #tabla-tickets .listado thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+}

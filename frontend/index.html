@@ -156,13 +156,14 @@
       <table class="listado">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Título</th>
+            <!-- Las columnas con botón se ordenan al hacer clic (app.js). -->
+            <th aria-sort="none"><button type="button" class="orden-columna" data-orden="id">ID</button></th>
+            <th aria-sort="none"><button type="button" class="orden-columna" data-orden="title">Título</button></th>
             <th data-vista="equipo">Categoría</th>
-            <th data-vista="equipo">Prioridad</th>
-            <th>Estado</th>
+            <th data-vista="equipo" aria-sort="none"><button type="button" class="orden-columna" data-orden="priority">Prioridad</button></th>
+            <th aria-sort="none"><button type="button" class="orden-columna" data-orden="state">Estado</button></th>
             <th id="th-asignado">Asignado a</th>
-            <th>Fecha de creación</th>
+            <th aria-sort="none"><button type="button" class="orden-columna" data-orden="created_at">Fecha de creación</button></th>
             <th>Acción</th>
           </tr>
         </thead>
