@@ -3359,3 +3359,101 @@ body:has(.menu-usuario) .barra-usuario {
   background: var(--etiqueta-gris-fondo);
   color: var(--etiqueta-gris-texto);
 }
+
+/* ===== Impresión de un ticket (detalle) =====
+   Hoja formal: encabezado de la empresa, datos, pasos y comentarios; sin
+   menú, botones, formularios ni el asistente. */
+.impresion-cabecera {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 1.6cm;
+  }
+
+  :root,
+  :root[data-tema="oscuro"] {
+    color-scheme: light;
+  }
+
+  body,
+  body.app,
+  .app-principal,
+  .contenido {
+    display: block;
+    background: #fff !important;
+    color: #000;
+    font-size: 11pt;
+  }
+
+  .barra-lateral,
+  .cabecera,
+  .pie,
+  .acciones-principales,
+  .detalle-lateral,
+  #seccion-edicion,
+  #seccion-ia,
+  #form-comentario,
+  .seccion .nota,
+  .seccion:has(#tabla-historial[hidden]),
+  .seccion .filtros.formulario,
+  #estado-carga,
+  .chat-asistente,
+  .avisos,
+  .dialogo-fondo,
+  button {
+    display: none !important;
+  }
+
+  .contenido {
+    padding: 0;
+  }
+
+  .detalle-layout {
+    display: block;
+  }
+
+  .impresion-cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #000;
+    font-size: 9pt;
+  }
+
+  .impresion-cabecera strong {
+    display: block;
+    font-size: 13pt;
+  }
+
+  .tarjeta-ticket,
+  .comentario,
+  .listado {
+    border: 1px solid #999 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    break-inside: avoid;
+  }
+
+  .seccion h2::before {
+    display: none;
+  }
+
+  .seccion h2,
+  .tarjeta-ticket-titulo {
+    color: #000;
+  }
+
+  /* Las etiquetas con borde se leen bien también en blanco y negro. */
+  .badge {
+    border: 1px solid currentColor !important;
+  }
+
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+}

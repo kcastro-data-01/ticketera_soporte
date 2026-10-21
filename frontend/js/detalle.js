@@ -172,6 +172,32 @@ async function mensajeDeDetalle(response, mensajePorDefecto) {
   return body && body.detail ? String(body.detail) : mensajePorDefecto;
 }
 
+/* «Imprimir»: anota la fecha en el encabezado de la hoja y abre el
+   diálogo del navegador (el estilo de impresión está en estilos.css). */
+function imprimirTicket() {
+  if (typeof window.print === "function") window.print();
+}
+
+/* Antes de imprimir (con el botón o con Ctrl+P): fecha en el encabezado y
+   modo claro, para que la hoja salga en negro sobre blanco; al terminar
+   vuelve el tema que tenía. */
+let temaAntesDeImprimir = null;
+
+function prepararImpresion() {
+  const fecha = document.getElementById("impresion-fecha");
+  if (fecha) fecha.textContent = `Impreso el ${formatFecha(new Date().toISOString())}`;
+  const raiz = document.documentElement;
+  if (!raiz) return;
+  temaAntesDeImprimir = raiz.getAttribute("data-tema");
+  if (temaAntesDeImprimir) raiz.removeAttribute("data-tema");
+}
+
+function terminarImpresion() {
+  const raiz = document.documentElement;
+  if (raiz && temaAntesDeImprimir) raiz.setAttribute("data-tema", temaAntesDeImprimir);
+  temaAntesDeImprimir = null;
+}
+
 /* Barra de pasos: marca como hechos los estados anteriores al actual. */
 const PASOS_ESTADO = ["Nuevo", "En proceso", "Resuelto", "Cerrado"];
 
@@ -817,6 +843,12 @@ async function init() {
     agregarComentario();
   });
   elements.historial.addEventListener("click", () => cargarHistorial());
+  const imprimir = document.getElementById("imprimir");
+  if (imprimir) imprimir.addEventListener("click", imprimirTicket);
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("beforeprint", prepararImpresion);
+    window.addEventListener("afterprint", terminarImpresion);
+  }
 
   ticketId = getTicketId();
   const migaActual = document.getElementById("migas-actual");

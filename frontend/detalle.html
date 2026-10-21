@@ -56,6 +56,14 @@
     </header>
 
     <main class="contenido">
+      <!-- Encabezado que solo aparece al imprimir. -->
+      <div class="impresion-cabecera" aria-hidden="true">
+        <div>
+          <strong>American Data Networks</strong>
+          <span>Sistema de tickets · Ficha del ticket</span>
+        </div>
+        <span id="impresion-fecha"></span>
+      </div>
       <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
 
       <div class="detalle-layout">
@@ -65,6 +73,8 @@
             <button type="button" id="editar" data-permiso="editar">Editar ticket</button>
             <!-- Solo Administrador: borra el ticket con sus comentarios e historial. -->
             <button type="button" id="eliminar" class="peligro" data-permiso="eliminar">Eliminar</button>
+            <!-- Versión formal en papel o PDF: sin menú ni botones. -->
+            <button type="button" id="imprimir" class="secundario">Imprimir</button>
           </div>
   
           <!-- Tarjeta del ticket: título grande con estado y prioridad arriba,
