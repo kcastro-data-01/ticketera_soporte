@@ -49,57 +49,44 @@
     <main class="contenido">
       <section class="seccion" aria-label="Agregar usuario">
         <h2>Agregar usuario</h2>
-        <form id="form-usuario" class="filtros formulario" novalidate>
-          <label class="campo">
-            <span>Nombre *</span>
-            <input
-              type="text"
-              id="nombre"
-              name="nombre"
-              required
-              maxlength="120"
-              placeholder="Nombre completo"
-            >
-          </label>
-  
-          <label class="campo">
-            <span>Correo electrónico *</span>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              required
-              maxlength="255"
-              placeholder="nombre@soporte.local"
-            >
-          </label>
-  
-          <label class="campo">
-            <span>Contraseña *</span>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              required
-              minlength="6"
-              maxlength="72"
-              autocomplete="new-password"
-              placeholder="Mínimo 6 caracteres"
-            >
-          </label>
+        <form id="form-usuario" class="filtros formulario formulario-crear" novalidate>
+          <div class="campos-fila">
+            <label class="campo">
+              <span>Nombre *</span>
+              <input type="text" id="nombre" name="nombre" required maxlength="120" placeholder="Nombre completo" aria-describedby="ayuda-nombre error-nombre">
+              <small id="ayuda-nombre" class="ayuda-campo">Nombre y apellido, tal como se mostrará en los tickets.</small>
+              <small id="error-nombre" class="error-campo" role="alert" hidden></small>
+            </label>
+            <label class="campo">
+              <span>Correo electrónico *</span>
+              <input type="email" id="email" name="email" required maxlength="255" placeholder="nombre@soporte.local" aria-describedby="ayuda-email error-email">
+              <small id="ayuda-email" class="ayuda-campo">Con este correo inicia sesión en la ticketera.</small>
+              <small id="error-email" class="error-campo" role="alert" hidden></small>
+            </label>
+          </div>
+          <div class="campos-fila">
+            <label class="campo">
+              <span>Contraseña *</span>
+              <input type="password" id="password" name="password" required minlength="6" maxlength="72" autocomplete="new-password" placeholder="Mínimo 6 caracteres" aria-describedby="ayuda-password error-password">
+              <small id="ayuda-password" class="ayuda-campo">Entre 6 y 72 caracteres.</small>
+              <small id="error-password" class="error-campo" role="alert" hidden></small>
+            </label>
+            <label class="campo">
+              <span>Rol *</span>
+              <select id="rol" name="rol" aria-describedby="ayuda-rol error-rol">
+                <option value="Técnico" selected>Técnico</option>
+                <option value="Administrador">Administrador</option>
+                <option value="Supervisor">Supervisor</option>
+                <option value="Solicitante">Solicitante</option>
+              </select>
+              <small id="ayuda-rol" class="ayuda-campo">Define qué puede ver y hacer en la ticketera (ver Ayuda › Roles y permisos).</small>
+              <small id="error-rol" class="error-campo" role="alert" hidden></small>
+            </label>
+          </div>
 
-          <label class="campo">
-            <span>Rol *</span>
-            <select id="rol" name="rol">
-              <option value="Técnico" selected>Técnico</option>
-              <option value="Administrador">Administrador</option>
-              <option value="Supervisor">Supervisor</option>
-              <option value="Solicitante">Solicitante</option>
-            </select>
-          </label>
-  
           <div class="acciones">
             <button type="submit" id="crear">Agregar usuario</button>
+            <button type="reset" id="limpiar-usuario" class="secundario">Limpiar</button>
           </div>
         </form>
   
@@ -127,55 +114,42 @@
   
       <section class="seccion" aria-label="Editar usuario" id="seccion-editar" hidden>
         <h2>Editar usuario</h2>
-        <form id="form-editar-usuario" class="filtros formulario" novalidate>
+        <form id="form-editar-usuario" class="filtros formulario formulario-crear" novalidate>
           <input type="hidden" id="editar-id" name="id">
-          <label class="campo">
-            <span>Nombre *</span>
-            <input
-              type="text"
-              id="editar-nombre"
-              name="nombre"
-              required
-              maxlength="120"
-              placeholder="Nombre completo"
-            >
-          </label>
-  
-          <label class="campo">
-            <span>Correo electrónico *</span>
-            <input
-              type="email"
-              id="editar-email"
-              name="email"
-              required
-              maxlength="255"
-              placeholder="nombre@soporte.local"
-            >
-          </label>
-  
-          <label class="campo">
-            <span>Nueva contraseña</span>
-            <input
-              type="password"
-              id="editar-password"
-              name="password"
-              minlength="6"
-              maxlength="72"
-              autocomplete="new-password"
-              placeholder="Déjela vacía para no cambiarla"
-            >
-          </label>
+          <div class="campos-fila">
+            <label class="campo">
+              <span>Nombre *</span>
+              <input type="text" id="editar-nombre" name="nombre" required maxlength="120" placeholder="Nombre completo" aria-describedby="ayuda-editar-nombre error-editar-nombre">
+              <small id="ayuda-editar-nombre" class="ayuda-campo">Nombre y apellido, tal como se mostrará en los tickets.</small>
+              <small id="error-editar-nombre" class="error-campo" role="alert" hidden></small>
+            </label>
+            <label class="campo">
+              <span>Correo electrónico *</span>
+              <input type="email" id="editar-email" name="email" required maxlength="255" placeholder="nombre@soporte.local" aria-describedby="ayuda-editar-email error-editar-email">
+              <small id="ayuda-editar-email" class="ayuda-campo">Con este correo inicia sesión en la ticketera.</small>
+              <small id="error-editar-email" class="error-campo" role="alert" hidden></small>
+            </label>
+          </div>
+          <div class="campos-fila">
+            <label class="campo">
+              <span>Nueva contraseña</span>
+              <input type="password" id="editar-password" name="password" minlength="6" maxlength="72" autocomplete="new-password" placeholder="Déjela vacía para no cambiarla" aria-describedby="ayuda-editar-password error-editar-password">
+              <small id="ayuda-editar-password" class="ayuda-campo">Entre 6 y 72 caracteres. Déjela vacía para mantener la actual.</small>
+              <small id="error-editar-password" class="error-campo" role="alert" hidden></small>
+            </label>
+            <label class="campo">
+              <span>Rol *</span>
+              <select id="editar-rol" name="rol" aria-describedby="ayuda-editar-rol error-editar-rol">
+                <option value="Administrador">Administrador</option>
+                <option value="Supervisor">Supervisor</option>
+                <option value="Técnico">Técnico</option>
+                <option value="Solicitante">Solicitante</option>
+              </select>
+              <small id="ayuda-editar-rol" class="ayuda-campo">Define qué puede ver y hacer en la ticketera (ver Ayuda › Roles y permisos).</small>
+              <small id="error-editar-rol" class="error-campo" role="alert" hidden></small>
+            </label>
+          </div>
 
-          <label class="campo">
-            <span>Rol *</span>
-            <select id="editar-rol" name="rol">
-              <option value="Administrador">Administrador</option>
-              <option value="Supervisor">Supervisor</option>
-              <option value="Técnico">Técnico</option>
-              <option value="Solicitante">Solicitante</option>
-            </select>
-          </label>
-  
           <div class="acciones">
             <button type="submit" id="guardar-edicion">Guardar cambios</button>
             <button type="button" id="cancelar-edicion" class="secundario">Cancelar</button>

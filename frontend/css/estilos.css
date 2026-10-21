@@ -3815,3 +3815,20 @@ th[aria-sort="descending"] .orden-columna::after {
   margin: 0.2rem 0 0;
   color: var(--color-tenue-fuerte);
 }
+
+/* ===== Formularios: error debajo del campo ===== */
+.error-campo {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-error);
+}
+
+.campo :is(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--color-error);
+}
+
+.campo :is(input, select, textarea)[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px var(--color-error-fondo);
+}

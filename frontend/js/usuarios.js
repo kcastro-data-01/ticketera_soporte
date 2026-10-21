@@ -34,6 +34,46 @@ function validarPassword(password) {
 
 let ocupado = false;
 
+/* --- Errores debajo de cada campo ---------------------------------------
+   El mensaje se muestra debajo del campo al que corresponde (con
+   aria-invalid); si no corresponde a ninguno, queda el aviso general. */
+function campoDelError(mensaje, prefijo = "") {
+  const texto = String(mensaje || "").toLowerCase();
+  let campo = "";
+  if (/nombre|^name/.test(texto)) campo = "nombre";
+  else if (/correo|^email/.test(texto)) campo = "email";
+  else if (/contraseña|^password/.test(texto)) campo = "password";
+  else if (/\brol\b|^role/.test(texto)) campo = "rol";
+  return campo ? `${prefijo}${campo}` : "";
+}
+
+function limpiarErroresCampo(prefijo = "") {
+  ["nombre", "email", "password", "rol"].forEach((campo) => {
+    const error = document.getElementById(`error-${prefijo}${campo}`);
+    const control = document.getElementById(`${prefijo}${campo}`);
+    if (error) {
+      error.textContent = "";
+      error.hidden = true;
+    }
+    if (control && typeof control.removeAttribute === "function") control.removeAttribute("aria-invalid");
+  });
+}
+
+/* true si el mensaje quedó debajo de su campo. */
+function mostrarErrorCampo(mensaje, prefijo = "") {
+  const campo = campoDelError(mensaje, prefijo);
+  const error = campo ? document.getElementById(`error-${campo}`) : null;
+  if (!error) return false;
+  error.textContent = mensaje;
+  error.hidden = false;
+  const control = document.getElementById(campo);
+  if (control) {
+    if (typeof control.setAttribute === "function") control.setAttribute("aria-invalid", "true");
+    if (typeof control.focus === "function") control.focus();
+  }
+  return true;
+}
+
 function getElements() {
   return {
     estadoUsuario: document.getElementById("estado-usuario"),
@@ -263,6 +303,7 @@ function editarUsuario(user) {
   elements.editarNombre.value = user.name;
   elements.editarEmail.value = user.email;
   elements.editarRol.value = user.role;
+  limpiarErroresCampo("editar-");
   if (elements.editarPassword) elements.editarPassword.value = "";
   elements.seccionEditar.hidden = false;
   ocultarEdicionEstado();
@@ -292,11 +333,12 @@ async function guardarEdicion(event) {
   if (rol) payload.role = rol;
 
   /* La contraseña solo se envía si se escribió una nueva. */
+  limpiarErroresCampo("editar-");
   const nuevaPassword = elements.editarPassword ? elements.editarPassword.value : "";
   if (nuevaPassword) {
     const errorPassword = validarPassword(nuevaPassword);
     if (errorPassword) {
-      mostrarEdicionEstado(errorPassword, "error");
+      avisarErrorEdicion(errorPassword);
       return;
     }
     payload.password = nuevaPassword;
@@ -317,7 +359,7 @@ async function guardarEdicion(event) {
     });
     const body = response.ok ? null : await response.json().catch(() => null);
     if (!response.ok) {
-      mostrarEdicionEstado(mensajeDeError(response, body), "error");
+      avisarErrorEdicion(mensajeDeError(response, body));
       return;
     }
 
@@ -363,13 +405,26 @@ async function cargarUsuarios() {
   }
 }
 
+/* Error al agregar: debajo del campo si corresponde a uno (el aviso
+   general queda con el mismo texto, oculto); si no, el aviso general. */
+function avisarErrorCrear(mensaje) {
+  showStatus(mensaje, "error");
+  if (mostrarErrorCampo(mensaje)) getElements().estadoUsuario.hidden = true;
+}
+
+function avisarErrorEdicion(mensaje) {
+  mostrarEdicionEstado(mensaje, "error");
+  if (mostrarErrorCampo(mensaje, "editar-")) getElements().estadoEdicion.hidden = true;
+}
+
 async function crearUsuario(event) {
   event.preventDefault();
   if (ocupado) return;
 
+  limpiarErroresCampo();
   const errorValidacion = validarUsuario();
   if (errorValidacion) {
-    showStatus(errorValidacion, "error");
+    avisarErrorCrear(errorValidacion);
     return;
   }
 
@@ -391,7 +446,7 @@ async function crearUsuario(event) {
     });
     const body = response.ok ? null : await response.json().catch(() => null);
     if (!response.ok) {
-      showStatus(mensajeDeError(response, body), "error");
+      avisarErrorCrear(mensajeDeError(response, body));
       return;
     }
 
@@ -417,6 +472,11 @@ async function crearUsuario(event) {
 async function init() {
   const elements = getElements();
   elements.formUsuario.addEventListener("submit", crearUsuario);
+  /* «Limpiar» vacía el formulario y quita los errores. */
+  elements.formUsuario.addEventListener("reset", () => {
+    limpiarErroresCampo();
+    elements.estadoUsuario.hidden = true;
+  });
   elements.formEditar.addEventListener("submit", guardarEdicion);
   elements.cancelarEdicion.addEventListener("click", cancelarEdicion);
   await cargarUsuarios();
