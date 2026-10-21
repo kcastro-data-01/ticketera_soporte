@@ -48,90 +48,162 @@
 
     <main class="contenido">
     <section class="ayuda-contenido">
-      <h2>¿Qué es Ticketera?</h2>
-      <p>Ticketera es un sistema de gestión de tickets de soporte diseñado para equipos pequeños y medianos. Permite crear, organizar y dar seguimiento a los tickets de soporte desde la creación hasta el cierre.</p>
+      <!-- Índice: cada enlace abre su tema (ayuda.js). -->
+      <nav class="ayuda-indice" aria-label="Temas de ayuda">
+        <h2>Temas</h2>
+        <ol>
+          <li><a href="#crear">Crear un ticket</a></li>
+          <li><a href="#seguimiento">Seguimiento</a></li>
+          <li><a href="#roles">Roles y permisos</a></li>
+          <li><a href="#asistente">Asistente virtual</a></li>
+          <li><a href="#correo">Tickets por correo</a></li>
+          <li><a href="#faq">Preguntas frecuentes</a></li>
+        </ol>
+      </nav>
 
-      <h2>Funcionalidades principales</h2>
-      <ul>
-        <li><strong>Creación de tickets</strong>: Altas de nuevos tickets con título, descripción, categoría y prioridad</li>
-        <li><strong>Gestión de estados</strong>: Flujo de estados <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
-        <li><strong>Asignación de tickets</strong>: Asignación a usuarios con roles <code>Administrador</code>, <code>Supervisor</code>, <code>Técnico</code> y <code>Solicitante</code></li>
-        <li><strong>Comentarios</strong>: Cada comentario queda firmado con el nombre del usuario que lo escribió</li>
-        <li><strong>Búsqueda y filtros</strong>: Búsqueda por título/descripción y filtros por categoría, prioridad y estado</li>
-      </ul>
+      <details class="ayuda-tema" id="crear" open>
+        <summary>Crear un ticket</summary>
+        <div class="ayuda-cuerpo">
+          <h3>¿Qué es Ticketera?</h3>
+          <p>Ticketera es un sistema de gestión de tickets de soporte diseñado para equipos pequeños y medianos. Permite crear, organizar y dar seguimiento a los tickets de soporte desde la creación hasta el cierre.</p>
 
-      <h2>Flujos principales</h2>
-      <ol>
-        <li><strong>Crear un ticket</strong>: Desde el formulario en <code>index.html</code> o <code>crear.html</code></li>
-        <li><strong>Asignar un ticket</strong>: Asignar a un usuario mediante la sección de usuarios</li>
-        <li><strong>Comentar un ticket</strong>: Agregar comentarios, que quedan firmados con su nombre</li>
-        <li><strong>Cambiar estado</strong>: Flujos <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
-      </ol>
+          <h3>Funcionalidades principales</h3>
+          <ul>
+            <li><strong>Creación de tickets</strong>: Altas de nuevos tickets con título, descripción, categoría y prioridad</li>
+            <li><strong>Gestión de estados</strong>: Flujo de estados <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
+            <li><strong>Asignación de tickets</strong>: Asignación a usuarios con roles <code>Administrador</code>, <code>Supervisor</code>, <code>Técnico</code> y <code>Solicitante</code></li>
+            <li><strong>Comentarios</strong>: Cada comentario queda firmado con el nombre del usuario que lo escribió</li>
+            <li><strong>Búsqueda y filtros</strong>: Búsqueda por título/descripción y filtros por categoría, prioridad y estado</li>
+          </ul>
 
-      <h2>Roles del sistema</h2>
-      <p>El sistema cuenta con 4 roles de usuario:</p>
-      <ul>
-        <li><strong>Administrador</strong>: Tiene permisos completos</li>
-        <li><strong>Supervisor</strong>: Supervisa el trabajo del equipo</li>
-        <li><strong>Técnico</strong>: Atiende los tickets (recibe las asignaciones automáticas)</li>
-        <li><strong>Solicitante</strong>: Quien crea el ticket</li>
-      </ul>
+          <h3>Flujos principales</h3>
+          <ol>
+            <li><strong>Crear un ticket</strong>: Desde el formulario en <code>index.html</code> o <code>crear.html</code></li>
+            <li><strong>Asignar un ticket</strong>: Asignar a un usuario mediante la sección de usuarios</li>
+            <li><strong>Comentar un ticket</strong>: Agregar comentarios, que quedan firmados con su nombre</li>
+            <li><strong>Cambiar estado</strong>: Flujos <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
+          </ol>
+        </div>
+      </details>
 
-      <h2>Cómo leer el historial</h2>
-      <p>Cada fila del historial es una acción hecha sobre un ticket: cuándo pasó, quién la hizo, qué hizo y el detalle del cambio (valor anterior → valor nuevo).</p>
-      <div class="tabla-scroll">
-        <table class="listado">
-          <thead>
-            <tr><th>Acción</th><th>Cuándo aparece</th><th>Ejemplo de detalle</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Creó el ticket</td><td>Alguien registra un ticket nuevo. Si se asignó solo a un Técnico, se indica a quién.</td><td>Asignado automáticamente a José Solano</td></tr>
-            <tr><td>Editó el ticket</td><td>Se cambia el título, la descripción, la categoría o la prioridad (una fila por cada dato).</td><td>Prioridad: «Media» → «Alta»</td></tr>
-            <tr><td>Asignó el ticket</td><td>Se cambia la persona responsable.</td><td>José Solano → Carlos Rojas</td></tr>
-            <tr><td>Quitó la asignación</td><td>El ticket queda sin responsable.</td><td>Carlos Rojas → Sin asignar</td></tr>
-            <tr><td>Cambió el estado</td><td>El ticket avanza en el flujo.</td><td>Nuevo → En proceso</td></tr>
-            <tr><td>Comentó</td><td>Alguien agrega un comentario.</td><td>«Ya revisé el cable de red»</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>«Sistema» en la columna Quién indica registros antiguos, guardados antes de que el sistema identificara a cada usuario.</p>
+      <details class="ayuda-tema" id="seguimiento">
+        <summary>Seguimiento</summary>
+        <div class="ayuda-cuerpo">
+          <h3>Estados de los tickets</h3>
+          <p>Los tickets siguen un flujo lineal:</p>
+          <ul>
+            <li><code>Nuevo</code>: Ticket recién creado</li>
+            <li><code>En proceso</code>: Están trabajando en él</li>
+            <li><code>Resuelto</code>: Se ha dado solución</li>
+            <li><code>Cerrado</code>: Ticket cerrado definitivamente</li>
+          </ul>
 
-      <h2>Permisos por rol</h2>
-      <div class="tabla-scroll">
-        <table class="listado">
-          <thead>
-            <tr>
-              <th>Acción</th>
-              <th>Administrador</th>
-              <th>Supervisor</th>
-              <th>Técnico</th>
-              <th>Solicitante</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Solo los suyos</td></tr>
-            <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
-            <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>Sí</td><td>En los suyos</td></tr>
-            <tr><td>Editar ticket</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-            <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
-            <tr><td>Asignar ticket</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-            <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
-            <tr><td>Métricas</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-            <tr><td>Explicar con IA</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
-            <tr><td>Eliminar ticket</td><td>Sí</td><td>No</td><td>No</td><td>No</td></tr>
-            <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td><td>No</td></tr>
-          </tbody>
-        </table>
-      </div>
+          <h3>Cómo leer el historial</h3>
+          <p>Cada fila del historial es una acción hecha sobre un ticket: cuándo pasó, quién la hizo, qué hizo y el detalle del cambio (valor anterior → valor nuevo).</p>
+          <div class="tabla-scroll">
+            <table class="listado">
+              <thead>
+                <tr><th>Acción</th><th>Cuándo aparece</th><th>Ejemplo de detalle</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Creó el ticket</td><td>Alguien registra un ticket nuevo. Si se asignó solo a un Técnico, se indica a quién.</td><td>Asignado automáticamente a José Solano</td></tr>
+                <tr><td>Editó el ticket</td><td>Se cambia el título, la descripción, la categoría o la prioridad (una fila por cada dato).</td><td>Prioridad: «Media» → «Alta»</td></tr>
+                <tr><td>Asignó el ticket</td><td>Se cambia la persona responsable.</td><td>José Solano → Carlos Rojas</td></tr>
+                <tr><td>Quitó la asignación</td><td>El ticket queda sin responsable.</td><td>Carlos Rojas → Sin asignar</td></tr>
+                <tr><td>Cambió el estado</td><td>El ticket avanza en el flujo.</td><td>Nuevo → En proceso</td></tr>
+                <tr><td>Comentó</td><td>Alguien agrega un comentario.</td><td>«Ya revisé el cable de red»</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>«Sistema» en la columna Quién indica registros antiguos, guardados antes de que el sistema identificara a cada usuario.</p>
+        </div>
+      </details>
 
-      <h2>Estados de los tickets</h2>
-      <p>Los tickets siguen un flujo lineal:</p>
-      <ul>
-        <li><code>Nuevo</code>: Ticket recién creado</li>
-        <li><code>En proceso</code>: Están trabajando en él</li>
-        <li><code>Resuelto</code>: Se ha dado solución</li>
-        <li><code>Cerrado</code>: Ticket cerrado definitivamente</li>
-      </ul>
+      <details class="ayuda-tema" id="roles">
+        <summary>Roles y permisos</summary>
+        <div class="ayuda-cuerpo">
+          <h3>Roles del sistema</h3>
+          <p>El sistema cuenta con 4 roles de usuario:</p>
+          <ul>
+            <li><strong>Administrador</strong>: Tiene permisos completos</li>
+            <li><strong>Supervisor</strong>: Supervisa el trabajo del equipo</li>
+            <li><strong>Técnico</strong>: Atiende los tickets (recibe las asignaciones automáticas)</li>
+            <li><strong>Solicitante</strong>: Quien crea el ticket</li>
+          </ul>
+
+          <h3>Permisos por rol</h3>
+          <div class="tabla-scroll">
+            <table class="listado">
+              <thead>
+                <tr>
+                  <th>Acción</th>
+                  <th>Administrador</th>
+                  <th>Supervisor</th>
+                  <th>Técnico</th>
+                  <th>Solicitante</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Solo los suyos</td></tr>
+                <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+                <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>Sí</td><td>En los suyos</td></tr>
+                <tr><td>Editar ticket</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
+                <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+                <tr><td>Asignar ticket</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
+                <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+                <tr><td>Métricas</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
+                <tr><td>Explicar con IA</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+                <tr><td>Eliminar ticket</td><td>Sí</td><td>No</td><td>No</td><td>No</td></tr>
+                <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td><td>No</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <details class="ayuda-tema" id="asistente">
+        <summary>Asistente virtual</summary>
+        <div class="ayuda-cuerpo">
+          <p>El botón del asistente está abajo a la derecha en todas las pantallas. Responde preguntas sobre la ticketera y sobre los tickets que su rol puede ver: por ejemplo, cuántos tickets hay pendientes o en qué estado está uno.</p>
+          <ul>
+            <li>Solo usa la información que su rol ya ve en la aplicación: el Solicitante recibe respuestas solo sobre sus propios tickets.</li>
+            <li>El Técnico, el Supervisor y el Administrador pueden pedirle que explique un ticket indicando su número (por ejemplo, «Explique el ticket #1»).</li>
+            <li>La conversación se borra al cerrar la pestaña o la sesión, o con el botón «Nueva conversación».</li>
+            <li>Las respuestas automáticas pueden contener errores: verifique la información importante en el detalle del ticket.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="ayuda-tema" id="correo">
+        <summary>Tickets por correo</summary>
+        <div class="ayuda-cuerpo">
+          <p>Si el buzón de soporte está activo, la ticketera revisa los correos nuevos y crea un ticket con cada correo que pide ayuda.</p>
+          <ul>
+            <li>El correo tiene que enviarse desde la misma dirección con la que el usuario está registrado en la ticketera.</li>
+            <li>El asunto se usa como título y el texto como descripción. La respuesta automática indica el número del ticket y el enlace para consultarlo.</li>
+            <li>Si se responde al correo de un ticket («Ticket #N»), la respuesta se agrega como comentario de ese ticket.</li>
+            <li>Si quien escribe no tiene cuenta, no se crea el ticket: recibe un correo que le indica cómo registrarse. Si su cuenta está desactivada, se le pide que se comunique con un administrador.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="ayuda-tema" id="faq">
+        <summary>Preguntas frecuentes</summary>
+        <div class="ayuda-cuerpo">
+          <dl class="ayuda-preguntas">
+            <dt>¿Por qué no veo algunas opciones del menú, como Métricas o Usuarios?</dt>
+            <dd>Cada rol ve solo las pantallas que puede usar. Consulte la tabla de «Permisos por rol» en «Roles y permisos».</dd>
+            <dt>¿Puedo cambiar mi contraseña?</dt>
+            <dd>Sí, desde «Mi cuenta», en el menú del usuario o en el menú lateral.</dd>
+            <dt>¿Se puede eliminar un ticket?</dt>
+            <dd>Solo el Administrador puede eliminarlo, y la acción no se puede deshacer.</dd>
+            <dt>¿Cómo sé quién atiende mi ticket?</dt>
+            <dd>En el listado, la columna «Atendido por» (o «Asignado a») muestra la persona responsable; en el detalle aparece en «Asignado a».</dd>
+            <dt>¿Cómo imprimo un ticket?</dt>
+            <dd>En el detalle del ticket, use el botón «Imprimir»: la hoja sale sin menú ni botones.</dd>
+          </dl>
+        </div>
+      </details>
     </section>
     </main>
 
