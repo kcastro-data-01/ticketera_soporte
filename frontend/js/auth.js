@@ -118,17 +118,10 @@ function requirePermiso(permiso) {
   return true;
 }
 
-/* Muestra en el menú lateral el nombre, el rol y las iniciales del
-   usuario de la sesión y conecta el botón «Cerrar sesión». */
+/* Conecta el botón «Cerrar sesión» de abajo del menú lateral. El nombre,
+   el rol y las iniciales se muestran arriba (crearMenuUsuario). */
 function pintarUsuario(doc = document) {
   if (!doc || typeof doc.getElementById !== "function") return;
-  const user = getUser();
-  const nombre = doc.getElementById("usuario-nombre");
-  const rol = doc.getElementById("usuario-rol");
-  const iniciales = doc.getElementById("usuario-iniciales");
-  if (user && nombre) nombre.textContent = user.name || user.email || "";
-  if (user && rol) rol.textContent = user.role || "";
-  if (user && iniciales) iniciales.textContent = inicialesDe(user.name || user.email || "?");
   const salir = doc.getElementById("btn-logout");
   if (salir && typeof salir.addEventListener === "function") {
     salir.addEventListener("click", logout);
@@ -236,8 +229,8 @@ function confirmarAccion({ titulo, mensaje, aceptar = "Aceptar", cancelar = "Can
 }
 
 /* Usuario en la barra superior: iniciales, nombre y rol; al pulsarlo se
-   abre un menú con «Mi cuenta» y «Cerrar sesión». Solo en las páginas
-   con menú lateral (no en el login). */
+   abre un menú con «Mi cuenta». «Cerrar sesión» está abajo del menú
+   lateral. Solo en las páginas con menú lateral (no en el login). */
 const ICONO_FLECHA_ABAJO =
   '<svg class="menu-usuario-flecha" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 
@@ -273,11 +266,7 @@ function crearMenuUsuario(doc = document) {
   const cuenta = nodo("a", "menu-usuario-opcion", "Mi cuenta");
   cuenta.href = "cuenta.html";
   cuenta.setAttribute("role", "menuitem");
-  const salir = nodo("button", "menu-usuario-opcion salir", "Cerrar sesión");
-  salir.type = "button";
-  salir.setAttribute("role", "menuitem");
-  salir.addEventListener("click", logout);
-  lista.append(cuenta, salir);
+  lista.append(cuenta);
   menu.append(boton, lista);
 
   const alternar = (abrir) => {

@@ -1554,8 +1554,7 @@ body.app {
   }
 
   body.menu-plegado .marca-texto,
-  body.menu-plegado .menu-enlace span,
-  body.menu-plegado .usuario-datos {
+  body.menu-plegado .menu-enlace span {
     display: none;
   }
 
@@ -1571,16 +1570,14 @@ body.app {
     padding-right: 0;
   }
 
-  body.menu-plegado .barra-usuario {
-    flex-direction: column;
+  body.menu-plegado .barra-salir {
     padding-left: 0;
     padding-right: 0;
   }
 }
 
 .menu-enlace:focus-visible,
-.marca:focus-visible,
-.boton-salir:focus-visible {
+.marca:focus-visible {
   outline: 2px solid var(--color-texto-inverso);
   outline-offset: 2px;
 }
@@ -1596,14 +1593,31 @@ body.app {
   stroke-linejoin: round;
 }
 
-.barra-usuario {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.9rem 0.4rem 0;
+/* «Cerrar sesión» abajo del menú lateral: mismo aspecto que los enlaces
+   del menú (es un .menu-enlace); plegado, solo el ícono. */
+.barra-salir {
+  padding-top: 0.6rem;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+.boton-cerrar-sesion {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.boton-cerrar-sesion:hover,
+.boton-cerrar-sesion:active {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-texto-inverso);
+}
+
+/* Iniciales: también las usa el menú de usuario de la barra superior. */
 .usuario-avatar {
   display: grid;
   place-items: center;
@@ -1614,42 +1628,6 @@ body.app {
   background: var(--color-marca);
   font-size: 0.8rem;
   font-weight: 600;
-}
-
-.usuario-datos {
-  flex: 1;
-  min-width: 0;
-}
-
-.usuario-nombre {
-  display: block;
-  overflow: hidden;
-  font-size: 0.85rem;
-  font-weight: 600;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.usuario-rol {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--color-menu-tenue);
-}
-
-.boton-salir {
-  display: grid;
-  place-items: center;
-  padding: 0.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radio-suave);
-  background: transparent;
-  color: var(--color-menu-texto);
-  cursor: pointer;
-}
-
-.boton-salir:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--color-texto-inverso);
 }
 
 .app-principal {
@@ -2008,12 +1986,19 @@ body.app {
     height: 36px;
   }
 
-  .barra-usuario {
+  /* Arriba, junto a la marca: solo el ícono (el nombre queda en aria-label). */
+  .barra-salir {
     padding: 0;
     border: 0;
   }
 
-  .usuario-datos {
+  .boton-cerrar-sesion {
+    width: auto;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+  }
+
+  .boton-cerrar-sesion span {
     display: none;
   }
 
@@ -3200,11 +3185,6 @@ td.con-avatar {
 }
 
 /* ===== Usuario en la barra superior ===== */
-/* Con el menú arriba, el bloque de usuario del menú lateral sobra. */
-body:has(.menu-usuario) .barra-usuario {
-  display: none;
-}
-
 .menu-usuario {
   position: relative;
 }
@@ -3295,15 +3275,6 @@ body:has(.menu-usuario) .barra-usuario {
   background: var(--color-fondo-neutro);
 }
 
-.menu-usuario-opcion.salir {
-  border-top: 1px solid var(--color-borde);
-  border-radius: 0 0 4px 4px;
-  color: var(--color-error);
-}
-
-.menu-usuario-opcion.salir:hover {
-  background: var(--color-error-fondo);
-}
 
 /* En el celular solo el círculo con las iniciales. */
 @media (max-width: 600px) {
@@ -3898,7 +3869,7 @@ summary:focus-visible,
   .enlace-boton,
   .btn-accion,
   .boton-tema,
-  .boton-salir,
+  .boton-cerrar-sesion,
   .chat-icono,
   .chat-enviar,
   .menu-usuario-boton,
