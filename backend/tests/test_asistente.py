@@ -308,7 +308,8 @@ def test_qwen_receives_fewer_tickets(session):
             return "ok"
 
     grabador = Grabador()
-    responder(grabador, session, admin, [{"role": "user", "content": "hola"}])
+    # Una pregunta abierta (un saludo lo responde el servidor sin IA).
+    responder(grabador, session, admin, [{"role": "user", "content": "resume la situación"}])
     total = QWEN_MAX_TICKETS + 5
     assert (
         f"Tickets en estado Nuevo ({total}, se muestran los {QWEN_MAX_TICKETS} más recientes):"

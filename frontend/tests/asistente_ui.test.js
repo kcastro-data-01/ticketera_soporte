@@ -137,32 +137,30 @@ test("un error o una respuesta vacía no se reemplaza por un texto inventado", a
   assert.doesNotMatch(mostrado, /No tengo una respuesta/);
 });
 
-test("«Generada con IA» solo cuando respondió el modelo, no en las respuestas del servidor", async () => {
-  const ia = crearChat({ fetchImpl: async () => ndjson([{ t: "En este ticket, Laura reporta…" }, { fin: true, fuente: "ia" }]) });
-  await ia.sandbox.enviarPregunta("explicar tickete #3");
-  assert.match(texto(ia.ids["chat-lista"]), /Generada con IA/);
-
-  const plantilla = crearChat({
-    fetchImpl: async () => ndjson([{ t: "El ticket #3 «Impresora» está en estado Nuevo." }, { fin: true, fuente: "directa" }]),
-  });
-  await plantilla.sandbox.enviarPregunta("¿en qué estado está el #3?");
-  const mostrado = texto(plantilla.ids["chat-lista"]);
-  assert.match(mostrado, /Respuesta del sistema/);
-  assert.doesNotMatch(mostrado, /Generada con IA/);
-
-  const error = crearChat({ fetchImpl: async () => ndjson([{ error: "La IA no está disponible en este momento" }]) });
-  await error.sandbox.enviarPregunta("explicar ticket #3");
-  assert.doesNotMatch(texto(error.ids["chat-lista"]), /Generada con IA/);
+test("no se muestra la fuente debajo de los mensajes, pero se guarda", async () => {
+  for (const fuente of ["ia", "directa", "ia_datos"]) {
+    const guardado = [];
+    const chat = crearChat({ fetchImpl: async () => ndjson([{ t: "Hay 2 tickets en proceso." }, { fin: true, fuente }]) });
+    chat.sandbox.sessionStorage.setItem = (k, v) => guardado.push(JSON.parse(v));
+    await chat.sandbox.enviarPregunta("¿cuántos tickets en proceso hay?");
+    const mostrado = texto(chat.ids["chat-lista"]);
+    assert.doesNotMatch(mostrado, /Generada con IA|Respuesta del sistema/, fuente);
+    assert.equal(guardado.at(-1).at(-1).fuente, fuente, "la fuente queda en el historial");
+  }
 });
 
-test("«Generada con IA (datos del sistema)» cuando la IA redactó los datos del servidor", async () => {
+test("un «reemplazo» del servidor cambia lo que se estaba mostrando", async () => {
   const chat = crearChat({
-    fetchImpl: async () => ndjson([{ t: "Hay 2 tickets en proceso: el #4 y el #7." }, { fin: true, fuente: "ia_datos" }]),
+    fetchImpl: async () => ndjson([
+      { t: "Hola. No tienes datos " },
+      { reemplazo: "¿En qué te puedo ayudar? Podés preguntarme por tus tickets." },
+      { fin: true, fuente: "directa" },
+    ]),
   });
-  await chat.sandbox.enviarPregunta("¿cuántos tickets en proceso hay?");
+  await chat.sandbox.enviarPregunta("hola");
   const mostrado = texto(chat.ids["chat-lista"]);
-  assert.match(mostrado, /Generada con IA \(datos del sistema\)/);
-  assert.doesNotMatch(mostrado, /Respuesta del sistema/);
+  assert.match(mostrado, /¿En qué te puedo ayudar\?/);
+  assert.doesNotMatch(mostrado, /No tienes datos/);
 });
 
 /* Abrir y cerrar el panel (solo lo visual: clases y animación). */

@@ -606,6 +606,11 @@ Para que un modelo pequeño responda bien y rápido:
   `wsl --shutdown`.
 - A la IA, cada persona le llega con su rol: «asignado a Laura Méndez
   (Administrador)».
+- Los saludos y agradecimientos («hola», «buenas tardes», «gracias», «ok») los
+  responde el servidor, sin IA.
+- Lo que escribe la IA nunca muestra nada interno: se quitan las etiquetas
+  (`<datos_visibles>`…) y, si la respuesta hablaba de ellas, del prompt o de sus
+  instrucciones, se usa la respuesta del sistema.
 - Los nombres se reconocen aunque estén mal escritos («jsoe solano» = José
   Solano, «crlos» = Carlos): cada palabra se compara con nombres y apellidos
   (hasta 1 error en nombres de hasta 5 letras y 2 en los más largos; dos letras
@@ -687,10 +692,11 @@ Cómo se adapta a un modelo muy chico (`qwen3:0.6b`):
 **Desde el chat**: si el equipo escribe «explicame el ticket #3», «de qué
 trata este ticket», «resumí el #3» o «no entiendo el ticket #3» (también con
 «tickete», «tiket», «tikete» o sin tildes), el chat usa esta misma explicación
-y responde con el texto narrado y las preguntas sugeridas, con la nota
-«Generada con IA». Solo para tickets que la persona puede ver; el Solicitante
-sigue con el chat normal. Las respuestas que arma el servidor llevan «Respuesta
-del sistema», nunca «Generada con IA».
+y responde con el texto narrado y las preguntas sugeridas. Solo para tickets
+que la persona puede ver; el Solicitante sigue con el chat normal. El chat no
+muestra la fuente debajo de cada mensaje (el campo `fuente` sigue llegando del
+servidor y queda en el log); abajo está el aviso general «Las respuestas
+generadas con IA pueden contener errores».
 
 API: `GET /api/tickets/{id}/explicacion` (la guardada, sin IA) y
 `POST /api/tickets/{id}/explicacion[?regenerar=true]`.

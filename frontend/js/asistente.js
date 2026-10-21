@@ -124,12 +124,6 @@ function filaAsistente() {
   return { fila, contenido };
 }
 
-const NOTA_FUENTE = {
-  directa: "Respuesta del sistema",
-  ia_datos: "Generada con IA (datos del sistema)",
-  ia: "Generada con IA",
-};
-
 function burbuja(mensaje) {
   if (mensaje.role === "user") {
     const fila = crearElemento("div", "chat-fila usuario");
@@ -140,10 +134,9 @@ function burbuja(mensaje) {
   const el = crearElemento("div", `chat-mensaje asistente${mensaje.error ? " error" : ""}`);
   if (mensaje.error) el.textContent = mensaje.content;
   else pintarTexto(el, mensaje.content);
+  /* La fuente (sistema o IA) se guarda pero no se muestra: abajo queda el
+     aviso general «Las respuestas generadas con IA pueden contener errores». */
   contenido.appendChild(el);
-  if (!mensaje.error && NOTA_FUENTE[mensaje.fuente]) {
-    contenido.appendChild(crearElemento("span", "chat-nota", NOTA_FUENTE[mensaje.fuente]));
-  }
   return fila;
 }
 
@@ -256,6 +249,10 @@ async function enviarPregunta(texto) {
             acumulado += evento.t;
             pintarTexto(escribiendo, acumulado);
             lista.scrollTop = lista.scrollHeight;
+          } else if (typeof evento.reemplazo === "string") {
+            /* La respuesta de la IA no servía: se cambia por la del sistema. */
+            acumulado = evento.reemplazo;
+            pintarTexto(escribiendo, acumulado);
           } else if (evento.error) {
             error = evento.error;
           } else if (evento.fin) {
