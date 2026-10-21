@@ -118,8 +118,21 @@ async function createTicket() {
   }
 }
 
+/* Los botones de prioridad guardan su valor en #priority (el que se envía). */
+function iniciarPrioridad() {
+  if (typeof document.querySelectorAll !== "function") return;
+  const elements = getElements();
+  document.querySelectorAll('input[name="opcion-prioridad"]').forEach((opcion) => {
+    if (opcion.checked) elements.priority.value = opcion.value;
+    opcion.addEventListener("change", () => {
+      if (opcion.checked) elements.priority.value = opcion.value;
+    });
+  });
+}
+
 function init() {
   const elements = getElements();
+  iniciarPrioridad();
 
   elements.form.addEventListener("submit", (event) => {
     event.preventDefault();

@@ -48,7 +48,7 @@
     </header>
 
     <main class="contenido">
-      <form id="form-crear" class="filtros formulario" novalidate>
+      <form id="form-crear" class="filtros formulario formulario-crear" novalidate>
         <label class="campo">
           <span>Título *</span>
           <input
@@ -58,9 +58,11 @@
             required
             maxlength="200"
             placeholder="Resumen breve del ticket"
+            aria-describedby="ayuda-titulo"
           >
+          <small id="ayuda-titulo" class="ayuda-campo">Un resumen corto, por ejemplo: «La impresora del 2.º piso no imprime».</small>
         </label>
-  
+
         <label class="campo">
           <span>Descripción *</span>
           <textarea
@@ -68,29 +70,37 @@
             name="description"
             required
             placeholder="Detalle del problema o de la solicitud"
+            aria-describedby="ayuda-descripcion"
           ></textarea>
+          <small id="ayuda-descripcion" class="ayuda-campo">Contá qué pasa, desde cuándo, qué mensaje aparece y qué ya intentaste.</small>
         </label>
-  
-        <label class="campo">
-          <span>Categoría</span>
-          <select id="category" name="category">
-            <option value="Hardware">Hardware</option>
-            <option value="Software">Software</option>
-            <option value="Red">Red</option>
-            <option value="Accesos">Accesos</option>
-          </select>
-        </label>
-  
-        <label class="campo">
-          <span>Prioridad</span>
-          <select id="priority" name="priority">
-            <option value="Baja">Baja</option>
-            <option value="Media">Media</option>
-            <option value="Alta">Alta</option>
-            <option value="Crítica">Crítica</option>
-          </select>
-        </label>
-  
+
+        <div class="campos-fila">
+          <label class="campo">
+            <span>Categoría</span>
+            <select id="category" name="category" aria-describedby="ayuda-categoria">
+              <option value="Hardware">Hardware</option>
+              <option value="Software">Software</option>
+              <option value="Red">Red</option>
+              <option value="Accesos">Accesos</option>
+            </select>
+            <small id="ayuda-categoria" class="ayuda-campo">Hardware: equipos · Software: programas · Red: internet y VPN · Accesos: usuarios y contraseñas.</small>
+          </label>
+
+          <!-- Prioridad como botones de colores; el valor va en #priority. -->
+          <fieldset class="campo campo-prioridad" aria-describedby="ayuda-prioridad">
+            <legend>Prioridad</legend>
+            <div class="opciones-prioridad">
+              <label class="opcion-prioridad prioridad-baja"><input type="radio" name="opcion-prioridad" value="Baja"><span>Baja</span></label>
+              <label class="opcion-prioridad prioridad-media"><input type="radio" name="opcion-prioridad" value="Media" checked><span>Media</span></label>
+              <label class="opcion-prioridad prioridad-alta"><input type="radio" name="opcion-prioridad" value="Alta"><span>Alta</span></label>
+              <label class="opcion-prioridad prioridad-critica"><input type="radio" name="opcion-prioridad" value="Crítica"><span>Crítica</span></label>
+            </div>
+            <input type="hidden" id="priority" name="priority" value="Media">
+            <small id="ayuda-prioridad" class="ayuda-campo">Crítica solo si nadie puede trabajar o el servicio está caído.</small>
+          </fieldset>
+        </div>
+
         <div class="acciones">
           <button type="submit" id="guardar">Crear ticket</button>
         </div>
