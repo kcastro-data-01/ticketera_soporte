@@ -150,6 +150,14 @@ function assignedText(ticket) {
   return name || `Usuario #${ticket.assigned_to_id}`;
 }
 
+/* Ícono de línea de cada categoría (lo dibuja el CSS). */
+const CATEGORIAS_ICONO = { Hardware: "hardware", Software: "software", Red: "red", Accesos: "accesos" };
+
+function claseCategoria(categoria) {
+  const clave = CATEGORIAS_ICONO[categoria];
+  return clave ? `celda-categoria cat-${clave}` : "celda-categoria";
+}
+
 function appendCell(row, text, className) {
   const cell = document.createElement("td");
   if (className) cell.className = className;
@@ -193,7 +201,7 @@ function renderTickets(tickets) {
     appendIdCell(row, ticket.id);
     appendCell(row, ticket.title);
     if (!vistaSolicitante) {
-      appendCell(row, ticket.category);
+      appendCell(row, ticket.category, claseCategoria(ticket.category));
       appendBadgeCell(row, ticket.priority);
     }
     appendBadgeCell(row, ticket.state);

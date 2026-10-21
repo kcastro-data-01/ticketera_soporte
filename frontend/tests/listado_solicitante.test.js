@@ -155,3 +155,12 @@ test("index.html marca como «equipo» Nuevos, En proceso, Críticos, Categoría
   assert.doesNotMatch(indexHtml, /data-estado="Nuevo,En proceso"[^>]*data-vista="equipo"/, "Pendientes/Abiertas queda");
   assert.doesNotMatch(indexHtml, /data-estado="Resuelto,Cerrado"[^>]*data-vista="equipo"/, "Resueltos/Resueltas queda");
 });
+
+test("la categoría lleva su ícono (clase por categoría)", async () => {
+  const { filas } = await montar("Técnico");
+  assert.equal(filas[0].children[2].className, "celda-categoria cat-red");
+  assert.equal(filas[1].children[2].className, "celda-categoria cat-hardware");
+  assert.equal(String(filas[0].children[2].textContent), "Red", "el texto se mantiene");
+  const css = leer("css/estilos.css");
+  for (const cat of ["hardware", "software", "red", "accesos"]) assert.match(css, new RegExp(`\\.cat-${cat} \\{ --icono-categoria`));
+});
