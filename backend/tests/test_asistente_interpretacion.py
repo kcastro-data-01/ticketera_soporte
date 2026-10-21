@@ -187,7 +187,9 @@ def test_goes_to_the_free_ai(client, ia, tickets, interpretacion):
 def test_requester_cannot_name_anyone(client, session, ia, tickets):
     headers = login_as(client, session, "Solicitante", "sol@soli.local", "Andrea Castillo")
     ia.json = _json(persona="carlos")
-    _respuesta(ask(client, headers, "tikets de carlos"), "ia")
+    # Carlos no atiende sus tickets: no se confirma ni se cuenta, y no va a la IA libre.
+    respuesta = _respuesta(ask(client, headers, "tikets de carlos"), "directa")
+    assert respuesta == "No encontré a esa persona. ¿Podés escribir su nombre completo?"
 
 
 @pytest.mark.parametrize(

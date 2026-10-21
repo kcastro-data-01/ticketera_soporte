@@ -653,9 +653,12 @@ def test_count_by_person_with_two_matches_asks_which(client, session, fake_claud
     assert completo == "Carlos Mora (Supervisor) no tiene tickets sin resolver asignados."
 
 
-def test_count_by_unknown_person_goes_to_the_ai(client, session, fake_claude, equipo):
+def test_count_by_unknown_person_is_not_sent_to_the_ai(client, session, fake_claude, equipo):
+    # La IA libre podría contar los tickets de otra persona: el sistema avisa.
     datos = ask(client, equipo.headers, "cuantos tickets tiene Fernanda").json()
-    assert datos["fuente"] == "ia"
+    assert datos == {"respuesta": "No encontré a esa persona. ¿Podés escribir su nombre completo?",
+                     "fuente": "directa"}
+    assert fake_claude.calls == []
 
 
 def test_unassigned_count_tolerates_typos(client, session, fake_claude, equipo):
@@ -681,7 +684,8 @@ def test_requester_counts_only_own_tickets(client, session, fake_claude, equipo)
 
     # Laura no atiende ninguno de sus tickets: no se confirma ni se cuenta.
     laura = ask(client, headers, "cuantos tickets tiene Laura").json()
-    assert "Impresora" not in laura["respuesta"] and laura["fuente"] == "ia"
+    assert laura["respuesta"] == "No encontré a esa persona. ¿Podés escribir su nombre completo?"
+    assert "Impresora" not in laura["respuesta"]
 
     admins = ask(client, headers, "cuantos tickets tienen los administradores").json()["respuesta"]
     assert admins == ("No hay tickets tuyos sin resolver asignados a administradores. "

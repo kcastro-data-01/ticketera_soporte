@@ -606,6 +606,17 @@ Para que un modelo pequeño responda bien y rápido:
   `wsl --shutdown`.
 - A la IA, cada persona le llega con su rol: «asignado a Laura Méndez
   (Administrador)».
+- Los nombres se reconocen aunque estén mal escritos («jsoe solano» = José
+  Solano, «crlos» = Carlos): cada palabra se compara con nombres y apellidos
+  (hasta 1 error en nombres de hasta 5 letras y 2 en los más largos; dos letras
+  intercambiadas cuentan como uno). Si coinciden nombre y apellido es esa
+  persona; si hay empate gana quien coincide mejor y, para contar tickets,
+  quien puede tenerlos asignados antes que un Solicitante.
+- Seguimientos: «y José?», «y los técnicos?», «y ayer?» repiten la consulta
+  anterior del chat cambiando solo la persona, el rol o el período.
+- Si la pregunta nombra a alguien que no existe (o que el rol no puede ver),
+  responde «No encontré a esa persona. ¿Podés escribir su nombre completo?»: los
+  conteos por persona nunca los da la IA libre.
 - Las preguntas sobre el **contenido** de un ticket («¿cómo resuelvo el #5?»,
   «¿qué hago con este ticket?») van siempre a la IA, que
   recibe el título, la descripción (hasta 1500 caracteres), la categoría, la

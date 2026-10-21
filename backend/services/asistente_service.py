@@ -737,10 +737,71 @@ def _palabras_nombre(nombre: str) -> list[str]:
     return [p for p in _normalizar(nombre).split() if len(p) >= 3]
 
 
-def _personas_nombradas(session, user: User, t: str) -> list[User]:
-    """Personas que nombra la pregunta: primero por nombre completo y, si no,
-    por nombre o apellido. El Solicitante solo puede nombrar a quienes
-    atienden alguno de sus tickets."""
+NO_ENCONTRE_PERSONA = "No encontré a esa persona. ¿Podés escribir su nombre completo?"
+ROLES_CON_TICKETS = (UserRole.TECHNICIAN.value, UserRole.SUPERVISOR.value, UserRole.ADMIN.value)
+
+# Palabras de las preguntas que nunca son un nombre (sin tildes). Además de
+# estas, tampoco cuentan las formas de «ticket», «cuántos» y «asignado».
+VOCABULARIO_PREGUNTAS = frozenset("""
+    hay tiene tienen tengo tenemos cuantas cual cuales quien quienes que como donde cuando
+    pendiente pendientes nuevo nuevos nueva nuevas proceso resuelto resueltos resuelta
+    resueltas cerrado cerrados cerrada cerradas critico criticos critica criticas abierto
+    abiertos abierta abiertas terminado terminados prioridad alta altas media medias baja
+    bajas categoria categorias hardware software red accesos estado estados hoy ayer semana
+    mes este esta estos estas ese esa ultimo ultimos ultima ultimas dias dia total todos
+    todas sin asignar resolver resolvio resolvieron cerro cerraron creo crearon mis mios mias
+    mio mia nadie nada alguien alguno alguna persona personas usuario usuarios equipo sistema
+    ahora cada uno una unos unas por para con los las del ellos ella ellas lista listar
+    muestra muestrame mostrar dime decime ver carga trabajo tecnico tecnicos supervisor
+    supervisores administrador administradores admin admins solicitante solicitantes rol
+    roles gente favor porfa gracias hola buenas buenos dias tardes noches tambien igual
+    mas menos solo mucho muchos cuanto
+""".split())
+
+
+def _distancia(a: str, b: str) -> int:
+    """Distancia de edición contando como 1 dos letras vecinas intercambiadas
+    («jsoe» → «jose»)."""
+    previa, fila = None, list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        nueva = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            nueva[j] = min(fila[j] + 1, nueva[j - 1] + 1, fila[j - 1] + (ca != cb))
+            if previa is not None and i > 1 and j > 1 and ca == b[j - 2] and a[i - 2] == cb:
+                nueva[j] = min(nueva[j], previa[j - 2] + 1)
+        previa, fila = fila, nueva
+    return fila[-1]
+
+
+def _parecido(palabra: str, parte: str) -> int | None:
+    """Errores entre una palabra de la pregunta y un nombre o apellido, o
+    ``None`` si no se parecen: hasta 1 error en nombres de hasta 5 letras y
+    hasta 2 en los más largos, con la primera letra igual."""
+    if palabra == parte:
+        return 0
+    if palabra[:1] != parte[:1]:
+        return None
+    errores = _distancia(palabra, parte)
+    return errores if errores <= (1 if len(parte) <= 5 else 2) else None
+
+
+def _palabras_pregunta(t: str) -> list[str]:
+    """Palabras de la pregunta que podrían ser un nombre."""
+    return [
+        p for p in re.findall(r"[a-z]+", t)
+        if len(p) >= 3 and p not in VOCABULARIO_PREGUNTAS
+        and not re.fullmatch(rf"{_TICKET}|{_CUANTOS}|{_ASIGNADO}|{_HAY}", p)
+    ]
+
+
+def _personas_nombradas(session, user: User, t: str, para_conteo: bool = True) -> list[User]:
+    """Personas que nombra la pregunta, aunque esté mal escrita: cada palabra
+    se compara con cada nombre y apellido (:func:`_parecido`). Gana quien
+    coincide en más partes (nombre y apellido = esa persona); si empatan,
+    quien tiene menos errores y, para contar tickets, quien puede tenerlos
+    asignados antes que un Solicitante. Si sigue el empate se devuelven
+    todos (la respuesta pregunta de quién). El Solicitante solo puede
+    nombrar a quienes atienden alguno de sus tickets."""
     if user.role == UserRole.REQUESTER.value:
         candidatos = session.scalars(
             select(User).where(User.id.in_(
@@ -750,25 +811,75 @@ def _personas_nombradas(session, user: User, t: str) -> list[User]:
     else:
         candidatos = session.scalars(select(User)).all()
     roles = {_normalizar(r) for _, r, _ in ROLES_EN_PREGUNTA}
+    palabras = _palabras_pregunta(t)
+    if not palabras:
+        return []
 
-    def aparece(palabra: str) -> bool:
-        return bool(re.search(rf"\b{re.escape(palabra)}\b", t))
+    puntajes = []
+    for candidato in candidatos:
+        coincidencias, errores = 0, 0
+        for parte in _palabras_nombre(candidato.name):
+            if parte in roles:
+                continue
+            mejor = min((e for e in (_parecido(p, parte) for p in palabras) if e is not None),
+                        default=None)
+            if mejor is not None:
+                coincidencias += 1
+                errores += mejor
+        if coincidencias:
+            puntajes.append((candidato, coincidencias, errores))
+    if not puntajes:
+        return []
+    mas = max(c for _, c, _ in puntajes)
+    mejores = [(u, e) for u, c, e in puntajes if c == mas]
+    menos = min(e for _, e in mejores)
+    elegidos = [u for u, e in mejores if e == menos]
+    if para_conteo and len(elegidos) > 1:
+        con_tickets = [u for u in elegidos if u.role in ROLES_CON_TICKETS]
+        if con_tickets:
+            elegidos = con_tickets
+    return sorted(elegidos, key=lambda u: u.id)
 
-    completos = [u for u in candidatos if aparece(_normalizar(u.name))]
-    if completos:
-        return completos
-    return [u for u in candidatos
-            if any(aparece(p) for p in _palabras_nombre(u.name) if p not in roles)]
+
+# «tiene Fernanda», «Fernanda tiene», «de Fernanda», «a Fernanda».
+_NOMBRES_EN_PREGUNTA = (
+    re.compile(r"\btienen? ([a-z]+)"),
+    re.compile(r"\b([a-z]+) (?=tienen?\b)"),
+    re.compile(r"\b(?:de|a) ([a-z]+)\b"),
+)
+
+
+def nombra_persona_desconocida(t: str) -> bool:
+    """¿La pregunta (normalizada) nombra a alguien con «tiene X», «de X» o
+    «a X»? Se usa cuando no se encontró a nadie: nunca se pasa a la IA libre
+    una pregunta por los tickets de una persona."""
+    candidatas = [m.group(1) for patron in _NOMBRES_EN_PREGUNTA for m in patron.finditer(t)]
+    if _palabras_pregunta(" ".join(candidatas)):
+        return True
+    # «Fernanda cuántos tickets tiene»: con «tiene», cualquier palabra que no
+    # sea de las preguntas es un nombre.
+    return bool(re.search(r"\btienen?\b", t) and _palabras_pregunta(t))
+
+
+def _pide_conteo_persona(t: str) -> bool:
+    """«cuántos tickets tiene X», sin la palabra ticket «cuántos tiene X», o
+    «tickets de X» / «tickets asignados a X»."""
+    return (
+        _pide_conteo(t)
+        or bool(re.search(rf"\b{_CUANTOS}\b", t) and re.search(r"\btienen?\b", t))
+        or bool(re.search(rf"\b{_TICKET}(?: {_ASIGNADO})? (?:de|a) [a-z]+", t))
+    )
 
 
 def respuesta_por_persona(session, user: User, t: str) -> Directa | None:
     """«Carlos Solís (Técnico) tiene 2 tickets sin resolver asignados: …»,
-    contando solo lo que ``user`` puede ver. ``None`` si no nombra a nadie."""
-    if not _pide_conteo(t):
+    contando solo lo que ``user`` puede ver. ``None`` si no nombra a nadie;
+    si nombra a alguien que no existe, :data:`NO_ENCONTRE_PERSONA`."""
+    if not _pide_conteo_persona(t):
         return None
     personas = _personas_nombradas(session, user, t)
     if not personas:
-        return None
+        return Directa(NO_ENCONTRE_PERSONA) if nombra_persona_desconocida(t) else None
     return _conteo_persona(session, user, personas)
 
 
@@ -1384,11 +1495,17 @@ def calcular_desde_interpretacion(session, user: User, datos: dict,
             return None
         if rol:
             return _conteo_rol(session, user, rol, ROLES_INTERPRETACION[rol]), None
-        # El nombre tiene que estar en la pregunta (no copiado de un ejemplo).
-        if not all(re.search(rf"\b{re.escape(p)}\b", t) for p in _normalizar(persona).split()):
+        # El nombre tiene que estar en la pregunta, aunque sea con errores
+        # («jsoe» → «jose»), y no copiado de un ejemplo.
+        en_pregunta = re.findall(r"[a-z]+", t)
+        if not all(any(_parecido(q, p) is not None or _parecido(p, q) is not None for q in en_pregunta)
+                   for p in re.findall(r"[a-z]+", _normalizar(persona))):
             return None
         personas = _personas_nombradas(session, user, _normalizar(persona))
-        return (_conteo_persona(session, user, personas), None) if personas else None
+        if not personas:
+            # Nunca a la IA libre: daría el conteo de otra persona.
+            return Directa(NO_ENCONTRE_PERSONA), None
+        return _conteo_persona(session, user, personas), None
     if estado in (None, "todos") and not (re.search(r"\b(total|todos)\b", t) or _solo_pide_el_total(t)):
         # El modelo pudo perder el estado («cuantos tikets nuevos ai»): no
         # se responde el total por error.
@@ -1698,17 +1815,68 @@ def crear_proveedor():
     )
 
 
+# ---------- Preguntas de seguimiento ----------
+# «y José Solano?», «y los técnicos?», «y ayer?»: repiten la consulta anterior
+# del chat cambiando solo lo nuevo (la persona, el rol o el período).
+
+SEGUIMIENTO_MAX_PALABRAS = 6
+_RELLENO_SEGUIMIENTO = frozenset("los las el la de del a al con para que tal sobre en".split())
+
+
+def _es_conteo(t: str) -> bool:
+    """¿La pregunta (normalizada) cuenta o lista tickets?"""
+    return bool(
+        re.search(rf"\b{_CUANTOS}\b", t) or _pide_conteo_persona(t)
+        or detectar_consulta(t) not in (None, "no_entendi")
+    )
+
+
+def _seguimiento(session, user: User, pregunta: str, anterior: str | None) -> str | None:
+    """La pregunta completa que quiso hacer un seguimiento («y ayer?»), armada
+    con ``anterior`` (ya normalizada y resuelta), o ``None`` si no es uno."""
+    if not anterior or not _es_conteo(anterior):
+        return None
+    palabras = re.findall(r"[a-z0-9]+", _normalizar(pregunta))
+    if len(palabras) < 2 or palabras[0] not in ("y", "e") or len(palabras) > SEGUIMIENTO_MAX_PALABRAS:
+        return None
+    resto = " ".join(p for p in palabras[1:] if p not in _RELLENO_SEGUIMIENTO)
+    if not resto:
+        return None
+    rol = next((plural for patron, _, plural in ROLES_EN_PREGUNTA if re.search(patron, resto)), None)
+    if rol is not None:
+        return f"cuantos tickets tienen los {rol}"
+    if _periodo(resto) is not None and not _palabras_pregunta(_quitar_periodo(resto)):
+        return " ".join(f"{_quitar_periodo(anterior)} {resto}".split())
+    if _palabras_pregunta(resto):
+        # Una persona (o un nombre que no existe: la respuesta lo dice).
+        return f"cuantos tickets tiene {resto}"
+    return None
+
+
+def pregunta_efectiva(session, user: User, messages: list[dict]) -> str:
+    """La última pregunta del chat; si es un seguimiento, la consulta completa
+    armada con las anteriores (que también pueden ser seguimientos)."""
+    pregunta = messages[-1]["content"]
+    previas = [i for i, m in enumerate(messages[:-1]) if m["role"] == "user"]
+    if not previas:
+        return pregunta
+    anterior = _normalizar(pregunta_efectiva(session, user, messages[: previas[-1] + 1]))
+    return _seguimiento(session, user, pregunta, anterior) or pregunta
+
+
 def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actual: int | None):
     """``(directa, system, ticket_a_explicar)``: la respuesta directa si la
     hay; si la pregunta pide explicar un ticket visible, ese ticket; si no,
-    el prompt para la IA."""
-    pregunta = messages[-1]["content"]
+    el prompt para la IA. ``pregunta`` es la que se respondió (la consulta
+    completa si era un seguimiento)."""
+    pregunta = pregunta_efectiva(session, user, messages)
     explicar_id = ticket_a_explicar(user, pregunta, ticket_actual)
     if explicar_id is not None:
         ticket = ticket_service.get_visible_ticket(session, explicar_id, user)
         if ticket is None:
-            return Directa(f"No encontré el ticket #{explicar_id} entre los tickets que puedes ver."), None, None
-        return None, None, ticket
+            return (Directa(f"No encontré el ticket #{explicar_id} entre los tickets que puedes ver."),
+                    None, None, pregunta)
+        return None, None, ticket, pregunta
     directa = calcular_directa(session, user, pregunta, ticket_actual)
     # Las reglas no la reconocieron: la IA la clasifica y el servidor calcula.
     # Si no sirve, «No entendí…» se mantiene y lo demás va a la IA libre.
@@ -1717,15 +1885,20 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
             datos = interpretar(proveedor, pregunta)
         except IATardo:
             # No se llama a la IA libre detrás: también se pasaría del tiempo.
-            return directa or Directa(MENSAJE_IA_OCUPADA), None, None
+            return directa or Directa(MENSAJE_IA_OCUPADA), None, None, pregunta
         calculado = datos and calcular_desde_interpretacion(session, user, datos, ticket_actual, pregunta)
         if calculado:
             interpretada, ticket = calculado
-            return interpretada, None, ticket
+            return interpretada, None, ticket, pregunta
     if directa is not None:
-        return directa, None, None
+        return directa, None, None, pregunta
+    t = _normalizar(pregunta)
+    if _pide_conteo_persona(t) and nombra_persona_desconocida(t):
+        # La IA libre nunca cuenta los tickets de una persona: podría hablar
+        # de otra (la del mensaje anterior, por ejemplo).
+        return Directa(NO_ENCONTRE_PERSONA), None, None, pregunta
     max_tickets = getattr(proveedor, "max_tickets", MAX_TICKETS_IN_CONTEXT)
-    return None, build_system(session, user, max_tickets, pregunta, ticket_actual), None
+    return None, build_system(session, user, max_tickets, pregunta, ticket_actual), None, pregunta
 
 
 def _explicar_ticket(proveedor, session, user: User, ticket: Ticket) -> str:
@@ -1757,9 +1930,9 @@ def responder_completo(proveedor, session, user: User, messages: list[dict],
     se registra el detalle y se lanza ``AsistenteNoDisponible`` con
     :data:`MENSAJE_NO_DISPONIBLE` (nunca un texto inventado).
     """
-    directa, system, ticket = _preparar(proveedor, session, user, messages, ticket_actual)
+    directa, system, ticket, pregunta = _preparar(proveedor, session, user, messages, ticket_actual)
     if directa is not None:
-        return _texto_directa(proveedor, messages[-1]["content"], directa)
+        return _texto_directa(proveedor, pregunta, directa)
     if ticket is not None:
         return _explicar_ticket(proveedor, session, user, ticket), "ia"
     try:
@@ -1783,9 +1956,9 @@ def responder_stream(proveedor, session, user: User, messages: list[dict],
                      ticket_actual: int | None = None):
     """Eventos para el chat: ``{"t": texto}`` por partes, ``{"error": msg}``
     si el proveedor falla y ``{"fin": True, "fuente": …}`` al terminar."""
-    directa, system, ticket = _preparar(proveedor, session, user, messages, ticket_actual)
+    directa, system, ticket, pregunta = _preparar(proveedor, session, user, messages, ticket_actual)
     if directa is not None:
-        texto, fuente = _texto_directa(proveedor, messages[-1]["content"], directa)
+        texto, fuente = _texto_directa(proveedor, pregunta, directa)
         yield {"t": texto}
         yield {"fin": True, "fuente": fuente}
         return
