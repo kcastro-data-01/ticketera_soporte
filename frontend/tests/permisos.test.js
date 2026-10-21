@@ -64,10 +64,10 @@ test("aplicarPermisos() oculta solo los elementos no permitidos", () => {
   );
 });
 
-test("requirePermiso() redirige al listado sin permiso", () => {
+test("requirePermiso() lleva a «Acceso restringido» sin permiso", () => {
   const ctx = loadAuth("Solicitante");
   assert.equal(ctx.requirePermiso("historial_global"), false);
-  assert.equal(ctx.window.location.href, "index.html");
+  assert.equal(ctx.window.location.href, "sin-permiso.html");
 });
 
 test("detalle.html: el botón Eliminar solo lo ve el Administrador", () => {

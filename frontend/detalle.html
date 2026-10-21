@@ -66,7 +66,17 @@
       </div>
       <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
 
-      <div class="detalle-layout">
+      <!-- Ticket inexistente o identificador inválido (detalle.js lo muestra). -->
+      <section id="ticket-no-encontrado" class="pagina-error-tarjeta en-pagina" hidden>
+        <span class="pagina-error-icono icono-buscar" aria-hidden="true"></span>
+        <h2>Ticket no encontrado</h2>
+        <p class="pagina-error-mensaje" id="ticket-no-encontrado-mensaje"></p>
+        <div class="acciones">
+          <a href="index.html" class="enlace-boton">Volver al listado</a>
+        </div>
+      </section>
+
+      <div class="detalle-layout" id="detalle-layout">
         <div class="detalle-principal">
   
           <div class="acciones acciones-principales">

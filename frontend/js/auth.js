@@ -107,12 +107,12 @@ function aplicarPermisos(root = document) {
   });
 }
 
-/* Para páginas restringidas: sin sesión va a login y sin permiso al
-   listado. Devuelve true si se puede mostrar la página. */
+/* Para páginas restringidas: sin sesión va a login y sin permiso a la
+   página «Acceso restringido». Devuelve true si se puede mostrar la página. */
 function requirePermiso(permiso) {
   if (!requireAuth()) return false;
   if (!puede(permiso)) {
-    window.location.href = "index.html";
+    window.location.href = "sin-permiso.html";
     return false;
   }
   return true;

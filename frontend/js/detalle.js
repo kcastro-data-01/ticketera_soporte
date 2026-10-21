@@ -314,13 +314,25 @@ async function cargarUsuarios() {
   }
 }
 
+/* En lugar de la ficha vacía: bloque «Ticket no encontrado» con el botón
+   para volver al listado. */
+function mostrarNoEncontrado(mensaje) {
+  hideStatus();
+  const bloque = document.getElementById("ticket-no-encontrado");
+  const texto = document.getElementById("ticket-no-encontrado-mensaje");
+  const layout = document.getElementById("detalle-layout");
+  if (texto) texto.textContent = mensaje;
+  if (bloque) bloque.hidden = false;
+  if (layout) layout.hidden = true;
+}
+
 async function cargarTicket({ silencioso = false } = {}) {
   const panel = document.getElementById("panel-ticket");
   if (!silencioso) marcarCargando(panel, true);
   try {
     const response = await fetchWithAuth(`/api/tickets/${ticketId}`);
     if (response.status === 404) {
-      showStatus(`No se encontró el ticket #${ticketId}.`, "error");
+      mostrarNoEncontrado(`No existe el ticket #${ticketId} o no tiene acceso a él.`);
       return false;
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -854,10 +866,7 @@ async function init() {
   const migaActual = document.getElementById("migas-actual");
   if (migaActual && ticketId !== null) migaActual.textContent = `Ticket #${ticketId}`;
   if (ticketId === null) {
-    showStatus(
-      "Identificador de ticket no válido. Regrese al listado y abra un ticket.",
-      "error"
-    );
+    mostrarNoEncontrado("El identificador del ticket no es válido. Regrese al listado y abra un ticket.");
     ocupado = true;
     bloquearBotones(true);
     return;

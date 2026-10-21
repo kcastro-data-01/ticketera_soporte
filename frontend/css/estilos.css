@@ -3457,3 +3457,80 @@ body:has(.menu-usuario) .barra-usuario {
     text-decoration: none;
   }
 }
+
+/* ===== Páginas de error («no encontrado» y «sin permiso») ===== */
+body.pagina-error {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  margin: 0;
+  padding: 1rem;
+}
+
+.pagina-error-tarjeta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 440px;
+  padding: 2rem 1.75rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 8px;
+  background: var(--color-superficie-alta);
+  box-shadow: var(--sombra-tarjeta);
+  text-align: center;
+}
+
+/* Dentro del detalle: mismo bloque, sin ocupar toda la pantalla. */
+.pagina-error-tarjeta.en-pagina {
+  margin: 1rem auto;
+}
+
+.pagina-error-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--color-titulo);
+  font-weight: 600;
+}
+
+.pagina-error-marca img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.pagina-error-icono {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 0.75rem;
+  background: var(--color-tenue);
+  -webkit-mask: var(--icono-error) center / contain no-repeat;
+  mask: var(--icono-error) center / contain no-repeat;
+}
+
+.pagina-error-icono.icono-buscar { --icono-error: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4M8.5 11h5'/%3E%3C/svg%3E"); }
+.pagina-error-icono.icono-candado { --icono-error: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4.5' y='10.5' width='15' height='10' rx='1.5'/%3E%3Cpath d='M8 10.5V7.5a4 4 0 0 1 8 0v3M12 14.5v2'/%3E%3C/svg%3E"); }
+
+.pagina-error-codigo {
+  margin: 0 0 0.25rem;
+  color: var(--color-tenue);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pagina-error-tarjeta h1,
+.pagina-error-tarjeta h2 {
+  margin: 0 0 0.5rem;
+  color: var(--color-titulo);
+  font-size: 1.25rem;
+}
+
+.pagina-error-mensaje {
+  margin: 0 0 1.25rem;
+  color: var(--color-tenue-fuerte);
+  line-height: 1.5;
+}
