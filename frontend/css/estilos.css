@@ -2037,7 +2037,7 @@ body.app {
   gap: 0.75rem;
 }
 
-/* --- Botón flotante: cuadrado de 6 px con un auricular --- */
+/* --- Botón flotante: cuadrado de 6 px con el globo de chat --- */
 .chat-boton {
   position: relative;
   display: grid;
@@ -2062,7 +2062,7 @@ body.app {
   outline-offset: 2px;
 }
 
-/* El auricular y la «X» (al abrir) ocupan el mismo lugar. */
+/* El globo de chat y la «X» (al abrir) ocupan el mismo lugar. */
 .chat-boton-icono {
   grid-area: 1 / 1;
   width: 22px;
@@ -2139,6 +2139,19 @@ body.app {
   align-items: center;
   gap: 0.6rem;
   min-width: 0;
+}
+
+/* Ícono del chat junto al título, del color del título. */
+.chat-cabecera-icono {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--color-titulo);
+}
+
+.chat-cabecera-icono .chat-svg {
+  width: 20px;
+  height: 20px;
 }
 
 .chat-titulo {

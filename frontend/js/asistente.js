@@ -46,11 +46,10 @@ const SALUDO = "Buen día. ¿En qué le puedo ayudar? Puede consultar, por ejemp
 
 /* Íconos (trazos con currentColor, sin dependencias externas). */
 const ICONOS = {
-  /* Auricular de soporte. */
-  auricular:
-    '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/>' +
-    '<rect x="3" y="14" width="4" height="6" rx="1"/><rect x="17" y="14" width="4" height="6" rx="1"/>' +
-    '<path d="M19 20a3 3 0 0 1-3 3h-3"/>',
+  /* Globo de chat con tres puntos (el ícono original del asistente). */
+  chat:
+    '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/>' +
+    '<path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/>',
   cerrar: '<path d="M6 6l12 12M18 6L6 18"/>',
   nueva: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
   enviar: '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
@@ -296,9 +295,11 @@ function crearAsistente() {
   panel.hidden = true;
   panel.setAttribute("aria-label", "Asistente virtual");
 
-  /* Cabecera: título con estado y acciones con ícono. */
+  /* Cabecera: ícono del chat, título con estado y acciones con ícono. */
   const cabecera = crearElemento("header", "chat-cabecera");
   const identidad = crearElemento("div", "chat-identidad");
+  const iconoCabecera = crearElemento("span", "chat-cabecera-icono");
+  iconoCabecera.innerHTML = icono("chat");
   const titulos = crearElemento("div");
   titulos.appendChild(crearElemento("strong", "chat-titulo", "Asistente virtual"));
   const estado = crearElemento("span", "chat-subtitulo");
@@ -307,7 +308,7 @@ function crearAsistente() {
   /* El rol queda a la vista al pasar el mouse (y en el saludo del chat). */
   estado.title = user && user.role ? `Respuestas según su rol: ${user.role}` : "Respuestas según su rol";
   titulos.appendChild(estado);
-  identidad.append(titulos);
+  identidad.append(iconoCabecera, titulos);
 
   const acciones = crearElemento("div", "chat-acciones");
   const limpiar = crearElemento("button", "chat-icono");
@@ -354,14 +355,14 @@ function crearAsistente() {
 
   panel.append(cabecera, lista, formulario);
 
-  /* Cuadrado de esquinas suaves con un auricular; al abrir cambia a una «X». */
+  /* Cuadrado de esquinas suaves con el globo de chat; al abrir cambia a una «X». */
   const abrir = crearElemento("button", "chat-boton");
   abrir.type = "button";
   abrir.setAttribute("aria-expanded", "false");
   abrir.setAttribute("aria-label", "Abrir asistente virtual");
   abrir.dataset.tooltip = "Asistente virtual";
   abrir.innerHTML =
-    icono("auricular", "chat-boton-icono icono-chat") + icono("cerrar", "chat-boton-icono icono-cerrar");
+    icono("chat", "chat-boton-icono icono-chat") + icono("cerrar", "chat-boton-icono icono-cerrar");
 
   contenedor.append(panel, abrir);
   document.body.appendChild(contenedor);
