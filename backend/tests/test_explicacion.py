@@ -137,7 +137,7 @@ def test_little_text_end_to_end(client, session, ollama, tecnico):
     roles = [m["role"] for m in pedido["messages"]]
     assert roles == ["system", "user", "assistant", "user"]
     assert json.loads(pedido["messages"][2]["content"]) == ex.EJEMPLO_SALIDA
-    assert "no adivines" in pedido["messages"][0]["content"]
+    assert "no adivine" in pedido["messages"][0]["content"]
     texto = ollama.ultimo_ticket()
     assert "Título: No sirve" in texto and "no sirve" in texto
     assert "Datos que el sistema no encontró en el texto: Qué equipo" in texto
@@ -366,7 +366,7 @@ def test_chat_explicar_tickete_uses_the_explanation_not_the_template(client, ses
     datos = resp.json()
     assert datos["fuente"] == "ia"
     assert datos["respuesta"].startswith(BUENA["explicacion"])
-    assert "Preguntas que podés hacerle:\n1. ¿Qué equipo es?" in datos["respuesta"]
+    assert "Preguntas que puede hacerle:\n1. ¿Qué equipo es?" in datos["respuesta"]
     # Ni la plantilla del ticket ni el chat libre: el pedido es el de «Explicar con IA».
     assert "Título:" not in datos["respuesta"] and "Categoría" not in datos["respuesta"]
     assert len(ollama.pedidos) == 1
@@ -417,7 +417,7 @@ def test_chat_invalid_explanation_twice_is_an_error(client, session, ollama, tec
 
 def test_chat_explanation_of_missing_ticket_is_a_server_answer(client, session, ollama, tecnico):
     datos = preguntar(client, tecnico, "explicar ticket #999").json()
-    assert datos == {"respuesta": "No encontré el ticket #999 entre los tickets que puedes ver.",
+    assert datos == {"respuesta": "No encontré el ticket #999 entre los tickets que puede ver.",
                      "fuente": "directa"}
     assert ollama.pedidos == []
 

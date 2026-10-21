@@ -1112,6 +1112,109 @@ def ticket_a_explicar(user: User, pregunta: str, ticket_actual: int | None = Non
     return None
 
 
+# ---------- Ajustes de la última explicación (sin IA) ----------
+# «sin preguntas», «más corto», «solo las preguntas», «más detalle»: cambian
+# cómo se muestra la explicación que ya se generó en la conversación; no se
+# vuelve a llamar a la IA.
+
+PIDE_TICKET_A_EXPLICAR = "¿De qué ticket desea la explicación?"
+AJUSTE_MAX_PALABRAS = 10
+# Palabras de los pedidos: se corrigen los errores de escritura («preguntsa»,
+# «cortp», «resumilo») antes de buscar los patrones.
+_VOCABULARIO_AJUSTE = (
+    "preguntas", "pregunta", "corto", "corta", "breve", "resumen", "resumilo", "resumelo", "resumir",
+    "resumi", "resume", "linea", "oracion", "frase", "detalle", "detalles", "detallado", "detallada",
+    "detallalo", "completa", "completo", "mejor", "explicalo", "explicala", "explicame", "quita",
+    "quitale", "quitalas", "quitar", "saca", "sacale", "sacalas", "elimina", "eliminalas", "borra",
+    "solo", "solamente", "unicamente", "molestar", "quiero", "amplia", "amplialo",
+)
+_AJUSTES = (
+    ("solo_preguntas", r"\b(solo|solamente|unicamente|nada mas que)\b.*\bpregunta"),
+    ("sin_preguntas", r"\b(sin|no quiero|no (me )?(des|pongas|incluyas|agregues|muestres)|"
+                      r"quit\w*|sac\w*|elimin\w*|borr\w*)\b.*\bpregunta"),
+    # «resume la situación» o «detallá los críticos» son preguntas nuevas: solo
+    # cuentan «resumilo», «resumen» solo, «más detalle», «detallalo»…
+    ("detalle", r"\b(mas|con) detall\w*|\bdetall\w*(lo|la)\b|^(los )?detalles?\b|"
+                r"\bexplic\w*(lo|la)? mejor\b|\bmas complet[oa]\b|\bampli\w*(lo|la)\b|\bmas informacion\b"),
+    ("corto", r"\b(mas )?(corto|corta|breve)\b|\bresum\w*(lo|la)\b|\ben una (linea|oracion|frase)\b|"
+              r"^(dame |solo )?(el |un )?(resumen|resumi|resume|resumir)( por favor| porfa)?$"),
+)
+
+
+def _corregir_palabra(palabra: str) -> str:
+    if len(palabra) < 4 or palabra in _VOCABULARIO_AJUSTE:
+        return palabra
+    candidatas = [(errores, v) for v in _VOCABULARIO_AJUSTE
+                  if (errores := _parecido(palabra, v)) is not None]
+    return min(candidatas)[1] if candidatas else palabra
+
+
+def ajuste_pedido(pregunta: str) -> str | None:
+    """Modo de :data:`explicacion_service.MODOS_CHAT` que pide el mensaje
+    («sin preguntas para no molestar» → «sin_preguntas»), o ``None``.
+
+    Solo mensajes cortos y sin número de ticket: «resumí el #5» es pedir
+    una explicación nueva."""
+    t = _normalizar(pregunta)
+    if re.search(r"\d", t):
+        return None
+    palabras = re.findall(r"[a-z]+", t)
+    if not palabras or len(palabras) > AJUSTE_MAX_PALABRAS:
+        return None
+    corregido = " ".join(_corregir_palabra(p) for p in palabras)
+    # «resumen de los tickets críticos», «listado completo»: es una consulta,
+    # no un ajuste de la explicación.
+    if re.search(r"\b(tickets|tikets|tiquetes)\b", t) or _es_conteo(t):
+        return None
+    return next((modo for modo, patron in _AJUSTES if re.search(patron, corregido)), None)
+
+
+def _ticket_de_mensaje(user: User, texto: str, ticket_actual: int | None) -> int | None:
+    """Ticket que pidió explicar un mensaje anterior («explicá el #3»,
+    «explicame el 7», «explicá este ticket»)."""
+    ticket_id = ticket_a_explicar(user, texto, ticket_actual)
+    if ticket_id is not None:
+        return ticket_id
+    t = _normalizar(texto)
+    if not _PIDE_EXPLICACION.search(t):
+        return None
+    numeros = list(dict.fromkeys(re.findall(r"\b\d+\b", t)))
+    if len(numeros) == 1:
+        return int(numeros[0])
+    return ticket_actual if not numeros else None
+
+
+def ticket_explicado_antes(user: User, messages: list[dict], ticket_actual: int | None = None) -> int | None:
+    """Ticket de la explicación anterior de la conversación: el que pidió el
+    último mensaje del usuario que no fue a su vez un ajuste."""
+    for mensaje in reversed(messages[:-1]):
+        if mensaje.get("role") != "user":
+            continue
+        texto = mensaje.get("content") or ""
+        if ajuste_pedido(texto) is not None:
+            continue
+        return _ticket_de_mensaje(user, texto, ticket_actual)
+    return None
+
+
+def ajustar_ultima_explicacion(session, user: User, messages: list[dict],
+                               ticket_actual: int | None = None) -> Directa | None:
+    """Si el mensaje pide ajustar la última explicación, la respuesta del
+    servidor con la explicación guardada en ese modo; si no, ``None``."""
+    if user.role == UserRole.REQUESTER.value:
+        return None
+    modo = ajuste_pedido(messages[-1]["content"])
+    if modo is None:
+        return None
+    from backend.services import explicacion_service
+
+    ticket_id = ticket_explicado_antes(user, messages, ticket_actual)
+    ticket = ticket_service.get_visible_ticket(session, ticket_id, user) if ticket_id else None
+    texto = explicacion_service.ajustar_guardada(ticket, modo) if ticket is not None else None
+    limpio = limpiar_respuesta_ia(texto) if texto else None
+    return Directa(limpio or PIDE_TICKET_A_EXPLICAR)
+
+
 # ---------- Saludos (sin IA) ----------
 
 _SALUDOS = frozenset("""
@@ -1252,7 +1355,7 @@ def calcular_directa(session, user: User, pregunta: str,
     ):
         ticket = ticket_service.get_visible_ticket(session, ids[0], user)
         if ticket is None:
-            return Directa(f"No encontré el ticket #{ids[0]} entre los tickets que puedes ver.")
+            return Directa(f"No encontré el ticket #{ids[0]} entre los tickets que puede ver.")
         return _estado_ticket(ticket)
     if not ids:
         # Antes que la guía: «quiero ver los tickets asignados a técnicos» es
@@ -1983,11 +2086,14 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
     el prompt para la IA. ``pregunta`` es la que se respondió (la consulta
     completa si era un seguimiento)."""
     pregunta = pregunta_efectiva(session, user, messages)
+    ajustada = ajustar_ultima_explicacion(session, user, messages, ticket_actual)
+    if ajustada is not None:
+        return ajustada, None, None, pregunta
     explicar_id = ticket_a_explicar(user, pregunta, ticket_actual)
     if explicar_id is not None:
         ticket = ticket_service.get_visible_ticket(session, explicar_id, user)
         if ticket is None:
-            return (Directa(f"No encontré el ticket #{explicar_id} entre los tickets que puedes ver."),
+            return (Directa(f"No encontré el ticket #{explicar_id} entre los tickets que puede ver."),
                     None, None, pregunta)
         return None, None, ticket, pregunta
     directa = calcular_directa(session, user, pregunta, ticket_actual)

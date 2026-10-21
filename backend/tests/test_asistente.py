@@ -404,7 +404,7 @@ def test_requester_cannot_ask_for_other_tickets_by_number(client, session, fake_
     ajeno = add_ticket(session, "Servidor interno caído")
 
     resp = ask(client, headers, f"¿En qué estado está el ticket #{ajeno.id}?")
-    assert resp.json()["respuesta"] == f"No encontré el ticket #{ajeno.id} entre los tickets que puedes ver."
+    assert resp.json()["respuesta"] == f"No encontré el ticket #{ajeno.id} entre los tickets que puede ver."
 
     ask(client, headers, f"Explícame el ticket #{ajeno.id}")
     system = fake_claude.system_text()

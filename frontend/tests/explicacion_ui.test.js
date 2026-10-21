@@ -163,7 +163,7 @@ test("las preguntas se copian al comentario, sin publicarlo", async () => {
 test("errores: IA caída, JSON inválido y rol sin permiso", async () => {
   for (const [status, detail, esperado] of [
     [502, "La IA no está disponible en este momento", /La IA no está disponible/],
-    [502, "La IA no pudo generar una explicación válida. Intenta de nuevo.", /explicación válida/],
+    [502, "La IA no pudo generar una explicación válida. Intente de nuevo.", /explicación válida/],
     [403, "No autorizado", /Su rol no tiene permiso para usar/],
   ]) {
     const ia = crear({
