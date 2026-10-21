@@ -2037,8 +2037,8 @@ body.app {
   gap: 0.75rem;
 }
 
-/* --- Botón flotante: cuadrado blanco (en modo oscuro, el fondo de las
-   tarjetas) con borde fino y el robot en el centro --- */
+/* --- Botón flotante: cuadrado del color principal (sólido) con el
+   ícono de conversación en el centro --- */
 .chat-boton {
   position: relative;
   display: grid;
@@ -2046,17 +2046,16 @@ body.app {
   width: 52px;
   height: 52px;
   padding: 0;
-  border: 1px solid var(--color-borde);
+  border: 0;
   border-radius: 8px;
-  background: var(--color-superficie);
-  color: var(--color-tenue-fuerte);
+  background: var(--color-primario);
+  color: var(--color-texto-inverso);
   box-shadow: 0 2px 8px rgba(26, 34, 51, 0.1);
-  transition: border-color 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
 .chat-boton:hover {
-  background: var(--color-superficie);
-  border-color: var(--color-borde-fuerte);
+  background: var(--color-primario-oscuro);
 }
 
 .chat-boton:focus-visible {
@@ -2076,7 +2075,7 @@ body.app {
   stroke-linejoin: round;
 }
 
-.chat-boton .icono-robot {
+.chat-boton .icono-conversacion {
   width: 28px;
   height: 28px;
 }
@@ -2148,28 +2147,22 @@ body.app {
   min-width: 0;
 }
 
-/* Robot: cuerpo del color principal, antena y orejas en su versión clara
-   y la cara en blanco. */
-.icono-robot :is(rect, circle) {
+/* Conversación: burbuja de atrás en la versión clara del color principal,
+   la de adelante en blanco y sus líneas del color principal. */
+.icono-conversacion .conv-fondo {
+  fill: color-mix(in srgb, var(--color-primario) 45%, #fff);
   stroke: none;
 }
 
-.icono-robot .robot-cuerpo {
-  fill: var(--color-primario);
-}
-
-.icono-robot .robot-claro {
-  fill: color-mix(in srgb, var(--color-primario) 45%, #fff);
-}
-
-.icono-robot .robot-cara {
+.icono-conversacion .conv-frente {
   fill: #fff;
+  stroke: none;
 }
 
-.icono-robot .robot-boca {
+.icono-conversacion .conv-lineas {
   fill: none;
-  stroke: #fff;
-  stroke-width: 1.5;
+  stroke: var(--color-primario);
+  stroke-width: 1.6;
   stroke-linecap: round;
 }
 

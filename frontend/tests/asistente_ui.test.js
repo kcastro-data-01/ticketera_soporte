@@ -229,7 +229,7 @@ test("cabecera: «Asistente virtual» con el estado «En línea», sin avatar", 
   assert.match(chat.subtitulo.title, /Técnico/);
   const identidad = chat.panel.children[0].children[0];
   assert.equal(identidad.children[0].className, "chat-cabecera-icono");
-  assert.match(identidad.children[0].innerHTML, /icono-robot/, "robot en el encabezado");
+  assert.match(identidad.children[0].innerHTML, /icono-conversacion/, "ícono de conversación en el encabezado");
   const titulo = identidad.children[1].children[0];
   assert.equal(titulo.className, "chat-titulo");
   assert.equal(titulo.textContent, "Asistente virtual");
@@ -253,11 +253,13 @@ test("abrir muestra el panel y cerrar lo oculta al instante, sin animación", ()
   assert.equal(chat.temporizadores.length, 0, "no espera ninguna animación");
 });
 
-test("botón: robot, sin chispas ni texto", () => {
+test("botón: ícono de conversación, sin chispas ni texto", () => {
   const chat = montarChat();
   assert.equal(chat.boton.className, "chat-boton");
-  assert.match(chat.boton.innerHTML, /class="chat-boton-icono icono-chat icono-robot"/, "robot");
-  assert.match(chat.boton.innerHTML, /class="robot-cuerpo" x="4" y="6" width="16" height="13" rx="4"/);
+  assert.match(chat.boton.innerHTML, /class="chat-boton-icono icono-chat icono-conversacion"/, "dos burbujas");
+  assert.match(chat.boton.innerHTML, /class="conv-fondo" d="M10 8h10a2 2 0 0 1 2 2v7/);
+  assert.match(chat.boton.innerHTML, /class="conv-lineas" d="M5 6h7M5 9h4"/);
+  assert.doesNotMatch(chat.boton.innerHTML, /robot/, "sin el robot");
   assert.doesNotMatch(chat.boton.innerHTML, /#2f56d9|#9db1f2/, "los colores salen de las variables del CSS");
   assert.doesNotMatch(chat.boton.innerHTML, /M4 15v-3a8 8 0 0 1 16 0v3/, "sin auricular");
   assert.doesNotMatch(chat.boton.innerHTML, /M12 3l1\.8 4\.9/, "sin chispas de IA");

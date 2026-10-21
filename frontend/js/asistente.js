@@ -51,21 +51,16 @@ const ICONOS = {
   enviar: '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
 };
 
-/* Robot del asistente: a color, con las partes pintadas desde el CSS
-   (color principal y su versión clara), por eso va aparte de los íconos
-   de trazo. */
-const ROBOT =
-  '<rect class="robot-claro" x="11.2" y="2" width="1.6" height="3.5" rx=".8"/>' +
-  '<circle class="robot-claro" cx="12" cy="2.4" r="1.4"/>' +
-  '<rect class="robot-cuerpo" x="4" y="6" width="16" height="13" rx="4"/>' +
-  '<rect class="robot-claro" x="1.5" y="10.5" width="2" height="4" rx="1"/>' +
-  '<rect class="robot-claro" x="20.5" y="10.5" width="2" height="4" rx="1"/>' +
-  '<circle class="robot-cara" cx="9" cy="12" r="1.6"/>' +
-  '<circle class="robot-cara" cx="15" cy="12" r="1.6"/>' +
-  '<path class="robot-boca" d="M9.5 15.5c1.4 1 3.6 1 5 0"/>';
+/* Ícono de conversación (dos burbujas): a color, con las partes pintadas
+   desde el CSS (color principal y su versión clara), por eso va aparte de
+   los íconos de trazo. */
+const CONVERSACION =
+  '<path class="conv-fondo" d="M10 8h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-1v3l-4-3h-5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"/>' +
+  '<path class="conv-frente" d="M3 2h11a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H8l-4 3v-3H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/>' +
+  '<path class="conv-lineas" d="M5 6h7M5 9h4"/>';
 
-function iconoRobot(clase) {
-  return `<svg class="${clase} icono-robot" viewBox="0 0 24 24" aria-hidden="true">${ROBOT}</svg>`;
+function iconoConversacion(clase) {
+  return `<svg class="${clase} icono-conversacion" viewBox="0 0 24 24" aria-hidden="true">${CONVERSACION}</svg>`;
 }
 
 function icono(nombre, clase = "chat-svg") {
@@ -312,7 +307,7 @@ function crearAsistente() {
   const cabecera = crearElemento("header", "chat-cabecera");
   const identidad = crearElemento("div", "chat-identidad");
   const iconoCabecera = crearElemento("span", "chat-cabecera-icono");
-  iconoCabecera.innerHTML = iconoRobot("chat-svg");
+  iconoCabecera.innerHTML = iconoConversacion("chat-svg");
   const titulos = crearElemento("div");
   titulos.appendChild(crearElemento("strong", "chat-titulo", "Asistente virtual"));
   const estado = crearElemento("span", "chat-subtitulo");
@@ -368,14 +363,15 @@ function crearAsistente() {
 
   panel.append(cabecera, lista, formulario);
 
-  /* Cuadrado blanco con el robot; al abrir cambia a una «X». */
+  /* Cuadrado del color principal con el ícono de conversación; al abrir
+     cambia a una «X». */
   const abrir = crearElemento("button", "chat-boton");
   abrir.type = "button";
   abrir.setAttribute("aria-expanded", "false");
   abrir.setAttribute("aria-label", "Abrir asistente virtual");
   abrir.dataset.tooltip = "Asistente virtual";
   abrir.innerHTML =
-    iconoRobot("chat-boton-icono icono-chat") + icono("cerrar", "chat-boton-icono icono-cerrar");
+    iconoConversacion("chat-boton-icono icono-chat") + icono("cerrar", "chat-boton-icono icono-cerrar");
 
   contenedor.append(panel, abrir);
   document.body.appendChild(contenedor);
