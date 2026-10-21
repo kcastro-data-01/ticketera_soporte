@@ -118,16 +118,6 @@ function requirePermiso(permiso) {
   return true;
 }
 
-/* Conecta el botón «Cerrar sesión» de abajo del menú lateral. El nombre,
-   el rol y las iniciales se muestran arriba (crearMenuUsuario). */
-function pintarUsuario(doc = document) {
-  if (!doc || typeof doc.getElementById !== "function") return;
-  const salir = doc.getElementById("btn-logout");
-  if (salir && typeof salir.addEventListener === "function") {
-    salir.addEventListener("click", logout);
-  }
-}
-
 /* Iniciales de un nombre: «Carlos Solano» → «CS». */
 function inicialesDe(nombre) {
   return String(nombre || "")
@@ -228,17 +218,17 @@ function confirmarAccion({ titulo, mensaje, aceptar = "Aceptar", cancelar = "Can
   });
 }
 
-/* Usuario en la barra superior: iniciales, nombre y rol; al pulsarlo se
-   abre un menú con «Mi cuenta». «Cerrar sesión» está abajo del menú
-   lateral. Solo en las páginas con menú lateral (no en el login). */
+/* Usuario abajo del todo en el menú lateral: iniciales, nombre y rol; al
+   pulsarlo se abre (hacia arriba) un menú con «Mi cuenta» y «Cerrar
+   sesión». Solo en las páginas con menú lateral (no en el login). */
 const ICONO_FLECHA_ABAJO =
   '<svg class="menu-usuario-flecha" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 
 function crearMenuUsuario(doc = document) {
   if (!doc || typeof doc.querySelector !== "function") return null;
   const user = getUser();
-  const cabecera = doc.querySelector(".cabecera");
-  if (!user || !cabecera || !doc.querySelector(".barra-lateral") || doc.querySelector(".menu-usuario")) return null;
+  const barra = doc.querySelector(".barra-lateral");
+  if (!user || !barra || doc.querySelector(".menu-usuario")) return null;
 
   const nodo = (tag, clase, texto) => {
     const el = doc.createElement(tag);
@@ -266,7 +256,11 @@ function crearMenuUsuario(doc = document) {
   const cuenta = nodo("a", "menu-usuario-opcion", "Mi cuenta");
   cuenta.href = "cuenta.html";
   cuenta.setAttribute("role", "menuitem");
-  lista.append(cuenta);
+  const salir = nodo("button", "menu-usuario-opcion salir", "Cerrar sesión");
+  salir.type = "button";
+  salir.setAttribute("role", "menuitem");
+  salir.addEventListener("click", logout);
+  lista.append(cuenta, salir);
   menu.append(boton, lista);
 
   const alternar = (abrir) => {
@@ -287,12 +281,7 @@ function crearMenuUsuario(doc = document) {
     }
   });
 
-  let acciones = cabecera.querySelector(".cabecera-acciones");
-  if (!acciones) {
-    acciones = nodo("div", "cabecera-acciones");
-    cabecera.appendChild(acciones);
-  }
-  acciones.appendChild(menu);
+  barra.appendChild(menu);
   return menu;
 }
 
@@ -570,7 +559,6 @@ if (typeof document !== "undefined" && document.documentElement) {
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
   document.addEventListener("DOMContentLoaded", () => {
     aplicarPermisos();
-    pintarUsuario();
     pintarMigas();
     iniciarMenuPlegable();
     iniciarBotonTema();

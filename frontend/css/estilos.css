@@ -1570,9 +1570,16 @@ body.app {
     padding-right: 0;
   }
 
-  body.menu-plegado .barra-salir {
+  /* Plegado: solo el círculo de iniciales; el menú se abre igual. */
+  body.menu-plegado .menu-usuario-boton {
+    justify-content: center;
     padding-left: 0;
     padding-right: 0;
+  }
+
+  body.menu-plegado .menu-usuario-datos,
+  body.menu-plegado .menu-usuario-flecha {
+    display: none;
   }
 }
 
@@ -1593,31 +1600,7 @@ body.app {
   stroke-linejoin: round;
 }
 
-/* «Cerrar sesión» abajo del menú lateral: mismo aspecto que los enlaces
-   del menú (es un .menu-enlace); plegado, solo el ícono. */
-.barra-salir {
-  padding-top: 0.6rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.boton-cerrar-sesion {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  font-family: inherit;
-  line-height: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.boton-cerrar-sesion:hover,
-.boton-cerrar-sesion:active {
-  border-color: transparent;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--color-texto-inverso);
-}
-
-/* Iniciales: también las usa el menú de usuario de la barra superior. */
+/* Círculo de iniciales del menú de usuario. */
 .usuario-avatar {
   display: grid;
   place-items: center;
@@ -1964,7 +1947,8 @@ body.app {
   }
 
   .barra-lateral {
-    position: static;
+    /* relative (sin moverlo) para que el menú de usuario abierto quede encima */
+    position: relative;
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
@@ -1986,20 +1970,23 @@ body.app {
     height: 36px;
   }
 
-  /* Arriba, junto a la marca: solo el ícono (el nombre queda en aria-label). */
-  .barra-salir {
+  /* El menú lateral va arriba: el usuario queda junto a la marca, sin
+     línea de separación, y su menú se abre hacia abajo a la derecha. */
+  .barra-lateral .menu-usuario {
+    margin: 0;
     padding: 0;
     border: 0;
   }
 
-  .boton-cerrar-sesion {
+  .barra-lateral .menu-usuario-boton {
     width: auto;
-    padding-left: 0.6rem;
-    padding-right: 0.6rem;
   }
 
-  .boton-cerrar-sesion span {
-    display: none;
+  .barra-lateral .menu-usuario-lista {
+    top: calc(100% + 4px);
+    bottom: auto;
+    left: auto;
+    right: 0;
   }
 
   .menu {
@@ -3184,76 +3171,116 @@ td.con-avatar {
   color: var(--color-tenue-fuerte);
 }
 
-/* ===== Usuario en la barra superior ===== */
+/* ===== Usuario abajo del menú lateral =====
+   Botón con iniciales, nombre y rol en claro sobre el azul; su menú
+   («Mi cuenta», «Cerrar sesión») se abre hacia arriba. */
 .menu-usuario {
   position: relative;
+  margin-top: var(--espaciado-md);
+  padding-top: var(--espaciado-md);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .menu-usuario-boton {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.25rem 0.5rem 0.25rem 0.3rem;
-  border: 1px solid var(--color-borde);
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 40px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid transparent;
   border-radius: var(--radio-suave);
-  background: var(--color-superficie-alta);
-  color: var(--color-texto);
+  background: transparent;
+  color: var(--color-texto-inverso);
   font-weight: 400;
+  line-height: inherit;
   text-align: left;
 }
 
 .menu-usuario-boton:hover,
+.menu-usuario-boton:active,
 .menu-usuario-boton[aria-expanded="true"] {
-  border-color: var(--color-borde-fuerte);
-  background: var(--color-fondo-neutro);
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.menu-usuario-boton:focus-visible {
+  outline: 2px solid var(--color-texto-inverso);
+  outline-offset: 2px;
 }
 
 .menu-usuario-avatar {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   color: var(--color-texto-inverso);
   font-size: 0.72rem;
 }
 
 .menu-usuario-datos {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  line-height: 1.2;
+  min-width: 0;
+  line-height: 1.25;
 }
 
 .menu-usuario-nombre {
+  overflow: hidden;
   font-size: 0.8125rem;
   font-weight: 600;
+  color: var(--color-texto-inverso);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .menu-usuario-rol {
   font-size: 0.72rem;
-  color: var(--color-tenue);
+  color: var(--color-menu-tenue);
 }
 
+/* Flecha en el tono del rol; apunta hacia donde se abre el menú. */
 .menu-usuario-flecha {
+  flex-shrink: 0;
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: var(--color-tenue);
+  stroke: var(--color-menu-tenue);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  transform: rotate(180deg);
+  transition: transform 0.15s ease;
+}
+
+.menu-usuario-boton[aria-expanded="true"] .menu-usuario-flecha {
+  transform: none;
 }
 
 .menu-usuario-lista {
   position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
+  bottom: calc(100% + 4px);
+  left: 0;
   z-index: 60;
   display: flex;
   flex-direction: column;
+  width: 100%;
   min-width: 180px;
   padding: 0.3rem;
   border: 1px solid var(--color-borde-fuerte);
   border-radius: var(--radio-suave);
   background: var(--color-superficie-alta);
   box-shadow: 0 4px 16px rgba(26, 34, 51, 0.1);
+}
+
+.menu-usuario-lista[hidden] {
+  display: none;
+}
+
+/* El menú abierto no queda recortado por el desplazamiento del menú
+   lateral (plegado mide 76 px y en el celular va arriba). */
+.barra-lateral:has(.menu-usuario-lista:not([hidden])) {
+  z-index: 50;
+  overflow: visible;
 }
 
 .menu-usuario-opcion {
@@ -3266,27 +3293,36 @@ td.con-avatar {
   color: var(--color-texto);
   font-size: 0.8125rem;
   font-weight: 400;
+  line-height: 1.4;
   text-align: left;
   text-decoration: none;
 }
 
 .menu-usuario-opcion:hover,
+.menu-usuario-opcion:active,
 .menu-usuario-opcion:focus-visible {
   background: var(--color-fondo-neutro);
+  color: var(--color-texto);
 }
 
+.menu-usuario-opcion.salir {
+  margin-top: 0.2rem;
+  border-top: 1px solid var(--color-borde);
+  border-radius: 0 0 var(--radio-suave) var(--radio-suave);
+  color: var(--color-error);
+}
+
+.menu-usuario-opcion.salir:hover,
+.menu-usuario-opcion.salir:active {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
 
 /* En el celular solo el círculo con las iniciales. */
 @media (max-width: 600px) {
   .menu-usuario-datos,
   .menu-usuario-flecha {
     display: none;
-  }
-
-  /* El botón queda a la izquierda: el menú se abre hacia la derecha. */
-  .menu-usuario-lista {
-    right: auto;
-    left: 0;
   }
 }
 
@@ -3869,7 +3905,6 @@ summary:focus-visible,
   .enlace-boton,
   .btn-accion,
   .boton-tema,
-  .boton-cerrar-sesion,
   .chat-icono,
   .chat-enviar,
   .menu-usuario-boton,
