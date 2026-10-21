@@ -128,6 +128,18 @@ function appendCell(row, text) {
   row.appendChild(cell);
 }
 
+/* Color de la etiqueta de cada rol. */
+const CLASES_ROL = {
+  Administrador: "rol-administrador",
+  Supervisor: "rol-supervisor",
+  Técnico: "rol-tecnico",
+  Solicitante: "rol-solicitante",
+};
+
+function claseRol(rol) {
+  return CLASES_ROL[rol] || "rol-solicitante";
+}
+
 /* Renderiza con textContent: los datos del backend nunca se interpretan
    como HTML. Todos los usuarios listados están activos (el filtro lo hace
    el backend), por eso la columna Estado lo indica con un badge. */
@@ -141,9 +153,17 @@ function renderUsers(users) {
   }
   users.forEach((user) => {
     const row = document.createElement("tr");
-    appendCell(row, user.name);
+    /* Nombre con el círculo de iniciales y el rol como etiqueta. */
+    const nameCell = document.createElement("td");
+    pintarPersona(nameCell, user.name);
+    row.appendChild(nameCell);
     appendCell(row, user.email);
-    appendCell(row, user.role);
+    const roleCell = document.createElement("td");
+    const roleBadge = document.createElement("span");
+    roleBadge.className = `badge ${claseRol(user.role)}`;
+    roleBadge.textContent = user.role;
+    roleCell.appendChild(roleBadge);
+    row.appendChild(roleCell);
 
     const activo = user.is_active !== false;
     const stateCell = document.createElement("td");

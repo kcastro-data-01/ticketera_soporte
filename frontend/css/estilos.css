@@ -3338,3 +3338,24 @@ body:has(.menu-usuario) .barra-usuario {
   background: var(--color-error);
   color: var(--color-error-fondo);
 }
+
+/* ===== Usuarios: rol como etiqueta ===== */
+.rol-administrador {
+  background: var(--etiqueta-violeta-fondo);
+  color: var(--etiqueta-violeta-texto);
+}
+
+.rol-supervisor {
+  background: var(--etiqueta-azul-fondo);
+  color: var(--etiqueta-azul-texto);
+}
+
+.rol-tecnico {
+  background: var(--etiqueta-verde-fondo);
+  color: var(--etiqueta-verde-texto);
+}
+
+.rol-solicitante {
+  background: var(--etiqueta-gris-fondo);
+  color: var(--etiqueta-gris-texto);
+}

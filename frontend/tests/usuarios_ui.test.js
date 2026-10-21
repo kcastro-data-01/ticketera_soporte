@@ -69,6 +69,7 @@ function createNode(id) {
     id,
     textContent: "",
     className: "",
+    dataset: {},
     hidden: false,
     disabled: false,
     value: "",
@@ -188,10 +189,16 @@ test("init lista los usuarios con nombre, correo, rol y estado", async () => {
   assert.deepEqual(rows[0].children.map((cell) => cell.textContent), [
     "Ana Pérez",
     "ana@soporte.local",
-    "Técnico",
+    "", // la celda de rol contiene la etiqueta
     "", // la celda de estado contiene el badge
     "", // la celda de acciones contiene el botón Editar
   ]);
+  // Nombre con iniciales y rol como etiqueta de color.
+  assert.match(rows[0].children[0].className, /con-avatar tono-avatar-\d/);
+  assert.equal(rows[0].children[0].dataset.iniciales, "AP");
+  const rol = rows[0].children[2].children[0];
+  assert.equal(rol.className, "badge rol-tecnico");
+  assert.equal(rol.textContent, "Técnico");
   const badge = rows[0].children[3].children[0];
   assert.equal(badge.className, "badge badge-activo");
   assert.equal(badge.textContent, "Activo");
