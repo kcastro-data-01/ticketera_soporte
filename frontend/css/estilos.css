@@ -2037,24 +2037,26 @@ body.app {
   gap: 0.75rem;
 }
 
-/* --- Botón flotante: cuadrado de 6 px con el globo de chat --- */
+/* --- Botón flotante: cuadrado blanco (en modo oscuro, el fondo de las
+   tarjetas) con borde fino y el robot en el centro --- */
 .chat-boton {
   position: relative;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   padding: 0;
-  border: 0;
-  border-radius: var(--radio-suave);
-  background: var(--color-primario);
-  color: var(--color-texto-inverso);
-  box-shadow: var(--sombra-tarjeta);
-  transition: background-color 0.15s ease;
+  border: 1px solid var(--color-borde);
+  border-radius: 8px;
+  background: var(--color-superficie);
+  color: var(--color-tenue-fuerte);
+  box-shadow: 0 2px 8px rgba(26, 34, 51, 0.1);
+  transition: border-color 0.15s ease;
 }
 
 .chat-boton:hover {
-  background: var(--color-primario-oscuro);
+  background: var(--color-superficie);
+  border-color: var(--color-borde-fuerte);
 }
 
 .chat-boton:focus-visible {
@@ -2072,6 +2074,11 @@ body.app {
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.chat-boton .icono-robot {
+  width: 28px;
+  height: 28px;
 }
 
 .chat-boton .icono-cerrar,
@@ -2139,6 +2146,31 @@ body.app {
   align-items: center;
   gap: 0.6rem;
   min-width: 0;
+}
+
+/* Robot: cuerpo del color principal, antena y orejas en su versión clara
+   y la cara en blanco. */
+.icono-robot :is(rect, circle) {
+  stroke: none;
+}
+
+.icono-robot .robot-cuerpo {
+  fill: var(--color-primario);
+}
+
+.icono-robot .robot-claro {
+  fill: color-mix(in srgb, var(--color-primario) 45%, #fff);
+}
+
+.icono-robot .robot-cara {
+  fill: #fff;
+}
+
+.icono-robot .robot-boca {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.5;
+  stroke-linecap: round;
 }
 
 /* Ícono del chat junto al título, del color del título. */
