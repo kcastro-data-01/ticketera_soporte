@@ -13,6 +13,52 @@ let usersById = new Map();
 /* Página actual (empieza en 0) y vista «Mis tickets». */
 let paginaActual = 0;
 let soloMios = false;
+/* Vista simple del Solicitante: solo ve sus tickets (el servidor ya los
+   filtra) y no los resuelve, así que se le ocultan los datos del equipo. */
+let vistaSolicitante = false;
+
+function esSolicitante() {
+  const user = typeof getUser === "function" ? getUser() : null;
+  return Boolean(user && user.role === "Solicitante");
+}
+
+const TEXTOS_SOLICITANTE = {
+  "titulo-listado": "Mis solicitudes",
+  "subtitulo-listado": "Consulte el estado de sus tickets de soporte",
+  "etq-pendientes": "Abiertas",
+  "etq-resueltos": "Resueltas",
+  "opt-pendientes": "Abiertas",
+  "opt-resueltos": "Resueltas",
+  "th-asignado": "Atendido por",
+};
+
+/* Cambia títulos y etiquetas, oculta lo marcado con data-vista="equipo"
+   y muestra el botón «Nuevo ticket». Devuelve true si se aplicó. */
+function aplicarVistaSolicitante() {
+  if (!esSolicitante()) return false;
+  Object.entries(TEXTOS_SOLICITANTE).forEach(([id, texto]) => {
+    const nodo = document.getElementById(id);
+    if (nodo) nodo.textContent = texto;
+  });
+  if (typeof document.querySelectorAll === "function") {
+    document.querySelectorAll('[data-vista="equipo"]').forEach((el) => {
+      el.hidden = true;
+    });
+  }
+  const nuevo = document.getElementById("nuevo-ticket-solicitante");
+  if (nuevo) nuevo.hidden = false;
+  if (document.title !== undefined) document.title = "Mis solicitudes · American Data Networks";
+  return true;
+}
+
+/* Bloque «Todavía no ha creado solicitudes» (solo Solicitante). */
+function mostrarSinSolicitudes(mostrar) {
+  const bloque = document.getElementById("sin-solicitudes");
+  if (bloque) bloque.hidden = !mostrar;
+  /* La tabla vacía no aporta nada junto a la invitación. */
+  const tabla = document.getElementById("tabla-tickets");
+  if (tabla) tabla.hidden = mostrar;
+}
 
 function getElements() {
   return {
@@ -146,10 +192,16 @@ function renderTickets(tickets) {
     const row = document.createElement("tr");
     appendIdCell(row, ticket.id);
     appendCell(row, ticket.title);
-    appendCell(row, ticket.category);
-    appendBadgeCell(row, ticket.priority);
+    if (!vistaSolicitante) {
+      appendCell(row, ticket.category);
+      appendBadgeCell(row, ticket.priority);
+    }
     appendBadgeCell(row, ticket.state);
-    appendPersonaCell(row, assignedText(ticket));
+    if (vistaSolicitante && (ticket.assigned_to_id === null || ticket.assigned_to_id === undefined)) {
+      appendCell(row, "Pendiente de asignar", "celda-pendiente");
+    } else {
+      appendPersonaCell(row, assignedText(ticket));
+    }
     appendCell(row, formatFecha(ticket.created_at), "celda-fecha");
     appendActionCell(row, ticket.id);
     elements.tbody.appendChild(row);
@@ -187,11 +239,12 @@ async function readApiDetail(response) {
 const FILAS_ESQUELETO = 6;
 function pintarFilasEsqueleto() {
   const elements = getElements();
-  const columnas = 8;
+  /* Forma de cada columna; el Solicitante no tiene Categoría ni Prioridad. */
+  const columnas = vistaSolicitante ? [0, 1, 4, 5, 6, 7] : [0, 1, 2, 3, 4, 5, 6, 7];
   for (let i = 0; i < FILAS_ESQUELETO; i += 1) {
     const row = document.createElement("tr");
     row.className = "fila-esqueleto";
-    for (let c = 0; c < columnas; c += 1) {
+    for (const c of columnas) {
       const cell = document.createElement("td");
       const barra = document.createElement("span");
       barra.className = `esqueleto-barra col-${c}`;
@@ -204,6 +257,7 @@ function pintarFilasEsqueleto() {
 
 async function fetchTickets() {
   hideStatus();
+  mostrarSinSolicitudes(false);
   clearRows();
   pintarFilasEsqueleto();
 
@@ -262,6 +316,11 @@ async function fetchTickets() {
     const conFiltros = Boolean(
       filtros.search || filtros.category || filtros.priority || filtros.state || filtros.mios
     );
+    if (vistaSolicitante && !conFiltros) {
+      clearRows();
+      mostrarSinSolicitudes(true);
+      return;
+    }
     showStatus(
       conFiltros ? "No hay tickets que coincidan con los filtros." : "No hay tickets para mostrar.",
       "vacio"
@@ -368,6 +427,7 @@ function aplicarTarjeta(tarjeta) {
 
 function init() {
   const elements = getElements();
+  vistaSolicitante = aplicarVistaSolicitante();
 
   elements.form.addEventListener("submit", (event) => {
     event.preventDefault();

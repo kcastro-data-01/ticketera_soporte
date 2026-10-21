@@ -3009,3 +3009,18 @@ td.con-avatar {
 .esqueleto-activo .metrica-cambio {
   visibility: hidden;
 }
+
+/* ===== Listado: vista simple del Solicitante ===== */
+/* «Atendido por» sin responsable todavía. */
+.celda-pendiente {
+  color: var(--color-tenue);
+}
+
+.sin-solicitudes p {
+  margin: 0;
+}
+
+/* Solo dos tarjetas (Abiertas y Resueltas): ancho fijo, no toda la fila. */
+.resumen:has(> [data-vista="equipo"][hidden]) {
+  grid-template-columns: repeat(2, minmax(0, 240px));
+}
