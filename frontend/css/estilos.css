@@ -3192,6 +3192,17 @@ td.con-avatar {
   margin-bottom: 0;
 }
 
+/* Densidad «Compacta» (app.js): menos espacio en las filas de la tabla. */
+#tabla-tickets.densidad-compacta .listado th,
+#tabla-tickets.densidad-compacta .listado td {
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
+}
+
+#tabla-tickets.densidad-compacta .listado td {
+  font-size: var(--texto-sm);
+}
+
 /* ===== Tablero por estado (app.js) =====
    Una columna por estado con los tickets ya cargados; cada tarjeta es un
    enlace al detalle. Sin arrastrar. */
@@ -3200,10 +3211,6 @@ td.con-avatar {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--espaciado-md);
   align-items: start;
-}
-
-.tablero[hidden] {
-  display: none;
 }
 
 .tablero-columna {

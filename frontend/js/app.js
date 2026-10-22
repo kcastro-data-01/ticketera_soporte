@@ -257,7 +257,15 @@ function aplicarVista() {
   const zona = document.getElementById("tablero");
   if (tabla) tabla.hidden = tablero;
   if (zona) zona.hidden = !tablero;
-  [["ver-tabla", !tablero], ["ver-tablero", tablero]].forEach(([id, activo]) => {
+  marcarBotones([["ver-tabla", !tablero], ["ver-tablero", tablero]]);
+  /* La densidad es de la tabla: con el tablero no se ofrece. */
+  const densidad = document.getElementById("densidad");
+  if (densidad) densidad.hidden = tablero;
+}
+
+/* Botones de dos opciones: marca el elegido (clase y aria-pressed). */
+function marcarBotones(pares) {
+  pares.forEach(([id, activo]) => {
     const boton = document.getElementById(id);
     if (!boton) return;
     boton.classList.toggle("activa", activo);
@@ -274,6 +282,38 @@ function cambiarVista(valor) {
   }
   aplicarVista();
   if (ticketsActuales.length) renderTickets(ticketsActuales);
+}
+
+/* --- Densidad de la tabla --------------------------------------------
+   «Compacta» achica el espacio de las filas; «Cómoda» es la de siempre.
+   Se recuerda en este navegador. */
+const DENSIDAD_KEY = "densidad_listado";
+
+let densidad = leerDensidad();
+
+function leerDensidad() {
+  try {
+    return localStorage.getItem(DENSIDAD_KEY) === "compacta" ? "compacta" : "comoda";
+  } catch (error) {
+    return "comoda";
+  }
+}
+
+function aplicarDensidad() {
+  const compacta = densidad === "compacta";
+  const tabla = document.getElementById("tabla-tickets");
+  if (tabla) tabla.classList.toggle("densidad-compacta", compacta);
+  marcarBotones([["densidad-compacta", compacta], ["densidad-comoda", !compacta]]);
+}
+
+function cambiarDensidad(valor) {
+  densidad = valor === "compacta" ? "compacta" : "comoda";
+  try {
+    localStorage.setItem(DENSIDAD_KEY, densidad);
+  } catch (error) {
+    /* La densidad vale solo para esta visita. */
+  }
+  aplicarDensidad();
 }
 
 /* Tarjeta del tablero: ID, prioridad, título y asignado; es un enlace al
@@ -671,6 +711,13 @@ function init() {
     verTablero.addEventListener("click", () => cambiarVista("tablero"));
   }
   aplicarVista();
+  const compacta = document.getElementById("densidad-compacta");
+  const comoda = document.getElementById("densidad-comoda");
+  if (compacta && comoda) {
+    compacta.addEventListener("click", () => cambiarDensidad("compacta"));
+    comoda.addEventListener("click", () => cambiarDensidad("comoda"));
+  }
+  aplicarDensidad();
 
   cargarResumen();
   loadUsers().then(fetchTickets);
