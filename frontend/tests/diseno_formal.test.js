@@ -47,3 +47,16 @@ test("las tres tablas (listado, historial y usuarios) usan .listado", () => {
     assert.match(html, /<table[^>]*class="listado"/, pagina);
   }
 });
+
+test("encabezado: título de 26 px en 600, subtítulo gris y línea de 1 px", () => {
+  const cabecera = regla(".cabecera");
+  assert.match(cabecera, /border-bottom: 1px solid var\(--color-borde\);/);
+  const h1 = regla(".cabecera h1");
+  assert.match(h1, /font-size: 26px;/);
+  assert.match(h1, /font-weight: 600;/);
+  assert.match(regla(".cabecera p"), /color: var\(--color-tenue\);/);
+  for (const pagina of ["index.html", "crear.html", "detalle.html", "historial.html", "metricas.html", "usuarios.html", "ayuda.html", "cuenta.html"]) {
+    const html = fs.readFileSync(path.join(__dirname, "..", pagina), "utf8");
+    assert.match(html, /<header class="cabecera">[\s\S]*?<h1[^>]*>[^<]+<\/h1>\s*<p[^>]*>[^<]+<\/p>/, `${pagina}: título y subtítulo`);
+  }
+});

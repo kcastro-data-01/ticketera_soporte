@@ -282,15 +282,19 @@ h3 {
   box-shadow: var(--sombra-suave);
 }
 
+/* Título de la página y subtítulo en gris; la línea fina de abajo
+   (border-bottom de .cabecera) lo separa del contenido. */
 .cabecera h1 {
   margin: 0;
-  font-size: var(--texto-titulo);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
   color: var(--color-primario-texto-fuerte);
 }
 
 .cabecera p {
-  margin: 0.25rem 0 0;
-  font-size: var(--texto-sm);
+  margin: 0.3rem 0 0;
+  font-size: var(--texto-md);
   color: var(--color-tenue);
 }
 
