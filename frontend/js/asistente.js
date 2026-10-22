@@ -101,22 +101,71 @@ function crearElemento(tag, clase, texto) {
   return el;
 }
 
-/* Escribe el texto con «#N» como enlace al detalle del ticket. Usa nodos
-   de texto: nada de lo que responde el servidor se interpreta como HTML. */
+/* Escribe una línea con «**negrita**» y «#N» como enlace al detalle del
+   ticket. Usa nodos de texto: nada de lo que responde el servidor se
+   interpreta como HTML. */
+function pintarLinea(elemento, texto) {
+  String(texto).split(/(\*\*[^*\n]+\*\*)/).forEach((trozo) => {
+    const negrita = /^\*\*([^*\n]+)\*\*$/.exec(trozo);
+    const destino = negrita ? elemento.appendChild(document.createElement("strong")) : elemento;
+    (negrita ? negrita[1] : trozo).split(/(#\d+)/).forEach((parte) => {
+      const numero = /^#(\d+)$/.exec(parte);
+      if (numero) {
+        const enlace = document.createElement("a");
+        enlace.className = "chat-enlace";
+        enlace.href = `detalle.html?id=${numero[1]}`;
+        enlace.textContent = parte;
+        destino.appendChild(enlace);
+      } else if (parte) {
+        destino.appendChild(document.createTextNode(parte));
+      }
+    });
+  });
+}
+
+/* Líneas que se muestran como título: «Resumen:», «Pasos sugeridos:» o
+   «## Resumen» (pocas palabras, sin otra puntuación). */
+function tituloDeLinea(linea) {
+  const markdown = /^#{1,3}\s+(.+)$/.exec(linea);
+  if (markdown) return markdown[1].replace(/\*\*/g, "");
+  const limpia = linea.replace(/\*\*/g, "");
+  if (/^[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñü ]{0,40}:$/.test(limpia) && limpia.split(" ").length <= 4) return limpia;
+  return null;
+}
+
+/* Arma la respuesta con párrafos, listas («- » o «1. ») y títulos en
+   negrita, siempre con createElement y textContent. */
 function pintarTexto(elemento, texto) {
   elemento.replaceChildren();
-  const partes = String(texto).split(/(#\d+)/);
-  partes.forEach((parte) => {
-    const numero = /^#(\d+)$/.exec(parte);
-    if (numero) {
-      const enlace = document.createElement("a");
-      enlace.className = "chat-enlace";
-      enlace.href = `detalle.html?id=${numero[1]}`;
-      enlace.textContent = parte;
-      elemento.appendChild(enlace);
-    } else if (parte) {
-      elemento.appendChild(document.createTextNode(parte));
+  let lista = null;
+  let parrafo = null;
+  String(texto).split("\n").forEach((cruda) => {
+    const linea = cruda.trim();
+    const vineta = /^[-*•]\s+(.*)$/.exec(linea);
+    const numerada = /^\d+[.)]\s+(.*)$/.exec(linea);
+    if (vineta || numerada) {
+      const tipo = vineta ? "ul" : "ol";
+      if (!lista || lista.tag !== tipo) {
+        lista = { tag: tipo, el: elemento.appendChild(crearElemento(tipo, "chat-lista-respuesta")) };
+      }
+      pintarLinea(lista.el.appendChild(document.createElement("li")), (vineta || numerada)[1]);
+      parrafo = null;
+      return;
     }
+    lista = null;
+    if (!linea) {
+      parrafo = null;
+      return;
+    }
+    const titulo = tituloDeLinea(linea);
+    if (titulo) {
+      elemento.appendChild(crearElemento("strong", "chat-titulo-respuesta", titulo));
+      parrafo = null;
+      return;
+    }
+    if (parrafo) parrafo.appendChild(document.createElement("br"));
+    else parrafo = elemento.appendChild(crearElemento("p", "chat-parrafo"));
+    pintarLinea(parrafo, linea);
   });
 }
 
@@ -135,7 +184,7 @@ function burbuja(mensaje) {
     return fila;
   }
   const { fila, contenido } = filaAsistente();
-  const el = crearElemento("div", `chat-mensaje asistente${mensaje.error ? " error" : ""}`);
+  const el = crearElemento("div", `chat-mensaje asistente${mensaje.error ? " error" : " chat-formato"}`);
   if (mensaje.error) el.textContent = mensaje.content;
   else pintarTexto(el, mensaje.content);
   /* La fuente (sistema o IA) se guarda pero no se muestra: abajo queda el
@@ -247,7 +296,7 @@ async function enviarPregunta(texto) {
             if (!acumulado) {
               clearTimeout(aviso);
               pista.remove();
-              escribiendo.className = "chat-mensaje asistente";
+              escribiendo.className = "chat-mensaje asistente chat-formato";
             }
             acumulado += evento.t;
             pintarTexto(escribiendo, acumulado);

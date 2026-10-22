@@ -2407,6 +2407,38 @@ body.app {
   font-style: italic;
 }
 
+/* Respuestas con formato: párrafos, listas y títulos armados en el
+   navegador (el texto de la IA nunca se toma como HTML). */
+.chat-mensaje.chat-formato {
+  white-space: normal;
+}
+
+.chat-formato > * {
+  margin: 0;
+}
+
+.chat-formato > * + * {
+  margin-top: 0.45rem;
+}
+
+.chat-titulo-respuesta {
+  display: block;
+  font-weight: 600;
+  color: var(--color-titulo);
+}
+
+.chat-lista-respuesta {
+  padding-left: 1.2rem;
+}
+
+.chat-lista-respuesta li + li {
+  margin-top: 0.15rem;
+}
+
+.chat-formato strong {
+  font-weight: 600;
+}
+
 .chat-enlace {
   color: var(--color-enlace);
   font-weight: 600;
