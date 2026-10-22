@@ -131,3 +131,64 @@ test("formato: CSS sin degradados y respetando los saltos", () => {
   const bloque = css.slice(css.indexOf("/* ---------- Asistente virtual"), css.indexOf("/* ---------- Nuevo ticket"));
   assert.doesNotMatch(bloque, /gradient/);
 });
+
+/* ---------- 2. Tarjeta del ticket mencionado ---------- */
+
+const TICKETS = {
+  7: { id: 7, title: "VPN caída", state: "En proceso", priority: "Alta" },
+  8: { id: 8, title: "Monitor", state: "Nuevo", priority: "Crítica" },
+  9: { id: 9, title: "Correo", state: "Resuelto", priority: "Baja" },
+  10: { id: 10, title: "Impresora", state: "Cerrado", priority: "Media" },
+};
+
+test("tarjeta: título, estado y prioridad del #N; clic abre el detalle", async () => {
+  const chat = montar({ api: TICKETS, guardado: [{ role: "user", content: "hola" }, { role: "assistant", content: "Revise el #7." }] });
+  clic(chat.boton);
+  await esperar();
+  const [tarjeta] = todos(chat.lista, "chat-ticket");
+  assert.equal(tarjeta.tag, "a");
+  assert.equal(tarjeta.href, "detalle.html?id=7");
+  assert.equal(texto(todos(tarjeta, "chat-ticket-id")[0]), "#7");
+  assert.equal(texto(todos(tarjeta, "chat-ticket-titulo")[0]), "VPN caída");
+  const etiquetas = todos(tarjeta, "chat-ticket-etiquetas")[0].children;
+  assert.deepEqual(etiquetas.map((e) => [e.className, e.textContent]), [
+    ["badge estado-proceso", "En proceso"],
+    ["badge prioridad-alta", "Alta"],
+  ]);
+  assert.ok(chat.pedidos.includes("/api/tickets/7"));
+});
+
+test("tarjeta: máximo 3, en orden, sin repetir; sin permiso o con error no se muestra", async () => {
+  const chat = montar({
+    api: TICKETS,
+    guardado: [{ role: "user", content: "x" }, { role: "assistant", content: "#8, #99, #7, #8, #9 y #10" }],
+  });
+  clic(chat.boton);
+  await esperar();
+  const pedidos = chat.pedidos.filter((u) => u.startsWith("/api/tickets/"));
+  assert.deepEqual(pedidos, ["/api/tickets/8", "/api/tickets/99", "/api/tickets/7"]);
+  assert.deepEqual(todos(chat.lista, "chat-ticket").map((t) => t.href), ["detalle.html?id=8", "detalle.html?id=7"]);
+
+  clic(chat.boton);
+  clic(chat.boton);
+  await esperar();
+  assert.equal(chat.pedidos.filter((u) => u.startsWith("/api/tickets/")).length, 3, "se consulta una vez por página");
+});
+
+test("tarjeta: el Solicitante ve el estado pero no la prioridad; los errores no llevan tarjeta", async () => {
+  const solicitante = montar({ rol: "Solicitante", api: TICKETS, guardado: [{ role: "user", content: "x" }, { role: "assistant", content: "Su #7" }] });
+  clic(solicitante.boton);
+  await esperar();
+  const etiquetas = todos(solicitante.lista, "chat-ticket-etiquetas")[0].children;
+  assert.deepEqual(etiquetas.map((e) => e.textContent), ["En proceso"]);
+
+  const error = montar({ api: TICKETS, guardado: [{ role: "assistant", content: "No se encontró el #7", error: true }] });
+  clic(error.boton);
+  await esperar();
+  assert.equal(todos(error.lista, "chat-ticket").length, 0);
+});
+
+test("tarjeta: CSS con borde fino, franja del color principal y sin degradados", () => {
+  assert.match(css, /\.chat-ticket \{[^}]*border-left: 3px solid var\(--color-primario\);/);
+  assert.match(css, /\.chat-tickets:not\(:has\(\.chat-ticket\)\) \{\s*display: none;/);
+});
