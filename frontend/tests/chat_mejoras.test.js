@@ -279,3 +279,51 @@ test("hora: mensajes sin hora guardada (saludo o chats anteriores) no la muestra
 test("hora: gris y de 11 px", () => {
   assert.match(css, /\.chat-hora \{\s*font-size: 11px;[^}]*color: var\(--color-tenue\);/);
 });
+
+/* ---------- 5. Copiar respuesta ---------- */
+
+test("copiar: ícono en cada respuesta; copia el texto y muestra «Copiado» un segundo", async () => {
+  const copiado = [];
+  const chat = montar({
+    guardado: [
+      { role: "user", content: "hola", hora: "2026-10-22T15:00:00Z" },
+      { role: "assistant", content: "Hay **2** tickets: #7.", hora: "2026-10-22T15:00:05Z" },
+      { role: "assistant", content: "La IA no está disponible", error: true },
+    ],
+    extra: { navigator: { clipboard: { writeText: async (t) => { copiado.push(t); } } } },
+  });
+  clic(chat.boton);
+  const botones = todos(chat.lista, "chat-copiar");
+  assert.equal(botones.length, 1, "ni en mis mensajes ni en los errores");
+  const [boton] = botones;
+  assert.equal(boton.atributos["aria-label"], "Copiar respuesta");
+  assert.match(boton.innerHTML, /<rect x="9" y="9"/);
+  const aviso = todos(boton, "chat-copiado")[0];
+  assert.equal(aviso.textContent, "Copiado");
+  assert.equal(aviso.hidden, true);
+
+  await boton.listeners.click[0]();
+  assert.deepEqual(copiado, ["Hay 2 tickets: #7."]);
+  assert.equal(aviso.hidden, false);
+  assert.ok(boton.classList.contains("copiado"));
+  const reloj = chat.temporizadores.at(-1);
+  assert.equal(reloj.ms, 1000);
+  reloj.fn();
+  assert.equal(aviso.hidden, true);
+  assert.equal(boton.classList.contains("copiado"), false);
+});
+
+test("copiar: el saludo no lleva botón; si el portapapeles falla no dice «Copiado»", async () => {
+  const vacio = montar();
+  clic(vacio.boton);
+  assert.equal(todos(vacio.lista, "chat-copiar").length, 0);
+
+  const chat = montar({
+    guardado: [{ role: "user", content: "x" }, { role: "assistant", content: "Respuesta" }],
+    extra: { navigator: { clipboard: { writeText: async () => { throw new Error("sin permiso"); } } } },
+  });
+  clic(chat.boton);
+  const [boton] = todos(chat.lista, "chat-copiar");
+  await boton.listeners.click[0]();
+  assert.equal(todos(boton, "chat-copiado")[0].hidden, true);
+});

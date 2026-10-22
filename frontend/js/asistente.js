@@ -53,6 +53,7 @@ const ICONOS = {
   enviar: '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
   expandir: '<path d="M14 4h6v6"/><path d="M20 4l-7 7"/><path d="M10 20H4v-6"/><path d="M4 20l7-7"/>',
   contraer: '<path d="M20 4l-6 6"/><path d="M14 4v6h6"/><path d="M4 20l6-6"/><path d="M10 20v-6H4"/>',
+  copiar: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>',
 };
 
 /* Ícono de conversación (dos burbujas): a color, con las partes pintadas
@@ -245,8 +246,36 @@ function horaDeMensaje(mensaje) {
   return `${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
 }
 
-/* Debajo de la burbuja: la hora en gris. */
-function pieDeMensaje(mensaje) {
+/* Botón con ícono que copia la respuesta (sin los «**» del formato) y
+   muestra «Copiado» un segundo. */
+function botonCopiar(contenido) {
+  const boton = crearElemento("button", "chat-copiar");
+  boton.type = "button";
+  boton.title = "Copiar";
+  boton.setAttribute("aria-label", "Copiar respuesta");
+  boton.innerHTML = icono("copiar");
+  const aviso = boton.appendChild(crearElemento("span", "chat-copiado", "Copiado"));
+  aviso.hidden = true;
+  let reloj = null;
+  boton.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(String(contenido).replace(/\*\*/g, ""));
+    } catch {
+      return;
+    }
+    aviso.hidden = false;
+    boton.classList.add("copiado");
+    clearTimeout(reloj);
+    reloj = setTimeout(() => {
+      aviso.hidden = true;
+      boton.classList.remove("copiado");
+    }, 1000);
+  });
+  return boton;
+}
+
+/* Debajo de la burbuja: la hora en gris y, en las respuestas, «Copiar». */
+function pieDeMensaje(mensaje, copiable = false) {
   const pie = crearElemento("div", "chat-pie");
   const hora = horaDeMensaje(mensaje);
   if (hora) {
@@ -254,6 +283,7 @@ function pieDeMensaje(mensaje) {
     tiempo.setAttribute("datetime", mensaje.hora);
     pie.appendChild(tiempo);
   }
+  if (copiable) pie.appendChild(botonCopiar(mensaje.content));
   return pie.children.length ? pie : null;
 }
 
@@ -273,7 +303,7 @@ function burbuja(mensaje) {
   /* La fuente (sistema o IA) se guarda pero no se muestra: abajo queda el
      aviso general «Las respuestas generadas con IA pueden contener errores». */
   contenido.appendChild(el);
-  const pie = pieDeMensaje(mensaje);
+  const pie = pieDeMensaje(mensaje, !mensaje.error && !mensaje.saludo);
   if (pie) contenido.appendChild(pie);
   if (!mensaje.error) {
     const tarjetas = tarjetasMencionadas(mensaje.content);
@@ -286,7 +316,7 @@ function pintarMensajes(lista, mensajes) {
   lista.replaceChildren();
   const user = getUser();
   if (mensajes.length === 0) {
-    lista.appendChild(burbuja({ role: "assistant", content: SALUDO }));
+    lista.appendChild(burbuja({ role: "assistant", content: SALUDO, saludo: true }));
     const sugerencias = crearElemento("div", "chat-sugerencias");
     (SUGERENCIAS_POR_ROL[user && user.role] || []).forEach((texto) => {
       const chip = crearElemento("button", "chat-sugerencia", texto);
