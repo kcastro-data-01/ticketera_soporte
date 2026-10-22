@@ -54,6 +54,7 @@ const ICONOS = {
   expandir: '<path d="M14 4h6v6"/><path d="M20 4l-7 7"/><path d="M10 20H4v-6"/><path d="M4 20l7-7"/>',
   contraer: '<path d="M20 4l-6 6"/><path d="M14 4v6h6"/><path d="M4 20l6-6"/><path d="M10 20v-6H4"/>',
   copiar: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>',
+  abajo: '<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>',
 };
 
 /* Ícono de conversación (dos burbujas): a color, con las partes pintadas
@@ -73,6 +74,19 @@ function icono(nombre, clase = "chat-svg") {
 }
 
 let chatOcupado = false;
+/* Si el usuario subió para leer, lo nuevo no lo mueve: aparece «Ir al
+   final». Se vuelve a seguir al pie al enviar, al abrir o al bajar. */
+let chatSeguirAbajo = true;
+
+function seguirAlFinal(lista) {
+  const irFinal = document.getElementById("chat-ir-final");
+  if (chatSeguirAbajo) {
+    lista.scrollTop = lista.scrollHeight;
+    if (irFinal) irFinal.hidden = true;
+  } else if (irFinal) {
+    irFinal.hidden = false;
+  }
+}
 
 function leerChat() {
   try {
@@ -224,7 +238,7 @@ function tarjetasMencionadas(texto) {
       if (!ticket || ticket.id === undefined) return;
       lugar.appendChild(tarjetaTicket(ticket));
       const lista = document.getElementById("chat-lista");
-      if (lista) lista.scrollTop = lista.scrollHeight;
+      if (lista) seguirAlFinal(lista);
     });
   });
   return contenedor;
@@ -346,7 +360,7 @@ function pintarMensajes(lista, mensajes) {
     lista.appendChild(sugerencias);
   }
   mensajes.forEach((mensaje) => lista.appendChild(burbuja(mensaje)));
-  lista.scrollTop = lista.scrollHeight;
+  seguirAlFinal(lista);
 }
 
 /* El campo crece con el texto hasta un máximo y el botón Enviar solo se
@@ -364,6 +378,8 @@ async function enviarPregunta(texto) {
   const entrada = document.getElementById("chat-entrada");
   const boton = document.getElementById("chat-enviar");
 
+  chatSeguirAbajo = true;
+
   /* Los avisos de error se muestran pero no se envían a la API. */
   const historial = leerChat().filter((m) => !m.error);
   historial.push({ role: "user", content: pregunta, hora: new Date().toISOString() });
@@ -379,7 +395,7 @@ async function enviarPregunta(texto) {
   const escribiendo = crearElemento("div", "chat-mensaje asistente escribiendo", "Escribiendo…");
   contenido.appendChild(escribiendo);
   lista.appendChild(fila);
-  lista.scrollTop = lista.scrollHeight;
+  seguirAlFinal(lista);
   /* Un modelo local puede tardar en cargarse: se avisa para que no parezca
      colgado. */
   const pista = crearElemento(
@@ -389,7 +405,7 @@ async function enviarPregunta(texto) {
   );
   const aviso = setTimeout(() => {
     contenido.appendChild(pista);
-    lista.scrollTop = lista.scrollHeight;
+    seguirAlFinal(lista);
   }, 8000);
 
   /* La respuesta llega por partes (NDJSON): {"t"} texto, {"fin"} o {"error"}. */
@@ -438,7 +454,7 @@ async function enviarPregunta(texto) {
             }
             acumulado += evento.t;
             pintarTexto(escribiendo, acumulado);
-            lista.scrollTop = lista.scrollHeight;
+            seguirAlFinal(lista);
           } else if (typeof evento.reemplazo === "string") {
             /* La respuesta de la IA no servía: se cambia por la del sistema. */
             acumulado = evento.reemplazo;
@@ -526,6 +542,25 @@ function crearAsistente() {
   lista.id = "chat-lista";
   lista.setAttribute("aria-live", "polite");
 
+  /* Flecha «Ir al final» sobre la conversación. */
+  const irFinal = crearElemento("button", "chat-ir-final");
+  irFinal.id = "chat-ir-final";
+  irFinal.type = "button";
+  irFinal.hidden = true;
+  irFinal.title = "Ir al final";
+  irFinal.setAttribute("aria-label", "Ir al final");
+  irFinal.innerHTML = icono("abajo");
+  const cuerpo = crearElemento("div", "chat-cuerpo");
+  cuerpo.append(lista, irFinal);
+  lista.addEventListener("scroll", () => {
+    chatSeguirAbajo = lista.scrollHeight - lista.scrollTop - lista.clientHeight < 40;
+    if (chatSeguirAbajo) irFinal.hidden = true;
+  });
+  irFinal.addEventListener("click", () => {
+    chatSeguirAbajo = true;
+    seguirAlFinal(lista);
+  });
+
   /* Campo rectangular con el botón de enviar a la derecha. */
   const formulario = crearElemento("form", "chat-formulario");
   const caja = crearElemento("div", "chat-caja");
@@ -551,7 +586,7 @@ function crearAsistente() {
     )
   );
 
-  panel.append(cabecera, lista, formulario);
+  panel.append(cabecera, cuerpo, formulario);
 
   /* Cuadrado del color principal con el ícono de conversación; al abrir
      cambia a una «X». */
@@ -603,6 +638,7 @@ function crearAsistente() {
     panel.hidden = !mostrar;
     contenedor.classList.toggle("abierto", mostrar);
     if (mostrar) {
+      chatSeguirAbajo = true;
       pintarMensajes(lista, leerChat());
       entrada.focus();
     }

@@ -359,3 +359,48 @@ test("separador: si la conversación guardada empezó otro día, dice «Ayer» o
 test("separador: línea fina con el texto en el medio", () => {
   assert.match(css, /\.chat-separador::before,\n\.chat-separador::after \{\s*content: "";\s*flex: 1;\s*border-top: 1px solid var\(--color-borde\);/);
 });
+
+/* ---------- 7. Ir al final ---------- */
+
+test("ir al final: aparece si el usuario subió y llega un mensaje; al tocarlo baja", async () => {
+  let soltar;
+  const chat = montar({ extra: { fetch: () => new Promise((r) => { soltar = r; }), TextDecoder } });
+  const irFinal = chat.buscar("chat-ir-final");
+  const lista = chat.lista;
+  assert.equal(irFinal.hidden, true);
+  assert.equal(irFinal.atributos["aria-label"], "Ir al final");
+  assert.match(irFinal.innerHTML, /M6 13l6 6 6-6/, "flecha hacia abajo");
+  assert.equal(chat.buscar("chat-cuerpo").children[1], irFinal, "encima de la conversación");
+
+  clic(chat.boton);
+  const pendiente = chat.sandbox.enviarPregunta("hola");
+  await esperar();
+  // El usuario sube para leer algo anterior.
+  Object.assign(lista, { scrollHeight: 1000, clientHeight: 300, scrollTop: 100 });
+  lista.listeners.scroll[0]();
+  soltar(ndjson([{ t: "Respuesta nueva" }, { fin: true }]));
+  await pendiente;
+  assert.equal(irFinal.hidden, false, "llegó un mensaje y estaba arriba");
+  assert.equal(lista.scrollTop, 100, "no lo mueve mientras lee");
+
+  clic(irFinal);
+  assert.equal(lista.scrollTop, 1000);
+  assert.equal(irFinal.hidden, true);
+});
+
+test("ir al final: si ya está abajo, sigue bajando solo y la flecha no aparece", async () => {
+  const chat = montar({ extra: conversar([{ t: "ok" }, { fin: true }]) });
+  const lista = chat.lista;
+  clic(chat.boton);
+  Object.assign(lista, { scrollHeight: 500, clientHeight: 300, scrollTop: 200 });
+  lista.listeners.scroll[0]();
+  lista.scrollHeight = 800;
+  await chat.sandbox.enviarPregunta("hola");
+  assert.equal(lista.scrollTop, 800);
+  assert.equal(chat.buscar("chat-ir-final").hidden, true);
+});
+
+test("ir al final: botón sobre la lista, con borde fino y sin degradados", () => {
+  assert.match(css, /\.chat-cuerpo \{\s*position: relative;/);
+  assert.match(css, /\.chat-ir-final \{\s*position: absolute;[^}]*border: 1px solid var\(--color-borde-fuerte\);/);
+});

@@ -2339,6 +2339,43 @@ body.app {
 }
 
 /* --- Conversación --- */
+/* La lista y, encima, la flecha «Ir al final». */
+.chat-cuerpo {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chat-ir-final {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: var(--radio-suave);
+  background: var(--color-superficie);
+  color: var(--color-texto);
+  box-shadow: 0 2px 6px rgba(26, 34, 51, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.chat-ir-final:hover {
+  border-color: var(--color-primario);
+  background: var(--color-primario-tenue);
+  color: var(--color-primario-texto);
+}
+
+.chat-ir-final:focus-visible {
+  outline: 2px solid var(--color-primario-oscuro);
+  outline-offset: 2px;
+}
+
 .chat-lista {
   display: flex;
   flex: 1;
