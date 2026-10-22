@@ -1,4 +1,4 @@
-/* Tipografía: Inter de Google Fonts (400, 500, 600) en todas las páginas,
+/* Tipografía: Inter de Google Fonts (400, 500, 600 y 700 para los números) en todas las páginas,
    con respaldo del sistema, y la misma en los gráficos de métricas.
    Ejecutar con: node --test frontend/tests/tipografia_ui.test.js */
 
@@ -14,13 +14,13 @@ const leer = (archivo) => fs.readFileSync(path.join(carpeta, archivo), "utf8");
 const PAGINAS = fs.readdirSync(carpeta).filter((f) => f.endsWith(".html"));
 const FUENTE = '"Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif';
 
-test("todas las páginas cargan Inter 400, 500 y 600 antes de estilos.css", () => {
+test("todas las páginas cargan Inter 400, 500, 600 y 700 antes de estilos.css", () => {
   assert.ok(PAGINAS.length >= 11, PAGINAS.join(", "));
   for (const pagina of PAGINAS) {
     const html = leer(pagina);
     assert.match(
       html,
-      /<link rel="preconnect" href="https:\/\/fonts\.googleapis\.com">\s*<link rel="preconnect" href="https:\/\/fonts\.gstatic\.com" crossorigin>\s*<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com\/css2\?family=Inter:wght@400;500;600&display=swap">\s*<link rel="stylesheet" href="\/?css\/estilos\.css">/,
+      /<link rel="preconnect" href="https:\/\/fonts\.googleapis\.com">\s*<link rel="preconnect" href="https:\/\/fonts\.gstatic\.com" crossorigin>\s*<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com\/css2\?family=Inter:wght@400;500;600;700&display=swap">\s*<link rel="stylesheet" href="\/?css\/estilos\.css">/,
       pagina,
     );
   }

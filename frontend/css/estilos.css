@@ -1727,7 +1727,8 @@ body.app {
   gap: 0.15rem;
   padding: 1rem 1.1rem;
   border: 1px solid var(--color-borde);
-  border-left: 4px solid var(--color-primario);
+  /* Franja fina con el color de la tarjeta. */
+  border-left: 3px solid var(--color-primario);
   border-radius: var(--radio-medio);
   background: var(--color-superficie-alta);
   color: var(--color-texto);
@@ -1752,8 +1753,8 @@ body.app {
 }
 
 .tarjeta-numero {
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: 700;
   line-height: 1.1;
   color: var(--color-titulo);
 }
@@ -1780,8 +1781,7 @@ body.app {
   align-items: center;
   column-gap: 0.7rem;
   row-gap: 0.05rem;
-  border-left-width: 1px;
-  border-left-color: var(--color-borde);
+  border-left-color: var(--tono-texto);
   --tono-fondo: var(--etiqueta-azul-fondo);
   --tono-texto: var(--etiqueta-azul-texto);
 }
@@ -1833,7 +1833,6 @@ body.app {
 
 .resumen .tarjeta-resumen:has(.tarjeta-icono) .tarjeta-numero {
   grid-area: numero;
-  font-size: 1.65rem;
 }
 
 .resumen .tarjeta-resumen:has(.tarjeta-icono) .tarjeta-etiqueta {
