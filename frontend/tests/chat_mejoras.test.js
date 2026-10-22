@@ -327,3 +327,35 @@ test("copiar: el saludo no lleva botón; si el portapapeles falla no dice «Copi
   await boton.listeners.click[0]();
   assert.equal(todos(boton, "chat-copiado")[0].hidden, true);
 });
+
+/* ---------- 6. Separador de fecha ---------- */
+
+test("separador: «Hoy» al inicio, también con el chat vacío", () => {
+  const vacio = montar();
+  clic(vacio.boton);
+  const primero = vacio.lista.children[0];
+  assert.equal(primero.className, "chat-separador");
+  assert.equal(texto(primero), "Hoy");
+  assert.equal(primero.atributos.role, "separator");
+
+  const chat = montar({ guardado: [{ role: "user", content: "x", hora: new Date().toISOString() }, { role: "assistant", content: "y" }] });
+  clic(chat.boton);
+  assert.equal(todos(chat.lista, "chat-separador").length, 1, "uno solo, al inicio");
+  assert.equal(texto(chat.lista.children[0]), "Hoy");
+});
+
+test("separador: si la conversación guardada empezó otro día, dice «Ayer» o la fecha", () => {
+  const ayer = new Date();
+  ayer.setDate(ayer.getDate() - 1);
+  const deAyer = montar({ guardado: [{ role: "user", content: "x", hora: ayer.toISOString() }] });
+  clic(deAyer.boton);
+  assert.equal(texto(deAyer.lista.children[0]), "Ayer");
+
+  const vieja = montar({ guardado: [{ role: "user", content: "x", hora: new Date(2026, 0, 5, 10).toISOString() }] });
+  clic(vieja.boton);
+  assert.equal(texto(vieja.lista.children[0]), "05/01/2026");
+});
+
+test("separador: línea fina con el texto en el medio", () => {
+  assert.match(css, /\.chat-separador::before,\n\.chat-separador::after \{\s*content: "";\s*flex: 1;\s*border-top: 1px solid var\(--color-borde\);/);
+});

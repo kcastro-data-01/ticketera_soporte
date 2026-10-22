@@ -312,8 +312,27 @@ function burbuja(mensaje) {
   return fila;
 }
 
+/* Separador al inicio de la conversación: «Hoy» (o «Ayer» / la fecha si
+   la conversación guardada empezó otro día). */
+function separadorDeFecha(mensajes) {
+  const primera = mensajes.find((m) => m.hora);
+  const fecha = primera ? new Date(primera.hora) : new Date();
+  const hoy = new Date();
+  const ayer = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1);
+  const mismoDia = (a, b) => a.toDateString() === b.toDateString();
+  const dos = (n) => String(n).padStart(2, "0");
+  let texto = `${dos(fecha.getDate())}/${dos(fecha.getMonth() + 1)}/${fecha.getFullYear()}`;
+  if (Number.isNaN(fecha.getTime()) || mismoDia(fecha, hoy)) texto = "Hoy";
+  else if (mismoDia(fecha, ayer)) texto = "Ayer";
+  const separador = crearElemento("div", "chat-separador");
+  separador.setAttribute("role", "separator");
+  separador.setAttribute("aria-label", texto);
+  separador.appendChild(crearElemento("span", "", texto));
+  return separador;
+}
+
 function pintarMensajes(lista, mensajes) {
-  lista.replaceChildren();
+  lista.replaceChildren(separadorDeFecha(mensajes));
   const user = getUser();
   if (mensajes.length === 0) {
     lista.appendChild(burbuja({ role: "assistant", content: SALUDO, saludo: true }));
