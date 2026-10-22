@@ -60,3 +60,19 @@ test("encabezado: título de 26 px en 600, subtítulo gris y línea de 1 px", ()
     assert.match(html, /<header class="cabecera">[\s\S]*?<h1[^>]*>[^<]+<\/h1>\s*<p[^>]*>[^<]+<\/p>/, `${pagina}: título y subtítulo`);
   }
 });
+
+test("fondo: puntos de 1 px cada 20 px con el color de borde, muy suaves", () => {
+  const body = regla("body");
+  assert.match(body, /background-color: var\(--color-fondo\);/);
+  assert.match(body, /background-image: radial-gradient\(\s*circle,\s*color-mix\(in srgb, var\(--color-borde\) 55%, transparent\) 0\.5px,\s*transparent 1px\s*\);/);
+  assert.match(body, /background-size: 20px 20px;/);
+  /* Solo en el fondo general: ningún otro radial-gradient en la hoja. */
+  assert.equal(css.match(/radial-gradient/g).length, 1);
+  /* Tarjetas, tablas y el chat tapan el patrón con su propio fondo. */
+  assert.match(regla(".tarjeta-resumen"), /background: var\(--color-superficie-alta\);/);
+  assert.match(regla(".listado"), /background: var\(--color-superficie-alta\);/);
+  assert.match(regla(".chat-panel"), /background: var\(--color-superficie\);/);
+  /* Modo oscuro: el mismo patrón con el borde oscuro (misma variable). */
+  const oscuro = css.slice(css.indexOf(':root[data-tema="oscuro"] {'));
+  assert.match(oscuro.slice(0, oscuro.indexOf("\n}")), /--color-borde: #[0-9a-f]{6};/);
+});

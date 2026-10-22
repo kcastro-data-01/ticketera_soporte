@@ -248,7 +248,16 @@ body {
   font-family: "Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 0.875rem;
   line-height: 1.55;
-  background: var(--color-fondo);
+  background-color: var(--color-fondo);
+  /* Textura de puntos muy sutil (1 px cada 20 px) con el color de borde,
+     que en modo oscuro ya es el oscuro. Tarjetas, tablas y el chat tienen
+     fondo propio y la tapan. Sin color-mix() queda el fondo liso. */
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--color-borde) 55%, transparent) 0.5px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
   color: var(--color-texto);
   -webkit-font-smoothing: antialiased;
 }
