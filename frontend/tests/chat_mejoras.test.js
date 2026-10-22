@@ -404,3 +404,16 @@ test("ir al final: botón sobre la lista, con borde fino y sin degradados", () =
   assert.match(css, /\.chat-cuerpo \{\s*position: relative;/);
   assert.match(css, /\.chat-ir-final \{\s*position: absolute;[^}]*border: 1px solid var\(--color-borde-fuerte\);/);
 });
+
+/* ---------- 8. Preguntas sugeridas ---------- */
+
+test("sugeridas: al tocar una, se envía", async () => {
+  const pedidos = [];
+  const chat = montar({ rol: "Solicitante", extra: { fetch: async (url, op) => { pedidos.push(JSON.parse(op.body)); return ndjson([{ t: "ok" }, { fin: true }]); }, TextDecoder } });
+  clic(chat.boton);
+  const chips = todos(chat.lista, "chat-sugerencia");
+  assert.equal(chips.length, 3);
+  clic(chips[0]);
+  await esperar();
+  assert.equal(pedidos[0].messages.at(-1).content, "¿Cómo va mi solicitud?");
+});

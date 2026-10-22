@@ -292,8 +292,7 @@ test("sin mensajes: saludo y 3 preguntas de ejemplo", () => {
   const otros = [];
   const juntar2 = (n) => { if (n.className === "chat-sugerencia") otros.push(n.textContent); (n.children || []).forEach(juntar2); };
   juntar2(solicitante.lista);
-  assert.equal(otros.length, 3);
-  assert.ok(!otros.includes("¿Qué tickets tengo asignados?"));
+  assert.deepEqual(otros, ["¿Cómo va mi solicitud?", "¿Cómo creo un ticket?", "¿Cuántos tickets tengo abiertos?"]);
 });
 
 test("indicador de espera: texto «Escribiendo…», sin puntos animados", () => {

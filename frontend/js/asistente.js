@@ -39,9 +39,9 @@ const SUGERENCIAS_POR_ROL = {
   Supervisor: SUGERENCIAS_EQUIPO,
   Técnico: SUGERENCIAS_EQUIPO,
   Solicitante: [
-    "¿Cuántos tickets pendientes tengo?",
-    "¿En qué estado están mis tickets?",
+    "¿Cómo va mi solicitud?",
     "¿Cómo creo un ticket?",
+    "¿Cuántos tickets tengo abiertos?",
   ],
 };
 const SALUDO = "Buen día. ¿En qué le puedo ayudar? Puede consultar, por ejemplo:";
