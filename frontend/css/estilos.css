@@ -2358,6 +2358,15 @@ body.app {
   justify-content: flex-end;
 }
 
+/* Mis mensajes van a la derecha, con la hora debajo. */
+.chat-fila.usuario .chat-contenido {
+  align-items: flex-end;
+}
+
+.chat-fila.usuario .chat-mensaje.usuario {
+  max-width: 100%;
+}
+
 .chat-contenido {
   display: flex;
   flex-direction: column;
@@ -2509,6 +2518,20 @@ body.app {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
+}
+
+/* Debajo de cada burbuja: la hora en gris, 11 px. */
+.chat-pie {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: -0.1rem;
+}
+
+.chat-hora {
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--color-tenue);
 }
 
 /* Nota debajo de la respuesta: gris claro, 11 px. */

@@ -226,3 +226,56 @@ test("agrandar: 640 px × 80 % del alto en computadora; en el celular no aparece
   assert.match(celular, /\.chat-agrandar \{\s*display: none;/);
   assert.ok(css.indexOf(".chat-asistente.grande .chat-panel") < css.indexOf(".chat-asistente.abierto .chat-panel"), "en el celular gana la pantalla completa");
 });
+
+/* ---------- 4. Hora en los mensajes ---------- */
+
+function ndjson(eventos) {
+  const datos = new TextEncoder().encode(eventos.map((e) => JSON.stringify(e)).join("\n") + "\n");
+  let leido = false;
+  return {
+    ok: true, status: 200,
+    body: { getReader: () => ({ read: async () => (leido ? { done: true } : ((leido = true), { value: datos, done: false })) }) },
+  };
+}
+
+const conversar = (respuesta) => ({ fetch: async () => ndjson(respuesta), TextDecoder });
+
+test("hora: HH:MM debajo de la burbuja, de la pregunta y de la respuesta", async () => {
+  const chat = montar({ extra: conversar([{ t: "Listo." }, { fin: true, fuente: "ia" }]) });
+  clic(chat.boton);
+  await chat.sandbox.enviarPregunta("hola");
+  const guardado = JSON.parse(chat.sandbox.sessionStorage.getItem("asistente_chat"));
+  assert.equal(guardado.length, 2);
+  for (const m of guardado) assert.ok(!Number.isNaN(Date.parse(m.hora)), "se guarda la hora");
+
+  const horas = todos(chat.lista, "chat-hora");
+  assert.equal(horas.length, 2);
+  const esperado = (iso) => { const f = new Date(iso); return `${String(f.getHours()).padStart(2, "0")}:${String(f.getMinutes()).padStart(2, "0")}`; };
+  assert.deepEqual(horas.map((h) => h.textContent), guardado.map((m) => esperado(m.hora)));
+  assert.match(horas[0].textContent, /^\d{2}:\d{2}$/);
+  assert.equal(horas[0].tag, "time");
+
+  const [filaUsuario] = todos(chat.lista, "usuario").filter((n) => n.className.includes("chat-fila"));
+  const contenido = filaUsuario.children[0];
+  assert.equal(contenido.children[0].className, "chat-mensaje usuario");
+  assert.equal(contenido.children[1].children[0], horas[0], "debajo de la burbuja");
+});
+
+test("hora: solo role y content van a la API", async () => {
+  const pedidos = [];
+  const chat = montar({ extra: { fetch: async (url, op) => { pedidos.push(op); return ndjson([{ t: "ok" }, { fin: true }]); }, TextDecoder } });
+  await chat.sandbox.enviarPregunta("uno");
+  await chat.sandbox.enviarPregunta("dos");
+  const cuerpo = JSON.parse(pedidos.at(-1).body);
+  assert.ok(cuerpo.messages.every((m) => Object.keys(m).join() === "role,content"));
+});
+
+test("hora: mensajes sin hora guardada (saludo o chats anteriores) no la muestran", () => {
+  const chat = montar({ guardado: [{ role: "user", content: "hola" }, { role: "assistant", content: "Buen día" }] });
+  clic(chat.boton);
+  assert.equal(todos(chat.lista, "chat-hora").length, 0);
+});
+
+test("hora: gris y de 11 px", () => {
+  assert.match(css, /\.chat-hora \{\s*font-size: 11px;[^}]*color: var\(--color-tenue\);/);
+});

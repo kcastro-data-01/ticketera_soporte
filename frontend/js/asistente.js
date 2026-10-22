@@ -237,10 +237,33 @@ function filaAsistente() {
   return { fila, contenido };
 }
 
+/* Hora del mensaje (HH:MM) o null si no se guardó (saludo, chats viejos). */
+function horaDeMensaje(mensaje) {
+  const fecha = mensaje.hora ? new Date(mensaje.hora) : null;
+  if (!fecha || Number.isNaN(fecha.getTime())) return null;
+  const dos = (n) => String(n).padStart(2, "0");
+  return `${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
+}
+
+/* Debajo de la burbuja: la hora en gris. */
+function pieDeMensaje(mensaje) {
+  const pie = crearElemento("div", "chat-pie");
+  const hora = horaDeMensaje(mensaje);
+  if (hora) {
+    const tiempo = crearElemento("time", "chat-hora", hora);
+    tiempo.setAttribute("datetime", mensaje.hora);
+    pie.appendChild(tiempo);
+  }
+  return pie.children.length ? pie : null;
+}
+
 function burbuja(mensaje) {
   if (mensaje.role === "user") {
     const fila = crearElemento("div", "chat-fila usuario");
-    fila.appendChild(crearElemento("div", "chat-mensaje usuario", mensaje.content));
+    const contenido = fila.appendChild(crearElemento("div", "chat-contenido"));
+    contenido.appendChild(crearElemento("div", "chat-mensaje usuario", mensaje.content));
+    const pie = pieDeMensaje(mensaje);
+    if (pie) contenido.appendChild(pie);
     return fila;
   }
   const { fila, contenido } = filaAsistente();
@@ -250,6 +273,8 @@ function burbuja(mensaje) {
   /* La fuente (sistema o IA) se guarda pero no se muestra: abajo queda el
      aviso general «Las respuestas generadas con IA pueden contener errores». */
   contenido.appendChild(el);
+  const pie = pieDeMensaje(mensaje);
+  if (pie) contenido.appendChild(pie);
   if (!mensaje.error) {
     const tarjetas = tarjetasMencionadas(mensaje.content);
     if (tarjetas) contenido.appendChild(tarjetas);
@@ -292,7 +317,7 @@ async function enviarPregunta(texto) {
 
   /* Los avisos de error se muestran pero no se envían a la API. */
   const historial = leerChat().filter((m) => !m.error);
-  historial.push({ role: "user", content: pregunta });
+  historial.push({ role: "user", content: pregunta, hora: new Date().toISOString() });
   guardarChat(historial);
   pintarMensajes(lista, historial);
   entrada.value = "";
@@ -395,6 +420,7 @@ async function enviarPregunta(texto) {
 
   clearTimeout(aviso);
   if (limite) clearTimeout(limite);
+  respuesta.hora = new Date().toISOString();
   /* Si falló, la pregunta se quita del historial para poder reintentarla. */
   const actualizado = respuesta.error ? historial.slice(0, -1) : historial;
   guardarChat([...actualizado, respuesta]);
