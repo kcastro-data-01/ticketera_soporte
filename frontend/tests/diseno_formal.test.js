@@ -28,3 +28,22 @@ test("tarjetas de resumen: franja de 3 px con su color y número de 28 px en neg
   assert.match(numero, /font-weight: 700;/);
   assert.doesNotMatch(regla(".resumen .tarjeta-resumen:has(.tarjeta-icono) .tarjeta-numero"), /font-size/);
 });
+
+test("tablas: filas alternadas con el fondo neutro y encabezados formales", () => {
+  assert.match(regla(".listado tbody tr:nth-child(even)"), /background: var\(--color-fondo-neutro\);/);
+  assert.ok(css.indexOf("\n.listado tbody tr:nth-child(even) {") < css.indexOf("\n.listado tbody tr:hover {"), "el hover gana sobre la alternancia");
+  const th = regla(".listado th");
+  assert.match(th, /font-size: 12px;/);
+  assert.match(th, /text-transform: uppercase;/);
+  assert.match(th, /letter-spacing: 0\.04em;/);
+  /* Modo oscuro: la misma variable, con su valor oscuro. */
+  const oscuro = css.slice(css.indexOf(':root[data-tema="oscuro"] {'));
+  assert.match(oscuro.slice(0, oscuro.indexOf("\n}")), /--color-fondo-neutro: #[0-9a-f]{6};/);
+});
+
+test("las tres tablas (listado, historial y usuarios) usan .listado", () => {
+  for (const pagina of ["index.html", "historial.html", "usuarios.html"]) {
+    const html = fs.readFileSync(path.join(__dirname, "..", pagina), "utf8");
+    assert.match(html, /<table[^>]*class="listado"/, pagina);
+  }
+});

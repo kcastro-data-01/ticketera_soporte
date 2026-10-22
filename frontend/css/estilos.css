@@ -628,11 +628,11 @@ button.peligro:disabled:hover {
   padding-bottom: 0.55rem;
   border-bottom-color: var(--color-borde-fuerte);
   background: var(--color-fondo-neutro);
-  font-size: 0.72rem;
+  font-size: 12px;
   white-space: nowrap;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: var(--color-tenue);
 }
 
@@ -646,6 +646,12 @@ button.peligro:disabled:hover {
 
 .listado tbody tr {
   transition: background-color 0.15s ease;
+}
+
+/* Filas alternadas: una blanca (el fondo de la tabla) y otra gris muy
+   suave; en modo oscuro las variables ya traen sus tonos oscuros. */
+.listado tbody tr:nth-child(even) {
+  background: var(--color-fondo-neutro);
 }
 
 .listado tbody tr:hover {
