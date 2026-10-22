@@ -1458,6 +1458,37 @@ body.app {
   flex: 1;
 }
 
+/* Secciones del menú (Gestión, Administración, Soporte): título chico en
+   mayúsculas y una línea fina entre secciones. */
+.menu-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.menu-seccion + .menu-seccion {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Si el rol no ve ningún enlace de la sección, tampoco se ve su título. */
+.menu-seccion:not(:has(> .menu-enlace:not([hidden]))) {
+  display: none;
+}
+
+.menu-titulo {
+  margin: 0 0 0.2rem;
+  padding: 0 0.8rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--color-menu-tenue);
+}
+
 .menu-enlace {
   position: relative;
   display: flex;
@@ -1571,7 +1602,8 @@ body.app {
   }
 
   body.menu-plegado .marca-texto,
-  body.menu-plegado .menu-enlace span {
+  body.menu-plegado .menu-enlace span,
+  body.menu-plegado .menu-titulo {
     display: none;
   }
 
@@ -2033,6 +2065,15 @@ body.app {
     flex: 1 0 100%;
     flex-direction: row;
     overflow-x: auto;
+  }
+
+  /* Arriba, en una fila: los enlaces seguidos, sin títulos ni líneas. */
+  .menu-seccion {
+    display: contents;
+  }
+
+  .menu-titulo {
+    display: none;
   }
 
   .menu-enlace {
