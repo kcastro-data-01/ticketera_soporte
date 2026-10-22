@@ -31,12 +31,13 @@ function el(tag) {
   return n;
 }
 
-function montar({ conMenuLateral = true, user = { name: "Laura Méndez", role: "Administrador" } } = {}) {
+function montar({ conMenuLateral = true, user = { name: "Laura Méndez", role: "Administrador" }, ruta = "/index.html" } = {}) {
   const cabecera = el("header");
   const barra = el("aside");
   const docListeners = {};
   const doc = {
     createElement: el,
+    location: { pathname: ruta },
     querySelector: (sel) => ({ ".cabecera": cabecera, ".barra-lateral": conMenuLateral ? barra : null })[sel] || null,
     addEventListener: (t, fn) => { (docListeners[t] = docListeners[t] || []).push(fn); },
   };
@@ -109,6 +110,26 @@ test("CSS: colores claros sobre el azul, menú hacia arriba, plegado y celular",
   assert.match(css, /\.barra-lateral:has\(\.menu-usuario-lista:not\(\[hidden\]\)\) \{\s*z-index: 50;\s*overflow: visible;/, "abierto no se recorta");
   assert.match(css, /\.barra-lateral \.menu-usuario-lista \{\s*top: calc\(100% \+ 4px\);\s*bottom: auto;/, "celular: el menú va arriba y se abre hacia abajo");
   assert.doesNotMatch(css, /barra-salir|boton-cerrar-sesion/);
+});
+
+test("en Mi cuenta el botón de usuario queda resaltado como página actual", () => {
+  for (const ruta of ["/cuenta.html", "/cuenta"]) {
+    const { menu } = montar({ ruta });
+    const boton = buscar(menu, "menu-usuario-boton");
+    assert.equal(boton.className, "menu-usuario-boton activo", ruta);
+    assert.equal(buscar(menu, "menu-usuario-lista").children[0].atributos["aria-current"], "page");
+  }
+  const { menu } = montar({ ruta: "/index.html" });
+  assert.equal(buscar(menu, "menu-usuario-boton").className, "menu-usuario-boton");
+  assert.equal(buscar(menu, "menu-usuario-lista").children[0].atributos["aria-current"], undefined);
+});
+
+test("«Mi cuenta» no está en la lista del menú lateral, solo en el menú del usuario", () => {
+  for (const pagina of PAGINAS_CON_MENU) {
+    const nav = leer(pagina).match(/<nav class="menu"[\s\S]*?<\/nav>/)[0];
+    assert.doesNotMatch(nav, /cuenta\.html|Mi cuenta/, pagina);
+  }
+  assert.match(css, /\.menu-usuario-boton\.activo::before \{[^}]*background: var\(--color-primario-claro\);/, "barra de color como los enlaces");
 });
 
 test("sin sesión o sin menú lateral (login) no se agrega", () => {

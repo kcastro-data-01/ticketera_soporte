@@ -263,6 +263,13 @@ function crearMenuUsuario(doc = document) {
   lista.append(cuenta, salir);
   menu.append(boton, lista);
 
+  /* En «Mi cuenta» el botón queda resaltado como página actual. */
+  const ruta = (doc.location && doc.location.pathname) || "";
+  if (/\/cuenta(\.html)?$/.test(ruta)) {
+    boton.className += " activo";
+    cuenta.setAttribute("aria-current", "page");
+  }
+
   const alternar = (abrir) => {
     lista.hidden = !abrir;
     boton.setAttribute("aria-expanded", String(abrir));

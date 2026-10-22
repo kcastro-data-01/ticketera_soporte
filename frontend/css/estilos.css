@@ -1982,6 +1982,16 @@ body.app {
     width: auto;
   }
 
+  .menu-usuario-boton.activo::before {
+    top: auto;
+    bottom: 0;
+    left: 22%;
+    right: 22%;
+    width: auto;
+    height: 3px;
+    border-radius: var(--radio-etiqueta) var(--radio-etiqueta) 0 0;
+  }
+
   .barra-lateral .menu-usuario-lista {
     top: calc(100% + 4px);
     bottom: auto;
@@ -3202,6 +3212,23 @@ td.con-avatar {
 .menu-usuario-boton[aria-expanded="true"] {
   border-color: transparent;
   background: rgba(255, 255, 255, 0.08);
+}
+
+/* En «Mi cuenta»: resaltado como página actual, igual que los enlaces. */
+.menu-usuario-boton.activo {
+  position: relative;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.menu-usuario-boton.activo::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 0 var(--radio-etiqueta) var(--radio-etiqueta) 0;
+  background: var(--color-primario-claro);
 }
 
 .menu-usuario-boton:focus-visible {
