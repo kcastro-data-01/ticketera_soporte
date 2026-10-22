@@ -135,6 +135,15 @@
       </div>
     </form>
 
+    <!-- Cómo ver el listado; app.js recuerda la elección. El Solicitante
+         solo ve la tabla. -->
+    <div class="listado-opciones" data-vista="equipo">
+      <div class="vista-tabs" role="group" aria-label="Cómo ver los tickets">
+        <button type="button" id="ver-tabla" class="vista-tab activa" aria-pressed="true">Tabla</button>
+        <button type="button" id="ver-tablero" class="vista-tab" aria-pressed="false">Tablero</button>
+      </div>
+    </div>
+
     <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
 
     <!-- Solicitante sin tickets: invitación a crear el primero. -->
@@ -161,6 +170,9 @@
         <tbody id="lista-tickets"></tbody>
       </table>
     </div>
+
+    <!-- Tablero: una columna por estado con los tickets ya cargados (app.js). -->
+    <div id="tablero" class="tablero" aria-label="Tickets por estado" hidden></div>
 
     <nav class="paginacion" id="paginacion" aria-label="Páginas del listado" hidden>
       <button type="button" id="pagina-anterior" class="secundario">← Anterior</button>

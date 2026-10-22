@@ -57,7 +57,7 @@ function mostrarSinSolicitudes(mostrar) {
   if (bloque) bloque.hidden = !mostrar;
   /* La tabla vacía no aporta nada junto a la invitación. */
   const tabla = document.getElementById("tabla-tickets");
-  if (tabla) tabla.hidden = mostrar;
+  if (tabla) tabla.hidden = mostrar || usaTablero();
 }
 
 function getElements() {
@@ -126,6 +126,8 @@ function hideStatus() {
 function clearRows() {
   const elements = getElements();
   elements.tbody.replaceChildren();
+  const tablero = document.getElementById("tablero");
+  if (tablero) tablero.replaceChildren();
 }
 
 function formatFecha(value) {
@@ -226,6 +228,117 @@ function marcarOrden() {
   });
 }
 
+/* --- Tabla o tablero -------------------------------------------------
+   El tablero reparte los tickets ya cargados (la página y los filtros
+   actuales) en una columna por estado; clic en una tarjeta abre el
+   detalle. La elección se recuerda en este navegador. El Solicitante
+   solo usa la tabla. */
+const VISTA_KEY = "vista_listado";
+const ESTADOS_TABLERO = ["Nuevo", "En proceso", "Resuelto", "Cerrado"];
+
+let vistaListado = leerVista();
+
+function leerVista() {
+  try {
+    return localStorage.getItem(VISTA_KEY) === "tablero" ? "tablero" : "tabla";
+  } catch (error) {
+    return "tabla";
+  }
+}
+
+function usaTablero() {
+  return vistaListado === "tablero" && !vistaSolicitante;
+}
+
+/* Muestra la tabla o el tablero y marca el botón elegido. */
+function aplicarVista() {
+  const tablero = usaTablero();
+  const tabla = document.getElementById("tabla-tickets");
+  const zona = document.getElementById("tablero");
+  if (tabla) tabla.hidden = tablero;
+  if (zona) zona.hidden = !tablero;
+  [["ver-tabla", !tablero], ["ver-tablero", tablero]].forEach(([id, activo]) => {
+    const boton = document.getElementById(id);
+    if (!boton) return;
+    boton.classList.toggle("activa", activo);
+    boton.setAttribute("aria-pressed", String(activo));
+  });
+}
+
+function cambiarVista(valor) {
+  vistaListado = valor === "tablero" ? "tablero" : "tabla";
+  try {
+    localStorage.setItem(VISTA_KEY, vistaListado);
+  } catch (error) {
+    /* La vista vale solo para esta visita. */
+  }
+  aplicarVista();
+  if (ticketsActuales.length) renderTickets(ticketsActuales);
+}
+
+/* Tarjeta del tablero: ID, prioridad, título y asignado; es un enlace al
+   detalle, así se abre con clic o con Enter. */
+function crearTarjetaTablero(ticket) {
+  const tarjeta = document.createElement("a");
+  tarjeta.className = `tablero-tarjeta ${FILAS_DESTACADAS[ticket.priority] || ""}`.trim();
+  tarjeta.href = `detalle.html?id=${ticket.id}`;
+
+  const cabeza = document.createElement("span");
+  cabeza.className = "tablero-tarjeta-cabeza";
+  const id = document.createElement("span");
+  id.className = "tablero-tarjeta-id";
+  id.textContent = `#${ticket.id}`;
+  const prioridad = document.createElement("span");
+  prioridad.className = claseBadge(ticket.priority);
+  prioridad.textContent = ticket.priority;
+  cabeza.append(id, prioridad);
+
+  const titulo = document.createElement("span");
+  titulo.className = "tablero-tarjeta-titulo";
+  titulo.textContent = ticket.title;
+
+  const asignado = document.createElement("span");
+  const nombre = assignedText(ticket);
+  asignado.className = nombre === "—" ? "tablero-tarjeta-asignado sin-asignar" : "tablero-tarjeta-asignado";
+  pintarPersona(asignado, nombre === "—" ? "" : nombre);
+  if (nombre === "—") asignado.textContent = "Sin asignar";
+
+  tarjeta.append(cabeza, titulo, asignado);
+  return tarjeta;
+}
+
+function renderTablero(tickets) {
+  const zona = document.getElementById("tablero");
+  if (!zona) return;
+  const columnas = ESTADOS_TABLERO.map((estado) => {
+    const propios = tickets.filter((ticket) => ticket.state === estado);
+    const columna = document.createElement("section");
+    columna.className = "tablero-columna";
+    const titulo = document.createElement("h2");
+    titulo.className = "tablero-titulo";
+    const nombre = document.createElement("span");
+    nombre.className = claseBadge(estado);
+    nombre.textContent = estado;
+    const cuenta = document.createElement("span");
+    cuenta.className = "tablero-cuenta";
+    cuenta.textContent = String(propios.length);
+    cuenta.setAttribute("aria-label", `${propios.length} tickets`);
+    titulo.append(nombre, cuenta);
+    const lista = document.createElement("div");
+    lista.className = "tablero-lista";
+    if (propios.length === 0) {
+      const vacio = document.createElement("p");
+      vacio.className = "tablero-vacio";
+      vacio.textContent = "Sin tickets";
+      lista.appendChild(vacio);
+    }
+    propios.forEach((ticket) => lista.appendChild(crearTarjetaTablero(ticket)));
+    columna.append(titulo, lista);
+    return columna;
+  });
+  zona.replaceChildren(...columnas);
+}
+
 /* Ícono de línea de cada categoría (lo dibuja el CSS). */
 const CATEGORIAS_ICONO = { Hardware: "hardware", Software: "software", Red: "red", Accesos: "accesos" };
 
@@ -299,6 +412,7 @@ function renderTickets(tickets) {
     appendActionCell(row, ticket.id);
     elements.tbody.appendChild(row);
   });
+  if (usaTablero()) renderTablero(ordenarTickets(tickets));
 }
 
 /* Los usuarios solo sirven para mostrar el nombre de quien tiene el ticket. */
@@ -550,6 +664,13 @@ function init() {
     });
   }
   marcarOrden();
+  const verTabla = document.getElementById("ver-tabla");
+  const verTablero = document.getElementById("ver-tablero");
+  if (verTabla && verTablero) {
+    verTabla.addEventListener("click", () => cambiarVista("tabla"));
+    verTablero.addEventListener("click", () => cambiarVista("tablero"));
+  }
+  aplicarVista();
 
   cargarResumen();
   loadUsers().then(fetchTickets);

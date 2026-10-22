@@ -146,10 +146,10 @@ for (const rol of ["Técnico", "Supervisor", "Administrador"]) {
   });
 }
 
-test("index.html marca como «equipo» Nuevos, En proceso, Críticos, Categoría y Prioridad", () => {
+test("index.html marca como «equipo» Nuevos, En proceso, Críticos, Categoría, Prioridad y Tabla/Tablero", () => {
   const marcados = [...indexHtml.matchAll(/<[^>]*data-vista="equipo"[^>]*>(?:\s*<[^>]*>)*\s*([^<]*)/g)].map((m) => m[0]);
-  assert.equal(marcados.length, 7);
-  for (const texto of ['data-estado="Nuevo"', 'data-estado="En proceso"', 'data-prioridad="Crítica"', ">Categoría", ">Prioridad"]) {
+  assert.equal(marcados.length, 8);
+  for (const texto of ['data-estado="Nuevo"', 'data-estado="En proceso"', 'data-prioridad="Crítica"', ">Categoría", ">Prioridad", 'class="listado-opciones"']) {
     assert.ok(marcados.some((m) => m.includes(texto)), texto);
   }
   assert.doesNotMatch(indexHtml, /data-estado="Nuevo,En proceso"[^>]*data-vista="equipo"/, "Pendientes/Abiertas queda");

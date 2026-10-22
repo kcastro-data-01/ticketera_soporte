@@ -3179,6 +3179,144 @@ td.con-avatar {
   box-shadow: inset 3px 0 0 var(--etiqueta-naranja-texto);
 }
 
+/* ===== Opciones del listado: Tabla / Tablero (junto a los filtros) ===== */
+.listado-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--espaciado-md);
+  margin: var(--espaciado-md) 0;
+}
+
+.listado-opciones .vista-tabs {
+  margin-bottom: 0;
+}
+
+/* ===== Tablero por estado (app.js) =====
+   Una columna por estado con los tickets ya cargados; cada tarjeta es un
+   enlace al detalle. Sin arrastrar. */
+.tablero {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--espaciado-md);
+  align-items: start;
+}
+
+.tablero[hidden] {
+  display: none;
+}
+
+.tablero-columna {
+  min-width: 0;
+  padding: var(--espaciado-sm);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-medio);
+  background: var(--color-fondo-neutro);
+}
+
+.tablero-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaciado-sm);
+  margin: 0 0 var(--espaciado-sm);
+  padding: 0.15rem 0.25rem;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+}
+
+.tablero-cuenta {
+  color: var(--color-tenue-fuerte);
+  font-size: var(--texto-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tablero-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaciado-sm);
+}
+
+.tablero-vacio {
+  margin: 0;
+  padding: 0.75rem 0.25rem;
+  color: var(--color-tenue);
+  font-size: var(--texto-sm);
+  text-align: center;
+}
+
+.tablero-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-suave);
+  background: var(--color-superficie-alta);
+  box-shadow: var(--sombra-tarjeta);
+  color: var(--color-texto);
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.tablero-tarjeta:hover {
+  border-color: var(--color-primario);
+}
+
+.tablero-tarjeta:focus-visible {
+  outline: 2px solid var(--color-primario);
+  outline-offset: 2px;
+}
+
+/* Críticas y Altas: la misma línea a la izquierda que en la tabla. */
+.tablero-tarjeta.fila-critica {
+  box-shadow: inset 3px 0 0 var(--etiqueta-rojo-texto), var(--sombra-tarjeta);
+}
+
+.tablero-tarjeta.fila-alta {
+  box-shadow: inset 3px 0 0 var(--etiqueta-naranja-texto), var(--sombra-tarjeta);
+}
+
+.tablero-tarjeta-cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaciado-sm);
+}
+
+.tablero-tarjeta-id {
+  color: var(--color-enlace);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+}
+
+.tablero-tarjeta-titulo {
+  font-size: var(--texto-md);
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.tablero-tarjeta-asignado {
+  display: flex;
+  align-items: center;
+  color: var(--color-tenue-fuerte);
+  font-size: var(--texto-sm);
+}
+
+.tablero-tarjeta-asignado.sin-asignar {
+  color: var(--color-tenue);
+  font-style: italic;
+}
+
+/* En el celular, las columnas una debajo de la otra. */
+@media (max-width: 700px) {
+  .tablero {
+    grid-template-columns: 1fr;
+  }
+}
+/* ===== Fin del tablero ===== */
+
 /* ===== Ruta de navegación (Tickets › Ticket #11) ===== */
 .migas ol {
   display: flex;
