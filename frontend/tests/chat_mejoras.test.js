@@ -192,3 +192,37 @@ test("tarjeta: CSS con borde fino, franja del color principal y sin degradados",
   assert.match(css, /\.chat-ticket \{[^}]*border-left: 3px solid var\(--color-primario\);/);
   assert.match(css, /\.chat-tickets:not\(:has\(\.chat-ticket\)\) \{\s*display: none;/);
 });
+
+/* ---------- 3. Ventana agrandable ---------- */
+
+test("agrandar: botón en la cabecera que cambia el tamaño y se recuerda", () => {
+  const chat = montar();
+  const boton = chat.buscar("chat-agrandar");
+  const contenedor = chat.buscar("chat-asistente");
+  assert.equal(chat.buscar("chat-acciones").children[0], boton, "junto a Nueva conversación y Cerrar");
+  assert.equal(boton.atributos["aria-label"], "Agrandar ventana");
+  assert.equal(boton.atributos["aria-pressed"], "false");
+  assert.match(boton.innerHTML, /M14 4h6v6/, "ícono de expandir");
+  assert.equal(contenedor.classList.contains("grande"), false);
+
+  clic(boton);
+  assert.equal(contenedor.classList.contains("grande"), true);
+  assert.equal(boton.atributos["aria-label"], "Achicar ventana");
+  assert.equal(boton.atributos["aria-pressed"], "true");
+  assert.match(boton.innerHTML, /M14 4v6h6/, "ícono de contraer");
+  assert.equal(chat.store.get("asistente_grande"), "1");
+
+  const otraPagina = montar({ extra: { localStorage: chat.sandbox.localStorage } });
+  assert.equal(otraPagina.buscar("chat-asistente").classList.contains("grande"), true, "se usa al volver");
+
+  clic(boton);
+  assert.equal(chat.store.get("asistente_grande"), "0");
+  assert.equal(contenedor.classList.contains("grande"), false);
+});
+
+test("agrandar: 640 px × 80 % del alto en computadora; en el celular no aparece", () => {
+  assert.match(css, /\.chat-asistente\.grande \.chat-panel \{\s*width: 640px;\s*height: 80vh;/);
+  const celular = css.slice(css.indexOf("/* --- Celular --- */\n@media (max-width: 600px)"), css.indexOf("/* ---------- Nuevo ticket"));
+  assert.match(celular, /\.chat-agrandar \{\s*display: none;/);
+  assert.ok(css.indexOf(".chat-asistente.grande .chat-panel") < css.indexOf(".chat-asistente.abierto .chat-panel"), "en el celular gana la pantalla completa");
+});

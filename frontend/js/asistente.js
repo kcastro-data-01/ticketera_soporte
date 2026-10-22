@@ -6,6 +6,8 @@
 
 const API_ASISTENTE_URL = "/api/asistente/stream";
 const CHAT_KEY = "asistente_chat";
+/* Tamaño de la ventana elegido por el usuario (grande o normal). */
+const CHAT_GRANDE_KEY = "asistente_grande";
 const CHAT_MAX_MENSAJES = 20;
 /* Lo que se muestra si la IA falla o tarda demasiado (el servidor corta a
    los 90 s por llamada; explicar un ticket puede reintentar una vez, así que
@@ -49,6 +51,8 @@ const ICONOS = {
   cerrar: '<path d="M6 6l12 12M18 6L6 18"/>',
   nueva: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
   enviar: '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
+  expandir: '<path d="M14 4h6v6"/><path d="M20 4l-7 7"/><path d="M10 20H4v-6"/><path d="M4 20l7-7"/>',
+  contraer: '<path d="M20 4l-6 6"/><path d="M14 4v6h6"/><path d="M4 20l6-6"/><path d="M10 20v-6H4"/>',
 };
 
 /* Ícono de conversación (dos burbujas): a color, con las partes pintadas
@@ -428,6 +432,8 @@ function crearAsistente() {
   identidad.append(iconoCabecera, titulos);
 
   const acciones = crearElemento("div", "chat-acciones");
+  const agrandar = crearElemento("button", "chat-icono chat-agrandar");
+  agrandar.type = "button";
   const limpiar = crearElemento("button", "chat-icono");
   limpiar.type = "button";
   limpiar.title = "Nueva conversación";
@@ -438,7 +444,7 @@ function crearAsistente() {
   cerrar.title = "Cerrar";
   cerrar.setAttribute("aria-label", "Cerrar asistente");
   cerrar.innerHTML = icono("cerrar");
-  acciones.append(limpiar, cerrar);
+  acciones.append(agrandar, limpiar, cerrar);
   cabecera.append(identidad, acciones);
 
   const lista = crearElemento("div", "chat-lista");
@@ -484,6 +490,32 @@ function crearAsistente() {
 
   contenedor.append(panel, abrir);
   document.body.appendChild(contenedor);
+
+  /* Ventana grande o normal, recordada entre páginas. */
+  const ponerGrande = (grande) => {
+    contenedor.classList.toggle("grande", grande);
+    const texto = grande ? "Achicar ventana" : "Agrandar ventana";
+    agrandar.title = texto;
+    agrandar.setAttribute("aria-label", texto);
+    agrandar.setAttribute("aria-pressed", String(grande));
+    agrandar.innerHTML = icono(grande ? "contraer" : "expandir");
+  };
+  let grande = false;
+  try {
+    grande = localStorage.getItem(CHAT_GRANDE_KEY) === "1";
+  } catch {
+    /* Sin almacenamiento arranca en tamaño normal. */
+  }
+  ponerGrande(grande);
+  agrandar.addEventListener("click", () => {
+    grande = !grande;
+    ponerGrande(grande);
+    try {
+      localStorage.setItem(CHAT_GRANDE_KEY, grande ? "1" : "0");
+    } catch {
+      /* Si no se puede guardar, vale solo para esta página. */
+    }
+  });
 
   /* Abre y cierra al instante, sin animaciones. */
   let abierto = false;
