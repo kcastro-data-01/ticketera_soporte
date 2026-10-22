@@ -16,7 +16,12 @@ const COLORES_POR_DEFECTO = {
   texto: "#5d6880",
   rejilla: "#dde3ee",
   superficie: "#ffffff",
+  radio: 6,
 };
+
+/* Letra del sitio (la de body en estilos.css) para ejes, leyendas y
+   tooltips; sin esto Chart.js usa la suya. */
+const FUENTE_SITIO = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
 
 let graficos = [];
 
@@ -231,6 +236,9 @@ function colores() {
   valores.texto = leer("--color-tenue", valores.texto);
   valores.rejilla = leer("--color-borde", valores.rejilla);
   valores.superficie = leer("--color-superficie", valores.superficie);
+  /* Esquinas de las barras: las mismas que el resto (--radio-suave). */
+  const radio = Number.parseFloat(leer("--radio-suave", ""));
+  if (Number.isFinite(radio)) valores.radio = radio;
   return valores;
 }
 
@@ -242,7 +250,7 @@ const valoresEnBarras = {
     const { ctx } = chart;
     ctx.save();
     ctx.fillStyle = opciones.color;
-    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.font = `600 12px ${FUENTE_SITIO}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     chart.getDatasetMeta(0).data.forEach((barra, i) => {
@@ -281,7 +289,7 @@ function barrasSimples(canvas, filas, c) {
       labels: filas.map((f) => f.nombre),
       datasets: [{
         label: "Tickets", data: filas.map((f) => f.total), backgroundColor: c.serie1,
-        borderRadius: 4, borderSkipped: "start", maxBarThickness: 48,
+        borderRadius: c.radio, borderSkipped: "start", maxBarThickness: 48,
       }],
     },
     options: opciones,
@@ -300,7 +308,7 @@ function barrasPersonas(canvas, personas, c) {
          ticks: { color: c.texto, precision: 0 } },
     y: { grid: { display: false }, ticks: { color: c.texto } },
   };
-  const barra = { borderRadius: 4, borderSkipped: "start", borderColor: c.superficie,
+  const barra = { borderRadius: c.radio, borderSkipped: "start", borderColor: c.superficie,
                   borderWidth: 1, categoryPercentage: 0.7, barPercentage: 0.9, maxBarThickness: 18 };
   return new Chart(canvas, {
     type: "bar",
@@ -348,6 +356,7 @@ function pintarGraficos(s) {
   });
   if (!disponible) return false;
 
+  if (Chart.defaults && Chart.defaults.font) Chart.defaults.font.family = FUENTE_SITIO;
   const c = colores();
   /* El gráfico de personas crece con la cantidad de filas. */
   const alto = Math.max(220, 46 * s.personas.length + 70);

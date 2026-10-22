@@ -11,6 +11,7 @@ const vm = require("node:vm");
 
 const authSource = fs.readFileSync(path.join(__dirname, "..", "js", "auth.js"), "utf8");
 const metricasSource = fs.readFileSync(path.join(__dirname, "..", "js", "metricas.js"), "utf8");
+const css = fs.readFileSync(path.join(__dirname, "..", "css", "estilos.css"), "utf8");
 
 function nodo(tag) {
   return {
@@ -48,7 +49,7 @@ const DATOS = {
   por_dia: [{ fecha: "2026-10-18", total: 3 }, { fecha: "2026-10-19", total: 1 }],
 };
 
-function crear({ rol = "Supervisor", fetchImpl, conChart = true }) {
+function crear({ rol = "Supervisor", fetchImpl, conChart = true, variables = null }) {
   const ids = {};
   for (const id of ["form-rango", "desde", "hasta", "aplicar", "estado-carga", "m-abiertos", "m-en-proceso",
     "m-resueltos", "m-promedio", "m-origen", "m-origen-nota",
@@ -82,6 +83,10 @@ function crear({ rol = "Supervisor", fetchImpl, conChart = true }) {
     console: { error() {} },
     URLSearchParams, Date, Math, Number, String, Object,
   };
+  if (variables) {
+    sandbox.document.documentElement = { setAttribute() {}, removeAttribute() {} };
+    sandbox.getComputedStyle = () => ({ getPropertyValue: (v) => variables[v] || "" });
+  }
   if (conChart) {
     sandbox.Chart = function Chart(canvas, config) {
       this.config = config;
@@ -89,6 +94,7 @@ function crear({ rol = "Supervisor", fetchImpl, conChart = true }) {
       this.destroy = () => { this.destroyed = true; };
       charts.push(this);
     };
+    sandbox.Chart.defaults = { font: { family: "Helvetica Neue" } };
   }
   vm.createContext(sandbox);
   vm.runInContext(authSource, sandbox);
@@ -156,6 +162,20 @@ test("gráfico por persona: nombre con rol, desactivados marcados y fila «Sin a
   assert.equal(persona.options.plugins.legend.display, true); // dos series: con leyenda
   assert.equal(m.charts[0].config.options.plugins.legend.display, false); // una serie: sin leyenda
   assert.match(texto(m.ids["g-persona"].datos.cuerpo), /Carlos Solís \(Técnico\)49/);
+});
+
+test("gráficos con la letra del sitio y las esquinas de --radio-suave", async () => {
+  const m = crear({ fetchImpl: async () => ok(DATOS), variables: { "--radio-suave": " 8px" } });
+  await m.sandbox.iniciarMetricas();
+  assert.equal(m.sandbox.Chart.defaults.font.family, 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif');
+  assert.match(css, /body \{\s*margin: 0;\s*font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;/, "la misma que body");
+  assert.equal(m.charts[0].config.data.datasets[0].borderRadius, 8);
+  assert.deepEqual([...m.charts[2].config.data.datasets.map((d) => d.borderRadius)], [8, 8]);
+  assert.doesNotMatch(metricasSource, /borderRadius: 4/);
+
+  const sinCss = crear({ fetchImpl: async () => ok(DATOS) });
+  await sinCss.sandbox.iniciarMetricas();
+  assert.equal(sinCss.charts[1].config.data.datasets[0].borderRadius, 6, "sin estilos: 6 px, el valor de --radio-suave");
 });
 
 test("sin Chart.js (sin internet) se muestran las tablas abiertas", async () => {
