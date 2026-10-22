@@ -23,7 +23,7 @@ import threading
 import time
 import unicodedata
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from sqlalchemy import func, select
@@ -1158,7 +1158,7 @@ def ajuste_pedido(pregunta: str) -> str | None:
     t = _normalizar(pregunta)
     if re.search(r"\d", t):
         return None
-    palabras = re.findall(r"[a-z]+", t)
+    palabras = re.findall(r"[a-z]+", _SALUDO_AL_INICIO.sub("", t.lstrip("¿¡ ")))
     if not palabras or len(palabras) > AJUSTE_MAX_PALABRAS:
         return None
     corregido = " ".join(_corregir_palabra(p) for p in palabras)
@@ -1243,6 +1243,87 @@ def respuesta_saludo(user: User, pregunta: str) -> str | None:
     if all(p in _AGRADECIMIENTOS | {"a", "ti", "vos", "usted"} for p in palabras):
         return f"¡Con gusto{con_nombre}! ¿Te ayudo con algo más? {_ayuda_corta(user)}"
     return None
+
+
+# ---------- Hora y fecha (sin IA) ----------
+# Costa Rica está en UTC-6 todo el año (sin horario de verano), así que no
+# hace falta la base de zonas horarias, que la imagen slim no trae.
+
+ZONA_COSTA_RICA = timezone(timedelta(hours=-6), "America/Costa_Rica")
+_DIAS_SEMANA = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+_MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+          "septiembre", "octubre", "noviembre", "diciembre")
+# Palabras que caben en «¿qué hora es?», «¿qué día es hoy?», «¿qué fecha es?»;
+# si la pregunta trae otra («¿a qué hora se cerró el #5?»), no es esta.
+_VOCABULARIO_FECHA_HORA = frozenset("""
+    que q ke qe cual a la el las los es son sera seria estamos tenemos hoy dia fecha hora horas
+    ahora actual exacta me nos dice dices decis decime dime digame podes puedes puede podria sabes
+    sabe saber favor por porfa en costa rica aqui aca de del tiene tenes tienes hay
+    disculpe oiga oye perdon y e
+""".split())
+_CORRECCIONES_FECHA_HORA = {"ora": "hora", "oras": "horas", "qeu": "que", "dai": "dia", "oy": "hoy"}
+# El saludo del principio («buenos días, ¿qué hora es?») no pide la fecha.
+_SALUDO_AL_INICIO = re.compile(r"^(hola|buen[oa]?s?(\s+(dias?|tardes|noches))?)\b\W*")
+FECHA_HORA_MAX_PALABRAS = 10
+# Palabras reales que no se corrigen aunque se parezcan («hola» no es «hora»).
+_NO_CORREGIR_FECHA_HORA = frozenset("hola hoja sola cola toda todo mora obra otra esta este para".split())
+
+
+def _ahora_costa_rica() -> datetime:
+    return datetime.now(ZONA_COSTA_RICA)
+
+
+def _palabra_fecha_hora(palabra: str) -> str | None:
+    """La palabra del vocabulario de fecha y hora que se quiso escribir
+    («hroa» → «hora», «fecah» → «fecha»), o ``None``."""
+    if palabra in _VOCABULARIO_FECHA_HORA:
+        return palabra
+    if palabra in _CORRECCIONES_FECHA_HORA:
+        return _CORRECCIONES_FECHA_HORA[palabra]
+    if len(palabra) < 3 or palabra in _NO_CORREGIR_FECHA_HORA:
+        return None
+    maximo = 1 if len(palabra) <= 5 else 2
+    candidatas = [v for v in _VOCABULARIO_FECHA_HORA if len(v) >= 3 and _distancia(palabra, v) <= maximo]
+    # Si se parece a varias, se elige la más cercana (y, empatadas, la de
+    # fecha u hora, que son las que importan).
+    candidatas.sort(key=lambda v: (_distancia(palabra, v), v not in {"hora", "fecha", "dia", "hoy"}))
+    return candidatas[0] if candidatas else None
+
+
+def _texto_fecha(ahora: datetime) -> str:
+    return f"{_DIAS_SEMANA[ahora.weekday()]} {ahora.day} de {_MESES[ahora.month - 1]} de {ahora.year}"
+
+
+def _texto_hora(ahora: datetime) -> str:
+    """«Son las 3:50 p. m.» / «Es la 1:05 a. m.»."""
+    hora = ahora.hour % 12 or 12
+    sufijo = "a. m." if ahora.hour < 12 else "p. m."
+    inicio = "Es la" if hora == 1 else "Son las"
+    return f"{inicio} {hora}:{ahora.minute:02d} {sufijo}"
+
+
+def respuesta_fecha_hora(pregunta: str, ahora: datetime | None = None) -> str | None:
+    """Hora y fecha de Costa Rica para «¿qué hora es?», «¿qué día es hoy?» o
+    «¿qué fecha es?» (con errores de escritura), o ``None``."""
+    t = _normalizar(pregunta)
+    if re.search(r"\d", t):
+        return None
+    palabras = re.findall(r"[a-z]+", _SALUDO_AL_INICIO.sub("", t.lstrip("¿¡ ")))
+    if not palabras or len(palabras) > FECHA_HORA_MAX_PALABRAS:
+        return None
+    corregidas = [_palabra_fecha_hora(p) for p in palabras]
+    if None in corregidas:
+        return None
+    pide_hora = bool({"hora", "horas"} & set(corregidas))
+    pide_fecha = bool({"fecha", "dia"} & set(corregidas)) or (
+        "estamos" in corregidas and bool({"que", "q", "ke", "qe", "a"} & set(corregidas))
+    )
+    if not pide_hora and not pide_fecha:
+        return None
+    ahora = ahora or _ahora_costa_rica()
+    if pide_hora:
+        return f"{_texto_hora(ahora)} del {_texto_fecha(ahora)}."
+    return f"Hoy es {_texto_fecha(ahora)}."
 
 
 # ---------- Limpieza de lo que escribe la IA ----------
@@ -1340,6 +1421,9 @@ def calcular_directa(session, user: User, pregunta: str,
     saludo = respuesta_saludo(user, pregunta)
     if saludo is not None:
         return Directa(saludo)
+    fecha_hora = respuesta_fecha_hora(pregunta)
+    if fecha_hora is not None:
+        return Directa(fecha_hora)
     t = _normalizar(pregunta)
     ids = tickets_mencionados(pregunta)
     # «¿cuántos tickets se resolvieron?» cuenta: no habla del ticket en pantalla.
@@ -2086,6 +2170,10 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
     el prompt para la IA. ``pregunta`` es la que se respondió (la consulta
     completa si era un seguimiento)."""
     pregunta = pregunta_efectiva(session, user, messages)
+    # Antes que los ajustes: «¿qué hora es en Costa Rica?» no pide «más corta».
+    fecha_hora = respuesta_fecha_hora(messages[-1]["content"]) if messages else None
+    if fecha_hora is not None:
+        return Directa(fecha_hora), None, None, messages[-1]["content"]
     ajustada = ajustar_ultima_explicacion(session, user, messages, ticket_actual)
     if ajustada is not None:
         return ajustada, None, None, pregunta
