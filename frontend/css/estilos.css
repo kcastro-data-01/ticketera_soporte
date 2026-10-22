@@ -245,7 +245,7 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: "Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 0.875rem;
   line-height: 1.55;
   background: var(--color-fondo);

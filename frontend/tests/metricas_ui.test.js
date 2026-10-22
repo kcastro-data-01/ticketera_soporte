@@ -167,8 +167,8 @@ test("gráfico por persona: nombre con rol, desactivados marcados y fila «Sin a
 test("gráficos con la letra del sitio y las esquinas de --radio-suave", async () => {
   const m = crear({ fetchImpl: async () => ok(DATOS), variables: { "--radio-suave": " 8px" } });
   await m.sandbox.iniciarMetricas();
-  assert.equal(m.sandbox.Chart.defaults.font.family, 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif');
-  assert.match(css, /body \{\s*margin: 0;\s*font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;/, "la misma que body");
+  assert.equal(m.sandbox.Chart.defaults.font.family, '"Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif');
+  assert.match(css, /body \{\s*margin: 0;\s*font-family: "Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif;/, "la misma que body");
   assert.equal(m.charts[0].config.data.datasets[0].borderRadius, 8);
   assert.deepEqual([...m.charts[2].config.data.datasets.map((d) => d.borderRadius)], [8, 8]);
   assert.doesNotMatch(metricasSource, /borderRadius: 4/);

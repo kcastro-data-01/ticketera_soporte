@@ -21,7 +21,7 @@ const COLORES_POR_DEFECTO = {
 
 /* Letra del sitio (la de body en estilos.css) para ejes, leyendas y
    tooltips; sin esto Chart.js usa la suya. */
-const FUENTE_SITIO = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+const FUENTE_SITIO = '"Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif';
 
 let graficos = [];
 
