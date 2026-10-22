@@ -1502,6 +1502,23 @@ body.app {
   background: var(--color-primario-claro);
 }
 
+/* Contador junto a «Tickets» (auth.js): etiqueta chica con el color
+   principal, empujada a la derecha del enlace. */
+.menu-enlace .menu-contador {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 0.4rem;
+  border-radius: var(--radio-pill);
+  background: var(--color-primario);
+  color: var(--color-texto-inverso);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
 /* Botón para achicar el menú (solo íconos). */
 .boton-plegar {
   min-height: 0;
@@ -1568,6 +1585,18 @@ body.app {
     justify-content: center;
     padding-left: 0;
     padding-right: 0;
+  }
+
+  /* Plegado: el contador queda sobre la esquina del ícono. */
+  body.menu-plegado .menu-enlace .menu-contador {
+    display: inline-grid;
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 0.25rem;
+    font-size: 0.65rem;
   }
 
   /* Plegado: solo el círculo de iniciales; el menú se abre igual. */

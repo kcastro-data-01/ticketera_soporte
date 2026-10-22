@@ -292,6 +292,50 @@ function crearMenuUsuario(doc = document) {
   return menu;
 }
 
+/* Contador junto a «Tickets» en el menú lateral: para Administrador y
+   Supervisor, los tickets Nuevos sin asignar; para el Técnico, los suyos
+   sin resolver (Nuevo o En proceso). El Solicitante no lo ve y con 0 no
+   se muestra. Usa los endpoints del listado y del resumen. */
+async function contarParaMenu(user) {
+  if (user.role === "Técnico") {
+    const response = await fetchWithAuth("/api/tickets/summary");
+    if (!response.ok) return null;
+    const resumen = await response.json();
+    return { cantidad: Number(resumen.mios_abiertos), texto: "asignados a usted sin resolver" };
+  }
+  if (user.role === "Administrador" || user.role === "Supervisor") {
+    const response = await fetchWithAuth("/api/tickets?state=Nuevo");
+    if (!response.ok) return null;
+    const tickets = await response.json();
+    if (!Array.isArray(tickets)) return null;
+    const sinAsignar = tickets.filter((t) => t.assigned_to_id === null || t.assigned_to_id === undefined);
+    return { cantidad: sinAsignar.length, texto: "nuevos sin asignar" };
+  }
+  return null;
+}
+
+async function pintarContadorTickets(doc = document) {
+  if (!doc || typeof doc.querySelector !== "function") return null;
+  const user = getUser();
+  const enlace = doc.querySelector('.menu a[href="index.html"]');
+  if (!user || !enlace || enlace.querySelector(".menu-contador")) return null;
+  let conteo;
+  try {
+    conteo = await contarParaMenu(user);
+  } catch (error) {
+    return null; /* Sin contador: el menú funciona igual. */
+  }
+  if (!conteo || !Number.isFinite(conteo.cantidad) || conteo.cantidad <= 0) return null;
+  const etiqueta = doc.createElement("span");
+  etiqueta.className = "menu-contador";
+  etiqueta.textContent = conteo.cantidad > 99 ? "99+" : String(conteo.cantidad);
+  etiqueta.setAttribute("aria-hidden", "true");
+  enlace.setAttribute("aria-label", `Tickets: ${conteo.cantidad} ${conteo.texto}`);
+  enlace.title = `${conteo.cantidad} ${conteo.texto}`;
+  enlace.appendChild(etiqueta);
+  return etiqueta;
+}
+
 /* Ruta de navegación: para el Solicitante el listado se llama
    «Mis solicitudes». */
 function pintarMigas(doc = document) {
@@ -570,6 +614,7 @@ if (typeof document !== "undefined" && typeof document.addEventListener === "fun
     iniciarMenuPlegable();
     iniciarBotonTema();
     crearMenuUsuario();
+    pintarContadorTickets();
     mostrarAvisoPendiente();
   });
 }
