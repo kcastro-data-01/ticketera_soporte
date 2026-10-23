@@ -107,6 +107,10 @@ function makeFetch(overrides = {}) {
     /* La lista se pide con ?todos=true (incluye desactivados). */
     const url = rawUrl.split("?")[0];
     const method = (options.method || "GET").toUpperCase();
+    /* ¿LOGIN_LOCAL? Por defecto no: sin campos de contraseña. */
+    if (url === "/api/auth/config") {
+      return resolve(overrides.config, jsonResponse(200, { tenant: "t", client_id: "c", login_local: false }));
+    }
     if (url === "/api/users" && method === "POST") {
       return resolve(overrides.create, jsonResponse(201, USER_A));
     }
@@ -183,7 +187,7 @@ test("init lista los usuarios con nombre, correo, rol y estado", async () => {
 
   await harness.init();
 
-  assert.deepEqual(harness.urls(), ["/api/users?todos=true"]);
+  assert.deepEqual(harness.urls(), ["/api/auth/config", "/api/users?todos=true"]);
   const rows = harness.node("cuerpo-usuarios").children;
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[0].children.map((cell) => cell.textContent), [
@@ -331,8 +335,12 @@ test("email inválido devuelve error sin enviar", async () => {
   );
 });
 
-test("contraseña corta devuelve error sin enviar", async () => {
-  const harness = createHarness(makeFetch());
+/* Con LOGIN_LOCAL=true (desarrollo) vuelven los campos de contraseña. */
+const conLoginLocal = (extra = {}) =>
+  makeFetch({ config: jsonResponse(200, { tenant: "t", client_id: "c", login_local: true }), ...extra });
+
+test("contraseña corta devuelve error sin enviar (solo con LOGIN_LOCAL)", async () => {
+  const harness = createHarness(conLoginLocal());
   await harness.init();
 
   await assertValidation(
@@ -386,10 +394,10 @@ test("crear usuario envía los datos, recarga la lista y limpia el formulario", 
 
   assert.deepEqual(harness.urls(), ["/api/users", "/api/users?todos=true"]);
   assert.equal(harness.fetchCalls[0].options.method, "POST");
+  /* Sin contraseña: la persona entra con su cuenta de Microsoft. */
   assert.deepEqual(JSON.parse(harness.fetchCalls[0].options.body), {
     name: "Carlos Gómez",
     email: "carlos@soporte.local",
-    password: "clave2026",
     role: "Administrador",
   });
   /* La lista se recarga sola: el usuario nuevo aparece sin recargar. */
@@ -478,4 +486,21 @@ test("error de conexión al crear informa que el servidor no responde", async ()
   assert.equal(harness.node("estado-usuario").className, "estado error");
   assert.ok(harness.consoleErrors.length > 0);
   assert.equal(harness.node("crear").disabled, false);
+});
+
+test("con LOGIN_LOCAL el alta también envía la contraseña", async () => {
+  const harness = createHarness(conLoginLocal());
+  await harness.init();
+  harness.node("nombre").value = "Carlos Gómez";
+  harness.node("email").value = "carlos@soporte.local";
+  harness.clearCalls();
+  await harness.crear();
+  assert.equal(JSON.parse(harness.fetchCalls[0].options.body).password, "clave2026");
+});
+
+test("usuarios.html: contraseña y nueva contraseña ocultas salvo LOGIN_LOCAL", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "usuarios.html"), "utf8");
+  assert.match(html, /<label class="campo solo-login-local" hidden>\s*<span>Contraseña \*<\/span>\s*<input type="password" id="password"/);
+  assert.match(html, /<label class="campo solo-login-local" hidden>\s*<span>Nueva contraseña<\/span>/);
+  assert.doesNotMatch(html, /id="password"[^>]*required/, "no es obligatoria si no se ve");
 });

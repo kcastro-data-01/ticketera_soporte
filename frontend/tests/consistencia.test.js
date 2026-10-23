@@ -44,6 +44,9 @@ test("ventanas con 8 px, tarjetas con 6 px y títulos con la misma escala", () =
   assert.match(regla(css, "\n.seccion"), /margin-top: var\(--espaciado-seccion\);/);
 });
 
-test("Mi cuenta trata de usted", () => {
-  assert.match(leer("cuenta.html"), /Repita la nueva contraseña \*/);
+test("Mi cuenta: solo sus datos, sin cambiar la contraseña (es la de Microsoft)", () => {
+  const cuenta = leer("cuenta.html");
+  assert.match(cuenta, /<p>Sus datos<\/p>/);
+  assert.doesNotMatch(cuenta, /contraseña|form-password/i);
+  assert.doesNotMatch(leer("js/cuenta.js"), /change-password/);
 });

@@ -73,7 +73,7 @@ test("en el celular los botones y campos miden al menos 40 x 40 px", () => {
 test("los botones de solo ícono tienen nombre (aria-label)", () => {
   const login = leer("login.html");
   const ojos = login.match(/<button type="button" class="toggle-password" aria-label="Mostrar contraseña" aria-pressed="false"/g) || [];
-  assert.equal(ojos.length, 2, "mostrar contraseña es un botón con nombre");
+  assert.equal(ojos.length, 1, "mostrar contraseña (solo LOGIN_LOCAL) es un botón con nombre");
   const chat = leer("js/asistente.js");
   for (const nombre of ["Abrir asistente virtual", "Cerrar asistente", "Nueva conversación", "Enviar"]) {
     assert.ok(chat.includes(`"${nombre}"`), nombre);

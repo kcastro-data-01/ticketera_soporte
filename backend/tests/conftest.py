@@ -5,7 +5,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from backend.auth import hash_password
 from backend.database import Base, enable_sqlite_foreign_keys, get_session
+from backend.models import User
 from backend.main import app
 from backend.services import asistente_service
 
@@ -17,6 +19,14 @@ def respuestas_fijas(monkeypatch):
     las encienden."""
     monkeypatch.setenv("ASISTENTE_REDACTAR_CON_IA", "false")
     monkeypatch.setenv("ASISTENTE_INTERPRETAR_CON_IA", "false")
+
+
+@pytest.fixture(autouse=True)
+def login_local(monkeypatch):
+    """Las pruebas entran con correo y contraseña como atajo (LOGIN_LOCAL,
+    solo para desarrollo). Las del inicio de sesión por defecto (solo
+    Microsoft) lo apagan."""
+    monkeypatch.setenv("LOGIN_LOCAL", "true")
 
 
 @pytest.fixture(autouse=True)
@@ -111,41 +121,30 @@ def client_public(session):
     return client(session)
 
 
+def _token_admin(client, session) -> str:
+    """Administrador de prueba (con contraseña) y su token de /login."""
+    session.add(User(name="Test Admin", email="testadmin@test.com", role="Administrador",
+                     password_hash=hash_password("testpass123")))
+    session.commit()
+    resp = client.post("/api/auth/login", json={"email": "testadmin@test.com", "password": "testpass123"})
+    assert resp.status_code == 200
+    return resp.json()["access_token"]
+
+
 @pytest.fixture
 def auth_client(client, session):
     """FastAPI test client with automatic authentication.
 
-    Registers a user and wraps the client to include the Bearer token
-    in all requests. Use this for tests that hit protected endpoints.
+    Creates an administrator and wraps the client to include the Bearer
+    token in all requests. Use this for tests that hit protected endpoints.
     """
-    resp = client.post(
-        "/api/auth/register",
-        json={
-            "name": "Test Admin",
-            "email": "testadmin@test.com",
-            "password": "testpass123",
-            "role": "Administrador",
-        },
-    )
-    assert resp.status_code == 201
-    token = resp.json()["access_token"]
-    return AuthenticatedClient(client, token)
+    return AuthenticatedClient(client, _token_admin(client, session))
 
 
 @pytest.fixture
-def auth_token(client):
-    """Register a user and return a valid access token for testing."""
-    resp = client.post(
-        "/api/auth/register",
-        json={
-            "name": "Test Admin",
-            "email": "testadmin@test.com",
-            "password": "testpass123",
-            "role": "Administrador",
-        },
-    )
-    assert resp.status_code == 201
-    return resp.json()["access_token"]
+def auth_token(client, session):
+    """Create an administrator and return a valid access token for testing."""
+    return _token_admin(client, session)
 
 
 @pytest.fixture

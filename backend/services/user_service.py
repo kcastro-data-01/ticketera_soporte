@@ -18,7 +18,7 @@ def create_user(session, payload: UserCreate) -> User | None:
         name=payload.name,
         email=payload.email,
         role=payload.role.value,
-        password_hash=hash_password(payload.password),
+        password_hash=hash_password(payload.password) if payload.password else None,
     )
     session.add(user)
     session.commit()

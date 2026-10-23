@@ -45,7 +45,7 @@
     <header class="cabecera">
       <div>
         <h1>Mi cuenta</h1>
-        <p>Sus datos y el cambio de contraseña</p>
+        <p>Sus datos</p>
       </div>
     </header>
 
@@ -66,28 +66,6 @@
             <span id="cuenta-rol">—</span>
           </div>
         </div>
-      </section>
-
-      <section class="seccion" aria-label="Cambiar contraseña">
-        <h2>Cambiar contraseña</h2>
-        <form id="form-password" class="filtros formulario" novalidate>
-          <label class="campo">
-            <span>Contraseña actual *</span>
-            <input type="password" id="password-actual" required autocomplete="current-password">
-          </label>
-          <label class="campo">
-            <span>Nueva contraseña *</span>
-            <input type="password" id="password-nueva" required minlength="6" maxlength="72" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
-          </label>
-          <label class="campo">
-            <span>Repita la nueva contraseña *</span>
-            <input type="password" id="password-confirmar" required minlength="6" maxlength="72" autocomplete="new-password">
-          </label>
-          <div class="acciones">
-            <button type="submit" id="guardar-password">Cambiar contraseña</button>
-          </div>
-        </form>
-        <p id="estado-password" class="estado" role="status" aria-live="polite" hidden></p>
       </section>
     </main>
 

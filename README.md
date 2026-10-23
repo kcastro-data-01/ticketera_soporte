@@ -52,13 +52,15 @@ filtrarlos, y consultar su historial de cambios.
   resolver, Asignados a mí; `GET /api/tickets/summary`), vista «Mis tickets»
   (`?mios=true`) y paginación de 20 en 20 (`limit`/`offset`, total en la
   cabecera `X-Total-Count`).
-- «Mi cuenta»: cada usuario cambia su contraseña
-  (`POST /api/auth/change-password`).
+- Inicio de sesión **solo con la cuenta de Microsoft de la empresa**
+  (Entra ID); ver [Inicio de sesión con Microsoft](#inicio-de-sesión-con-microsoft).
+  «Mi cuenta» muestra los datos del usuario (la contraseña es la de Microsoft).
 - Desactivar/reactivar usuarios desde Usuarios (`is_active` en
   `PATCH /api/users/{id}`; `GET /api/users?todos=true` para el admin). Un
   usuario desactivado no inicia sesión y pierde la sesión abierta.
-- El registro público solo existe para crear el primer Administrador
-  (`GET /api/auth/setup`); las demás cuentas las crea un Administrador.
+- No hay registro público: la cuenta se crea sola al entrar por primera vez
+  con Microsoft (como Solicitante, o Administrador si es `ADMIN_INICIAL`) o
+  al escribir al buzón de soporte desde el dominio de la empresa.
 
 - Asistente de IA (botón «Asistente» abajo a la derecha, `POST /api/asistente`):
   responde preguntas sobre la app con Claude. El servidor solo le entrega los
@@ -357,9 +359,9 @@ curl -X POST http://127.0.0.1:8000/api/users \
 curl http://127.0.0.1:8000/api/users
 ```
 
-`POST /api/users` (requiere `password`, de 6 a 72 caracteres, para que el
-usuario pueda iniciar sesión; `PATCH /api/users/{id}` acepta `password` para
-restablecerla) devuelve `201` con `{id, name, email, role}` (si `role`
+`POST /api/users` (`password` es opcional: se entra con Microsoft; solo se
+usa con `LOGIN_LOCAL=true`, de 6 a 72 caracteres, y `PATCH /api/users/{id}`
+la acepta para restablecerla) devuelve `201` con `{id, name, email, role}` (si `role`
 se omite, se guarda `Técnico`). Errores:
 `422` si `name` está vacío, el `email` no tiene formato válido o el `role` no
 es `Administrador`/`Supervisor`/`Técnico`/`Solicitante`; `409 Conflict` si el email ya está registrado.
@@ -695,8 +697,7 @@ trata este ticket», «resumí el #3» o «no entiendo el ticket #3» (también 
 y responde con el texto narrado y las preguntas sugeridas. Solo para tickets
 que la persona puede ver; el Solicitante sigue con el chat normal. El chat no
 muestra la fuente debajo de cada mensaje (el campo `fuente` sigue llegando del
-servidor y queda en el log); abajo está el aviso general «Las respuestas
-generadas con IA pueden contener errores».
+servidor y queda en el log).
 
 API: `GET /api/tickets/{id}/explicacion` (la guardada, sin IA) y
 `POST /api/tickets/{id}/explicacion[?regenerar=true]`.
@@ -709,6 +710,48 @@ docker compose exec ticketera python -m backend.probar_explicar_ia
 ```
 
 (con `--borrar` elimina los tickets de prueba al terminar).
+
+## Inicio de sesión con Microsoft
+
+Se entra **solo con la cuenta de Microsoft de la empresa** (Entra ID), con la
+misma app registrada del correo (`CORREO_M365_TENANT` y
+`CORREO_M365_CLIENT_ID`). No hay usuario y contraseña propios ni registro.
+
+1. `login.html` tiene un solo botón, «Iniciar sesión con Microsoft». Usa
+   MSAL.js (`@azure/msal-browser@4.30.0` desde jsDelivr, versión fija con hash
+   de integridad) con el flujo de código con PKCE y los scopes `openid`,
+   `profile`, `email` y `User.Read`.
+2. El navegador manda el `id_token` a `POST /api/auth/microsoft`. El backend lo
+   valida (`backend/services/login_microsoft.py`): firma con las claves
+   públicas de Microsoft del tenant, audiencia = `CORREO_M365_CLIENT_ID`,
+   emisor = el tenant, vencimiento y `tid` del tenant (solo cuentas de la
+   empresa). Después entrega la sesión de la app como siempre (`/api/auth/me`).
+3. Roles (`asignar_rol_inicial`, función aparte para sumar reglas por puesto o
+   departamento): `ADMIN_INICIAL` entra **siempre** como Administrador;
+   cualquier otra persona nueva se crea como **Solicitante** con su nombre y
+   correo de Microsoft. Quien ya existe mantiene su rol (lo cambia un
+   Administrador en Usuarios). Una cuenta desactivada no entra.
+
+### Requisitos en Microsoft Entra ID
+
+En la app registrada: plataforma **Aplicación de página única** con la URI de
+redirección `http://localhost:8000/login.html` (o `APP_URL/login.html`) y el
+permiso `User.Read` con consentimiento de administrador. No hace falta secreto.
+
+### Configuración
+
+```env
+CORREO_M365_TENANT=<Tenant ID o dominio>
+CORREO_M365_CLIENT_ID=<Client ID>
+ADMIN_INICIAL=kcastro@data.cr
+# Solo para desarrollo: también se puede entrar con correo y contraseña
+LOGIN_LOCAL=false
+```
+
+`GET /api/auth/config` (público) le pasa a `login.html` el tenant, el client id
+y si `LOGIN_LOCAL` está activo. Con `LOGIN_LOCAL=true` vuelve el formulario de
+contraseña (`POST /api/auth/login`) y, en Usuarios, los campos de contraseña;
+con `false` (por defecto) `/api/auth/login` no existe (404).
 
 ## Tickets por correo
 
@@ -742,18 +785,18 @@ Si un correo de soporte real no se detecta, agrega la frase a la lista.
 |---|---|
 | Usuario activo de la ticketera (mismo correo) | Se crea el ticket a su nombre (asunto = título, cuerpo = descripción, categoría y prioridad por palabras clave) y se le responde con el número y el enlace. |
 | Responde a «Ticket #N» de un ticket suyo | Se agrega como comentario a ese ticket. |
-| Alguien sin cuenta | **No se crea ticket.** Se le responde con el asunto «Registrate para crear tickets», que explica que primero cree su cuenta en `APP_URL/login.html?registro=1&email=…` y después vuelva a enviar su solicitud. Máximo un aviso cada 24 h por remitente; el correo igual se marca como leído y se mueve. En el registro: `Correo ignorado: remitente no registrado <correo>`. |
+| Alguien sin cuenta del dominio de la empresa (`DOMINIO_EMPRESA`, p. ej. `data.cr`) | Se crea como **Solicitante** (nombre del correo, o lo que va antes de @) y se crea el ticket como a cualquier usuario, con su respuesta. En el registro: `Usuario creado desde el correo: <correo> (Solicitante)`. |
+| Alguien sin cuenta de otro dominio (o sin `DOMINIO_EMPRESA`) | **Se ignora**: no se crea ticket ni se responde; se marca como leído y se mueve. En el registro: `Correo ignorado: remitente externo sin cuenta <correo>`. |
 | Cuenta desactivada | Se le avisa que hable con un administrador. |
 | Respuestas automáticas, rebotes, «noreply», o el propio buzón | Nunca se responden (evita bucles). |
-| Responde o reenvía un aviso de la app («Registrate para crear tickets», «No pudimos crear tu ticket»), con o sin `RE:`/`RV:`/`FW:`/`Fwd:` | Se ignora: nunca crea un ticket. Se marca como leído y se mueve. |
+| Responde o reenvía un aviso de la app («No pudimos crear tu ticket», o un «Registrate para crear tickets» viejo: ya no se envía), con o sin `RE:`/`RV:`/`FW:`/`Fwd:` | Se ignora: nunca crea un ticket. Se marca como leído y se mueve. |
 | Responde a «Ticket #N creado» o «Comentario agregado al ticket #N» | Si es el dueño del ticket y escribió algo, se agrega como **comentario**; si no, se ignora. Nunca crea un ticket nuevo. |
 
 La app lee los correos **no leídos** de la bandeja de entrada con Microsoft
 Graph. Cada correo que procesa se responde **en el mismo hilo**, se marca como
 leído y se mueve a la carpeta **Tickets-Procesados** (se crea sola). Los que
 no piden ayuda se quedan sin leer en la bandeja. Solo se procesan los correos
-que llegan después de activar la función. Cualquiera puede registrarse en
-`login.html`; esas cuentas siempre quedan como **Solicitante**.
+que llegan después de activar la función.
 
 ### Requisitos en Microsoft Entra ID (Azure)
 
@@ -773,6 +816,7 @@ CORREO_ACTIVO=1
 CORREO_USUARIO=kcastro@data.cr
 CORREO_M365_TENANT=<Tenant ID>
 CORREO_M365_CLIENT_ID=<Client ID>
+DOMINIO_EMPRESA=data.cr
 APP_URL=http://IP-O-NOMBRE-DEL-EQUIPO:8000
 ```
 

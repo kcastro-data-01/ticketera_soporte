@@ -185,7 +185,7 @@
             <li>El correo tiene que enviarse desde la misma dirección con la que el usuario está registrado en la ticketera.</li>
             <li>El asunto se usa como título y el texto como descripción. La respuesta automática indica el número del ticket y el enlace para consultarlo.</li>
             <li>Si se responde al correo de un ticket («Ticket #N»), la respuesta se agrega como comentario de ese ticket.</li>
-            <li>Si quien escribe no tiene cuenta, no se crea el ticket: recibe un correo que le indica cómo registrarse. Si su cuenta está desactivada, se le pide que se comunique con un administrador.</li>
+            <li>Si quien escribe no tiene cuenta y su correo es de la empresa, se le crea una cuenta de Solicitante y se crea el ticket igual. Los correos de fuera de la empresa se ignoran. Si su cuenta está desactivada, se le pide que se comunique con un administrador.</li>
           </ul>
         </div>
       </details>
@@ -197,7 +197,7 @@
             <dt>¿Por qué no veo algunas opciones del menú, como Métricas o Usuarios?</dt>
             <dd>Cada rol ve solo las pantallas que puede usar. Consulte la tabla de «Permisos por rol» en «Roles y permisos».</dd>
             <dt>¿Puedo cambiar mi contraseña?</dt>
-            <dd>Sí, desde «Mi cuenta», en el menú del usuario o en el menú lateral.</dd>
+            <dd>Se entra con la cuenta de Microsoft de la empresa, así que la contraseña es la de Microsoft: se cambia allí o con el área de TI. La ticketera no guarda contraseñas.</dd>
             <dt>¿Se puede eliminar un ticket?</dt>
             <dd>Solo el Administrador puede eliminarlo, y la acción no se puede deshacer.</dd>
             <dt>¿Cómo sé quién atiende mi ticket?</dt>

@@ -130,17 +130,20 @@ class UserCreate(BaseModel):
 
     ``role`` is optional and defaults to ``Técnico`` (the same default the
     database applies); an explicit value must still be a valid role.
-    ``password`` is required so the new user can log in.
+    ``password`` is optional: people sign in with their Microsoft account;
+    it is only used for development with ``LOGIN_LOCAL=true``.
     """
 
     name: str
     email: str
-    password: str
+    password: str | None = None
     role: UserRole = UserRole.TECHNICIAN
 
     @field_validator("password")
     @classmethod
-    def password_must_be_valid(cls, value: str) -> str:
+    def password_must_be_valid(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         return _validate_password(value)
 
     @field_validator("name")
@@ -406,24 +409,6 @@ class AsistenteResponse(BaseModel):
     fuente: Literal["directa", "ia_datos", "ia"] = "ia"
 
 
-class ChangePasswordRequest(BaseModel):
-    """Payload accepted by ``POST /api/auth/change-password``."""
-
-    current_password: str
-    new_password: str
-
-    @field_validator("new_password")
-    @classmethod
-    def new_password_must_be_valid(cls, value: str) -> str:
-        return _validate_password(value)
-
-
-class SetupResponse(BaseModel):
-    """``needs_setup`` is true while no user can log in yet (first run)."""
-
-    needs_setup: bool
-
-
 class TicketSummary(BaseModel):
     """Ticket counters for the dashboard, limited to the visible tickets."""
 
@@ -436,46 +421,23 @@ class TicketSummary(BaseModel):
     mios_abiertos: int
 
 
-class RegisterRequest(BaseModel):
-    """Payload accepted by ``POST /api/auth/register``."""
+class MicrosoftLoginRequest(BaseModel):
+    """Payload accepted by ``POST /api/auth/microsoft``: the ``id_token``
+    that MSAL.js got from Microsoft."""
 
-    name: str
-    email: str
-    password: str
-    role: UserRole | None = None
+    id_token: str = Field(min_length=1)
 
-    @field_validator("name")
-    @classmethod
-    def name_must_not_be_blank(cls, value: str) -> str:
-        cleaned = value.strip()
-        if not cleaned:
-            raise ValueError("el nombre no puede estar vacío")
-        if len(cleaned) > 120:
-            raise ValueError("el nombre debe tener como máximo 120 caracteres")
-        return cleaned
 
-    @field_validator("email")
-    @classmethod
-    def email_must_be_valid(cls, value: str) -> str:
-        cleaned = value.strip().lower()
-        if not _EMAIL_PATTERN.match(cleaned):
-            raise ValueError("el email no tiene un formato válido")
-        if len(cleaned) > 255:
-            raise ValueError("el email debe tener como máximo 255 caracteres")
-        return cleaned
+class LoginConfigResponse(BaseModel):
+    """Public data for login.html (``GET /api/auth/config``)."""
 
-    @field_validator("password")
-    @classmethod
-    def password_must_be_strong_enough(cls, value: str) -> str:
-        if len(value) < 6:
-            raise ValueError("la contraseña debe tener al menos 6 caracteres")
-        if len(value) > 128:
-            raise ValueError("la contraseña debe tener como máximo 128 caracteres")
-        return value
+    tenant: str
+    client_id: str
+    login_local: bool
 
 
 class TokenResponse(BaseModel):
-    """Response returned after successful registration or login."""
+    """Response returned after a successful login."""
 
     access_token: str
     token_type: str = "bearer"

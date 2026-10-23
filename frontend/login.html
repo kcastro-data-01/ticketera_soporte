@@ -297,10 +297,24 @@
     .auth-footer a:hover {
       text-decoration: underline;
     }
-    .nota-registro {
+    .nota-login {
       margin: 0 0 1rem;
       font-size: 0.85rem;
       color: var(--color-tenue);
+    }
+    .btn-microsoft {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+    }
+    .btn-microsoft svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    #form-login {
+      margin-top: 1.5rem;
     }
     .role-selector {
       display: none;
@@ -365,7 +379,14 @@
       <h2 class="login-titulo">Iniciar sesión</h2>
       <div id="auth-error" class="auth-error" role="alert"></div>
       <div id="auth-success" class="auth-success" role="status"></div>
-      <form id="form-login" class="auth-form activo">
+      <p class="nota-login">Use su cuenta de Microsoft de la empresa.</p>
+      <div class="btn-grp">
+        <button type="button" id="btn-microsoft" class="btn-primario btn-microsoft"><svg viewBox="0 0 21 21" aria-hidden="true"><path fill="#f25022" d="M1 1h9v9H1z"/><path fill="#7fba00" d="M11 1h9v9h-9z"/><path fill="#00a4ef" d="M1 11h9v9H1z"/><path fill="#ffb900" d="M11 11h9v9h-9z"/></svg>Iniciar sesión con Microsoft</button>
+      </div>
+
+      <!-- Solo para desarrollo (LOGIN_LOCAL=true en el .env): entrar con
+           correo y contraseña. Por defecto no se muestra. -->
+      <form id="form-login" class="auth-form">
         <div class="campo">
           <input type="email" id="login-email" name="email" required autocomplete="email" class="form-input" placeholder="nombre@empresa.com">
           <span class="field-icon email-icon"></span>
@@ -374,66 +395,35 @@
           <input type="password" id="login-password" name="password" required autocomplete="current-password" class="form-input" placeholder="••••••••">
           <button type="button" class="toggle-password" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
-        <div class="remember-me">
-          <input type="checkbox" id="remember-me" name="remember-me">
-          <span>Recordar sesión</span>
-        </div>
         <div class="btn-grp">
-          <button type="submit" id="btn-login" class="btn-primario">Entrar</button>
-          <button type="button" id="tab-register" class="btn-secundario">Crear cuenta</button>
+          <button type="submit" id="btn-login" class="btn-secundario">Entrar con contraseña (desarrollo)</button>
         </div>
       </form>
 
-      <form id="form-register" class="auth-form" >
-        
-        <div class="campo">
-          <input type="text" id="register-name" name="name" required class="form-input" placeholder="Nombre completo">
-          <span class="field-icon"></span>
-        </div>
-        <div class="campo">
-          <input type="email" id="register-email" name="email" required class="form-input" placeholder="nombre@soporte.local">
-          <span class="field-icon email-icon"></span>
-        </div>
-        <div class="campo">
-          <input type="password" id="register-password" name="password" required class="form-input" placeholder="Mínimo 6 caracteres">
-          <button type="button" class="toggle-password" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
-        </div>
-        <div class="remember-me">
-          <input type="checkbox" id="register-memory" name="remember-memory">
-          <span>Recordar sesión</span>
-        </div>
-        <p class="nota-registro" id="nota-registro">
-          Utilice su correo de la empresa. Su cuenta se crea como <b>Solicitante</b>
-          para que pueda registrar sus solicitudes y darles seguimiento.
-        </p>
-        <div class="btn-grp">
-          <button type="submit" id="btn-register" class="btn-primario">Crear cuenta</button>
-          <button type="button" id="tab-login" class="btn-secundario">Volver a iniciar sesión</button>
-        </div>
-      </form>
-
-      <a href="index.html" class="forgot-link">¿Olvidó su contraseña? Comuníquese con el administrador.</a>
       <div class="login-footer">
       </div>
     </div>
   </div>
 
+  <!-- MSAL.js (versión fija, con hash de integridad): inicio de sesión con
+       Microsoft, flujo de código con PKCE. -->
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@4.30.0/lib/msal-browser.min.js"
+          integrity="sha384-RGxxfG5yRS8DLU7ZJ8OoLhbV/BsJFHyPuMVHrTLbpj3t5Z15LnviJmaznKY/a7LZ"
+          crossorigin="anonymous"></script>
   <script>
     (function () {
       const API_BASE = "/api/auth";
+      // Solo lo que hace falta para iniciar sesión; User.Read ya tiene
+      // consentimiento de administrador.
+      const SCOPES = ["openid", "profile", "email", "User.Read"];
 
-      // Elementos del DOM
-      const tabLogin = document.getElementById("tab-login");
-      const tabRegister = document.getElementById("tab-register");
-      const formLogin = document.getElementById("form-login");
-      const formRegister = document.getElementById("form-register");
       const errorDiv = document.getElementById("auth-error");
       const successDiv = document.getElementById("auth-success");
+      const btnMicrosoft = document.getElementById("btn-microsoft");
+      const formLogin = document.getElementById("form-login");
       const btnLogin = document.getElementById("btn-login");
-      const btnRegister = document.getElementById("btn-register");
 
-      // Estado
-      let isFirstUser = false;
+      let msalApp = null;
 
       // --- Utilidades ---
 
@@ -457,11 +447,11 @@
       function setLoading(button, loading) {
         if (loading) {
           button.disabled = true;
-          button.dataset.originalText = button.textContent;
+          button.dataset.originalText = button.innerHTML;
           button.textContent = "Cargando...";
         } else {
           button.disabled = false;
-          button.textContent = button.dataset.originalText;
+          button.innerHTML = button.dataset.originalText;
         }
       }
 
@@ -470,44 +460,80 @@
         localStorage.setItem("user", JSON.stringify(user));
       }
 
-      function redirectToIndex() {
-        window.location.href = "index.html";
+      // Con el token de la app: datos del usuario, sesión guardada y al listado.
+      async function entrarConToken(accessToken, respaldo) {
+        const meResp = await fetch(`${API_BASE}/me`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        saveSession(accessToken, meResp.ok ? await meResp.json() : respaldo);
+        showSuccess("Inicio de sesión correcto. Redirigiendo…");
+        setTimeout(() => { window.location.href = "index.html"; }, 800);
       }
 
-      // --- Tabs ---
+      // --- Microsoft ---
 
-      function activateTab(tab) {
-        if (tab === "login") {
-          tabLogin.classList.add("activo");
-          tabRegister.classList.remove("activo");
-          formLogin.classList.add("activo");
-          formRegister.classList.remove("activo");
-          document.querySelector('.login-titulo').textContent = 'Iniciar sesión';
-        } else {
-          tabRegister.classList.add("activo");
-          tabLogin.classList.remove("activo");
-          formRegister.classList.add("activo");
-          formLogin.classList.remove("activo");
-          document.querySelector('.login-titulo').textContent =
-            isFirstUser ? 'Crear administrador' : 'Crear cuenta';
+      // El id_token de Microsoft va al backend, que lo valida (firma,
+      // audiencia, emisor y tenant) y entrega la sesión de la app.
+      async function entrarConMicrosoft(idToken) {
+        const resp = await fetch(`${API_BASE}/microsoft`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id_token: idToken }),
+        });
+        if (resp.status === 403) {
+          showError("Su cuenta está desactivada. Comuníquese con el administrador.");
+          return;
+        }
+        if (resp.status === 401) {
+          showError("No se pudo validar su cuenta. Use la cuenta de Microsoft de la empresa.");
+          return;
+        }
+        if (!resp.ok) {
+          showError(`Error del servidor (${resp.status}). Inténtelo de nuevo.`);
+          return;
+        }
+        const data = await resp.json();
+        await entrarConToken(data.access_token, {});
+      }
+
+      async function iniciarMicrosoft(config) {
+        if (!window.msal || !config.tenant || !config.client_id) {
+          btnMicrosoft.disabled = true;
+          showError("El inicio de sesión con Microsoft no está disponible en este momento.");
+          return;
+        }
+        msalApp = await msal.PublicClientApplication.createPublicClientApplication({
+          auth: {
+            clientId: config.client_id,
+            authority: `https://login.microsoftonline.com/${config.tenant}`,
+            redirectUri: `${window.location.origin}/login.html`,
+          },
+          cache: { cacheLocation: "sessionStorage" },
+        });
+        // Al volver de Microsoft (redirect) llega la respuesta con el id_token.
+        const respuesta = await msalApp.handleRedirectPromise();
+        if (respuesta && respuesta.idToken) {
+          setLoading(btnMicrosoft, true);
+          try {
+            await entrarConMicrosoft(respuesta.idToken);
+          } finally {
+            setLoading(btnMicrosoft, false);
+          }
         }
       }
 
-      tabLogin.addEventListener("click", () => activateTab("login"));
-      tabRegister.addEventListener("click", () => activateTab("register"));
-
-      // --- Verificar si es el primer usuario ---
-
-      async function checkFirstUser() {
+      btnMicrosoft.addEventListener("click", async () => {
+        clearMessages();
+        if (!msalApp) return;
         try {
-          const resp = await fetch("/api/auth/register", { method: "OPTIONS" });
-          // Si el método no está permitido, al menos sabemos que el endpoint existe
-        } catch (e) {
-          // No hacemos nada, el flujo normal maneja esto
+          // Flujo de código con PKCE (MSAL lo hace solo).
+          await msalApp.loginRedirect({ scopes: SCOPES, prompt: "select_account" });
+        } catch (err) {
+          showError("No se pudo abrir el inicio de sesión de Microsoft.");
         }
-      }
+      });
 
-      // --- Login ---
+      // --- Contraseña (solo LOGIN_LOCAL, desarrollo) ---
 
       async function handleLogin(event) {
         event.preventDefault();
@@ -515,51 +541,32 @@
 
         const email = document.getElementById("login-email").value.trim();
         const password = document.getElementById("login-password").value;
-
         if (!email || !password) {
-          showError("Todos los campos son obligatorios.");
+          showError("Ingrese su correo y su contraseña.");
           return;
         }
 
         setLoading(btnLogin, true);
-
         try {
           const resp = await fetch(`${API_BASE}/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password }),
           });
-
           if (resp.status === 401) {
             showError("Credenciales inválidas. Verifique su correo y contraseña.");
             return;
           }
-
           if (resp.status === 403) {
             showError("Su cuenta está desactivada. Comuníquese con el administrador.");
             return;
           }
-
           if (!resp.ok) {
             showError(`Error del servidor (${resp.status}). Inténtelo de nuevo.`);
             return;
           }
-
           const data = await resp.json();
-
-          // Obtener información del usuario
-          const meResp = await fetch(`${API_BASE}/me`, {
-            headers: { Authorization: `Bearer ${data.access_token}` },
-          });
-          if (meResp.ok) {
-            const user = await meResp.json();
-            saveSession(data.access_token, user);
-          } else {
-            saveSession(data.access_token, { email });
-          }
-
-          showSuccess("Inicio de sesión correcto. Redirigiendo…");
-          setTimeout(redirectToIndex, 800);
+          await entrarConToken(data.access_token, { email });
         } catch (err) {
           showError("No se pudo conectar con el servidor. Verifique su conexión.");
         } finally {
@@ -567,86 +574,7 @@
         }
       }
 
-      // --- Registro ---
-
-      async function handleRegister(event) {
-        event.preventDefault();
-        clearMessages();
-
-        const name = document.getElementById("register-name").value.trim();
-        const email = document.getElementById("register-email").value.trim();
-        const password = document.getElementById("register-password").value;
-        if (!name || !email || !password) {
-          showError("Todos los campos son obligatorios.");
-          return;
-        }
-
-        if (password.length < 6) {
-          showError("La contraseña debe tener al menos 6 caracteres.");
-          return;
-        }
-
-        /* El primer usuario se crea como Administrador; los demás, el
-           servidor siempre los crea como Solicitante. */
-        const payload = { name, email, password };
-        if (isFirstUser) payload.role = "Administrador";
-
-        setLoading(btnRegister, true);
-
-        try {
-          const resp = await fetch(`${API_BASE}/register`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-
-          if (resp.status === 409) {
-            showError("Este correo ya está registrado. Inicie sesión con esa cuenta.");
-            return;
-          }
-
-          if (resp.status === 422) {
-            const detail = await resp.json().catch(() => null);
-            if (detail && detail.detail) {
-              const msg = Array.isArray(detail.detail)
-                ? detail.detail.map((e) => e.msg).join(", ")
-                : detail.detail;
-              showError(`Datos inválidos: ${msg}`);
-            } else {
-              showError("Datos inválidos. Verifique la información.");
-            }
-            return;
-          }
-
-          if (!resp.ok) {
-            showError(`Error del servidor (${resp.status}). Inténtelo de nuevo.`);
-            return;
-          }
-
-          const data = await resp.json();
-
-          // Obtener información del usuario
-          const meResp = await fetch(`${API_BASE}/me`, {
-            headers: { Authorization: `Bearer ${data.access_token}` },
-          });
-          if (meResp.ok) {
-            const user = await meResp.json();
-            saveSession(data.access_token, user);
-          } else {
-            saveSession(data.access_token, { name, email });
-          }
-
-          showSuccess("Cuenta creada correctamente. Redirigiendo…");
-          setTimeout(redirectToIndex, 800);
-        } catch (err) {
-          showError("No se pudo conectar con el servidor. Verifique su conexión.");
-        } finally {
-          setLoading(btnRegister, false);
-        }
-      }
-
       formLogin.addEventListener("submit", handleLogin);
-      formRegister.addEventListener("submit", handleRegister);
       // Botón con aria-label y aria-pressed: también se usa con el teclado.
       document.querySelectorAll(".toggle-password").forEach(el => el.addEventListener("click", () => {
         const i = el.parentElement.querySelector("input");
@@ -657,38 +585,21 @@
         el.setAttribute("aria-pressed", String(mostrar));
         el.title = etiqueta;
       }));
+
       // --- Inicialización ---
 
-      // Primera vez (ningún usuario puede iniciar sesión): la cuenta que se
-      // cree será el Administrador. Después, quien se registre es Solicitante.
-      // El enlace del correo de bienvenida abre directo el registro
-      // (login.html?registro=1&email=...).
-      async function initCheck() {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get("email")) {
-          document.getElementById("register-email").value = params.get("email");
-        }
+      async function init() {
         try {
-          const resp = await fetch(`${API_BASE}/setup`);
-          if (resp.ok) {
-            const data = await resp.json();
-            if (data.needs_setup) {
-              isFirstUser = true;
-              tabRegister.textContent = "Crear administrador";
-              btnRegister.textContent = "Crear administrador";
-              document.getElementById("nota-registro").innerHTML =
-                "Primera vez: esta cuenta será el <b>Administrador</b>.";
-              activateTab("register");
-              return;
-            }
-          }
-        } catch (e) {
-          isFirstUser = false;
+          const resp = await fetch(`${API_BASE}/config`);
+          const config = resp.ok ? await resp.json() : {};
+          if (config.login_local) formLogin.classList.add("activo");
+          await iniciarMicrosoft(config);
+        } catch (err) {
+          showError("No se pudo iniciar sesión con Microsoft. Inténtelo de nuevo.");
         }
-        if (params.get("registro")) activateTab("register");
       }
 
-      initCheck();
+      init();
     })();
   </script>
 </body>

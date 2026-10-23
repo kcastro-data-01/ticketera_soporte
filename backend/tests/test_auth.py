@@ -1,121 +1,25 @@
-"""Tests for authentication endpoints (login, register, me)."""
+"""Tests for authentication endpoints: password login (only with
+``LOGIN_LOCAL``, development) and me. The Microsoft login is tested in
+test_login_microsoft.py."""
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import select
 
+from backend.auth import hash_password
 from backend.models import User
 
 
-# --- Register ---
-
-
-def test_register_first_user_can_be_admin(client):
-    """First user to register can choose their role (Administrador)."""
-    resp = client.post(
-        "/api/auth/register",
-        json={
-            "name": "Admin User",
-            "email": "admin@test.com",
-            "password": "securepass123",
-            "role": "Administrador",
-        },
-    )
-    assert resp.status_code == 201
-    data = resp.json()
-    assert "access_token" in data
-    assert data["token_type"] == "bearer"
-    assert data["expires_in"] > 0
-
-
-def test_register_after_the_first_user_is_always_requester(client):
-    """Once a user exists, anyone can register but only as Solicitante."""
-    first = client.post(
-        "/api/auth/register",
-        json={
-            "name": "First User",
-            "email": "first@test.com",
-            "password": "pass123456",
-            "role": "Administrador",
-        },
-    )
-    assert first.status_code == 201
-
-    resp = client.post(
-        "/api/auth/register",
-        json={
-            "name": "Second User",
-            "email": "second@test.com",
-            "password": "pass123456",
-            "role": "Administrador",
-        },
-    )
-    assert resp.status_code == 201
-    token = resp.json()["access_token"]
-    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert me.json()["role"] == "Solicitante"
-
-    dup = client.post(
-        "/api/auth/register",
-        json={"name": "Dup", "email": "first@test.com", "password": "pass123456"},
-    )
-    assert dup.status_code == 409
-
-
-def test_setup_status_reports_first_run(client):
-    assert client.get("/api/auth/setup").json() == {"needs_setup": True}
-    client.post(
-        "/api/auth/register",
-        json={"name": "Admin", "email": "admin@test.com", "password": "pass123456"},
-    )
-    assert client.get("/api/auth/setup").json() == {"needs_setup": False}
-
-
-def test_register_without_role_defaults_to_admin(client):
-    """The first user without an explicit role becomes Administrador."""
-    resp = client.post(
-        "/api/auth/register",
-        json={
-            "name": "No Role User",
-            "email": "norole@test.com",
-            "password": "pass123456",
-        },
-    )
-    assert resp.status_code == 201
-
-    me_resp = client.get(
-        "/api/auth/me",
-        headers={"Authorization": f"Bearer {resp.json()['access_token']}"},
-    )
-    assert me_resp.status_code == 200
-    assert me_resp.json()["role"] == "Administrador"
-
-
-def test_register_weak_password_returns_422(client):
-    """Passwords shorter than 6 characters are rejected."""
-    resp = client.post(
-        "/api/auth/register",
-        json={
-            "name": "Weak Pass",
-            "email": "weak@test.com",
-            "password": "123",
-        },
-    )
-    assert resp.status_code == 422
+def _usuario(session, email, password, name="Login User", role="Solicitante"):
+    session.add(User(name=name, email=email, role=role, password_hash=hash_password(password)))
+    session.commit()
 
 
 # --- Login ---
 
 
-def test_login_success(client):
+def test_login_success(client, session):
     """Successful login returns a valid token."""
-    client.post(
-        "/api/auth/register",
-        json={
-            "name": "Login User",
-            "email": "login@test.com",
-            "password": "mypassword",
-        },
-    )
+    _usuario(session, "login@test.com", "mypassword")
 
     resp = client.post(
         "/api/auth/login",
@@ -128,16 +32,9 @@ def test_login_success(client):
     assert data["expires_in"] > 0
 
 
-def test_login_wrong_password_returns_401(client):
+def test_login_wrong_password_returns_401(client, session):
     """Login with wrong password returns 401."""
-    client.post(
-        "/api/auth/register",
-        json={
-            "name": "Login User",
-            "email": "login2@test.com",
-            "password": "correctpass",
-        },
-    )
+    _usuario(session, "login2@test.com", "correctpass")
 
     resp = client.post(
         "/api/auth/login",
@@ -190,12 +87,19 @@ def test_user_created_by_admin_can_login(auth_client, client):
     assert resp.status_code == 200
 
 
+def test_user_can_be_created_without_password(auth_client, session):
+    """Con la cuenta de Microsoft no hace falta contraseña."""
+    resp = auth_client.post("/api/users", json={"name": "Sin Clave", "email": "sinclave@tec.local"})
+    assert resp.status_code == 201
+    assert session.scalar(select(User).where(User.email == "sinclave@tec.local")).password_hash is None
+
+
 @pytest.mark.parametrize(
     "extra",
-    [{}, {"password": "12345"}, {"password": "x" * 73}],
-    ids=["sin-contrasena", "muy-corta", "muy-larga"],
+    [{"password": "12345"}, {"password": "x" * 73}],
+    ids=["muy-corta", "muy-larga"],
 )
-def test_create_user_requires_a_valid_password(auth_client, extra):
+def test_create_user_rejects_an_invalid_password(auth_client, extra):
     resp = auth_client.post(
         "/api/users",
         json={"name": "Sin Clave", "email": "sinclave@tec.local", **extra},
@@ -222,18 +126,10 @@ def test_admin_can_reset_a_user_password(auth_client, client):
 # --- Me ---
 
 
-def test_me_with_valid_token(client):
+def test_me_with_valid_token(client, session):
     """GET /me returns the current user's info when token is valid."""
-    reg_resp = client.post(
-        "/api/auth/register",
-        json={
-            "name": "Me Test",
-            "email": "me@test.com",
-            "password": "pass123456",
-            "role": "Administrador",
-        },
-    )
-    token = reg_resp.json()["access_token"]
+    _usuario(session, "me@test.com", "pass123456", name="Me Test", role="Administrador")
+    token = client.post("/api/auth/login", json={"email": "me@test.com", "password": "pass123456"}).json()["access_token"]
 
     resp = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
@@ -283,15 +179,11 @@ def test_me_with_expired_token_returns_401(client):
 # --- Password hashing ---
 
 
-def test_password_is_hashed_in_database(session, client):
+def test_password_is_hashed_in_database(session, auth_client):
     """Passwords are stored as bcrypt hashes, not plain text."""
-    client.post(
-        "/api/auth/register",
-        json={
-            "name": "Hash Test",
-            "email": "hash@test.com",
-            "password": "mysecret",
-        },
+    auth_client.post(
+        "/api/users",
+        json={"name": "Hash Test", "email": "hash@test.com", "password": "mysecret"},
     )
 
     user = session.scalar(select(User).where(User.email == "hash@test.com"))
@@ -313,41 +205,29 @@ def test_migration_adds_password_hash_column(engine):
     assert "password_hash" in columns
 
 
-# --- Change password ---
+# --- Sin LOGIN_LOCAL (por defecto): solo Microsoft ---
 
 
-def test_user_can_change_own_password(auth_client, client):
-    resp = auth_client.post(
-        "/api/auth/change-password",
-        json={"current_password": "testpass123", "new_password": "otraclave1"},
-    )
-    assert resp.status_code == 204
-
-    old = client.post("/api/auth/login", json={"email": "testadmin@test.com", "password": "testpass123"})
-    new = client.post("/api/auth/login", json={"email": "testadmin@test.com", "password": "otraclave1"})
-    assert old.status_code == 401
-    assert new.status_code == 200
+def test_password_login_is_off_by_default(client, session, monkeypatch):
+    monkeypatch.delenv("LOGIN_LOCAL")
+    _usuario(session, "local@test.com", "mypassword")
+    resp = client.post("/api/auth/login", json={"email": "local@test.com", "password": "mypassword"})
+    assert resp.status_code == 404
+    monkeypatch.setenv("LOGIN_LOCAL", "false")
+    assert client.post("/api/auth/login", json={"email": "local@test.com", "password": "mypassword"}).status_code == 404
+    assert client.get("/api/auth/config").json()["login_local"] is False
 
 
-def test_change_password_rejects_wrong_current_password(auth_client):
-    resp = auth_client.post(
-        "/api/auth/change-password",
-        json={"current_password": "incorrecta", "new_password": "otraclave1"},
-    )
-    assert resp.status_code == 400
+def test_password_login_works_with_login_local(client, session, monkeypatch):
+    monkeypatch.setenv("LOGIN_LOCAL", "true")
+    _usuario(session, "local@test.com", "mypassword")
+    assert client.post("/api/auth/login", json={"email": "local@test.com", "password": "mypassword"}).status_code == 200
+    assert client.get("/api/auth/config").json()["login_local"] is True
 
 
-def test_change_password_validates_new_password(auth_client):
-    resp = auth_client.post(
-        "/api/auth/change-password",
-        json={"current_password": "testpass123", "new_password": "123"},
-    )
-    assert resp.status_code == 422
-
-
-def test_change_password_requires_login(client):
-    resp = client.post(
-        "/api/auth/change-password",
-        json={"current_password": "x", "new_password": "otraclave1"},
-    )
-    assert resp.status_code == 401
+@pytest.mark.parametrize("metodo, ruta", [
+    ("post", "/api/auth/register"), ("get", "/api/auth/setup"), ("post", "/api/auth/change-password"),
+])
+def test_registration_and_password_change_no_longer_exist(client, metodo, ruta):
+    resp = getattr(client, metodo)(ruta, json={}) if metodo == "post" else client.get(ruta)
+    assert resp.status_code in (404, 405)

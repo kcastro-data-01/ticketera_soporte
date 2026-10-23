@@ -1,4 +1,5 @@
-"""Authentication endpoints: register, login, and current user."""
+"""Authentication endpoints: Microsoft login, local login (development
+only, ``LOGIN_LOCAL``) and current user."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
@@ -7,20 +8,20 @@ from sqlalchemy.orm import Session
 from backend.auth import (
     create_access_token,
     get_current_user,
-    hash_password,
+    login_local_activo,
     verify_password,
 )
 from backend.constants import UserRole
 from backend.database import get_session
 from backend.models import User
 from backend.schemas import (
-    ChangePasswordRequest,
+    LoginConfigResponse,
     LoginRequest,
-    RegisterRequest,
-    SetupResponse,
+    MicrosoftLoginRequest,
     TokenResponse,
     UserResponse,
 )
+from backend.services import login_microsoft
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
@@ -113,94 +114,57 @@ def _get_user_by_email(session: Session, email: str) -> User | None:
     )
 
 
-def _count_users_with_password(session: Session) -> int:
-    """Count users that have a password hash (i.e., registered via auth)."""
-    return session.scalar(
-        select(func.count()).select_from(User).where(User.password_hash.is_not(None))
-    )
+def _token_de(user: User) -> TokenResponse:
+    token, expires_in = create_access_token(user.id, user.role)
+    return TokenResponse(access_token=token, token_type="bearer", expires_in=expires_in)
 
 
 @router.get(
-    "/setup",
-    response_model=SetupResponse,
-    summary="¿Falta crear el primer usuario?",
+    "/config",
+    response_model=LoginConfigResponse,
+    summary="Datos públicos para iniciar sesión",
 )
-def setup_status(session: Session = Depends(get_session)) -> SetupResponse:
-    """Public: tells the login page whether to offer the first registration."""
-    return SetupResponse(needs_setup=_count_users_with_password(session) == 0)
+def login_config() -> LoginConfigResponse:
+    """Public: what login.html needs to start the Microsoft login (MSAL.js)
+    and whether the password form is enabled (``LOGIN_LOCAL``)."""
+    return LoginConfigResponse(
+        tenant=login_microsoft.tenant(),
+        client_id=login_microsoft.client_id(),
+        login_local=login_local_activo(),
+    )
 
 
 @router.post(
-    "/change-password",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Cambiar mi contraseña",
+    "/microsoft",
+    response_model=TokenResponse,
+    summary="Iniciar sesión con Microsoft",
 )
-def change_password(
-    payload: ChangePasswordRequest,
-    session: Session = Depends(get_session),
-    current_user: User | None = Depends(get_current_user),
-) -> None:
-    """Let the logged-in user change their own password."""
-    if current_user is None:
+def login_with_microsoft(
+    payload: MicrosoftLoginRequest, session: Session = Depends(get_session)
+) -> TokenResponse:
+    """Validate the Microsoft ``id_token`` (signature, audience, issuer and
+    tenant) and return the app session. New users are created with the role
+    from ``asignar_rol_inicial``; existing users keep theirs."""
+    try:
+        claims = login_microsoft.validar_id_token(payload.id_token)
+        user = login_microsoft.usuario_desde_microsoft(session, claims)
+    except login_microsoft.LoginNoConfigurado:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="El inicio de sesión con Microsoft no está configurado",
+        )
+    except login_microsoft.TokenInvalido as error:
+        login_microsoft.logger.warning("inicio de sesión con Microsoft rechazado: %s", error)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No autenticado",
+            detail="No se pudo validar la cuenta de Microsoft",
         )
-    if current_user.password_hash is None or not verify_password(
-        payload.current_password, current_user.password_hash
-    ):
+    except login_microsoft.UsuarioDesactivado:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La contraseña actual no es correcta",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El usuario está desactivado",
         )
-    current_user.password_hash = hash_password(payload.new_password)
-    session.commit()
-
-
-@router.post(
-    "/register",
-    response_model=TokenResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Registrar un nuevo usuario",
-)
-def register(payload: RegisterRequest, session: Session = Depends(get_session)) -> TokenResponse:
-    """Register a new user and return an access token.
-
-    The first user (while nobody can log in yet) becomes ``Administrador``
-    unless another role is given. Everyone who registers afterwards is
-    always created as ``Solicitante``: other roles are assigned by an
-    administrator from Usuarios.
-    """
-    # Check if email already exists
-    existing = _get_user_by_email(session, payload.email)
-    if existing is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"El email {payload.email} ya está registrado",
-        )
-    if _count_users_with_password(session) == 0:
-        role = payload.role if payload.role else UserRole.ADMIN
-    else:
-        role = UserRole.REQUESTER
-
-    # Create the user with hashed password
-    user = User(
-        name=payload.name,
-        email=payload.email,
-        role=role.value,
-        password_hash=hash_password(payload.password),
-    )
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-
-    # Generate and return token
-    token, expires_in = create_access_token(user.id, user.role)
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer",
-        expires_in=expires_in,
-    )
+    return _token_de(user)
 
 
 @router.post(
@@ -209,7 +173,10 @@ def register(payload: RegisterRequest, session: Session = Depends(get_session)) 
     summary="Iniciar sesión",
 )
 def login(payload: LoginRequest, session: Session = Depends(get_session)) -> TokenResponse:
-    """Authenticate a user and return an access token."""
+    """Authenticate with email and password. Only for development, with
+    ``LOGIN_LOCAL=true``; otherwise the endpoint does not exist (404)."""
+    if not login_local_activo():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
     user = _get_user_by_email(session, payload.email)
 
     # Check if user exists and has a password
@@ -233,10 +200,4 @@ def login(payload: LoginRequest, session: Session = Depends(get_session)) -> Tok
             detail="El usuario está desactivado",
         )
 
-    # Generate and return token
-    token, expires_in = create_access_token(user.id, user.role)
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer",
-        expires_in=expires_in,
-    )
+    return _token_de(user)

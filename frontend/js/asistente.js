@@ -258,8 +258,7 @@ function burbuja(mensaje) {
   const el = crearElemento("div", `chat-mensaje asistente${mensaje.error ? " error" : " chat-formato"}`);
   if (mensaje.error) el.textContent = mensaje.content;
   else pintarTexto(el, mensaje.content);
-  /* La fuente (sistema o IA) se guarda pero no se muestra: abajo queda el
-     aviso general «Las respuestas generadas con IA pueden contener errores». */
+  /* La fuente (sistema o IA) se guarda pero no se muestra. */
   contenido.appendChild(el);
   const pie = pieDeMensaje(mensaje, !mensaje.error && !mensaje.saludo);
   if (pie) contenido.appendChild(pie);
@@ -517,14 +516,7 @@ function crearAsistente() {
   enviar.setAttribute("aria-label", "Enviar");
   enviar.innerHTML = icono("enviar");
   caja.append(entrada, enviar);
-  formulario.append(
-    caja,
-    crearElemento(
-      "p",
-      "chat-aviso",
-      "Las respuestas automáticas pueden contener errores. Verifique la información importante."
-    )
-  );
+  formulario.append(caja);
 
   panel.append(cabecera, cuerpo, formulario);
 

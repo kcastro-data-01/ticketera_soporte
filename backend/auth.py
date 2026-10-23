@@ -21,6 +21,12 @@ JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", "60"))
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+def login_local_activo() -> bool:
+    """``LOGIN_LOCAL=true``: solo para desarrollo, se mantiene el inicio de
+    sesión con contraseña (por defecto, solo con Microsoft)."""
+    return (os.environ.get("LOGIN_LOCAL") or "").strip().lower() in ("1", "true", "si", "sí", "yes")
+
+
 def hash_password(plain_password: str) -> str:
     """Hash a plain-text password using bcrypt."""
     # bcrypt has a 72-byte limit; truncate if necessary

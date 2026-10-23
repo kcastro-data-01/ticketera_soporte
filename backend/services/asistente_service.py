@@ -74,7 +74,7 @@ PERMISOS_POR_ROL = {
     UserRole.ADMIN.value: (
         "Ve todos los tickets; crea, comenta, edita, asigna, cambia el estado y "
         "elimina cualquier ticket; consulta el historial global; administra usuarios "
-        "(crear, editar, cambiar contraseña, desactivar y reactivar)."
+        "(crear, editar, cambiar el rol, desactivar y reactivar)."
     ),
     UserRole.SUPERVISOR.value: (
         "Ve todos los tickets; crea, comenta, edita, asigna y cambia el estado de "
@@ -109,11 +109,15 @@ páginas de 20 tickets.
 - Detalle de un ticket: datos, comentarios (firmados con el nombre de quien los \
 escribe) e historial de cambios; a la derecha, asignación y cambio de estado \
 según el rol.
-- Mi cuenta: cambiar la propia contraseña (mínimo 6 caracteres).
-- Contraseña olvidada: la restablece un Administrador desde Usuarios → Editar.
-- Usuarios (solo Administrador): «Agregar usuario» con nombre, correo, contraseña \
-y rol; «Editar» para cambiar datos, rol o contraseña; «Desactivar» / «Reactivar» \
-en la fila de cada persona.
+- Inicio de sesión: solo con la cuenta de Microsoft de la empresa (botón \
+«Iniciar sesión con Microsoft»); no hay registro ni contraseña propia de la \
+ticketera. La primera vez la cuenta se crea sola como Solicitante.
+- Mi cuenta: ver el nombre, el correo y el rol.
+- Contraseña olvidada: es la de Microsoft; la restablece el área de TI de la \
+empresa (la ticketera no la guarda).
+- Usuarios (solo Administrador): «Agregar usuario» con nombre, correo y rol; \
+«Editar» para cambiar datos o rol; «Desactivar» / «Reactivar» en la fila de \
+cada persona.
 """
 
 INSTRUCCIONES = """\
@@ -1172,21 +1176,12 @@ GUIA_POR_ACCION = [
         "a un Administrador",
     ),
     (
-        r"(contrasena|clave|password).*(usuario|otra persona|otro|de alguien|olvid|restablec|resete|recuper)"
-        r"|(olvid|restablec|resete|recuper)\w*.*(contrasena|clave|password)",
-        SOLO_ADMIN,
-        "restablecer la contraseña de otra persona",
-        "Entra a «Usuarios», pulsa «Editar» en la fila de la persona, escribe la "
-        "nueva contraseña (mínimo 6 caracteres) en «Nueva contraseña» y pulsa "
-        "«Guardar cambios». Compártela con esa persona para que inicie sesión.",
-        "a un Administrador (desde Usuarios → Editar)",
-    ),
-    (
         r"(contrasena|clave|password)",
         TODOS,
-        "cambiar tu contraseña",
-        "Entra a «Mi cuenta» en el menú lateral, escribe tu contraseña actual y la "
-        "nueva dos veces (mínimo 6 caracteres) y pulsa «Cambiar contraseña».",
+        "cambiar o restablecer una contraseña",
+        "Se entra con la cuenta de Microsoft de la empresa: la ticketera no guarda "
+        "contraseñas. Para cambiarla o si se olvidó, se hace en la cuenta de "
+        "Microsoft o con el área de TI de la empresa.",
         "",
     ),
     (
@@ -1201,9 +1196,10 @@ GUIA_POR_ACCION = [
         r"(crear|creo|agreg|anad|registr|dar de alta|alta de)\w*.*\busuarios?\b|\busuarios?\b.*(nuevo|crear|agregar)",
         SOLO_ADMIN,
         "crear usuarios",
-        "Entra a «Usuarios». En «Agregar usuario» escribe el nombre, el correo, una "
-        "contraseña (mínimo 6 caracteres) y elige el rol; luego pulsa «Agregar "
-        "usuario». La persona ya puede iniciar sesión con ese correo y contraseña.",
+        "Entra a «Usuarios». En «Agregar usuario» escribe el nombre y el correo de "
+        "la empresa, elige el rol y pulsa «Agregar usuario». La persona entra con "
+        "«Iniciar sesión con Microsoft» usando ese correo. Quien entra por primera "
+        "vez con Microsoft también queda creado solo, como Solicitante.",
         "a un Administrador",
     ),
     (

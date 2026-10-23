@@ -2555,13 +2555,6 @@ body.app {
   cursor: default;
 }
 
-.chat-aviso {
-  margin: 0.45rem 0 0;
-  font-size: 11px;
-  color: var(--color-tenue);
-  text-align: center;
-}
-
 /* Ventana grande (botón de la cabecera): 640 px de ancho y 80 % de la
    altura de la pantalla. */
 .chat-asistente.grande .chat-panel {

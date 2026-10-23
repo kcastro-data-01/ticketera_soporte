@@ -8,8 +8,9 @@ y, por cada correo nuevo que pide ayuda:
   su nombre (asunto = título, cuerpo = descripción, categoría y prioridad
   según palabras clave) y se le responde con el número y el enlace.
   Si el asunto trae «Ticket #N» de un ticket suyo, se agrega como comentario.
-* Si el remitente no tiene cuenta, se le responde que debe registrarse, con
-  el enlace a la aplicación (una vez por día como máximo).
+* Si el remitente no tiene cuenta y es del dominio de la empresa
+  (``DOMINIO_EMPRESA``), se crea como Solicitante y se crea el ticket igual.
+  Si es de otro dominio, el correo se ignora y queda en el log.
 * Si su cuenta está desactivada, se le avisa.
 
 Las respuestas se envían en el mismo hilo (``/reply``). Cada correo
@@ -26,7 +27,7 @@ vez se ejecuta ``python -m backend.correo_login``.
 Configuración (variables de entorno, ver README): ``CORREO_ACTIVO``,
 ``CORREO_USUARIO``, ``CORREO_M365_TENANT``, ``CORREO_M365_CLIENT_ID``,
 ``CORREO_M365_CACHE``, ``CORREO_CARPETA_PROCESADOS``, ``CORREO_FILTRO``,
-``CORREO_INTERVALO`` y ``APP_URL``.
+``CORREO_INTERVALO``, ``DOMINIO_EMPRESA`` y ``APP_URL``.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ import re
 import threading
 import unicodedata
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from html import unescape
 from pathlib import Path
 
@@ -49,6 +50,7 @@ from backend.models import ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate
 from backend.services import ticket_service
 from backend.services.correo_auth import ProveedorToken, SinSesionError, ruta_cache
+from backend.services.login_microsoft import asignar_rol_inicial
 
 logger = logging.getLogger(__name__)
 # Los mensajes salen en «docker compose logs ticketera» (uvicorn no muestra
@@ -64,8 +66,6 @@ MAX_DESCRIPCION = 5000
 MAX_TITULO = 200
 TITULO_POR_DEFECTO = "Solicitud recibida por correo"
 MARCA_INICIO = "__inicio__"
-HORAS_ENTRE_AVISOS = 24
-ASUNTO_REGISTRO = "Registrate para crear tickets"
 GRAPH_URL = "https://graph.microsoft.com/v1.0"
 CARPETA_PROCESADOS = "Tickets-Procesados"
 MAX_PAGINAS = 10  # hasta 500 no leídos por revisión (50 por página)
@@ -116,6 +116,8 @@ PREFIJOS_RESPUESTA = re.compile(r"^\s*((re|rv|fw|fwd|aw|tr|reenviar)\s*(\[\d+\])
 ASUNTO_INACTIVO = "No pudimos crear tu ticket"
 # Asuntos que envía la app. Los avisos nunca se procesan; las confirmaciones
 # solo sirven para agregar un comentario al ticket de quien responde.
+# «Registrate para crear tickets» ya no se envía, pero quedan avisos viejos en
+# los buzones: sus respuestas tampoco son solicitudes.
 AVISOS_APP = (re.compile(r"^registrate para crear tickets$", re.IGNORECASE),
               re.compile(r"^no pudimos crear tu ticket$", re.IGNORECASE))
 CONFIRMACIONES_APP = (re.compile(r"^ticket\s*#\d+ creado:", re.IGNORECASE),
@@ -139,6 +141,9 @@ class ConfigCorreo:
     filtro: str = "auto"
     intervalo: int = 60
     app_url: str = "http://localhost:8000"
+    # Los remitentes de este dominio sin cuenta se crean como Solicitante;
+    # los de otros dominios se ignoran.
+    dominio_empresa: str = ""
 
 
 def _activo(valor: str | None) -> bool:
@@ -163,6 +168,7 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         filtro="todos" if (env.get("CORREO_FILTRO") or "").strip().lower() == "todos" else "auto",
         intervalo=max(15, int(env.get("CORREO_INTERVALO") or 60)),
         app_url=(env.get("APP_URL") or "http://localhost:8000").rstrip("/"),
+        dominio_empresa=(env.get("DOMINIO_EMPRESA") or "").strip().lower().lstrip("@"),
     )
 
 
@@ -355,24 +361,6 @@ def _respuesta_comentario(correo, usuario, ticket, config) -> Respuesta:
     )
 
 
-def _respuesta_registro(correo, config) -> Respuesta:
-    enlace = f"{config.app_url}/login.html?registro=1&email={correo.remitente}"
-    return Respuesta(
-        para=correo.remitente,
-        asunto=ASUNTO_REGISTRO,
-        texto=(
-            f"{_saludo(correo.nombre)}\n\n"
-            "Recibimos tu correo, pero todavía no tienes una cuenta en la "
-            "ticketera de soporte, por eso no pudimos crear tu ticket.\n\n"
-            f"Regístrate aquí con este mismo correo ({correo.remitente}):\n"
-            f"{enlace}\n\n"
-            "Cuando tengas tu cuenta, vuelve a enviarnos tu solicitud por "
-            "correo o créala directamente en la aplicación.\n\n"
-            "Mesa de ayuda"
-        ),
-    )
-
-
 def _respuesta_inactivo(correo, usuario) -> Respuesta:
     return Respuesta(
         para=correo.remitente,
@@ -399,16 +387,22 @@ def _registrar(session, correo, resultado, ticket_id=None) -> None:
     session.commit()
 
 
-def _ya_avisado(session, remitente: str) -> bool:
-    """¿Ya se le pidió registrarse a este remitente en las últimas 24 h?"""
-    limite = datetime.now(timezone.utc) - timedelta(hours=HORAS_ENTRE_AVISOS)
-    return session.scalar(
-        select(func.count()).select_from(ProcessedEmail).where(
-            ProcessedEmail.sender == remitente,
-            ProcessedEmail.result == "registro",
-            ProcessedEmail.created_at >= limite,
-        )
-    ) > 0
+def es_de_la_empresa(remitente: str, config: ConfigCorreo) -> bool:
+    """¿El remitente es del dominio de la empresa (``DOMINIO_EMPRESA``)?"""
+    return bool(config.dominio_empresa) and remitente.rsplit("@", 1)[-1] == config.dominio_empresa
+
+
+def _crear_solicitante(session, correo: CorreoEntrante) -> User:
+    """Remitente interno sin cuenta: se crea con su nombre del correo (o lo
+    que va antes de @) y el rol de ``asignar_rol_inicial``."""
+    nombre = (correo.nombre or "").strip() or correo.remitente.split("@")[0]
+    usuario = User(name=nombre[:120], email=correo.remitente,
+                   role=asignar_rol_inicial(correo.remitente).value)
+    session.add(usuario)
+    session.commit()
+    session.refresh(usuario)
+    logger.info("Usuario creado desde el correo: %s (%s)", correo.remitente, usuario.role)
+    return usuario
 
 
 def _sin_tildes(texto: str) -> str:
@@ -460,16 +454,11 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
                         "registrado %s", correo.remitente)
             _registrar(session, correo, "ignorado")
             return "ignorado", None
-        # No se crea ticket: se le pide registrarse (un aviso cada 24 h).
-        if _ya_avisado(session, correo.remitente):
-            logger.info("Correo ignorado: remitente no registrado %s "
-                        "(ya se le envió el aviso de registro en las últimas 24 h)", correo.remitente)
+        if not es_de_la_empresa(correo.remitente, config):
+            logger.info("Correo ignorado: remitente externo sin cuenta %s", correo.remitente)
             _registrar(session, correo, "ignorado")
             return "ignorado", None
-        logger.info("Correo ignorado: remitente no registrado %s (se le envía el aviso de registro)",
-                    correo.remitente)
-        _registrar(session, correo, "registro")
-        return "registro", _respuesta_registro(correo, config)
+        usuario = _crear_solicitante(session, correo)
 
     if not usuario.is_active:
         _registrar(session, correo, "inactivo")

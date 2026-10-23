@@ -26,6 +26,10 @@ services:
       CORREO_USUARIO: ${CORREO_USUARIO:-}
       CORREO_M365_TENANT: ${CORREO_M365_TENANT:-}
       CORREO_M365_CLIENT_ID: ${CORREO_M365_CLIENT_ID:-}
+      # Inicio de sesión con Microsoft (misma app): ver README.
+      ADMIN_INICIAL: ${ADMIN_INICIAL:-}
+      LOGIN_LOCAL: ${LOGIN_LOCAL:-false}
+      DOMINIO_EMPRESA: ${DOMINIO_EMPRESA:-}
       # Caché de tokens dentro del volumen: la sesión sobrevive reinicios.
       CORREO_M365_CACHE: /data/msal_cache.json
       CORREO_CARPETA_PROCESADOS: ${CORREO_CARPETA_PROCESADOS:-Tickets-Procesados}

@@ -270,12 +270,11 @@ test("botón: ícono de conversación, sin chispas ni texto", () => {
   assert.equal(chat.boton.className, "chat-boton");
 });
 
-test("aviso de abajo con el texto formal", () => {
+test("sin el aviso de abajo («Las respuestas automáticas pueden contener errores…»)", () => {
   const chat = montarChat();
   const juntar = (n, out = []) => { if (n.className === "chat-aviso") out.push(n.textContent); (n.children || []).forEach((h) => juntar(h, out)); return out; };
-  assert.deepEqual(juntar(chat.panel), [
-    "Las respuestas automáticas pueden contener errores. Verifique la información importante.",
-  ]);
+  assert.deepEqual(juntar(chat.panel), []);
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "..", "js", "asistente.js"), "utf8"), /pueden contener errores/);
 });
 
 test("sin mensajes: saludo y 3 preguntas de ejemplo", () => {

@@ -17,6 +17,10 @@ const ROLES_VALIDOS = [
 /* Mismo patrón de correo que backend.schemas (UserCreate). */
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+/* Con la cuenta de Microsoft no hay contraseña: los campos solo se usan con
+   LOGIN_LOCAL=true (desarrollo), que informa GET /api/auth/config. */
+let loginLocal = false;
+
 /* Largo de contraseña aceptado (espejo de backend.schemas). */
 const PASSWORD_MIN = 6;
 const PASSWORD_MAX = 72;
@@ -116,8 +120,10 @@ function validarUsuario() {
   if (!EMAIL_PATTERN.test(email)) {
     return "El correo electrónico no tiene un formato válido.";
   }
-  const errorPassword = validarPassword(elements.password ? elements.password.value : "");
-  if (errorPassword) return errorPassword;
+  if (loginLocal) {
+    const errorPassword = validarPassword(elements.password ? elements.password.value : "");
+    if (errorPassword) return errorPassword;
+  }
   if (!ROLES_VALIDOS.includes(elements.rol.value)) {
     return "Seleccione un rol válido.";
   }
@@ -334,7 +340,7 @@ async function guardarEdicion(event) {
 
   /* La contraseña solo se envía si se escribió una nueva. */
   limpiarErroresCampo("editar-");
-  const nuevaPassword = elements.editarPassword ? elements.editarPassword.value : "";
+  const nuevaPassword = loginLocal && elements.editarPassword ? elements.editarPassword.value : "";
   if (nuevaPassword) {
     const errorPassword = validarPassword(nuevaPassword);
     if (errorPassword) {
@@ -432,9 +438,9 @@ async function crearUsuario(event) {
   const payload = {
     name: elements.nombre.value.trim(),
     email: elements.email.value.trim(),
-    password: elements.password.value,
     role: elements.rol.value,
   };
+  if (loginLocal) payload.password = elements.password.value;
 
   ocupado = true;
   elements.crear.disabled = true;
@@ -452,7 +458,7 @@ async function crearUsuario(event) {
 
     elements.nombre.value = "";
     elements.email.value = "";
-    elements.password.value = "";
+    if (elements.password) elements.password.value = "";
     elements.rol.value = "Técnico";
     showStatus("Usuario agregado correctamente.", "exito");
     /* El usuario nuevo aparece en la lista sin recargar la página. */
@@ -469,8 +475,24 @@ async function crearUsuario(event) {
   }
 }
 
+/* ¿Está LOGIN_LOCAL? Entonces se muestran los campos de contraseña. */
+async function leerLoginLocal() {
+  try {
+    const response = await fetch("/api/auth/config");
+    loginLocal = response.ok && Boolean((await response.json()).login_local);
+  } catch (error) {
+    loginLocal = false;
+  }
+  if (typeof document.querySelectorAll === "function") {
+    document.querySelectorAll(".solo-login-local").forEach((campo) => {
+      campo.hidden = !loginLocal;
+    });
+  }
+}
+
 async function init() {
   const elements = getElements();
+  await leerLoginLocal();
   elements.formUsuario.addEventListener("submit", crearUsuario);
   /* «Limpiar» vacía el formulario y quita los errores. */
   elements.formUsuario.addEventListener("reset", () => {

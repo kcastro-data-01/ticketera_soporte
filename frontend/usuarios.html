@@ -68,9 +68,11 @@
             </label>
           </div>
           <div class="campos-fila">
-            <label class="campo">
+            <!-- Contraseña: solo con LOGIN_LOCAL=true (desarrollo); se entra
+                 con la cuenta de Microsoft. usuarios.js la muestra. -->
+            <label class="campo solo-login-local" hidden>
               <span>Contraseña *</span>
-              <input type="password" id="password" name="password" required minlength="6" maxlength="72" autocomplete="new-password" placeholder="Mínimo 6 caracteres" aria-describedby="ayuda-password error-password">
+              <input type="password" id="password" name="password" minlength="6" maxlength="72" autocomplete="new-password" placeholder="Mínimo 6 caracteres" aria-describedby="ayuda-password error-password">
               <small id="ayuda-password" class="ayuda-campo">Entre 6 y 72 caracteres.</small>
               <small id="error-password" class="error-campo" role="alert" hidden></small>
             </label>
@@ -134,7 +136,7 @@
             </label>
           </div>
           <div class="campos-fila">
-            <label class="campo">
+            <label class="campo solo-login-local" hidden>
               <span>Nueva contraseña</span>
               <input type="password" id="editar-password" name="password" minlength="6" maxlength="72" autocomplete="new-password" placeholder="Déjela vacía para no cambiarla" aria-describedby="ayuda-editar-password error-editar-password">
               <small id="ayuda-editar-password" class="ayuda-campo">Entre 6 y 72 caracteres. Déjela vacía para mantener la actual.</small>

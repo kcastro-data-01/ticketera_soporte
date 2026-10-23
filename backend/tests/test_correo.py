@@ -15,8 +15,9 @@ from backend.services.correo_auth import SinSesionError
 
 # Sin filtro para probar el procesamiento; la detección tiene sus pruebas.
 CONFIG = cs.ConfigCorreo(usuario="kcastro@data.cr", app_url="http://ticketera.data.cr",
-                         filtro="todos")
-CONFIG_FILTRO = cs.ConfigCorreo(usuario="kcastro@data.cr", app_url="http://ticketera.data.cr")
+                         filtro="todos", dominio_empresa="data.cr")
+CONFIG_FILTRO = cs.ConfigCorreo(usuario="kcastro@data.cr", app_url="http://ticketera.data.cr",
+                                dominio_empresa="data.cr")
 
 _ids = count(1)
 
@@ -68,17 +69,48 @@ def test_known_user_gets_a_ticket_and_a_reply(session, usuario):
     assert f"http://ticketera.data.cr/detalle.html?id={ticket.id}" in respuesta.texto
 
 
-def test_unknown_sender_is_asked_to_register(session):
-    resultado, respuesta = procesar(session, crear_correo(remitente="luis@otro.com", nombre="Luis"))
-    assert resultado == "registro"
-    assert session.scalars(select(Ticket)).first() is None
-    assert respuesta.para == "luis@otro.com"
-    assert "http://ticketera.data.cr/login.html?registro=1&email=luis@otro.com" in respuesta.texto
-    assert "Hola Luis" in respuesta.texto
+def test_company_sender_without_account_is_created_as_requester_with_a_ticket(session):
+    resultado, respuesta = procesar(session, crear_correo(remitente="Luis@Data.cr", nombre="Luis Mora"))
+    assert resultado == "ticket"
+    luis = session.scalars(select(User).where(User.email == "luis@data.cr")).one()
+    assert (luis.name, luis.role, luis.password_hash) == ("Luis Mora", "Solicitante", None)
+    ticket = session.scalars(select(Ticket)).one()
+    assert ticket.created_by_id == luis.id
+    assert respuesta.para == "luis@data.cr"
+    assert f"#{ticket.id}" in respuesta.asunto
+    assert "registr" not in respuesta.texto.lower()
 
-    # Un segundo correo el mismo día no vuelve a enviar el aviso.
-    resultado, respuesta = procesar(session, crear_correo(remitente="luis@otro.com", msg_id="<m2@x>"))
+    # El segundo correo ya lo encuentra como usuario: otro ticket, sin duplicarlo.
+    assert procesar(session, crear_correo(remitente="luis@data.cr", msg_id="<m2@x>"))[0] == "ticket"
+    assert len(session.scalars(select(User)).all()) == 1
+
+
+def test_company_sender_without_name_uses_the_address(session):
+    procesar(session, crear_correo(remitente="soporte.ti@data.cr", nombre=""))
+    assert session.scalars(select(User)).one().name == "soporte.ti"
+
+
+def test_admin_inicial_writing_first_by_mail_is_administrator(session, monkeypatch):
+    monkeypatch.setenv("ADMIN_INICIAL", "kristin@data.cr")
+    procesar(session, crear_correo(remitente="kristin@data.cr", nombre="Kristin"))
+    assert session.scalars(select(User)).one().role == "Administrador"
+
+
+def test_external_sender_without_account_is_ignored_and_logged(session, log_correo):
+    resultado, respuesta = procesar(session, crear_correo(remitente="luis@otro.com", nombre="Luis"))
     assert (resultado, respuesta) == ("ignorado", None)
+    assert session.scalars(select(Ticket)).first() is None
+    assert session.scalars(select(User)).first() is None
+    assert "Correo ignorado: remitente externo sin cuenta luis@otro.com" in log_correo.text
+    # Un subdominio o un dominio parecido tampoco es la empresa.
+    for otro in ("ana@ventas.data.cr", "ana@data.cr.com", "ana@midata.cr"):
+        assert procesar(session, crear_correo(remitente=otro, msg_id=f"<{otro}>"))[0] == "ignorado"
+
+
+def test_without_company_domain_every_unknown_sender_is_ignored(session):
+    sin_dominio = cs.ConfigCorreo(usuario="kcastro@data.cr", filtro="todos")
+    assert procesar(session, crear_correo(remitente="luis@data.cr"), sin_dominio) == ("ignorado", None)
+    assert session.scalars(select(User)).first() is None
 
 
 def test_inactive_user_is_told_the_account_is_disabled(session, usuario):
@@ -192,13 +224,11 @@ def test_normal_company_mail_is_not_a_ticket(session, usuario, asunto, cuerpo):
     assert session.scalars(select(ProcessedEmail)).first() is None
 
 
-def test_unknown_sender_asking_for_help_gets_the_register_mail(session):
+def test_external_sender_asking_for_help_gets_no_reply(session):
     mensaje = crear_correo(remitente="kristin@gmail.com", nombre="Kristin",
                            asunto="Se dañó una impresora, ocupo arreglo urgente",
                            cuerpo="La impresora no enciende y la necesito para el trabajo")
-    resultado, respuesta = procesar(session, mensaje, CONFIG_FILTRO)
-    assert resultado == "registro"
-    assert "login.html?registro=1&email=kristin@gmail.com" in respuesta.texto
+    assert procesar(session, mensaje, CONFIG_FILTRO) == ("ignorado", None)
 
 
 def test_non_support_mail_from_unknown_sender_gets_no_reply(session):
@@ -224,6 +254,9 @@ def test_config_from_env(tmp_path):
     assert cfg.cache_path == tmp_path / "cache.json"
     assert cfg.carpeta_procesados == "Tickets-Procesados"
     assert cfg.filtro == "auto"
+    assert cfg.dominio_empresa == ""
+    base = {"CORREO_ACTIVO": "1", "CORREO_USUARIO": "kcastro@data.cr"}
+    assert cs.config_desde_entorno({**base, "DOMINIO_EMPRESA": " @Data.CR "}).dominio_empresa == "data.cr"
 
 
 def test_filter_from_env():
@@ -320,10 +353,11 @@ def test_revisar_buzon_replies_in_thread_marks_read_and_moves(factory, session, 
     graph = FakeGraph([viejo, nuevo, desconocido])
 
     conteo = cs.revisar_buzon(factory, CONFIG, graph.cliente)
-    assert conteo == {"ticket": 1, "registro": 1}
+    assert conteo == {"ticket": 1, "ignorado": 1}
 
-    # Respuestas en el mismo hilo, con la cabecera anti respuestas automáticas.
-    assert [r[0] for r in graph.respuestas] == [nuevo["id"], desconocido["id"]]
+    # Respuestas en el mismo hilo, con la cabecera anti respuestas automáticas
+    # (al remitente externo no se le responde).
+    assert [r[0] for r in graph.respuestas] == [nuevo["id"]]
     enviado = graph.respuestas[0][1]["message"]
     assert enviado["subject"].startswith("Ticket #")
     assert enviado["body"]["contentType"] == "Text"
@@ -342,7 +376,7 @@ def test_revisar_buzon_replies_in_thread_marks_read_and_moves(factory, session, 
 
     # Segunda revisión: nada nuevo, no se repite ninguna respuesta.
     assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {}
-    assert len(graph.respuestas) == 2
+    assert len(graph.respuestas) == 1
     assert session.scalar(select(ProcessedEmail).where(
         ProcessedEmail.message_id == cs.MARCA_INICIO)) is not None
 
@@ -457,46 +491,31 @@ def test_registered_sender_creates_ticket_as_requester_and_gets_confirmation(fac
     assert graph.no_leidos() == []
 
 
-def test_unregistered_sender_gets_register_notice_and_no_ticket(factory, session, log_correo):
-    mensaje = crear_correo(remitente="Luis@Otro.com", nombre="Luis")
+def test_company_sender_without_account_end_to_end(factory, session, log_correo):
+    mensaje = crear_correo(remitente="Luis@Data.cr", nombre="Luis")
     graph = FakeGraph([mensaje])
-    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"registro": 1}
-
-    assert session.scalars(select(Ticket)).first() is None
+    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"ticket": 1}
+    ticket = session.scalars(select(Ticket)).one()
+    assert session.get(User, ticket.created_by_id).email == "luis@data.cr"
     [(respondido, enviado)] = graph.respuestas
     assert respondido == mensaje["id"]
-    assert enviado["message"]["subject"] == "Registrate para crear tickets"
-    texto = enviado["message"]["body"]["content"]
-    assert "http://ticketera.data.cr/login.html?registro=1&email=luis@otro.com" in texto
-    assert "vuelve a enviarnos tu solicitud" in texto
-    # Igual queda procesado: leído y en la carpeta.
+    assert enviado["message"]["subject"] == f"Ticket #{ticket.id} creado: {ticket.title}"
     assert graph.no_leidos() == []
-    assert "Correo ignorado: remitente no registrado luis@otro.com" in log_correo.text
+    assert "Usuario creado desde el correo: luis@data.cr (Solicitante)" in log_correo.text
 
 
-def test_second_mail_from_unregistered_within_24h_gets_no_notice(factory, session, log_correo):
-    graph = FakeGraph([crear_correo(remitente="luis@otro.com", msg_id="<1@x>")])
-    cs.revisar_buzon(factory, CONFIG, graph.cliente)
-    assert len(graph.respuestas) == 1
-
-    graph.mensajes.update({m["id"]: dict(m, isRead=False, carpeta="inbox") for m in
-                           [crear_correo(remitente="luis@otro.com", msg_id="<2@x>")]})
-    log_correo.clear()
+def test_external_sender_end_to_end_is_moved_without_reply(factory, session, log_correo):
+    graph = FakeGraph([crear_correo(remitente="Luis@Otro.com", nombre="Luis")])
     assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"ignorado": 1}
-    assert len(graph.respuestas) == 1  # no hubo otro aviso
-    assert graph.no_leidos() == []  # pero se movió igual
     assert session.scalars(select(Ticket)).first() is None
-    assert "Correo ignorado: remitente no registrado luis@otro.com" in log_correo.text
+    assert graph.respuestas == []
+    assert graph.no_leidos() == []  # queda procesado: leído y en la carpeta
+    assert "Correo ignorado: remitente externo sin cuenta luis@otro.com" in log_correo.text
 
 
-def test_unregistered_gets_a_new_notice_after_24h(session):
-    procesar(session, crear_correo(remitente="luis@otro.com", msg_id="<1@x>"))
-    aviso = session.scalars(select(ProcessedEmail).where(ProcessedEmail.result == "registro")).one()
-    aviso.created_at = datetime.now(timezone.utc) - timedelta(hours=25)
-    session.commit()
-    resultado, respuesta = procesar(session, crear_correo(remitente="luis@otro.com", msg_id="<2@x>"))
-    assert resultado == "registro"
-    assert respuesta.asunto == "Registrate para crear tickets"
+def test_register_notice_and_24h_rule_are_gone():
+    assert not hasattr(cs, "ASUNTO_REGISTRO") and not hasattr(cs, "_ya_avisado")
+    assert not hasattr(cs, "HORAS_ENTRE_AVISOS") and not hasattr(cs, "_respuesta_registro")
 
 
 def test_not_a_help_request_is_logged_once(factory, usuario, log_correo):
@@ -513,7 +532,7 @@ def test_not_a_help_request_is_logged_once(factory, usuario, log_correo):
 
 @pytest.mark.parametrize("prefijo", ["RE: ", "RV: ", "FW: ", "Fwd: ", "Re: RE: ", "RE[2]: ", ""])
 def test_reply_to_register_notice_never_creates_a_ticket(session, usuario, prefijo, log_correo):
-    """El caso del ticket #6: el aviso de registro vuelve desde un usuario registrado."""
+    """El caso del ticket #6: un aviso de registro viejo vuelve desde un usuario registrado."""
     mensaje = crear_correo(asunto=f"{prefijo}Registrate para crear tickets",
                            cuerpo="Ya me registré, no funciona la impresora, ayuda")
     assert procesar(session, mensaje, CONFIG_FILTRO) == ("ignorado", None)
