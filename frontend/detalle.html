@@ -84,10 +84,11 @@
   
           <div class="acciones acciones-principales">
             <button type="button" id="editar" data-permiso="editar">Editar ticket</button>
-            <!-- Solo Administrador: borra el ticket con sus comentarios e historial. -->
-            <button type="button" id="eliminar" class="peligro" data-permiso="eliminar">Eliminar</button>
             <!-- Versión formal en papel o PDF: sin menú ni botones. -->
             <button type="button" id="imprimir" class="secundario">Imprimir</button>
+            <!-- Solo Administrador: borra el ticket con sus comentarios e historial.
+                 Va aparte, a la derecha de la barra. -->
+            <button type="button" id="eliminar" class="peligro accion-aparte" data-permiso="eliminar">Eliminar</button>
           </div>
   
           <!-- Tarjeta del ticket: título grande con estado y prioridad arriba,

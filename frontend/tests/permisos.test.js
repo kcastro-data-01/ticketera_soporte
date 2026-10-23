@@ -80,3 +80,13 @@ test("detalle.html: el botón Eliminar solo lo ve el Administrador", () => {
     assert.equal(boton.hidden, !visible, rol);
   }
 });
+
+test("detalle.html: Editar e Imprimir a la izquierda y Eliminar aparte a la derecha", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "detalle.html"), "utf8");
+  const barra = html.slice(html.indexOf('class="acciones acciones-principales"'), html.indexOf("</div>", html.indexOf("acciones-principales")));
+  const orden = [...barra.matchAll(/id="(editar|imprimir|eliminar)"/g)].map((m) => m[1]);
+  assert.deepEqual(orden, ["editar", "imprimir", "eliminar"]);
+  assert.match(barra, /id="eliminar" class="peligro accion-aparte"/);
+  const css = fs.readFileSync(path.join(__dirname, "..", "css", "estilos.css"), "utf8");
+  assert.match(css, /\.acciones-principales \.accion-aparte \{\s*margin-left: auto;/);
+});

@@ -485,6 +485,11 @@ button:focus-visible {
   margin-bottom: var(--espaciado-md);
 }
 
+/* «Eliminar» separado de las demás acciones, al otro extremo de la barra. */
+.acciones-principales .accion-aparte {
+  margin-left: auto;
+}
+
 /* Reglas deshabilitadas al final para ganar a las de hover (misma
    especificidad) y evitar estados contradictorios. */
 button:disabled,
