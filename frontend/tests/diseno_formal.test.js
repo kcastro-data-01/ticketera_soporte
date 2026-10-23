@@ -72,3 +72,15 @@ test("fondo: puntos de 1 px cada 20 px con el color de borde, muy suaves", () =>
   const oscuro = css.slice(css.indexOf(':root[data-tema="oscuro"] {'));
   assert.match(oscuro.slice(0, oscuro.indexOf("\n}")), /--color-borde: #[0-9a-f]{6};/);
 });
+
+const detalleHtml = fs.readFileSync(path.join(__dirname, "..", "detalle.html"), "utf8");
+
+test("detalle: la descripción con título y en un recuadro neutro de lectura cómoda", () => {
+  assert.match(detalleHtml, /<h3 class="tarjeta-ticket-subtitulo">Descripción<\/h3>\s*<p id="ver-description"/);
+  const recuadro = regla(".tarjeta-ticket-descripcion");
+  assert.match(recuadro, /background: var\(--color-fondo-neutro\);/);
+  assert.match(recuadro, /border: 1px solid var\(--color-borde\);/);
+  assert.match(recuadro, /line-height: 1\.7;/);
+  assert.match(recuadro, /max-width: 72ch;/);
+  assert.match(recuadro, /min-height: 3rem;/, "una descripción corta igual se ve");
+});

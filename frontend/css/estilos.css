@@ -1139,11 +1139,28 @@ button.peligro:disabled:hover {
   gap: 0.4rem;
 }
 
+/* Descripción: título chico en gris y el texto en un recuadro neutro, con
+   ancho de lectura cómodo; con una sola palabra igual se ve el recuadro. */
+.tarjeta-ticket-subtitulo {
+  margin: 1.1rem 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-tenue);
+}
+
 .tarjeta-ticket-descripcion {
-  margin: 0.9rem 0 0;
+  max-width: 72ch;
+  min-height: 3rem;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-suave);
+  background: var(--color-fondo-neutro);
   font-size: var(--texto-md);
-  line-height: 1.6;
-  color: var(--color-tenue-fuerte);
+  line-height: 1.7;
+  color: var(--color-texto);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
