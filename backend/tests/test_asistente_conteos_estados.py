@@ -12,6 +12,7 @@ from backend.services.asistente_service import NO_ENTENDI, detectar_consulta
 from backend.tests.test_asistente import ask, fake_claude, login_as  # noqa: F401 (fixture)
 from backend.tests.test_ia_ticket import preguntar
 from backend.tests.test_metricas import cr
+from backend.tests.textos_asistente import cabecera, es_forma, lista, negrita
 
 HOY = date(2026, 10, 14)  # miércoles; la semana empieza el lunes 12
 
@@ -61,7 +62,7 @@ def _directa(client, headers, pregunta, **kwargs):
 def test_resolvido_counts_resolved_not_the_total(client, tickets, fake_claude):
     headers, _ = tickets
     respuesta = _directa(client, headers, "cuantos ticketes se han resolvido?")
-    assert respuesta.startswith("Hay 4 tickets resueltos o cerrados:")
+    assert es_forma(cabecera(respuesta), "grupo_varios", n=negrita(4), frase="tickets resueltos o cerrados")
     assert "en total" not in respuesta
     assert fake_claude.calls == []
 
@@ -69,72 +70,84 @@ def test_resolvido_counts_resolved_not_the_total(client, tickets, fake_claude):
 def test_resolved_this_week_uses_the_first_step_to_resolved(client, tickets, fake_claude):
     headers, t = tickets
     respuesta = _directa(client, headers, "cuantos tickets se resolvieron esta semana")
-    lineas = respuesta.splitlines()
-    assert lineas[0] == "Esta semana se resolvieron 2 tickets."
-    assert {l.split()[1] for l in lineas[1:]} == {f"#{t['cerrado'].id}", f"#{t['hoy'].id}"}
+    assert es_forma(cabecera(respuesta), "periodo", cuando="esta semana", verbo="se resolvieron",
+                    n=negrita(2), tickets="tickets"), respuesta
+    assert {l.split()[1] for l in lista(respuesta)} == {f"#{t['cerrado'].id}", f"#{t['hoy'].id}"}
 
 
 def test_closed_counts_only_closed(client, tickets, fake_claude):
     headers, t = tickets
     respuesta = _directa(client, headers, "cuantos estan cerrados")
-    assert respuesta == f"Hay 1 ticket cerrado:\n- #{t['cerrado'].id} «Cable de red» " \
-                        "(Red, prioridad Media, estado Cerrado, asignado a sin asignar)"
+    assert es_forma(cabecera(respuesta), "grupo_uno", n=negrita(1), frase="ticket cerrado"), respuesta
+    assert lista(respuesta) == [f"- #{t['cerrado'].id} «Cable de red» "
+                                "(Red, prioridad Media, estado Cerrado, asignado a sin asignar)"]
 
 
 def test_pending_counts_new_and_in_progress(client, tickets, fake_claude):
     headers, t = tickets
-    lineas = _directa(client, headers, "cuantos hay pendientes").splitlines()
-    assert lineas[0] == "Hay 2 tickets pendientes (1 nuevo y 1 en proceso):"
-    assert {l.split()[1] for l in lineas[1:]} == {f"#{t['nuevo'].id}", f"#{t['en_proceso'].id}"}
+    respuesta = _directa(client, headers, "cuantos hay pendientes")
+    assert es_forma(cabecera(respuesta), "grupo_varios", n=negrita(2),
+                    frase="tickets pendientes (1 nuevo y 1 en proceso)"), respuesta
+    assert {l.split()[1] for l in lista(respuesta)} == {f"#{t['nuevo'].id}", f"#{t['en_proceso'].id}"}
 
 
 def test_pending_this_week_are_created_this_week_and_still_open(client, tickets, fake_claude):
     headers, t = tickets
     respuesta = _directa(client, headers, "cuantos pendientes esta semana")
     # El «En proceso» se creó el sábado 10: no cuenta.
-    assert respuesta == (f"Esta semana se creó 1 ticket que sigue pendiente (1 nuevo).\n"
-                         f"- #{t['nuevo'].id} «Monitor nuevo» (Red, prioridad Media, estado Nuevo, "
-                         "asignado a sin asignar)")
+    assert es_forma(cabecera(respuesta), "pendientes_periodo", cuando="esta semana", verbo="se creó",
+                    n=negrita(1), tickets="ticket", siguen="sigue pendiente", desglose="(1 nuevo)"), respuesta
+    assert lista(respuesta) == [f"- #{t['nuevo'].id} «Monitor nuevo» (Red, prioridad Media, estado Nuevo, "
+                                "asignado a sin asignar)"]
 
 
 def test_finished_counts_as_resolved(client, tickets, fake_claude):
     headers, _ = tickets
     respuesta = _directa(client, headers, "cuantos tickets terminados")
-    assert respuesta.startswith("Hay 4 tickets resueltos o cerrados:")
+    assert es_forma(cabecera(respuesta), "grupo_varios", n=negrita(4), frase="tickets resueltos o cerrados")
 
 
 def test_solved_today(client, tickets, fake_claude):
     headers, t = tickets
     respuesta = _directa(client, headers, "cuantos tickets solucionados hoy")
-    assert respuesta.startswith(f"Hoy se resolvió 1 ticket.\n- #{t['hoy'].id} «Acceso a carpeta»")
+    assert es_forma(cabecera(respuesta), "periodo", cuando="hoy", verbo="se resolvió", n=negrita(1),
+                    tickets="ticket"), respuesta
+    assert lista(respuesta)[0].startswith(f"- #{t['hoy'].id} «Acceso a carpeta»")
 
 
 def test_unknown_state_does_not_answer_the_total(client, tickets, fake_claude):
     headers, _ = tickets
     respuesta = _directa(client, headers, "cuantos tickets estan congelados")
     assert "en total" not in respuesta
-    assert respuesta == NO_ENTENDI
+    assert respuesta in NO_ENTENDI
 
 
 @pytest.mark.parametrize(
-    "pregunta, esperado",
+    "pregunta, cuando, verbo, total",
     [
-        ("cuantos tickets se cerraron hoy", "Hoy se cerró 1 ticket."),
-        ("cuantos pasaron a en proceso ayer", "Ayer pasó a En proceso 1 ticket."),
-        ("cuantos tickets hay hoy", "Hoy se crearon 2 tickets."),
-        ("cuantos tickets nuevos este mes", "Este mes se crearon 6 tickets."),
-        ("cuantos resueltos en los ultimos 7 dias", "En los últimos 7 días se resolvieron 4 tickets."),
-        ("cuantos tickets se resolvieron ayer", "Ayer no se resolvió ningún ticket."),
+        ("cuantos tickets se cerraron hoy", "hoy", "se cerró", 1),
+        ("cuantos pasaron a en proceso ayer", "ayer", "pasó a En proceso", 1),
+        ("cuantos tickets hay hoy", "hoy", "se crearon", 2),
+        ("cuantos tickets nuevos este mes", "este mes", "se crearon", 6),
+        ("cuantos resueltos en los ultimos 7 dias", "en los últimos 7 días", "se resolvieron", 4),
+        ("cuantos tickets se resolvieron ayer", "ayer", "se resolvió", 0),
     ],
 )
-def test_other_periods(client, tickets, fake_claude, pregunta, esperado):
+def test_other_periods(client, tickets, fake_claude, pregunta, cuando, verbo, total):
     headers, _ = tickets
-    assert _directa(client, headers, pregunta).split("\n")[0] == esperado
+    respuesta = _directa(client, headers, pregunta)
+    if total:
+        assert es_forma(cabecera(respuesta), "periodo", cuando=cuando, verbo=verbo, n=negrita(total),
+                        tickets="ticket" if total == 1 else "tickets"), respuesta
+        assert len(lista(respuesta)) == total
+    else:
+        assert es_forma(respuesta, "periodo_cero", cuando=cuando, verbo=verbo, ticket="ticket"), respuesta
 
 
 def test_plain_total_still_works(client, tickets, fake_claude):
     headers, _ = tickets
-    assert _directa(client, headers, "¿cuántos tickets hay en total?") == "Hay 6 tickets visibles para ti en total."
+    respuesta = _directa(client, headers, "¿cuántos tickets hay en total?")
+    assert es_forma(respuesta, "total", n=negrita(6), tickets="tickets que usted puede ver"), respuesta
 
 
 @pytest.mark.parametrize(
@@ -151,7 +164,7 @@ def test_category_priority_or_unsupported_period_go_to_ai(client, tickets, fake_
 def test_counting_resolved_with_a_ticket_on_screen_still_counts(client, tickets, fake_claude):
     headers, t = tickets
     respuesta = _directa(client, headers, "cuantos ticketes se han resolvido?", ticket_id=t["nuevo"].id)
-    assert respuesta.startswith("Hay 4 tickets resueltos o cerrados:")
+    assert es_forma(cabecera(respuesta), "grupo_varios", n=negrita(4), frase="tickets resueltos o cerrados")
 
 
 def test_requester_only_counts_own_tickets_in_a_period(client, session, tickets, fake_claude):
@@ -160,10 +173,11 @@ def test_requester_only_counts_own_tickets_in_a_period(client, session, tickets,
     andrea = session.query(User).filter_by(email="sol@soli.local").one()
     t["hoy"].created_by_id = andrea.id
     session.commit()
-    assert _directa(client, headers, "cuantos tickets se resolvieron esta semana").startswith(
-        "Esta semana se resolvió 1 ticket tuyo."
-    )
-    assert _directa(client, headers, "cuantos se cerraron hoy") == "Hoy no se cerró ningún ticket tuyo."
+    semana = _directa(client, headers, "cuantos tickets se resolvieron esta semana")
+    assert es_forma(cabecera(semana), "periodo", cuando="esta semana", verbo="se resolvió", n=negrita(1),
+                    tickets="ticket suyo"), semana
+    hoy = _directa(client, headers, "cuantos se cerraron hoy")
+    assert es_forma(hoy, "periodo_cero", cuando="hoy", verbo="se cerró", ticket="ticket suyo"), hoy
 
 
 @pytest.mark.parametrize(

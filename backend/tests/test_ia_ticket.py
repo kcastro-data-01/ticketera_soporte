@@ -12,6 +12,7 @@ from backend.routers.asistente import get_proveedor
 from backend.services import asistente_service as a
 from backend.services.asistente_service import MENSAJE_NO_DISPONIBLE, ProveedorQwen
 from backend.tests.test_asistente import login_as
+from backend.tests.textos_asistente import es_forma, negrita
 
 
 class OllamaFalso:
@@ -138,7 +139,8 @@ def test_counting_questions_on_detail_page_still_count(client, session, ollama, 
     t1, _ = dos_tickets
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
     resp = preguntar(client, headers, "¿Cuántos tickets hay?", ticket_id=t1.id)
-    assert resp.json() == {"respuesta": "Hay 2 tickets visibles para ti en total.", "fuente": "directa"}
+    assert resp.json()["fuente"] == "directa"
+    assert es_forma(resp.json()["respuesta"], "total", n=negrita(2), tickets="tickets que usted puede ver"), resp.json()
 
 
 def test_requester_cannot_get_another_ticket_on_screen(client, session, ollama, dos_tickets):

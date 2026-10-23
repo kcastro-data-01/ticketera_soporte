@@ -24,6 +24,7 @@ from backend.services.asistente_service import (
     leer_interpretacion,
 )
 from backend.tests.test_asistente import add_ticket, ask, login_as
+from backend.tests.textos_asistente import cabecera, es_forma, lista, negrita
 
 
 def _json(tipo="conteo", estado=None, periodo=None, persona=None, rol=None, ticket=None):
@@ -104,7 +105,7 @@ def test_misspelled_finished_is_counted_by_the_server(client, ia, log, tickets):
 
     respuesta = _respuesta(ask(client, headers, "tikets terminaos ?"), "directa")
 
-    assert respuesta.startswith("Hay 2 tickets resueltos o cerrados:")
+    assert es_forma(cabecera(respuesta), "grupo_varios", n=negrita(2), frase="tickets resueltos o cerrados")
     assert f"#{t['Resuelto'].id}" in respuesta and f"#{t['Cerrado'].id}" in respuesta
     assert ia.calls == []
     enviado = ia.interpretaciones[0]
@@ -117,7 +118,9 @@ def test_misspelled_finished_is_counted_by_the_server(client, ia, log, tickets):
 def test_rules_go_first_and_answer_without_interpreting(client, ia, tickets):
     headers, _ = tickets
     respuesta = _respuesta(ask(client, headers, "cunatos pendientes hay esta semana"), "directa")
-    assert respuesta.startswith("Esta semana se crearon 2 tickets que siguen pendientes")
+    assert es_forma(cabecera(respuesta), "pendientes_periodo", cuando="esta semana", verbo="se crearon",
+                    n=negrita(2), tickets="tickets", siguen="siguen pendientes",
+                    desglose="(1 nuevo y 1 en proceso)"), respuesta
     assert ia.interpretaciones == []
 
 
@@ -125,8 +128,11 @@ def test_interpreted_period_uses_the_same_count_as_the_rules(session, tickets):
     _, t = tickets
     jose = session.query(User).filter_by(email="tec@tec.local").one()
     datos = leer_interpretacion(_json(estado="pendientes", periodo="semana"))
+    # Con la misma semilla las dos dicen el resultado de la misma forma.
+    asistente_service._azar.seed(7)
     directa, ticket = calcular_desde_interpretacion(session, jose, datos, pregunta="cunatos pendientes hay esta semana")
     assert ticket is None
+    asistente_service._azar.seed(7)
     assert directa == calcular_directa(session, jose, "cuantos pendientes esta semana")
 
 
@@ -134,23 +140,26 @@ def test_misspelled_person_counts_their_tickets(client, ia, tickets):
     headers, t = tickets
     ia.json = _json(persona="carlos")
     respuesta = _respuesta(ask(client, headers, "tikets de carlos"), "directa")
-    assert respuesta == f"Carlos Solís (Técnico) tiene 1 ticket sin resolver asignado: #{t['En proceso'].id} «VPN caída»."
+    assert es_forma(respuesta, "persona", persona="Carlos Solís (Técnico)", n=negrita(1), tickets="ticket",
+                    asignados="asignado", lista=f"#{t['En proceso'].id} «VPN caída»"), respuesta
 
 
 @pytest.mark.parametrize("persona", [None, "tecnicoss"])  # el rol a veces llega también como persona
 def test_role_counts_its_tickets(client, ia, tickets, persona):
-    headers, _ = tickets
+    headers, t = tickets
     ia.json = _json(rol="Técnico", persona=persona)
     respuesta = _respuesta(ask(client, headers, "tikets de los tecnicoss"), "directa")
-    assert respuesta.startswith("Hay 1 ticket sin resolver asignado a técnicos: Carlos Solís (Técnico) tiene 1")
+    assert es_forma(respuesta, "rol", despues=" José Solano (Técnico) no tiene ninguno.", n=negrita(1),
+                    tickets="ticket", asignados="asignado", rol="técnicos",
+                    detalle=f"Carlos Solís (Técnico) tiene 1 (#{t['En proceso'].id})"), respuesta
 
 
 @pytest.mark.parametrize("estado", [None, "todos"])
 def test_total_only_when_the_question_asks_for_it(client, ia, tickets, estado):
     headers, _ = tickets
     ia.json = _json(estado=estado)
-    assert _respuesta(ask(client, headers, "todos los tikets q ai registrados"), "directa") == \
-        "Hay 4 tickets visibles para ti en total."
+    respuesta = _respuesta(ask(client, headers, "todos los tikets q ai registrados"), "directa")
+    assert es_forma(respuesta, "total", n=negrita(4), tickets="tickets que usted puede ver"), respuesta
     # El modelo perdió «nuevos»: no se responde el total por error.
     _respuesta(ask(client, headers, "tikets nuebos q ai registrados"), "ia")
 
@@ -159,10 +168,11 @@ def test_what_the_rules_did_not_understand_is_interpreted(client, ia, tickets):
     headers, t = tickets
     ia.json = _json(estado="nuevos")
     respuesta = _respuesta(ask(client, headers, "cuantos tikets ai q nadie atendio"), "directa")
-    assert respuesta.startswith(f"Hay 1 ticket nuevo:\n- #{t['Nuevo'].id}")
+    assert es_forma(cabecera(respuesta), "grupo_uno", n=negrita(1), frase="ticket nuevo"), respuesta
+    assert lista(respuesta)[0].startswith(f"- #{t['Nuevo'].id}")
     # Si la interpretación no sirve, se mantiene «No entendí…».
     ia.json = _json("otra")
-    assert _respuesta(ask(client, headers, "cuantos tikets ai q nadie atendio"), "directa") == NO_ENTENDI
+    assert _respuesta(ask(client, headers, "cuantos tikets ai q nadie atendio"), "directa") in NO_ENTENDI
     assert ia.calls == []
 
 
@@ -189,7 +199,7 @@ def test_requester_cannot_name_anyone(client, session, ia, tickets):
     ia.json = _json(persona="carlos")
     # Carlos no atiende sus tickets: no se confirma ni se cuenta, y no va a la IA libre.
     respuesta = _respuesta(ask(client, headers, "tikets de carlos"), "directa")
-    assert respuesta == "No encontré a esa persona. ¿Podés escribir su nombre completo?"
+    assert respuesta in asistente_service.NO_ENCONTRE_PERSONA
 
 
 @pytest.mark.parametrize(
@@ -232,7 +242,7 @@ def test_slow_interpretation_keeps_the_rules_answer(client, ia, tickets, monkeyp
     headers, _ = tickets
     monkeypatch.setattr(asistente_service, "INTERPRETACION_TIMEOUT", 0.05)
     ia.demora = 0.5
-    assert _respuesta(ask(client, headers, "cuantos tikets ai q nadie atendio"), "directa") == NO_ENTENDI
+    assert _respuesta(ask(client, headers, "cuantos tikets ai q nadie atendio"), "directa") in NO_ENTENDI
     assert ia.calls == []
 
 
@@ -258,7 +268,9 @@ def test_ticket_state(client, ia, tickets):
     headers, t = tickets
     ia.json = _json("estado_ticket", ticket=t["En proceso"].id)
     respuesta = _respuesta(ask(client, headers, f"q tal va el tiket {t['En proceso'].id}"), "directa")
-    assert respuesta.startswith(f"El ticket #{t['En proceso'].id} «VPN caída» está en estado En proceso")
+    assert es_forma(respuesta, "estado_ticket", id=negrita(f"#{t['En proceso'].id}"), titulo="VPN caída",
+                    estado="En proceso", prioridad="Alta",
+                    asignado="está asignado a Carlos Solís (Técnico)"), respuesta
 
 
 def test_explain_ticket_uses_explain_with_ai(client, ia, tickets, monkeypatch):
@@ -295,7 +307,7 @@ def test_stream_also_interprets(client, ia, tickets):
     resp = client.post("/api/asistente/stream", headers=headers,
                        json={"messages": [{"role": "user", "content": "tikets terminaos ?"}]})
     eventos = [json.loads(linea) for linea in resp.text.splitlines() if linea]
-    assert eventos[0]["t"].startswith("Hay 2 tickets resueltos o cerrados:")
+    assert es_forma(cabecera(eventos[0]["t"]), "grupo_varios", n=negrita(2), frase="tickets resueltos o cerrados")
     assert eventos[-1] == {"fin": True, "fuente": "directa"}
 
 

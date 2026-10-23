@@ -17,10 +17,12 @@ from backend.models import Ticket, User
 from backend.routers.asistente import get_proveedor
 from backend.services.asistente_service import (
     AsistenteNoDisponible,
+    NO_ENCONTRE_PERSONA,
     ProveedorClaude,
     ProveedorQwen,
     crear_proveedor,
 )
+from backend.tests.textos_asistente import cabecera, es_forma, lista, negrita
 
 
 class FakeProveedor:
@@ -356,20 +358,30 @@ def _sesion_tecnico(client, session):
     return headers, proceso, critico, cerrado
 
 
+UNO = negrita(1)
+
+
 @pytest.mark.parametrize(
-    "pregunta, esperado",
+    "pregunta, tipo, datos, primer_ticket",
     [
-        ("¿Hay tickets en proceso?", "Hay 1 ticket en proceso:\n- #{proceso} «Problemas»"),
-        ("en proceso?", "Hay 1 ticket en proceso:"),
-        ("¿Cuántos tickets críticos hay sin resolver?", "Hay 1 ticket crítico sin resolver:\n- #{critico}"),
-        ("¿qué tickets tengo pendientes?", "Hay 1 ticket asignado a ti sin resolver:\n- #{proceso}"),
-        ("dime los resueltos", "Hay 1 ticket resuelto o cerrado:\n- #{cerrado} «Cable»"),
-        ("¿cuántos tickets hay?", "Hay 3 tickets visibles para ti en total."),
-        ("muestra los nuevos", "Hay 1 ticket nuevo:\n- #{critico}"),
-        ("¿en qué estado está el ticket #{proceso}?", "El ticket #{proceso} «Problemas» está en estado En proceso"),
+        ("¿Hay tickets en proceso?", "grupo_uno", {"n": UNO, "frase": "ticket en proceso"},
+         "- #{proceso} «Problemas»"),
+        ("en proceso?", "grupo_uno", {"n": UNO, "frase": "ticket en proceso"}, "- #{proceso}"),
+        ("¿Cuántos tickets críticos hay sin resolver?", "grupo_uno",
+         {"n": UNO, "frase": "ticket crítico sin resolver"}, "- #{critico}"),
+        ("¿qué tickets tengo pendientes?", "grupo_uno",
+         {"n": UNO, "frase": "ticket asignado a usted sin resolver"}, "- #{proceso}"),
+        ("dime los resueltos", "grupo_uno", {"n": UNO, "frase": "ticket resuelto o cerrado"},
+         "- #{cerrado} «Cable»"),
+        ("¿cuántos tickets hay?", "total", {"n": negrita(3), "tickets": "tickets que usted puede ver"}, None),
+        ("muestra los nuevos", "grupo_uno", {"n": UNO, "frase": "ticket nuevo"}, "- #{critico}"),
+        ("¿en qué estado está el ticket #{proceso}?", "estado_ticket",
+         {"id": "**#{proceso}**", "titulo": "Problemas", "estado": "En proceso", "prioridad": "Alta",
+          "asignado": "está asignado a José Solano (Técnico)"}, None),
     ],
 )
-def test_frequent_questions_are_answered_without_ai(client, session, fake_claude, pregunta, esperado):
+def test_frequent_questions_are_answered_without_ai(client, session, fake_claude, pregunta, tipo, datos,
+                                                    primer_ticket):
     headers, proceso, critico, cerrado = _sesion_tecnico(client, session)
     ids = {"proceso": proceso.id, "critico": critico.id, "cerrado": cerrado.id}
 
@@ -377,14 +389,21 @@ def test_frequent_questions_are_answered_without_ai(client, session, fake_claude
 
     assert resp.status_code == 200
     assert resp.json()["fuente"] == "directa"
-    assert resp.json()["respuesta"].startswith(esperado.format(**ids))
+    respuesta = resp.json()["respuesta"]
+    datos = {clave: valor.format(**ids) for clave, valor in datos.items()}
+    if primer_ticket is None:
+        assert es_forma(respuesta, tipo, **datos), respuesta
+    else:
+        assert es_forma(cabecera(respuesta), tipo, **datos), respuesta
+        assert lista(respuesta)[0].startswith(primer_ticket.format(**ids))
     assert fake_claude.calls == []  # la IA no se usó
 
 
 def test_empty_group_answer(client, session, fake_claude):
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
     resp = ask(client, headers, "¿hay tickets críticos?")
-    assert resp.json() == {"respuesta": "No hay tickets críticos sin resolver.", "fuente": "directa"}
+    assert resp.json()["fuente"] == "directa"
+    assert es_forma(resp.json()["respuesta"], "grupo_cero_bueno", frase="tickets críticos sin resolver")
 
 
 @pytest.mark.parametrize(
@@ -404,7 +423,7 @@ def test_requester_cannot_ask_for_other_tickets_by_number(client, session, fake_
     ajeno = add_ticket(session, "Servidor interno caído")
 
     resp = ask(client, headers, f"¿En qué estado está el ticket #{ajeno.id}?")
-    assert resp.json()["respuesta"] == f"No encontré el ticket #{ajeno.id} entre los tickets que puede ver."
+    assert es_forma(resp.json()["respuesta"], "ticket_no_encontrado", id=f"#{ajeno.id}")
 
     ask(client, headers, f"Explícame el ticket #{ajeno.id}")
     system = fake_claude.system_text()
@@ -444,10 +463,9 @@ def test_stream_direct_answer(client, session, fake_claude):
         headers=headers,
     )
     assert resp.status_code == 200
-    assert _eventos(resp) == [
-        {"t": "Hay 3 tickets visibles para ti en total."},
-        {"fin": True, "fuente": "directa"},
-    ]
+    texto, fin = _eventos(resp)
+    assert es_forma(texto["t"], "total", n=negrita(3), tickets="tickets que usted puede ver")
+    assert fin == {"fin": True, "fuente": "directa"}
 
 
 def test_stream_ai_answer_and_error(client, session, fake_claude):
@@ -534,7 +552,7 @@ def test_how_to_answers_depend_on_the_role(client, session, fake_claude, rol, pr
 def test_how_to_does_not_hijack_counting_questions(client, session, fake_claude):
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
     resp = ask(client, headers, "¿cuántos tickets en proceso hay?")
-    assert resp.json()["respuesta"] == "No hay tickets en proceso."
+    assert es_forma(resp.json()["respuesta"], "grupo_cero", frase="tickets en proceso")
 
 
 
@@ -582,14 +600,13 @@ def equipo(client, session):
 def test_count_by_role_with_the_misspelled_question(client, session, fake_claude, equipo):
     e = equipo
     resp = ask(client, e.headers, "cuantos ticketes hay asigandos a tecnicos")
-    assert resp.json() == {
-        "respuesta": (
-            f"Hay 3 tickets sin resolver asignados a técnicos: Carlos Solís (Técnico) tiene 2 "
-            f"(#{e.c1.id}, #{e.c2.id}) y José Solano (Técnico) tiene 1 (#{e.de_jose.id}). "
-            "Ana Pérez (Técnico) no tiene ninguno."
-        ),
-        "fuente": "directa",
-    }
+    assert resp.json()["fuente"] == "directa"
+    assert es_forma(
+        resp.json()["respuesta"], "rol", despues=" Ana Pérez (Técnico) no tiene ninguno.",
+        n=negrita(3), tickets="tickets", asignados="asignados", rol="técnicos",
+        detalle=(f"Carlos Solís (Técnico) tiene 2 (#{e.c1.id}, #{e.c2.id}) y "
+                 f"José Solano (Técnico) tiene 1 (#{e.de_jose.id})"),
+    ), resp.json()["respuesta"]
     assert fake_claude.calls == []  # la IA no se usó
 
 
@@ -600,9 +617,15 @@ def test_count_by_role_with_the_misspelled_question(client, session, fake_claude
     "dime los tikets asignados al técnico",
 ])
 def test_count_by_role_variants(client, session, fake_claude, equipo, pregunta):
-    datos = ask(client, equipo.headers, pregunta).json()
+    e = equipo
+    datos = ask(client, e.headers, pregunta).json()
     assert datos["fuente"] == "directa"
-    assert datos["respuesta"].startswith("Hay 3 tickets sin resolver asignados a técnicos: Carlos Solís (Técnico) tiene 2")
+    assert es_forma(
+        datos["respuesta"], "rol", despues=" Ana Pérez (Técnico) no tiene ninguno.",
+        n=negrita(3), tickets="tickets", asignados="asignados", rol="técnicos",
+        detalle=(f"Carlos Solís (Técnico) tiene 2 (#{e.c1.id}, #{e.c2.id}) y "
+                 f"José Solano (Técnico) tiene 1 (#{e.de_jose.id})"),
+    ), datos["respuesta"]
 
 
 def test_count_by_role_when_none_says_who_has_them(client, session, fake_claude, equipo):
@@ -611,61 +634,61 @@ def test_count_by_role_when_none_says_who_has_them(client, session, fake_claude,
         ticket.assigned_to_id = None
     session.commit()
     datos = ask(client, e.headers, "cuantos ticketes hay asigandos a tecnicos").json()
-    assert datos["respuesta"] == (
-        f"No hay tickets sin resolver asignados a técnicos. El #{e.de_laura.id} está asignado "
-        "a Laura Méndez (Administrador)."
-    )
+    assert es_forma(datos["respuesta"], "rol_cero", tickets="tickets", rol="técnicos",
+                    despues=f" El #{e.de_laura.id} está asignado a Laura Méndez (Administrador).")
     assert datos["fuente"] == "directa"
 
 
 def test_count_by_role_supervisors_and_admins(client, session, fake_claude, equipo):
     e = equipo
     sup = ask(client, e.headers, "¿Cuántos tickets tienen los supervisores?").json()["respuesta"]
-    assert sup.startswith("No hay tickets sin resolver asignados a supervisores. Los que están asignados: ")
-    assert "Laura Méndez (Administrador)" in sup and "Carlos Solís (Técnico)" in sup
+    asignados = (f"#{e.de_laura.id} a Laura Méndez (Administrador), #{e.c1.id} a Carlos Solís (Técnico), "
+                 f"#{e.c2.id} a Carlos Solís (Técnico), #{e.de_jose.id} a José Solano (Técnico)")
+    assert es_forma(sup, "rol_cero", tickets="tickets", rol="supervisores",
+                    despues=f" Los que están asignados: {asignados}."), sup
 
     admin = ask(client, e.headers, "cuantos tickets tiene el administrador").json()["respuesta"]
-    assert admin == (f"Hay 1 ticket sin resolver asignado a administradores: Laura Méndez "
-                     f"(Administrador) tiene 1 (#{e.de_laura.id}).")
+    assert es_forma(admin, "rol", n=UNO, tickets="ticket", asignados="asignado", rol="administradores",
+                    detalle=f"Laura Méndez (Administrador) tiene 1 (#{e.de_laura.id})"), admin
 
 
 def test_count_by_person(client, session, fake_claude, equipo):
     e = equipo
     datos = ask(client, e.headers, "cuantos tickets tiene Carlos").json()
-    assert datos == {
-        "respuesta": (f"Carlos Solís (Técnico) tiene 2 tickets sin resolver asignados: "
-                      f"#{e.c1.id} «VPN», #{e.c2.id} «Correo»."),
-        "fuente": "directa",
-    }
+    assert datos["fuente"] == "directa"
+    assert es_forma(datos["respuesta"], "persona", persona="Carlos Solís (Técnico)", n=negrita(2),
+                    tickets="tickets", asignados="asignados",
+                    lista=f"#{e.c1.id} «VPN», #{e.c2.id} «Correo»"), datos["respuesta"]
     laura = ask(client, e.headers, "qué tiketes tiene asignados laura mendez").json()["respuesta"]
-    assert laura == f"Laura Méndez (Administrador) tiene 1 ticket sin resolver asignado: #{e.de_laura.id} «Impresora»."
+    assert es_forma(laura, "persona", persona="Laura Méndez (Administrador)", n=UNO, tickets="ticket",
+                    asignados="asignado", lista=f"#{e.de_laura.id} «Impresora»"), laura
     ana = ask(client, e.headers, "cuántos tickets tiene Ana").json()["respuesta"]
-    assert ana == "Ana Pérez (Técnico) no tiene tickets sin resolver asignados."
+    assert es_forma(ana, "persona_cero", persona="Ana Pérez (Técnico)", tickets="tickets"), ana
     assert fake_claude.calls == []
 
 
 def test_count_by_person_with_two_matches_asks_which(client, session, fake_claude, equipo):
     _persona(session, "Carlos Mora", "Supervisor", "cmora@x.local")
     datos = ask(client, equipo.headers, "cuantos tickets tiene Carlos").json()
-    assert datos["respuesta"] == ("Hay varias personas con ese nombre: Carlos Solís (Técnico) y "
-                                  "Carlos Mora (Supervisor). ¿De quién quieres saber?")
+    assert es_forma(datos["respuesta"], "persona_varias",
+                    personas="Carlos Solís (Técnico) y Carlos Mora (Supervisor)"), datos["respuesta"]
     # Con el nombre completo no hay duda.
     completo = ask(client, equipo.headers, "cuantos tickets tiene Carlos Mora").json()["respuesta"]
-    assert completo == "Carlos Mora (Supervisor) no tiene tickets sin resolver asignados."
+    assert es_forma(completo, "persona_cero", persona="Carlos Mora (Supervisor)", tickets="tickets"), completo
 
 
 def test_count_by_unknown_person_is_not_sent_to_the_ai(client, session, fake_claude, equipo):
     # La IA libre podría contar los tickets de otra persona: el sistema avisa.
     datos = ask(client, equipo.headers, "cuantos tickets tiene Fernanda").json()
-    assert datos == {"respuesta": "No encontré a esa persona. ¿Podés escribir su nombre completo?",
-                     "fuente": "directa"}
+    assert datos["respuesta"] in NO_ENCONTRE_PERSONA
+    assert datos["fuente"] == "directa"
     assert fake_claude.calls == []
 
 
 def test_unassigned_count_tolerates_typos(client, session, fake_claude, equipo):
     datos = ask(client, equipo.headers, "cuantos ticketes sin asigar").json()
-    assert datos["respuesta"].startswith(
-        f"Hay 1 ticket sin asignar sin resolver:\n- #{equipo.sin_asignar.id} «Teclado»")
+    assert es_forma(cabecera(datos["respuesta"]), "grupo_uno", n=UNO, frase="ticket sin asignar sin resolver")
+    assert lista(datos["respuesta"])[0].startswith(f"- #{equipo.sin_asignar.id} «Teclado»")
     assert datos["fuente"] == "directa"
 
 
@@ -676,21 +699,22 @@ def test_requester_counts_only_own_tickets(client, session, fake_claude, equipo)
     propio = _asignar(session, "Mi impresora", e.carlos, created_by=andrea.id)
 
     datos = ask(client, headers, "cuantos ticketes hay asigandos a tecnicos").json()
-    assert datos["respuesta"] == (f"Hay 1 ticket tuyo sin resolver asignado a técnicos: "
-                                  f"Carlos Solís (Técnico) tiene 1 (#{propio.id}).")
+    assert es_forma(datos["respuesta"], "rol", n=UNO, tickets="ticket suyo", asignados="asignado",
+                    rol="técnicos", detalle=f"Carlos Solís (Técnico) tiene 1 (#{propio.id})"), datos["respuesta"]
     assert "Ana" not in datos["respuesta"]  # no ve al resto del equipo
 
     carlos = ask(client, headers, "cuantos tickets tiene Carlos").json()["respuesta"]
-    assert carlos == f"Carlos Solís (Técnico) tiene 1 ticket tuyo sin resolver asignado: #{propio.id} «Mi impresora»."
+    assert es_forma(carlos, "persona", persona="Carlos Solís (Técnico)", n=UNO, tickets="ticket suyo",
+                    asignados="asignado", lista=f"#{propio.id} «Mi impresora»"), carlos
 
     # Laura no atiende ninguno de sus tickets: no se confirma ni se cuenta.
     laura = ask(client, headers, "cuantos tickets tiene Laura").json()
-    assert laura["respuesta"] == "No encontré a esa persona. ¿Podés escribir su nombre completo?"
+    assert laura["respuesta"] in NO_ENCONTRE_PERSONA
     assert "Impresora" not in laura["respuesta"]
 
     admins = ask(client, headers, "cuantos tickets tienen los administradores").json()["respuesta"]
-    assert admins == ("No hay tickets tuyos sin resolver asignados a administradores. "
-                      f"El #{propio.id} está asignado a Carlos Solís (Técnico).")
+    assert es_forma(admins, "rol_cero", tickets="tickets suyos", rol="administradores",
+                    despues=f" El #{propio.id} está asignado a Carlos Solís (Técnico)."), admins
 
 
 def test_ai_receives_the_role_next_to_each_name(client, session, fake_claude, equipo):
@@ -705,5 +729,5 @@ def test_ai_receives_the_role_next_to_each_name(client, session, fake_claude, eq
 def test_how_to_questions_still_use_the_guide(client, session, fake_claude, equipo):
     datos = ask(client, equipo.headers, "¿Cómo asigno un ticket a un técnico?").json()
     assert datos["respuesta"].startswith("Con tu rol (Técnico) no puedes asignar tickets.")
-    assert ask(client, equipo.headers, "¿cuántos tickets tengo?").json()["respuesta"].startswith(
-        "Hay 1 ticket asignado a ti sin resolver:")
+    mios = ask(client, equipo.headers, "¿cuántos tickets tengo?").json()["respuesta"]
+    assert es_forma(cabecera(mios), "grupo_uno", n=UNO, frase="ticket asignado a usted sin resolver"), mios

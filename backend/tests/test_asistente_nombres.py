@@ -16,6 +16,7 @@ from backend.services.asistente_service import (
     _personas_nombradas,
 )
 from backend.tests.test_asistente import _asignar, _persona, ask, fake_claude, login_as  # noqa: F401
+from backend.tests.textos_asistente import es_forma, negrita
 
 
 @pytest.fixture
@@ -45,9 +46,21 @@ def conversar(client, headers, *turnos):
     return resp.json()
 
 
-def jose_texto(g):
-    return (f"José Solano (Técnico) tiene 2 tickets sin resolver asignados: "
-            f"#{g.j1.id} «VPN», #{g.j2.id} «Correo».")
+def es_de_jose(texto, g):
+    """¿Es el conteo de José Solano (2 tickets), dicho de cualquier forma?"""
+    return es_forma(texto, "persona", persona="José Solano (Técnico)", n=negrita(2), tickets="tickets",
+                    asignados="asignados", lista=f"#{g.j1.id} «VPN», #{g.j2.id} «Correo»")
+
+
+def es_de_una(texto, persona, ticket, titulo):
+    """¿Es el conteo de ``persona`` con un solo ticket?"""
+    return es_forma(texto, "persona", persona=persona, n=negrita(1), tickets="ticket",
+                    asignados="asignado", lista=f"#{ticket.id} «{titulo}»")
+
+
+def directa(datos):
+    assert datos["fuente"] == "directa", datos
+    return datos["respuesta"]
 
 
 # --- Comparación tolerante -------------------------------------------------------
@@ -83,33 +96,30 @@ def test_similarity_limits(palabra, parte, coincide):
 
 def test_misspelled_full_name_is_that_person_not_ambiguous(client, gente, fake_claude):
     datos = ask(client, gente.headers, "jsoe solano cuantos tiketes tiene?").json()
-    assert datos == {"respuesta": jose_texto(gente), "fuente": "directa"}
+    assert es_de_jose(directa(datos), gente), datos
     assert fake_claude.calls == []
 
 
 def test_follow_up_with_misspelled_person_changes_only_the_person(client, gente, fake_claude):
     primera = "cuantos tickets tiene Laura?"
     laura = ask(client, gente.headers, primera).json()["respuesta"]
-    assert laura.startswith("Laura Méndez (Administrador) tiene 1 ticket")
+    assert es_de_una(laura, "Laura Méndez (Administrador)", gente.de_laura, "Impresora"), laura
 
     datos = conversar(client, gente.headers, primera, laura, "y jsoe solano ?")
-    assert datos == {"respuesta": jose_texto(gente), "fuente": "directa"}
+    assert es_de_jose(directa(datos), gente), datos
     assert "Laura" not in datos["respuesta"]
     assert fake_claude.calls == []
 
 
 def test_count_with_misspelled_first_name_only(client, gente, fake_claude):
     datos = ask(client, gente.headers, "cuantos tiene crlos").json()
-    assert datos == {
-        "respuesta": f"Carlos Rojas (Técnico) tiene 1 ticket sin resolver asignado: #{gente.de_carlos.id} «Monitor».",
-        "fuente": "directa",
-    }
+    assert es_de_una(directa(datos), "Carlos Rojas (Técnico)", gente.de_carlos, "Monitor"), datos
 
 
 def test_unknown_name_is_not_sent_to_the_free_ai(client, gente, fake_claude):
     for pregunta in ("cuantos tickets tiene Fernanda", "Fernanda cuantos tickets tiene", "tickets de fernanda"):
         datos = ask(client, gente.headers, pregunta).json()
-        assert datos == {"respuesta": NO_ENCONTRE_PERSONA, "fuente": "directa"}, pregunta
+        assert directa(datos) in NO_ENCONTRE_PERSONA, pregunta
     assert fake_claude.calls == []
 
 
@@ -117,7 +127,7 @@ def test_unknown_name_as_follow_up(client, gente, fake_claude):
     primera = "cuantos tickets tiene Laura?"
     laura = ask(client, gente.headers, primera).json()["respuesta"]
     datos = conversar(client, gente.headers, primera, laura, "y fernanda?")
-    assert datos == {"respuesta": NO_ENCONTRE_PERSONA, "fuente": "directa"}
+    assert directa(datos) in NO_ENCONTRE_PERSONA
     assert fake_claude.calls == []
 
 
@@ -125,10 +135,11 @@ def test_follow_up_with_a_role(client, gente, fake_claude):
     primera = "cuantos tickets tiene Laura?"
     laura = ask(client, gente.headers, primera).json()["respuesta"]
     datos = conversar(client, gente.headers, primera, laura, "y los tecnicos?")
-    assert datos["fuente"] == "directa"
-    assert datos["respuesta"].startswith("Hay 3 tickets sin resolver asignados a técnicos: "
-                                         "José Solano (Técnico) tiene 2")
-    assert "Carlos Rojas (Técnico) tiene 1" in datos["respuesta"]
+    g = gente
+    assert es_forma(directa(datos), "rol", despues=" Ana Pérez (Técnico) no tiene ninguno.", n=negrita(3),
+                    tickets="tickets", asignados="asignados", rol="técnicos",
+                    detalle=(f"José Solano (Técnico) tiene 2 (#{g.j1.id}, #{g.j2.id}) y "
+                             f"Carlos Rojas (Técnico) tiene 1 (#{g.de_carlos.id})")), datos
 
 
 def test_follow_up_with_a_period_keeps_the_rest(client, gente, fake_claude):
@@ -145,9 +156,9 @@ def test_follow_ups_can_chain(client, gente, fake_claude):
     p1 = "cuantos tickets tiene Laura?"
     r1 = ask(client, gente.headers, p1).json()["respuesta"]
     r2 = conversar(client, gente.headers, p1, r1, "y jsoe?")["respuesta"]
-    assert r2 == jose_texto(gente)
+    assert es_de_jose(r2, gente), r2
     r3 = conversar(client, gente.headers, p1, r1, "y jsoe?", r2, "y crlos?")["respuesta"]
-    assert r3.startswith("Carlos Rojas (Técnico) tiene 1 ticket")
+    assert es_de_una(r3, "Carlos Rojas (Técnico)", gente.de_carlos, "Monitor"), r3
 
 
 def test_y_without_a_previous_count_is_not_a_follow_up(client, gente, fake_claude):
@@ -177,10 +188,10 @@ def test_better_match_wins(session, gente):
 def test_same_first_name_and_same_role_still_asks(client, session, gente, fake_claude):
     _persona(session, "Carlos Mora", "Técnico", "cmora@x.local")
     datos = ask(client, gente.headers, "cuantos tickets tiene carlos").json()
-    assert datos["respuesta"].startswith("Hay varias personas con ese nombre: Carlos Rojas (Técnico) y "
-                                         "Carlos Mora (Técnico)")
+    assert es_forma(directa(datos), "persona_varias",
+                    personas="Carlos Rojas (Técnico) y Carlos Mora (Técnico)"), datos
     completo = ask(client, gente.headers, "cuantos tickets tiene crlos rojas").json()["respuesta"]
-    assert completo.startswith("Carlos Rojas (Técnico) tiene 1 ticket")
+    assert es_de_una(completo, "Carlos Rojas (Técnico)", gente.de_carlos, "Monitor"), completo
 
 
 def test_common_words_are_not_names(session, gente):
@@ -202,7 +213,7 @@ def test_interpreted_name_may_be_corrected_by_the_ai(session, gente):
     ana = session.query(User).filter_by(email="ana@tec.local").one()
     # La IA corrigió «jsoe» a «jose»: antes se descartaba por no estar tal cual.
     directa, _ = calcular_desde_interpretacion(session, ana, _datos("jose solano"), None, "q onda los tikets d jsoe solano")
-    assert directa.texto == jose_texto(gente)
+    assert es_de_jose(directa.texto, gente), directa.texto
 
 
 def test_interpreted_unknown_name_never_reaches_the_free_ai(session, gente):
@@ -210,6 +221,6 @@ def test_interpreted_unknown_name_never_reaches_the_free_ai(session, gente):
 
     ana = session.query(User).filter_by(email="ana@tec.local").one()
     directa, _ = calcular_desde_interpretacion(session, ana, _datos("fernanda"), None, "q onda los tikets d fernanda")
-    assert directa.texto == NO_ENCONTRE_PERSONA
+    assert directa.texto in NO_ENCONTRE_PERSONA
     # Un nombre que la IA inventó (no está en la pregunta) se descarta.
     assert calcular_desde_interpretacion(session, ana, _datos("maria"), None, "que significa prioridad alta") is None

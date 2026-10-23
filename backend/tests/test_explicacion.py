@@ -15,6 +15,7 @@ from backend.services import asistente_service
 from backend.services import explicacion_service as ex
 from backend.services.asistente_service import ProveedorQwen
 from backend.tests.test_asistente import login_as
+from backend.tests.textos_asistente import es_forma
 
 BUENA = {
     "explicacion": ("En este ticket, José Solano dice que algo no sirve, pero no cuenta qué es. "
@@ -417,8 +418,8 @@ def test_chat_invalid_explanation_twice_is_an_error(client, session, ollama, tec
 
 def test_chat_explanation_of_missing_ticket_is_a_server_answer(client, session, ollama, tecnico):
     datos = preguntar(client, tecnico, "explicar ticket #999").json()
-    assert datos == {"respuesta": "No encontré el ticket #999 entre los tickets que puede ver.",
-                     "fuente": "directa"}
+    assert datos["fuente"] == "directa"
+    assert es_forma(datos["respuesta"], "ticket_no_encontrado", id="#999"), datos
     assert ollama.pedidos == []
 
 

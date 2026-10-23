@@ -19,6 +19,7 @@ from backend.services.asistente_service import (
     detectar_consulta,
 )
 from backend.tests.test_asistente import add_ticket, ask, fake_claude, login_as  # noqa: F401 (fixture)
+from backend.tests.textos_asistente import es_forma, negrita
 
 
 @pytest.fixture
@@ -138,7 +139,8 @@ def test_misspelled_total_answers_at_once_without_ai(client, session, fake_claud
     add_ticket(session, "Impresora sin tinta")
     add_ticket(session, "Monitor apagado")
     resp = ask(client, headers, "cuatos ticketes hay ?").json()
-    assert resp == {"respuesta": "Hay 2 tickets visibles para ti en total.", "fuente": "directa"}
+    assert resp["fuente"] == "directa"
+    assert es_forma(resp["respuesta"], "total", n=negrita(2), tickets="tickets que usted puede ver"), resp
     assert fake_claude.calls == []
 
 

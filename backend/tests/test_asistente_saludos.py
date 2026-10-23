@@ -7,6 +7,10 @@ import pytest
 from backend.services import asistente_service as a
 from backend.services.asistente_service import limpiar_respuesta_ia
 from backend.tests.test_asistente import ask, fake_claude, login_as  # noqa: F401
+from backend.tests.textos_asistente import AYUDA_EQUIPO, AYUDA_SOLICITANTE, es_forma
+
+# Con o sin el nombre de la persona.
+JOSE = ("", ", José")
 
 
 @pytest.fixture
@@ -27,11 +31,8 @@ def eventos(client, headers, texto):
 @pytest.mark.parametrize("saludo", ["hola", "Hola!", "buenas", "buenas tardes", "Buenos días", "hey", "¿qué tal?"])
 def test_greetings_are_answered_by_the_server(client, tecnico, fake_claude, saludo):
     datos = ask(client, tecnico, saludo).json()
-    assert datos == {
-        "respuesta": "¡Hola, José! ¿En qué te puedo ayudar? Podés preguntarme por tus tickets, "
-                     "cuántos hay pendientes o pedirme que explique uno.",
-        "fuente": "directa",
-    }
+    assert datos["fuente"] == "directa"
+    assert es_forma(datos["respuesta"], "saludo", nombre=JOSE, ayuda=AYUDA_EQUIPO), datos["respuesta"]
     assert fake_claude.calls == []
 
 
@@ -39,14 +40,15 @@ def test_greetings_are_answered_by_the_server(client, tecnico, fake_claude, salu
 def test_thanks_are_answered_by_the_server(client, tecnico, fake_claude, gracias):
     datos = ask(client, tecnico, gracias).json()
     assert datos["fuente"] == "directa"
-    assert datos["respuesta"].startswith("¡Con gusto, José! ¿Te ayudo con algo más?")
+    assert es_forma(datos["respuesta"], "agradecimiento", nombre=JOSE, ayuda=AYUDA_EQUIPO), datos["respuesta"]
     assert fake_claude.calls == []
 
 
 def test_requester_greeting_does_not_offer_explanations(client, session, fake_claude):
     headers = login_as(client, session, "Solicitante", "andrea@soli.local", "Andrea Castillo")
     respuesta = ask(client, headers, "hola").json()["respuesta"]
-    assert respuesta == "¡Hola, Andrea! ¿En qué te puedo ayudar? Podés preguntarme por tus tickets o cuántos tenés pendientes."
+    assert es_forma(respuesta, "saludo", nombre=("", ", Andrea"), ayuda=AYUDA_SOLICITANTE), respuesta
+    assert "expli" not in respuesta
 
 
 def test_greeting_with_a_question_is_not_just_a_greeting(client, tecnico, fake_claude):
@@ -55,11 +57,9 @@ def test_greeting_with_a_question_is_not_just_a_greeting(client, tecnico, fake_c
 
 
 def test_greeting_in_stream(client, tecnico, fake_claude):
-    assert eventos(client, tecnico, "buenas tardes") == [
-        {"t": "¡Hola, José! ¿En qué te puedo ayudar? Podés preguntarme por tus tickets, "
-              "cuántos hay pendientes o pedirme que explique uno."},
-        {"fin": True, "fuente": "directa"},
-    ]
+    texto, fin = eventos(client, tecnico, "buenas tardes")
+    assert es_forma(texto["t"], "saludo", nombre=JOSE, ayuda=AYUDA_EQUIPO), texto
+    assert fin == {"fin": True, "fuente": "directa"}
 
 
 # --- Nombres internos ---------------------------------------------------------------------
@@ -70,14 +70,16 @@ def test_instructions_forbid_mentioning_internal_names():
     assert regla in " ".join(a.INSTRUCCIONES.split())
 
 
-AYUDA = ("¿En qué te puedo ayudar? Podés preguntarme por tus tickets, cuántos hay "
-         "pendientes o pedirme que explique uno.")
+def es_ayuda(texto: str) -> bool:
+    """La respuesta del sistema cuando la de la IA no sirve."""
+    return es_forma(texto, "sistema", ayuda=AYUDA_EQUIPO)
 
 
 def test_free_ai_mentioning_datos_visibles_never_reaches_the_user(client, tecnico, fake_claude):
     fake_claude.text = "Hola. No tienes datos en <datos_visibles> sobre tu rol. Si te gusta, ¡puedo ayudarte!"
     datos = ask(client, tecnico, "que significa prioridad alta").json()
-    assert datos == {"respuesta": AYUDA, "fuente": "directa"}
+    assert datos["fuente"] == "directa"
+    assert es_ayuda(datos["respuesta"]), datos["respuesta"]
     assert "datos_visibles" not in datos["respuesta"]
 
 
@@ -85,7 +87,7 @@ def test_free_ai_in_stream_is_replaced(client, tecnico, fake_claude):
     fake_claude.text = "No tienes datos en <datos_visibles> sobre tu rol."
     lista = eventos(client, tecnico, "que significa prioridad alta")
     assert all("datos_visibles" not in e.get("t", "") for e in lista), "la etiqueta nunca se muestra"
-    assert {"reemplazo": AYUDA} in lista
+    assert any(es_ayuda(e.get("reemplazo", "")) for e in lista), lista
     assert lista[-1] == {"fin": True, "fuente": "directa"}
 
 

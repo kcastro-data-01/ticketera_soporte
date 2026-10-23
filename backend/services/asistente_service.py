@@ -18,6 +18,7 @@ alcance.
 import json
 import logging
 import os
+import random
 import re
 import threading
 import time
@@ -425,11 +426,238 @@ def _claves_desglose(desglose: str) -> tuple[tuple[str, str], ...]:
     return tuple(c for c in (_CLAVE_NUEVOS, _CLAVE_EN_PROCESO) if re.search(c[1], _normalizar(desglose)))
 
 
-def _con_lista(cabecera: str, tickets: list, total: int, claves=()) -> "Directa":
-    """«Hay 3 …:» + la lista de tickets; la IA resume solo la cabecera."""
+def _con_lista(cabecera: str, tickets: list, total: int, claves=(), resumen: str | None = None,
+               cierre: str | None = None) -> "Directa":
+    """«Revisé y hay **3** …:» + la lista de tickets (+ el cierre, si hay).
+    La IA resume solo ``resumen``: el dato dicho de la forma fija."""
     lineas = tuple(_lista_tickets(tickets, total))
-    return Directa("\n".join([cabecera, *lineas]), total, resumen=cabecera.rstrip(":.") + ".",
-                   lista=lineas, claves=tuple(claves))
+    return Directa("\n".join([cabecera, *lineas, *([cierre] if cierre else [])]), total,
+                   resumen=resumen, lista=lineas, claves=tuple(claves))
+
+
+# ---------- Cómo se dicen las respuestas del sistema (sin IA) ----------
+# Cada tipo de respuesta tiene varias formas y se elige una al azar, en tono
+# formal (de «usted»). Cada forma usa todos sus datos: los números, nombres y
+# #tickets salen siempre iguales, y el número principal va en negrita. A veces
+# se nombra a la persona y a veces se agrega un cierre. La IA no participa:
+# ``resumen`` sigue siendo la forma fija. Las pruebas fijan la semilla.
+
+_azar = random.Random()
+PROBABILIDAD_NOMBRE = 0.4
+PROBABILIDAD_CIERRE = 0.5
+
+VARIANTES = {
+    # Conteo de un grupo. {frase}: «tickets nuevos», «tickets pendientes (2 nuevos)».
+    "grupo_cero": (
+        "Por ahora no hay {frase}.",
+        "Revisé y no hay {frase}.",
+        "En este momento no hay {frase}.",
+    ),
+    # Sin tickets pendientes, críticos, sin asignar o propios: es bueno.
+    "grupo_cero_bueno": (
+        "Buenas noticias: no hay {frase}.",
+        "Por ahora no hay {frase}.",
+        "Revisé y no hay {frase}; está todo al día.",
+    ),
+    "grupo_uno": (
+        "Encontré {n} {frase}:",
+        "Revisé y hay {n} {frase}:",
+        "Por ahora hay solo {n} {frase}:",
+    ),
+    "grupo_varios": (
+        "Revisé y hay {n} {frase}:",
+        "Encontré {n} {frase}:",
+        "En este momento hay {n} {frase}:",
+    ),
+    # {tickets}: «tickets que usted puede ver» o «tickets suyos».
+    "total": (
+        "Hay {n} {tickets} en total.",
+        "En total hay {n} {tickets}.",
+        "Revisé y hay {n} {tickets} en total.",
+    ),
+    # Por período. {cuando}: «hoy», «esta semana»…; {verbo}: «se resolvió».
+    "periodo_cero": (
+        "{cuando} no {verbo} ningún {ticket}.",
+        "Revisé y {cuando} no {verbo} ningún {ticket}.",
+        "Por lo que veo, {cuando} no {verbo} ningún {ticket}.",
+    ),
+    "periodo": (
+        "{cuando} {verbo} {n} {tickets}:",
+        "Revisé y {cuando} {verbo} {n} {tickets}:",
+        "Encontré {n} {tickets} que {verbo} {cuando}:",
+    ),
+    "pendientes_periodo_cero": (
+        "{cuando} no se creó ningún {ticket} que siga pendiente.",
+        "Buenas noticias: {cuando} no se creó ningún {ticket} que siga pendiente.",
+        "Revisé y {cuando} no se creó ningún {ticket} que siga pendiente.",
+    ),
+    "pendientes_periodo": (
+        "{cuando} {verbo} {n} {tickets} que {siguen} {desglose}:",
+        "Revisé y {cuando} {verbo} {n} {tickets} que {siguen} {desglose}:",
+        "Encontré {n} {tickets} que {verbo} {cuando} y {siguen} {desglose}:",
+    ),
+    # Por persona. {persona}: «Carlos Solís (Técnico)».
+    "persona_varias": (
+        "Hay varias personas con ese nombre: {personas}. ¿De quién desea saber?",
+        "Encontré varias personas con ese nombre: {personas}. ¿A cuál se refiere?",
+        "Ese nombre coincide con varias personas: {personas}. ¿De quién desea la información?",
+    ),
+    "persona_cero": (
+        "{persona} no tiene {tickets} sin resolver asignados.",
+        "Revisé y {persona} no tiene {tickets} sin resolver asignados.",
+        "Por ahora, {persona} no tiene {tickets} sin resolver asignados.",
+    ),
+    "persona": (
+        "{persona} tiene {n} {tickets} sin resolver {asignados}: {lista}.",
+        "Revisé y {persona} tiene {n} {tickets} sin resolver {asignados}: {lista}.",
+        "Encontré {n} {tickets} sin resolver {asignados} a {persona}: {lista}.",
+    ),
+    "no_encontre_persona": (
+        "No encontré a esa persona. ¿Puede escribir su nombre completo?",
+        "No encontré a nadie con ese nombre. ¿Podría escribir el nombre completo?",
+        "Esa persona no aparece entre los usuarios. ¿Puede escribir su nombre completo?",
+    ),
+    # Por rol. {rol}: «técnicos».
+    "rol_cero": (
+        "No hay {tickets} sin resolver asignados a {rol}.",
+        "Por ahora no hay {tickets} sin resolver asignados a {rol}.",
+        "Revisé y no hay {tickets} sin resolver asignados a {rol}.",
+    ),
+    "rol": (
+        "Hay {n} {tickets} sin resolver {asignados} a {rol}: {detalle}.",
+        "Revisé y hay {n} {tickets} sin resolver {asignados} a {rol}: {detalle}.",
+        "Encontré {n} {tickets} sin resolver {asignados} a {rol}: {detalle}.",
+    ),
+    # Estado de un ticket. {asignado}: «está asignado a …» o «todavía no está asignado a nadie».
+    "estado_ticket": (
+        "El ticket {id} «{titulo}» está en estado {estado}, con prioridad {prioridad}, y {asignado}.",
+        "Revisé el ticket {id} «{titulo}»: está en estado {estado}, tiene prioridad {prioridad} y {asignado}.",
+        "El ticket {id} «{titulo}» se encuentra en estado {estado}; su prioridad es {prioridad} y {asignado}.",
+    ),
+    "ticket_no_encontrado": (
+        "No encontré el ticket {id} entre los tickets que puede ver.",
+        "El ticket {id} no aparece entre los tickets que usted puede consultar.",
+        "Revisé y no encontré el ticket {id} entre los que puede ver.",
+    ),
+    "no_entendi": (
+        "No entendí qué tickets desea contar. ¿Nuevos, en proceso, resueltos o cerrados?",
+        "Disculpe, no me quedó claro qué tickets quiere contar. Puedo contar los nuevos, en proceso, "
+        "resueltos o cerrados.",
+        "¿Qué tickets desea que cuente? Puedo darle los nuevos, en proceso, resueltos o cerrados.",
+    ),
+    # Saludos. {nombre}: «, Laura» o nada.
+    "saludo": (
+        "Hola{nombre}. ¿En qué le puedo ayudar? {ayuda}",
+        "Buenas{nombre}. ¿Qué desea consultar? {ayuda}",
+        "Hola{nombre}, con gusto le ayudo. {ayuda}",
+    ),
+    "agradecimiento": (
+        "Con gusto{nombre}. ¿Le ayudo con algo más? {ayuda}",
+        "Para servirle{nombre}. {ayuda}",
+        "A la orden{nombre}. ¿Hay algo más que desee consultar? {ayuda}",
+    ),
+    "ayuda_solicitante": (
+        "Puede preguntarme por sus tickets o cuántos tiene pendientes.",
+        "Puedo decirle cómo van sus tickets o cuántos tiene pendientes.",
+        "Si gusta, consúlteme por sus tickets o por los que tiene pendientes.",
+    ),
+    "ayuda_equipo": (
+        "Puede preguntarme por sus tickets, cuántos hay pendientes o pedirme que le explique uno.",
+        "Puedo decirle cuántos tickets hay pendientes, cómo va uno en particular o explicarle alguno.",
+        "Si gusta, consúlteme por sus tickets, por los pendientes o pídame que le explique uno.",
+    ),
+    "sistema": (
+        "¿En qué le puedo ayudar? {ayuda}",
+        "¿Qué desea consultar? {ayuda}",
+        "Con gusto le ayudo. {ayuda}",
+    ),
+    # Hora y fecha. {son}: «son las» o «es la».
+    "hora": (
+        "{son} {hora} del {fecha}.",
+        "En Costa Rica {son} {hora} del {fecha}.",
+        "En este momento {son} {hora}; hoy es {fecha}.",
+    ),
+    "fecha": (
+        "Hoy es {fecha}.",
+        "Estamos a {fecha}.",
+        "La fecha de hoy es {fecha}.",
+    ),
+}
+
+# Cierres que a veces se agregan, según el caso (ver :func:`_cierre`).
+CIERRES = {
+    "abrir_uno": ("Puede abrirlo tocando su número.",),
+    "abrir_varios": ("Puede abrir cualquiera tocando su número.",
+                     "Para ver el detalle, toque el número del ticket."),
+    "explicar_uno": ("¿Desea que se lo explique?",),
+    "explicar_varios": ("¿Desea que le explique alguno?",),
+    "criticos": ("Si gusta, puedo mostrarle los críticos.",),
+    "pendientes": ("Si gusta, puedo revisar los pendientes.",),
+}
+# Grupos en los que no tener tickets es una buena noticia.
+GRUPOS_SIN_TICKETS_BUENO = ("pendientes", "criticos", "sin_asignar", "mios")
+# Con tickets en estos grupos se ofrece ver los críticos; sin tickets en
+# estos, los pendientes.
+_OFRECE_CRITICOS = ("pendientes", "nuevos", "en_proceso", "mios", "sin_asignar")
+_OFRECE_PENDIENTES = ("nuevos", "en_proceso", "resueltos", "cerrados", "criticos", "sin_asignar")
+
+
+def _negrita(valor) -> str:
+    return f"**{valor}**"
+
+
+def _primer_nombre(user: User | None) -> str:
+    partes = (user.name or "").split() if user is not None else []
+    return partes[0] if partes else ""
+
+
+def _vocativo(user: User) -> str:
+    """«, Laura» algunas veces; si no, nada."""
+    nombre = _primer_nombre(user)
+    return f", {nombre}" if nombre and _azar.random() < PROBABILIDAD_NOMBRE else ""
+
+
+def _decir(tipo: str, user: User | None = None, **datos) -> str:
+    """Una de las formas de ``tipo`` con ``datos``. Con ``user``, a veces
+    empieza con su nombre (no si la frase empieza con el de otra persona)."""
+    plantilla = _azar.choice(VARIANTES[tipo])
+    texto = plantilla.format(**datos)
+    nombre = _primer_nombre(user)
+    if nombre and not plantilla.startswith("{persona") and _azar.random() < PROBABILIDAD_NOMBRE:
+        return f"{nombre}, {texto[0].lower()}{texto[1:]}"
+    return texto[0].upper() + texto[1:]
+
+
+def _cierre(user: User, total: int, clave: str | None = None) -> str | None:
+    """A veces, una sugerencia para seguir según el caso; si no, ``None``.
+    Explicar un ticket solo se ofrece al equipo (como el botón)."""
+    if _azar.random() >= PROBABILIDAD_CIERRE:
+        return None
+    opciones = []
+    if total:
+        uno = total == 1
+        opciones += CIERRES["abrir_uno" if uno else "abrir_varios"]
+        if user.role != UserRole.REQUESTER.value:
+            opciones += CIERRES["explicar_uno" if uno else "explicar_varios"]
+        if clave in _OFRECE_CRITICOS:
+            opciones += CIERRES["criticos"]
+    elif clave in _OFRECE_PENDIENTES:
+        opciones += CIERRES["pendientes"]
+    return _azar.choice(opciones) if opciones else None
+
+
+def _con_cierre(texto: str, cierre: str | None) -> str:
+    return f"{texto} {cierre}" if cierre else texto
+
+
+def _sustantivo(total: int, suyo: bool = False) -> str:
+    """«ticket», «tickets», «ticket suyo», «tickets suyos»."""
+    palabra = "ticket" if total == 1 else "tickets"
+    return f"{palabra} {'suyo' if total == 1 else 'suyos'}" if suyo else palabra
+
+
+def _ticket_no_encontrado(user: User, ticket_id: int) -> str:
+    return _decir("ticket_no_encontrado", user, id=f"#{ticket_id}")
 
 
 FRASES_GRUPO = {
@@ -475,7 +703,8 @@ _CATEGORIA_O_PRIORIDAD = re.compile(
 )
 # «¿cuánto tarda en resolverse un ticket?» no es un conteo.
 _PIDE_TIEMPO = re.compile(r"\b(tiempo|tarda\w*|demora\w*|promedio|duran?)\b")
-NO_ENTENDI = "No entendí qué tickets querés contar. ¿Nuevos, en proceso, resueltos o cerrados?"
+# Las formas de «No entendí…» (sin el nombre: así se reconocen, ver _preparar).
+NO_ENTENDI = VARIANTES["no_entendi"]
 
 
 def _periodo(t: str):
@@ -588,14 +817,21 @@ def _respuesta_pendientes_periodo(session, user: User, periodo) -> Directa:
     )
     total, tickets = _contar_y_listar(session, statement, DIRECTAS_MAX_TICKETS)
     tuyo = user.role == UserRole.REQUESTER.value
+    cuando = frase[0].lower() + frase[1:]
     if not total:
-        return Directa(f"{frase} no se creó ningún ticket{' tuyo' if tuyo else ''} que siga pendiente.", 0)
+        texto = _decir("pendientes_periodo_cero", user, cuando=cuando, ticket=_sustantivo(1, tuyo))
+        return Directa(texto, 0,
+                       resumen=f"{frase} no se creó ningún ticket{' tuyo' if tuyo else ''} que siga pendiente.")
     if total == 1:
         cabecera = f"{frase} se creó 1 ticket{' tuyo' if tuyo else ''} que sigue pendiente"
     else:
         cabecera = f"{frase} se crearon {total} tickets{' tuyos' if tuyo else ''} que siguen pendientes"
     desglose = _desglose_pendientes(session, statement)
-    return _con_lista(f"{cabecera} {desglose}.", tickets, total, _claves_desglose(desglose))
+    texto = _decir("pendientes_periodo", user, cuando=cuando, verbo="se creó" if total == 1 else "se crearon",
+                   n=_negrita(total), tickets=_sustantivo(total, tuyo),
+                   siguen="sigue pendiente" if total == 1 else "siguen pendientes", desglose=desglose)
+    return _con_lista(texto, tickets, total, _claves_desglose(desglose), resumen=f"{cabecera} {desglose}.",
+                      cierre=_cierre(user, total, "pendientes"))
 
 
 def _respuesta_periodo(session, user: User, clave: str, periodo) -> Directa | None:
@@ -616,19 +852,30 @@ def _respuesta_periodo(session, user: User, clave: str, periodo) -> Directa | No
     total, tickets = _contar_y_listar(session, statement, DIRECTAS_MAX_TICKETS)
     singular, plural = VERBOS_PERIODO[clave]
     tuyo = user.role == UserRole.REQUESTER.value
+    cuando = frase[0].lower() + frase[1:]
     if not total:
-        return Directa(f"{frase} no {singular} ningún ticket{' tuyo' if tuyo else ''}.", 0)
+        texto = _decir("periodo_cero", user, cuando=cuando, verbo=singular, ticket=_sustantivo(1, tuyo))
+        return Directa(_con_cierre(texto, _cierre(user, 0, clave)), 0,
+                       resumen=f"{frase} no {singular} ningún ticket{' tuyo' if tuyo else ''}.")
     sustantivo = ("ticket tuyo" if tuyo else "ticket") if total == 1 else ("tickets tuyos" if tuyo else "tickets")
     verbo = singular if total == 1 else plural
-    return _con_lista(f"{frase} {verbo} {total} {sustantivo}.", tickets, total)
+    texto = _decir("periodo", user, cuando=cuando, verbo=verbo, n=_negrita(total),
+                   tickets=_sustantivo(total, tuyo))
+    return _con_lista(texto, tickets, total, resumen=f"{frase} {verbo} {total} {sustantivo}.",
+                      cierre=_cierre(user, total, clave))
 
 
-def _frase_grupo(clave: str, user: User, total: int) -> str:
+def _frase_grupo(clave: str, user: User, total: int, usted: bool = False) -> str:
+    """«tickets nuevos»; ``usted``: como se le dice a la persona («tickets
+    suyos sin resolver» en lugar de «tuyos», que queda en el resumen)."""
     if clave == "mios":
         if user.role == UserRole.REQUESTER.value:
-            sujeto = "ticket tuyo sin resolver" if total == 1 else "tickets tuyos sin resolver"
+            suyo = ("suyo", "suyos") if usted else ("tuyo", "tuyos")
+            sujeto = f"ticket {suyo[0]} sin resolver" if total == 1 else f"tickets {suyo[1]} sin resolver"
         else:
-            sujeto = "ticket asignado a ti sin resolver" if total == 1 else "tickets asignados a ti sin resolver"
+            a_quien = "a usted" if usted else "a ti"
+            sujeto = (f"ticket asignado {a_quien} sin resolver" if total == 1
+                      else f"tickets asignados {a_quien} sin resolver")
         return sujeto
     singular, plural = FRASES_GRUPO[clave]
     return singular if total == 1 else plural
@@ -705,10 +952,9 @@ def respuesta_por_rol(session, user: User, t: str) -> Directa | None:
 def _conteo_rol(session, user: User, rol: str, plural: str) -> Directa:
     solicitante = user.role == UserRole.REQUESTER.value
     tickets = _abiertos_asignados(session, user, Ticket.assignee.has(User.role == rol))
-    tuyos = (" tuyo" if len(tickets) == 1 else " tuyos") if solicitante else ""
 
     if not tickets:
-        respuesta = f"No hay tickets{' tuyos' if solicitante else ''} sin resolver asignados a {plural}."
+        respuesta = _decir("rol_cero", user, tickets=_sustantivo(2, solicitante), rol=plural)
         otros = _abiertos_asignados(session, user)
         if len(otros) == 1:
             respuesta += f" El #{otros[0].id} está asignado a {_persona(otros[0].assignee)}."
@@ -720,10 +966,9 @@ def _conteo_rol(session, user: User, rol: str, plural: str) -> Directa:
 
     grupos = _por_persona(tickets)
     detalle = _unir([f"{_persona(u)} tiene {len(ts)} ({_ids(ts)})" for u, ts in grupos])
-    sustantivo = "ticket" if len(tickets) == 1 else "tickets"
     asignado = "asignado" if len(tickets) == 1 else "asignados"
-    cabecera = f"Hay {len(tickets)} {sustantivo}{tuyos} sin resolver {asignado} a {plural}: "
-    respuesta = cabecera + f"{detalle}."
+    respuesta = _decir("rol", user, n=_negrita(len(tickets)), tickets=_sustantivo(len(tickets), solicitante),
+                       asignados=asignado, rol=plural, detalle=detalle)
     if not solicitante:
         con_tickets = {u.id for u, _ in grupos}
         sin_tickets = session.scalars(
@@ -733,14 +978,14 @@ def _conteo_rol(session, user: User, rol: str, plural: str) -> Directa:
         if sin_tickets:
             verbo = "no tiene" if len(sin_tickets) == 1 else "no tienen"
             respuesta += f" {_unir([_persona(u) for u in sin_tickets])} {verbo} ninguno."
-    return Directa(respuesta)
+    return Directa(_con_cierre(respuesta, _cierre(user, len(tickets))))
 
 
 def _palabras_nombre(nombre: str) -> list[str]:
     return [p for p in _normalizar(nombre).split() if len(p) >= 3]
 
 
-NO_ENCONTRE_PERSONA = "No encontré a esa persona. ¿Podés escribir su nombre completo?"
+NO_ENCONTRE_PERSONA = VARIANTES["no_encontre_persona"]
 ROLES_CON_TICKETS = (UserRole.TECHNICIAN.value, UserRole.SUPERVISOR.value, UserRole.ADMIN.value)
 
 # Palabras de las preguntas que nunca son un nombre (sin tildes). Además de
@@ -877,35 +1122,31 @@ def _pide_conteo_persona(t: str) -> bool:
 def respuesta_por_persona(session, user: User, t: str) -> Directa | None:
     """«Carlos Solís (Técnico) tiene 2 tickets sin resolver asignados: …»,
     contando solo lo que ``user`` puede ver. ``None`` si no nombra a nadie;
-    si nombra a alguien que no existe, :data:`NO_ENCONTRE_PERSONA`."""
+    si nombra a alguien que no existe, una de :data:`NO_ENCONTRE_PERSONA`."""
     if not _pide_conteo_persona(t):
         return None
     personas = _personas_nombradas(session, user, t)
     if not personas:
-        return Directa(NO_ENCONTRE_PERSONA) if nombra_persona_desconocida(t) else None
+        return Directa(_decir("no_encontre_persona")) if nombra_persona_desconocida(t) else None
     return _conteo_persona(session, user, personas)
 
 
 def _conteo_persona(session, user: User, personas: list[User]) -> Directa:
     if len(personas) > 1:
-        return Directa(f"Hay varias personas con ese nombre: {_unir([_persona(u) for u in personas])}. "
-                       "¿De quién quieres saber?")
+        return Directa(_decir("persona_varias", user, personas=_unir([_persona(u) for u in personas])))
     persona = personas[0]
     tickets = _abiertos_asignados(session, user, Ticket.assigned_to_id == persona.id)
     solicitante = user.role == UserRole.REQUESTER.value
     if not tickets:
-        return Directa(
-            f"{_persona(persona)} no tiene tickets{' tuyos' if solicitante else ''} sin resolver asignados."
-        )
-    tuyos = (" tuyo" if len(tickets) == 1 else " tuyos") if solicitante else ""
-    sustantivo = "ticket" if len(tickets) == 1 else "tickets"
+        return Directa(_decir("persona_cero", user, persona=_persona(persona),
+                              tickets=_sustantivo(2, solicitante)))
     asignado = "asignado" if len(tickets) == 1 else "asignados"
     lista = ", ".join(f"#{x.id} «{x.title}»" for x in tickets[:CONTEO_MAX_IDS])
     if len(tickets) > CONTEO_MAX_IDS:
         lista += f" y {len(tickets) - CONTEO_MAX_IDS} más"
-    return Directa(
-        f"{_persona(persona)} tiene {len(tickets)} {sustantivo}{tuyos} sin resolver {asignado}: {lista}."
-    )
+    texto = _decir("persona", user, persona=_persona(persona), n=_negrita(len(tickets)),
+                   tickets=_sustantivo(len(tickets), solicitante), asignados=asignado, lista=lista)
+    return Directa(_con_cierre(texto, _cierre(user, len(tickets))))
 
 
 # ---------- Guía de uso por rol (sin IA) ----------
@@ -1225,9 +1466,7 @@ _AGRADECIMIENTOS = frozenset("gracias muchas mil ok okay oki okey dale listo per
 
 
 def _ayuda_corta(user: User) -> str:
-    if user.role == UserRole.REQUESTER.value:
-        return "Podés preguntarme por tus tickets o cuántos tenés pendientes."
-    return "Podés preguntarme por tus tickets, cuántos hay pendientes o pedirme que explique uno."
+    return _decir("ayuda_solicitante" if user.role == UserRole.REQUESTER.value else "ayuda_equipo")
 
 
 def respuesta_saludo(user: User, pregunta: str) -> str | None:
@@ -1236,12 +1475,10 @@ def respuesta_saludo(user: User, pregunta: str) -> str | None:
     palabras = re.findall(r"[a-z]+", _normalizar(pregunta))
     if not palabras or len(palabras) > 4:
         return None
-    nombre = (user.name or "").split()[0] if user.name else ""
-    con_nombre = f", {nombre}" if nombre else ""
     if all(p in _SALUDOS for p in palabras):
-        return f"¡Hola{con_nombre}! ¿En qué te puedo ayudar? {_ayuda_corta(user)}"
+        return _decir("saludo", nombre=_vocativo(user), ayuda=_ayuda_corta(user))
     if all(p in _AGRADECIMIENTOS | {"a", "ti", "vos", "usted"} for p in palabras):
-        return f"¡Con gusto{con_nombre}! ¿Te ayudo con algo más? {_ayuda_corta(user)}"
+        return _decir("agradecimiento", nombre=_vocativo(user), ayuda=_ayuda_corta(user))
     return None
 
 
@@ -1295,14 +1532,17 @@ def _texto_fecha(ahora: datetime) -> str:
 
 
 def _texto_hora(ahora: datetime) -> str:
-    """«Son las 3:50 p. m.» / «Es la 1:05 a. m.»."""
+    """«3:50 p. m.» / «1:05 a. m.»."""
     hora = ahora.hour % 12 or 12
     sufijo = "a. m." if ahora.hour < 12 else "p. m."
-    inicio = "Es la" if hora == 1 else "Son las"
-    return f"{inicio} {hora}:{ahora.minute:02d} {sufijo}"
+    return f"{hora}:{ahora.minute:02d} {sufijo}"
 
 
-def respuesta_fecha_hora(pregunta: str, ahora: datetime | None = None) -> str | None:
+def _son_las(ahora: datetime) -> str:
+    return "es la" if ahora.hour % 12 == 1 else "son las"
+
+
+def respuesta_fecha_hora(pregunta: str, ahora: datetime | None = None, user: User | None = None) -> str | None:
     """Hora y fecha de Costa Rica para «¿qué hora es?», «¿qué día es hoy?» o
     «¿qué fecha es?» (con errores de escritura), o ``None``."""
     t = _normalizar(pregunta)
@@ -1322,8 +1562,9 @@ def respuesta_fecha_hora(pregunta: str, ahora: datetime | None = None) -> str | 
         return None
     ahora = ahora or _ahora_costa_rica()
     if pide_hora:
-        return f"{_texto_hora(ahora)} del {_texto_fecha(ahora)}."
-    return f"Hoy es {_texto_fecha(ahora)}."
+        return _decir("hora", user, son=_son_las(ahora), hora=_negrita(_texto_hora(ahora)),
+                      fecha=_texto_fecha(ahora))
+    return _decir("fecha", user, fecha=_negrita(_texto_fecha(ahora)))
 
 
 # ---------- Limpieza de lo que escribe la IA ----------
@@ -1405,12 +1646,19 @@ def respuesta_directa(session, user: User, pregunta: str,
     return directa.texto if directa is not None else None
 
 
-def _estado_ticket(ticket: Ticket) -> Directa:
+def _estado_ticket(ticket: Ticket, user: User) -> Directa:
     asignado = _persona(ticket.assignee) if ticket.assignee is not None else "nadie (sin asignar)"
+    if ticket.assignee is not None:
+        frase_asignado = f"está asignado a {_persona(ticket.assignee)}"
+    else:
+        frase_asignado = "todavía no está asignado a nadie"
+    texto = _decir("estado_ticket", user, id=_negrita(f"#{ticket.id}"), titulo=ticket.title,
+                   estado=ticket.state, prioridad=ticket.priority, asignado=frase_asignado)
     return Directa(
-        f"El ticket #{ticket.id} «{ticket.title}» está en estado {ticket.state}, "
-        f"con prioridad {ticket.priority}, y está asignado a {asignado}.",
+        _con_cierre(texto, _cierre(user, 1)),
         ticket.id,
+        resumen=(f"El ticket #{ticket.id} «{ticket.title}» está en estado {ticket.state}, "
+                 f"con prioridad {ticket.priority}, y está asignado a {asignado}."),
     )
 
 
@@ -1421,7 +1669,7 @@ def calcular_directa(session, user: User, pregunta: str,
     saludo = respuesta_saludo(user, pregunta)
     if saludo is not None:
         return Directa(saludo)
-    fecha_hora = respuesta_fecha_hora(pregunta)
+    fecha_hora = respuesta_fecha_hora(pregunta, user=user)
     if fecha_hora is not None:
         return Directa(fecha_hora)
     t = _normalizar(pregunta)
@@ -1439,8 +1687,8 @@ def calcular_directa(session, user: User, pregunta: str,
     ):
         ticket = ticket_service.get_visible_ticket(session, ids[0], user)
         if ticket is None:
-            return Directa(f"No encontré el ticket #{ids[0]} entre los tickets que puede ver.")
-        return _estado_ticket(ticket)
+            return Directa(_ticket_no_encontrado(user, ids[0]))
+        return _estado_ticket(ticket, user)
     if not ids:
         # Antes que la guía: «quiero ver los tickets asignados a técnicos» es
         # un conteo, no «cómo asignar».
@@ -1457,7 +1705,7 @@ def calcular_directa(session, user: User, pregunta: str,
     if clave is None:
         return None
     if clave == "no_entendi":
-        return Directa(NO_ENTENDI)
+        return Directa(_decir("no_entendi"))
     return _conteo(session, user, clave, _periodo(t))
 
 
@@ -1469,20 +1717,29 @@ def _conteo(session, user: User, clave: str, periodo) -> Directa | None:
     base = _base_visible(user)
     if clave == "total":
         total = session.scalar(select(func.count()).select_from(base.subquery()))
-        quien = "tuyos" if user.role == UserRole.REQUESTER.value else "visibles para ti"
-        return Directa(f"Hay {total} {'ticket' if total == 1 else 'tickets'} {quien} en total.", total)
+        solicitante = user.role == UserRole.REQUESTER.value
+        quien = "tuyos" if solicitante else "visibles para ti"
+        tickets = _sustantivo(total, True) if solicitante else f"{_sustantivo(total)} que usted puede ver"
+        return Directa(_decir("total", user, n=_negrita(total), tickets=tickets), total,
+                       resumen=f"Hay {total} {'ticket' if total == 1 else 'tickets'} {quien} en total.")
 
     _titulo, condiciones = _grupos(user)[clave]
     total, tickets = _contar_y_listar(session, base.where(*condiciones), DIRECTAS_MAX_TICKETS)
     frase = _frase_grupo(clave, user, total)
+    frase_usted = _frase_grupo(clave, user, total, usted=True)
     claves = (_CLAVE_CERRADOS,) if clave == "resueltos" else ()
     if not total:
-        return Directa(f"No hay {frase}.", 0, claves=claves)
+        tipo = "grupo_cero_bueno" if clave in GRUPOS_SIN_TICKETS_BUENO else "grupo_cero"
+        return Directa(_con_cierre(_decir(tipo, user, frase=frase_usted), _cierre(user, 0, clave)), 0,
+                       resumen=f"No hay {frase}.", claves=claves)
     if clave == "pendientes":
         desglose = _desglose_pendientes(session, base.where(*condiciones))
         frase += " " + desglose
+        frase_usted += " " + desglose
         claves = _claves_desglose(desglose)
-    return _con_lista(f"Hay {total} {frase}:", tickets, total, claves)
+    texto = _decir("grupo_uno" if total == 1 else "grupo_varios", user, n=_negrita(total), frase=frase_usted)
+    return _con_lista(texto, tickets, total, claves, resumen=f"Hay {total} {frase}.",
+                      cierre=_cierre(user, total, clave))
 
 
 # ---------- Redacción con IA de las respuestas directas ----------
@@ -1780,7 +2037,7 @@ def calcular_desde_interpretacion(session, user: User, datos: dict,
         if tipo == "explicar_ticket":
             # Como el botón «Explicar con IA»: solo el equipo.
             return None if user.role == UserRole.REQUESTER.value else (None, ticket)
-        return _estado_ticket(ticket), None
+        return _estado_ticket(ticket, user), None
     if tipo != "conteo":
         return None
 
@@ -1804,7 +2061,7 @@ def calcular_desde_interpretacion(session, user: User, datos: dict,
         personas = _personas_nombradas(session, user, _normalizar(persona))
         if not personas:
             # Nunca a la IA libre: daría el conteo de otra persona.
-            return Directa(NO_ENCONTRE_PERSONA), None
+            return Directa(_decir("no_encontre_persona")), None
         return _conteo_persona(session, user, personas), None
     if estado in (None, "todos") and not (re.search(r"\b(total|todos)\b", t) or _solo_pide_el_total(t)):
         # El modelo pudo perder el estado («cuantos tikets nuevos ai»): no
@@ -2171,7 +2428,7 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
     completa si era un seguimiento)."""
     pregunta = pregunta_efectiva(session, user, messages)
     # Antes que los ajustes: «¿qué hora es en Costa Rica?» no pide «más corta».
-    fecha_hora = respuesta_fecha_hora(messages[-1]["content"]) if messages else None
+    fecha_hora = respuesta_fecha_hora(messages[-1]["content"], user=user) if messages else None
     if fecha_hora is not None:
         return Directa(fecha_hora), None, None, messages[-1]["content"]
     ajustada = ajustar_ultima_explicacion(session, user, messages, ticket_actual)
@@ -2181,13 +2438,12 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
     if explicar_id is not None:
         ticket = ticket_service.get_visible_ticket(session, explicar_id, user)
         if ticket is None:
-            return (Directa(f"No encontré el ticket #{explicar_id} entre los tickets que puede ver."),
-                    None, None, pregunta)
+            return Directa(_ticket_no_encontrado(user, explicar_id)), None, None, pregunta
         return None, None, ticket, pregunta
     directa = calcular_directa(session, user, pregunta, ticket_actual)
     # Las reglas no la reconocieron: la IA la clasifica y el servidor calcula.
     # Si no sirve, «No entendí…» se mantiene y lo demás va a la IA libre.
-    if (directa is None or directa.texto == NO_ENTENDI) and interpretar_con_ia_activo():
+    if (directa is None or directa.texto in NO_ENTENDI) and interpretar_con_ia_activo():
         try:
             datos = interpretar(proveedor, pregunta)
         except IATardo:
@@ -2203,7 +2459,7 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
     if _pide_conteo_persona(t) and nombra_persona_desconocida(t):
         # La IA libre nunca cuenta los tickets de una persona: podría hablar
         # de otra (la del mensaje anterior, por ejemplo).
-        return Directa(NO_ENCONTRE_PERSONA), None, None, pregunta
+        return Directa(_decir("no_encontre_persona")), None, None, pregunta
     max_tickets = getattr(proveedor, "max_tickets", MAX_TICKETS_IN_CONTEXT)
     return None, build_system(session, user, max_tickets, pregunta, ticket_actual), None, pregunta
 
@@ -2228,7 +2484,7 @@ def _explicar_ticket(proveedor, session, user: User, ticket: Ticket) -> str:
 
 def respuesta_sistema(user: User) -> str:
     """Lo que se muestra si la respuesta de la IA no sirve (nombraba lo interno)."""
-    return f"¿En qué te puedo ayudar? {_ayuda_corta(user)}"
+    return _decir("sistema", ayuda=_ayuda_corta(user))
 
 
 def _registrar_falla(proveedor, user: User, ticket_actual, error: Exception) -> None:

@@ -20,6 +20,7 @@ from backend.services.asistente_service import (
     verificar_redaccion,
 )
 from backend.tests.test_asistente import add_ticket, ask, login_as
+from backend.tests.textos_asistente import cabecera, es_forma, lista, negrita
 
 
 class IASimulada:
@@ -68,15 +69,26 @@ def _linea(ticket, estado, asignado="José Solano (Técnico)"):
 
 @pytest.fixture
 def en_proceso(client, session):
-    """Técnico con un ticket en proceso; devuelve (headers, ticket, texto fijo)."""
+    """Técnico con un ticket en proceso; devuelve (headers, ticket, ¿es la
+    respuesta del sistema?)."""
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
     jose = session.query(User).filter_by(email="tec@tec.local").one()
     ticket = add_ticket(session, "Problemas")
     ticket.state = "En proceso"
     ticket.assigned_to_id = jose.id
     session.commit()
-    fijo = f"Hay 1 ticket en proceso:\n{_linea(ticket, 'En proceso')}"
+
+    def fijo(respuesta):
+        """La respuesta del sistema (dicha de cualquier forma) con su lista."""
+        return (es_forma(cabecera(respuesta), "grupo_uno", n=negrita(1), frase="ticket en proceso")
+                and lista(respuesta) == [_linea(ticket, "En proceso")])
+
     return headers, ticket, fijo
+
+
+def _del_sistema(resp, fijo):
+    assert resp.json()["fuente"] == "directa", resp.json()
+    assert fijo(resp.json()["respuesta"]), resp.json()["respuesta"]
 
 
 def test_ai_writes_the_summary_and_the_server_adds_the_list(client, ia, log, en_proceso):
@@ -118,7 +130,8 @@ def test_resolved_summary_must_say_closed(client, ia, log, varios):
     ia.texto = "Hay 2 tickets resueltos."
     resp = ask(client, headers, "cuantos se resolvieron")
     assert resp.json()["fuente"] == "directa"
-    assert resp.json()["respuesta"].startswith("Hay 2 tickets resueltos o cerrados:")
+    assert es_forma(cabecera(resp.json()["respuesta"]), "grupo_varios", n=negrita(2),
+                    frase="tickets resueltos o cerrados")
     assert "falta «cerrados»" in log[0]
 
     ia.texto = "Hay 2 tickets resueltos o cerrados."
@@ -140,13 +153,13 @@ def test_pending_summary_must_keep_the_breakdown(client, ia, log, varios, redact
     ia.texto = redactada
     resp = ask(client, headers, "cuantos hay pendientes").json()
     assert resp["fuente"] == ("ia_datos" if valida else "directa")
-    lineas = resp["respuesta"].splitlines()
     # La lista completa está siempre, la haya redactado la IA o no.
-    assert {l.split()[1] for l in lineas[1:]} == {f"#{t[n].id}" for n in ("Monitor", "Teclado", "VPN")}
+    assert {l.split()[1] for l in lista(resp["respuesta"])} == {f"#{t[n].id}" for n in ("Monitor", "Teclado", "VPN")}
     if valida:
-        assert lineas[0] == redactada
+        assert cabecera(resp["respuesta"]) == redactada
     else:
-        assert lineas[0] == "Hay 3 tickets pendientes (2 nuevos y 1 en proceso):"
+        assert es_forma(cabecera(resp["respuesta"]), "grupo_varios", n=negrita(3),
+                        frase="tickets pendientes (2 nuevos y 1 en proceso)"), resp["respuesta"]
         assert "falta" in log[0]
 
 
@@ -181,7 +194,7 @@ def test_wrong_draft_falls_back_to_the_system_answer(client, ia, log, en_proceso
 
     resp = ask(client, headers, "¿cuántos tickets hay en proceso?")
 
-    assert resp.json() == {"respuesta": fijo, "fuente": "directa"}
+    _del_sistema(resp, fijo)
     assert len(log) == 1
     assert log[0].startswith("respuesta descartada, se usó la del sistema")
     assert motivo in log[0]
@@ -192,7 +205,7 @@ def test_ai_failure_falls_back(client, ia, log, en_proceso, error):
     headers, _, fijo = en_proceso
     ia.error = error
     resp = ask(client, headers, "¿cuántos tickets hay en proceso?")
-    assert resp.json() == {"respuesta": fijo, "fuente": "directa"}
+    _del_sistema(resp, fijo)
     assert "falló" in log[0]
 
 
@@ -206,7 +219,7 @@ def test_slow_ai_falls_back(client, ia, log, en_proceso, monkeypatch):
     resp = ask(client, headers, "¿cuántos tickets hay en proceso?")
 
     assert time.monotonic() - inicio < 1
-    assert resp.json() == {"respuesta": fijo, "fuente": "directa"}
+    _del_sistema(resp, fijo)
     assert ia.calls[0]["timeout"] == 0.2  # el límite va en la propia petición
     assert "tardó más de 0.2 s, se canceló" in log[0]
 
@@ -240,7 +253,7 @@ def test_can_be_turned_off(client, ia, en_proceso, monkeypatch):
     headers, _, fijo = en_proceso
     monkeypatch.setenv("ASISTENTE_REDACTAR_CON_IA", "false")
     resp = ask(client, headers, "¿cuántos tickets hay en proceso?")
-    assert resp.json() == {"respuesta": fijo, "fuente": "directa"}
+    _del_sistema(resp, fijo)
     assert ia.calls == []
 
 
@@ -323,7 +336,8 @@ def test_wrong_state_verb_falls_back(client, ia, log, varios):
     ia.texto = "Hoy se resolvieron 5 tickets."
     resp = ask(client, headers, "cuantos tickets hay hoy").json()
     assert resp["fuente"] == "directa"
-    assert resp["respuesta"].startswith("Hoy se crearon 5 tickets.")
+    assert es_forma(cabecera(resp["respuesta"]), "periodo", cuando="hoy", verbo="se crearon", n=negrita(5),
+                    tickets="tickets"), resp["respuesta"]
     assert "usa el verbo «resolver»" in log[0]
 
 

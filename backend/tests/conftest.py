@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.database import Base, enable_sqlite_foreign_keys, get_session
 from backend.main import app
+from backend.services import asistente_service
 
 
 @pytest.fixture(autouse=True)
@@ -16,6 +17,14 @@ def respuestas_fijas(monkeypatch):
     las encienden."""
     monkeypatch.setenv("ASISTENTE_REDACTAR_CON_IA", "false")
     monkeypatch.setenv("ASISTENTE_INTERPRETAR_CON_IA", "false")
+
+
+@pytest.fixture(autouse=True)
+def azar_fijo():
+    """Las respuestas del sistema eligen al azar una de sus formas: con la
+    semilla fija cada prueba sale igual en cada corrida (y las pruebas
+    aceptan cualquiera de las formas)."""
+    asistente_service._azar.seed(2026)
 
 
 @pytest.fixture
