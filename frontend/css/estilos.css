@@ -3389,17 +3389,29 @@ td.con-avatar {
   box-shadow: inset 3px 0 0 var(--etiqueta-naranja-texto);
 }
 
-/* ===== Opciones del listado: Tabla / Tablero (junto a los filtros) ===== */
+/* ===== Barra del listado: «Todos / Mis tickets» a la izquierda y
+   Tabla / Tablero + Compacta / Cómoda a la derecha, a la misma altura.
+   Si no entran en una fila (celular), bajan en orden. ===== */
+.listado-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaciado-md);
+  margin-bottom: var(--espaciado-md);
+}
+
+.listado-barra .vista-tabs {
+  margin-bottom: 0;
+}
+
+/* margin-left: auto la deja a la derecha aunque no esté «Todos / Mis
+   tickets» (Solicitante). */
 .listado-opciones {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--espaciado-md);
-  margin: var(--espaciado-md) 0;
-}
-
-.listado-opciones .vista-tabs {
-  margin-bottom: 0;
+  margin-left: auto;
 }
 
 /* Densidad «Compacta» (app.js): menos espacio en las filas de la tabla. */

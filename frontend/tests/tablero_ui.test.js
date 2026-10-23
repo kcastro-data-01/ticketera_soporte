@@ -90,8 +90,15 @@ async function montar({ rol = "Técnico", guardado = null, densidadGuardada = nu
 const columnas = (nodos) => nodos.get("tablero").children;
 const tarjetas = (columna) => columna.children[1].children.filter((t) => t.tag === "a");
 
-test("index.html: botones Tabla y Tablero junto a los filtros, ocultos para el Solicitante", () => {
-  assert.match(indexHtml, /<\/form>\s*<!--[\s\S]*?-->\s*<div class="listado-opciones">\s*<div class="vista-tabs" role="group" aria-label="Cómo ver los tickets" data-vista="equipo">/);
+test("index.html: Tabla/Tablero y Compacta/Cómoda en la fila de Todos / Mis tickets, arriba de los filtros", () => {
+  const barra = indexHtml.slice(indexHtml.indexOf('<div class="listado-barra">'), indexHtml.indexOf('<form id="form-filtros"'));
+  assert.ok(indexHtml.indexOf('<div class="listado-barra">') >= 0, "la barra está arriba del formulario");
+  const grupos = [...barra.matchAll(/<div class="vista-tabs"[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(grupos, ["Qué tickets ver", "Cómo ver los tickets", "Densidad de la tabla"], "Todos/Mis a la izquierda y la vista a la derecha");
+  assert.match(barra, /<div class="listado-opciones">\s*<div class="vista-tabs" role="group" aria-label="Cómo ver los tickets" data-vista="equipo">/);
+  const css = fs.readFileSync(path.join(__dirname, "..", "css", "estilos.css"), "utf8");
+  assert.match(css, /\.listado-barra \{\s*display: flex;\s*flex-wrap: wrap;\s*align-items: center;/);
+  assert.match(css, /\.listado-opciones \{[^}]*margin-left: auto;/, "a la derecha también sin Todos / Mis tickets");
   assert.match(indexHtml, /<button type="button" id="ver-tabla" class="vista-tab activa" aria-pressed="true">Tabla<\/button>/);
   assert.match(indexHtml, /<button type="button" id="ver-tablero" class="vista-tab" aria-pressed="false">Tablero<\/button>/);
   assert.match(indexHtml, /<div id="tablero" class="tablero" aria-label="Tickets por estado" hidden><\/div>/);
