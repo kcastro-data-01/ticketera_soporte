@@ -84,3 +84,22 @@ test("detalle: la descripción con título y en un recuadro neutro de lectura c�
   assert.match(recuadro, /max-width: 72ch;/);
   assert.match(recuadro, /min-height: 3rem;/, "una descripción corta igual se ve");
 });
+
+test("detalle: «Detalles» arriba del panel derecho, fijo al bajar y debajo en pantallas angostas", () => {
+  const inicio = detalleHtml.indexOf('<aside class="detalle-lateral"');
+  const lateral = detalleHtml.slice(inicio, detalleHtml.indexOf("</aside>", inicio));
+  const secciones = [...lateral.matchAll(/<section[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(secciones, ["Detalles del ticket", "Asignación del ticket", "Cambio de estado del ticket"]);
+  const datos = [...lateral.matchAll(/<dt>([^<]+)<\/dt>\s*<dd id="(ver-[a-z]+)">/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(datos, [
+    ["Categoría", "ver-category"], ["Asignado a", "ver-assigned"], ["Solicitante", "ver-creator"],
+    ["Fecha de creación", "ver-created"], ["Fecha de actualización", "ver-updated"],
+  ]);
+  const tarjeta = detalleHtml.slice(detalleHtml.indexOf('id="panel-ticket"'), detalleHtml.indexOf("</section>", detalleHtml.indexOf('id="panel-ticket"')));
+  assert.doesNotMatch(tarjeta, /<dl/, "la grilla ya no está en la tarjeta");
+  assert.match(regla(".detalle-datos-lista"), /flex-direction: column;/);
+  assert.match(regla(".detalle-lateral"), /position: sticky;/);
+  assert.match(css, /@media \(max-width: 1100px\) \{\s*\.detalle-layout \{\s*grid-template-columns: minmax\(0, 1fr\);/);
+  const impresion = css.slice(css.indexOf("@media print"));
+  assert.match(impresion, /\.detalle-lateral > \.seccion:not\(#panel-datos\),/, "al imprimir se ven los datos, no las acciones");
+});

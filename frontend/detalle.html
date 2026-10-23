@@ -91,8 +91,8 @@
             <button type="button" id="eliminar" class="peligro accion-aparte" data-permiso="eliminar">Eliminar</button>
           </div>
   
-          <!-- Tarjeta del ticket: título grande con estado y prioridad arriba,
-               la descripción en un recuadro y los datos en una grilla. -->
+          <!-- Tarjeta del ticket: título grande con estado y prioridad arriba
+               y la descripción en un recuadro (los datos van en el panel derecho). -->
           <section id="panel-ticket" class="tarjeta-ticket" aria-label="Datos del ticket">
             <div class="tarjeta-ticket-cabecera">
               <div class="tarjeta-ticket-titulos">
@@ -113,28 +113,6 @@
             </ol>
             <h3 class="tarjeta-ticket-subtitulo">Descripción</h3>
             <p id="ver-description" class="tarjeta-ticket-descripcion">—</p>
-            <dl class="tarjeta-ticket-datos">
-              <div class="dato">
-                <dt>Categoría</dt>
-                <dd id="ver-category">—</dd>
-              </div>
-              <div class="dato">
-                <dt>Asignado a</dt>
-                <dd id="ver-assigned">—</dd>
-              </div>
-              <div class="dato">
-                <dt>Solicitante</dt>
-                <dd id="ver-creator">—</dd>
-              </div>
-              <div class="dato">
-                <dt>Fecha de creación</dt>
-                <dd id="ver-created">—</dd>
-              </div>
-              <div class="dato">
-                <dt>Fecha de actualización</dt>
-                <dd id="ver-updated">—</dd>
-              </div>
-            </dl>
           </section>
   
           <section id="seccion-edicion" class="seccion" aria-label="Edición del ticket" hidden>
@@ -249,7 +227,34 @@
           </section>
         </div>
 
-        <aside class="detalle-lateral" aria-label="Acciones del ticket">
+        <aside class="detalle-lateral" aria-label="Datos y acciones del ticket">
+          <!-- Datos del ticket, uno debajo del otro: etiqueta gris y valor. -->
+          <section id="panel-datos" class="seccion detalle-datos" aria-label="Detalles del ticket">
+            <h2>Detalles</h2>
+            <dl class="detalle-datos-lista">
+              <div class="dato">
+                <dt>Categoría</dt>
+                <dd id="ver-category">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Asignado a</dt>
+                <dd id="ver-assigned">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Solicitante</dt>
+                <dd id="ver-creator">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Fecha de creación</dt>
+                <dd id="ver-created">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Fecha de actualización</dt>
+                <dd id="ver-updated">—</dd>
+              </div>
+            </dl>
+          </section>
+
           <section class="seccion" aria-label="Asignación del ticket" data-permiso="asignar">
             <h2>Asignación</h2>
             <div class="filtros formulario">

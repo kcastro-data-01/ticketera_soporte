@@ -1165,20 +1165,19 @@ button.peligro:disabled:hover {
   overflow-wrap: anywhere;
 }
 
-.tarjeta-ticket-datos {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 0.9rem 1.25rem;
-  margin: 1.15rem 0 0;
-  padding-top: 1.05rem;
-  border-top: 1px solid var(--color-borde);
+/* Panel derecho del detalle: «Detalles» con un dato debajo del otro. */
+.detalle-datos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin: 0;
 }
 
-.tarjeta-ticket-datos .dato {
+.detalle-datos-lista .dato {
   min-width: 0;
 }
 
-.tarjeta-ticket-datos dt {
+.detalle-datos-lista dt {
   margin-bottom: 0.2rem;
   font-size: 0.72rem;
   font-weight: 600;
@@ -1187,7 +1186,7 @@ button.peligro:disabled:hover {
   color: var(--color-tenue);
 }
 
-.tarjeta-ticket-datos dd {
+.detalle-datos-lista dd {
   margin: 0;
   font-size: var(--texto-md);
   color: var(--color-texto);
@@ -1874,6 +1873,8 @@ body.app {
   align-items: start;
 }
 
+/* El panel derecho (Detalles, Asignación y Cambio de estado) queda fijo al
+   bajar; en pantallas angostas va debajo del contenido (más abajo). */
 .detalle-lateral {
   position: sticky;
   top: 1rem;
@@ -1881,15 +1882,6 @@ body.app {
 
 .detalle-lateral > .seccion:first-child {
   margin-top: 0;
-}
-
-/* Sin acciones visibles (Solicitante) la columna lateral desaparece. */
-.detalle-layout:not(:has(.detalle-lateral > .seccion:not([hidden]))) {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.detalle-lateral:not(:has(> .seccion:not([hidden]))) {
-  display: none;
 }
 
 @media (max-width: 1100px) {
@@ -3084,7 +3076,8 @@ td.con-avatar {
 .metricas-tarjetas.esqueleto-activo .tarjeta-etiqueta,
 .esqueleto-activo .metrica-nota,
 .esqueleto-activo .grafico-lienzo,
-#panel-ticket.esqueleto-activo :is(.tarjeta-ticket-titulo, .tarjeta-ticket-descripcion, .tarjeta-ticket-id, .tarjeta-ticket-etiquetas > span, dd) {
+#panel-ticket.esqueleto-activo :is(.tarjeta-ticket-titulo, .tarjeta-ticket-descripcion, .tarjeta-ticket-id, .tarjeta-ticket-etiquetas > span),
+.detalle-layout:has(#panel-ticket.esqueleto-activo) #panel-datos dd {
   color: transparent !important;
   border-color: transparent !important;
   border-radius: 6px;
@@ -3093,7 +3086,7 @@ td.con-avatar {
 }
 
 .esqueleto-activo .grafico-lienzo canvas,
-#panel-ticket.esqueleto-activo .con-avatar::before {
+.detalle-layout:has(#panel-ticket.esqueleto-activo) #panel-datos .con-avatar::before {
   visibility: hidden;
 }
 
@@ -3142,7 +3135,7 @@ td.con-avatar {
 #panel-ticket.esqueleto-activo .tarjeta-ticket-titulo { width: 60%; }
 #panel-ticket.esqueleto-activo .tarjeta-ticket-descripcion { width: 90%; min-height: 2.6rem; }
 #panel-ticket.esqueleto-activo .tarjeta-ticket-etiquetas > span { display: inline-block; width: 4.5rem; }
-#panel-ticket.esqueleto-activo dd { width: 7rem; }
+.detalle-layout:has(#panel-ticket.esqueleto-activo) #panel-datos dd { width: 7rem; }
 
 
 
@@ -3759,7 +3752,7 @@ td.con-avatar {
   .cabecera,
   .pie,
   .acciones-principales,
-  .detalle-lateral,
+  .detalle-lateral > .seccion:not(#panel-datos),
   #seccion-edicion,
   #seccion-ia,
   #form-comentario,
@@ -3778,8 +3771,30 @@ td.con-avatar {
     padding: 0;
   }
 
+  /* Los datos del panel derecho salen justo debajo de la tarjeta. */
   .detalle-layout {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .detalle-principal,
+  .detalle-lateral {
+    display: contents;
+  }
+
+  #panel-ticket {
+    order: 1;
+  }
+
+  #panel-datos {
+    order: 2;
+    margin: 0;
+    padding: 1rem 1.25rem;
+  }
+
+  .detalle-principal > :not(#panel-ticket) {
+    order: 3;
   }
 
   .impresion-cabecera {
@@ -3798,6 +3813,7 @@ td.con-avatar {
   }
 
   .tarjeta-ticket,
+  #panel-datos,
   .comentario,
   .listado {
     border: 1px solid #999 !important;
