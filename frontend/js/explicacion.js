@@ -63,12 +63,15 @@ function iaFecha(valor) {
   });
 }
 
+/* Un solo botón a la vista: «Explicar con IA» sin explicación y «Volver a
+   explicar» cuando ya hay una. */
 function iaRenderizar(datos) {
-  const { panel, regenerar } = iaElementos();
+  const { panel, explicar, regenerar } = iaElementos();
   const e = datos.explicacion;
   panel.replaceChildren();
   if (!e) {
     panel.hidden = true;
+    explicar.hidden = false;
     regenerar.hidden = true;
     return;
   }
@@ -137,6 +140,7 @@ function iaRenderizar(datos) {
   if (pie) panel.appendChild(iaNodo("p", "ia-pie", pie));
 
   panel.hidden = false;
+  explicar.hidden = true;
   regenerar.hidden = false;
 }
 
@@ -150,6 +154,8 @@ function iaUsarPreguntas() {
     "Para poder avanzar con este ticket necesito que me confirmes:\n" +
     preguntas.map((p, i) => `${i + 1}. ${p}`).join("\n");
   comentario.value = comentario.value.trim() ? `${comentario.value.trim()}\n\n${texto}` : texto;
+  /* El cuadro está en la pestaña Comentarios (detalle.js). */
+  if (typeof mostrarPestana === "function") mostrarPestana("comentarios");
   comentario.focus();
   if (typeof comentario.scrollIntoView === "function") comentario.scrollIntoView({ block: "center" });
   iaEstado(

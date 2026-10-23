@@ -103,6 +103,7 @@ test("al abrir el ticket muestra la explicación guardada sin generar una nueva"
   assert.match(panel, /Categoría sugerida: Hardware — Parece un equipo/);
   assert.doesNotMatch(panel, /Prioridad sugerida/);
   assert.equal(ia.ids["ia-regenerar"].hidden, false);
+  assert.equal(ia.ids["ia-explicar"].hidden, true, "un solo botón: Volver a explicar");
 });
 
 test("sin explicación guardada el panel queda oculto", async () => {
@@ -110,6 +111,7 @@ test("sin explicación guardada el panel queda oculto", async () => {
   await ia.sandbox.iniciarExplicacion();
   assert.equal(ia.ids["ia-panel"].hidden, true);
   assert.equal(ia.ids["ia-regenerar"].hidden, true);
+  assert.equal(ia.ids["ia-explicar"].hidden, false, "un solo botón: Explicar con IA");
 });
 
 test("si el ticket cambió avisa que la explicación está desactualizada", async () => {
@@ -150,7 +152,10 @@ test("las preguntas se copian al comentario, sin publicarlo", async () => {
   ia.ids.contenido.value = "Hola Ana.";
   const copiar = buscar(ia.ids["ia-panel"], (n) => n.id === "ia-copiar");
   assert.ok(copiar, "botón para copiar las preguntas");
+  const pestanas = [];
+  ia.sandbox.mostrarPestana = (nombre) => pestanas.push(nombre);
   copiar.listeners.click[0]();
+  assert.deepEqual(pestanas, ["comentarios"], "abre la pestaña donde está el cuadro");
   assert.equal(
     ia.ids.contenido.value,
     "Hola Ana.\n\nPara poder avanzar con este ticket necesito que me confirmes:\n1. ¿Qué equipo es?\n2. ¿Desde cuándo pasa?"

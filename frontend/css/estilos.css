@@ -1884,6 +1884,51 @@ body.app {
   margin-top: 0;
 }
 
+/* Pestañas del detalle (Comentarios, Historial, Explicación IA): texto
+   tenue y la elegida subrayada con el color principal. */
+.pestanas {
+  margin-top: var(--espaciado-seccion);
+}
+
+.pestanas-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.pestanas-lista .pestana {
+  min-height: var(--alto-control);
+  margin-bottom: -1px;
+  padding: 0.4rem 0.9rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-tenue);
+  font-weight: 500;
+}
+
+.pestanas-lista .pestana:hover {
+  background: transparent;
+  color: var(--color-texto);
+}
+
+.pestanas-lista .pestana[aria-selected="true"] {
+  border-bottom-color: var(--color-primario);
+  color: var(--color-texto);
+  font-weight: 600;
+}
+
+/* La pestaña ya nombra la sección: el título solo se ve al imprimir. */
+.pestana-panel {
+  margin-top: 1rem;
+}
+
+.pestana-panel > h2 {
+  display: none;
+}
+
 @media (max-width: 1100px) {
   .detalle-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -3769,6 +3814,17 @@ td.con-avatar {
 
   .contenido {
     padding: 0;
+  }
+
+  /* Al imprimir se ven todas las secciones de las pestañas, con su título
+     (el historial solo si se cargó; la explicación con IA no sale). */
+  #seccion-comentarios[hidden],
+  #seccion-historial[hidden]:has(#tabla-historial:not([hidden])) {
+    display: block !important;
+  }
+
+  .pestana-panel > h2 {
+    display: flex;
   }
 
   /* Los datos del panel derecho salen justo debajo de la tarjeta. */

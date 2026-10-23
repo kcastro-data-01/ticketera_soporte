@@ -838,8 +838,62 @@ async function cargarHistorial() {
   }
 }
 
+/* Pestañas debajo de la descripción (Comentarios, Historial y Explicación
+   IA): solo las que el rol ve; la de IA lleva data-permiso como su sección.
+   Se recuerda la última abierta en localStorage. */
+const PESTANA_KEY = "detalle_pestana";
+
+function pestanasVisibles() {
+  if (typeof document.querySelectorAll !== "function") return [];
+  return [...document.querySelectorAll("#pestanas-detalle [role=tab]")].filter(
+    (pestana) => !pestana.hidden && (!pestana.dataset.permiso || puede(pestana.dataset.permiso))
+  );
+}
+
+function mostrarPestana(nombre, { enfocar = false } = {}) {
+  const pestanas = pestanasVisibles();
+  if (!pestanas.length) return;
+  const elegida = pestanas.find((pestana) => pestana.dataset.pestana === nombre) || pestanas[0];
+  pestanas.forEach((pestana) => {
+    const activa = pestana === elegida;
+    pestana.setAttribute("aria-selected", String(activa));
+    pestana.tabIndex = activa ? 0 : -1;
+    const panel = document.getElementById(pestana.getAttribute("aria-controls"));
+    if (panel) panel.hidden = !activa;
+  });
+  if (enfocar) elegida.focus();
+  try {
+    localStorage.setItem(PESTANA_KEY, elegida.dataset.pestana);
+  } catch (error) {
+    /* Sin almacenamiento solo no se recuerda la pestaña. */
+  }
+}
+
+function iniciarPestanas() {
+  const pestanas = pestanasVisibles();
+  pestanas.forEach((pestana, indice) => {
+    pestana.addEventListener("click", () => mostrarPestana(pestana.dataset.pestana));
+    /* Flechas izquierda y derecha: pasan a la pestaña vecina. */
+    pestana.addEventListener("keydown", (event) => {
+      const paso = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+      if (!paso) return;
+      event.preventDefault();
+      const vecina = pestanas[(indice + paso + pestanas.length) % pestanas.length];
+      mostrarPestana(vecina.dataset.pestana, { enfocar: true });
+    });
+  });
+  let guardada = null;
+  try {
+    guardada = localStorage.getItem(PESTANA_KEY);
+  } catch (error) {
+    guardada = null;
+  }
+  mostrarPestana(guardada);
+}
+
 async function init() {
   const elements = getElements();
+  iniciarPestanas();
 
   elements.formEditar.addEventListener("submit", (event) => {
     event.preventDefault();

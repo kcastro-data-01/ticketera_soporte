@@ -156,75 +156,85 @@
             </form>
           </section>
 
-          <!-- Explicar con IA: Técnico, Supervisor y Administrador (js/explicacion.js). -->
-          <section id="seccion-ia" class="seccion" aria-label="Explicación con IA" data-permiso="explicar_ia">
-            <h2>Explicación con IA</h2>
-            <p class="nota">
-              Resume el ticket, dice qué datos faltan y propone preguntas para la persona.
-            </p>
-            <div class="acciones">
-              <button type="button" id="ia-explicar">Explicar con IA</button>
-              <button type="button" id="ia-regenerar" class="secundario" hidden>Volver a explicar</button>
+          <!-- Pestañas: solo las de este rol (la de IA lleva el mismo
+               data-permiso que su sección). detalle.js recuerda la última. -->
+          <div class="pestanas" id="pestanas-detalle">
+            <div class="pestanas-lista" role="tablist" aria-label="Secciones del ticket">
+              <button type="button" role="tab" class="pestana" id="pestana-comentarios" data-pestana="comentarios" aria-controls="seccion-comentarios" aria-selected="true">Comentarios</button>
+              <button type="button" role="tab" class="pestana" id="pestana-historial" data-pestana="historial" aria-controls="seccion-historial" aria-selected="false" tabindex="-1">Historial</button>
+              <button type="button" role="tab" class="pestana" id="pestana-ia" data-pestana="ia" aria-controls="seccion-ia" aria-selected="false" tabindex="-1" data-permiso="explicar_ia">Explicación IA</button>
             </div>
-            <p id="ia-estado" class="estado" role="status" aria-live="polite" hidden></p>
-            <div id="ia-panel" class="ia-panel" hidden></div>
-          </section>
 
-          <section class="seccion" aria-label="Comentarios del ticket">
-            <h2>Comentarios</h2>
-            <p class="nota">
-              Los comentarios se muestran de más antiguo a más reciente.
-            </p>
-            <p
-              id="comentarios-estado"
-              class="estado"
-              role="status"
-              aria-live="polite"
-              hidden
-            ></p>
-            <div id="lista-comentarios" class="comentarios" hidden></div>
-            <form id="form-comentario" class="filtros formulario" novalidate>
-              <label class="campo">
-                <span>Nuevo comentario</span>
-                <textarea
-                  id="contenido"
-                  name="content"
-                  maxlength="2000"
-                  placeholder="Escriba aquí el comentario"
-                ></textarea>
-              </label>
-              <div class="acciones">
-                <button type="submit" id="comentar">Agregar comentario</button>
+            <section id="seccion-comentarios" class="seccion pestana-panel" role="tabpanel" aria-labelledby="pestana-comentarios">
+              <h2>Comentarios</h2>
+              <p class="nota">
+                Los comentarios se muestran de más antiguo a más reciente.
+              </p>
+              <p
+                id="comentarios-estado"
+                class="estado"
+                role="status"
+                aria-live="polite"
+                hidden
+              ></p>
+              <div id="lista-comentarios" class="comentarios" hidden></div>
+              <form id="form-comentario" class="filtros formulario" novalidate>
+                <label class="campo">
+                  <span>Nuevo comentario</span>
+                  <textarea
+                    id="contenido"
+                    name="content"
+                    maxlength="2000"
+                    placeholder="Escriba aquí el comentario"
+                  ></textarea>
+                </label>
+                <div class="acciones">
+                  <button type="submit" id="comentar">Agregar comentario</button>
+                </div>
+              </form>
+            </section>
+
+            <section id="seccion-historial" class="seccion pestana-panel" role="tabpanel" aria-labelledby="pestana-historial" hidden>
+              <h2>Historial de cambios</h2>
+              <div class="filtros formulario">
+                <div class="acciones">
+                  <button type="button" id="historial">Ver historial</button>
+                </div>
               </div>
-            </form>
-          </section>
-  
-          <section class="seccion" aria-label="Historial del ticket">
-            <h2>Historial de cambios</h2>
-            <div class="filtros formulario">
+              <p
+                id="historial-estado"
+                class="estado"
+                role="status"
+                aria-live="polite"
+                hidden
+              ></p>
+              <table class="listado" id="tabla-historial" hidden>
+                <thead>
+                  <tr>
+                    <th>Fecha y hora</th>
+                    <th>Persona</th>
+                    <th>Acción</th>
+                    <th>Detalle</th>
+                  </tr>
+                </thead>
+                <tbody id="historial-cuerpo"></tbody>
+              </table>
+            </section>
+
+            <!-- Explicar con IA: Técnico, Supervisor y Administrador (js/explicacion.js). -->
+            <section id="seccion-ia" class="seccion pestana-panel" role="tabpanel" aria-labelledby="pestana-ia" data-permiso="explicar_ia" hidden>
+              <h2>Explicación con IA</h2>
+              <p class="nota">
+                Resume el ticket, dice qué datos faltan y propone preguntas para la persona.
+              </p>
               <div class="acciones">
-                <button type="button" id="historial">Ver historial</button>
+                <button type="button" id="ia-explicar">Explicar con IA</button>
+                <button type="button" id="ia-regenerar" class="secundario" hidden>Volver a explicar</button>
               </div>
-            </div>
-            <p
-              id="historial-estado"
-              class="estado"
-              role="status"
-              aria-live="polite"
-              hidden
-            ></p>
-            <table class="listado" id="tabla-historial" hidden>
-              <thead>
-                <tr>
-                  <th>Fecha y hora</th>
-                  <th>Persona</th>
-                  <th>Acción</th>
-                  <th>Detalle</th>
-                </tr>
-              </thead>
-              <tbody id="historial-cuerpo"></tbody>
-            </table>
-          </section>
+              <p id="ia-estado" class="estado" role="status" aria-live="polite" hidden></p>
+              <div id="ia-panel" class="ia-panel" hidden></div>
+            </section>
+          </div>
         </div>
 
         <aside class="detalle-lateral" aria-label="Datos y acciones del ticket">
