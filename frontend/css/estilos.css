@@ -2512,68 +2512,6 @@ body.app {
   text-decoration: underline;
 }
 
-/* Tarjetitas de los tickets mencionados (#N) debajo de la respuesta. */
-.chat-tickets {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.chat-ticket-lugar:empty,
-.chat-tickets:not(:has(.chat-ticket)) {
-  display: none;
-}
-
-.chat-ticket {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--color-borde);
-  border-left: 3px solid var(--color-primario);
-  border-radius: var(--radio-suave);
-  background: var(--color-superficie);
-  color: var(--color-texto);
-  text-decoration: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.chat-ticket:hover {
-  border-color: var(--color-primario);
-  background: var(--color-primario-tenue);
-}
-
-.chat-ticket:focus-visible {
-  outline: 2px solid var(--color-primario-oscuro);
-  outline-offset: 2px;
-}
-
-.chat-ticket-cabeza {
-  display: flex;
-  gap: 0.4rem;
-  min-width: 0;
-  font-size: 0.8125rem;
-}
-
-.chat-ticket-id {
-  flex-shrink: 0;
-  font-weight: 600;
-  color: var(--color-enlace);
-}
-
-.chat-ticket-titulo {
-  overflow: hidden;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-ticket-etiquetas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
 /* Debajo de cada burbuja: la hora en gris, 11 px. */
 .chat-pie {
   display: flex;

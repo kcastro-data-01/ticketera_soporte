@@ -188,62 +188,6 @@ function pintarTexto(elemento, texto) {
   });
 }
 
-/* Tickets mencionados (#N) en una respuesta: hasta 3 tarjetitas con el
-   título, el estado y la prioridad. Se consultan una vez por página con
-   GET /api/tickets/{id}; si no hay permiso o falla, no se muestra nada. */
-const CHAT_MAX_TARJETAS = 3;
-const ticketsConsultados = new Map();
-
-function consultarTicket(id) {
-  if (!ticketsConsultados.has(id)) {
-    ticketsConsultados.set(
-      id,
-      fetchWithAuth(`/api/tickets/${id}`)
-        .then((response) => (response.ok ? response.json() : null))
-        .catch(() => null)
-    );
-  }
-  return ticketsConsultados.get(id);
-}
-
-function tarjetaTicket(ticket) {
-  const tarjeta = crearElemento("a", "chat-ticket");
-  tarjeta.href = `detalle.html?id=${ticket.id}`;
-  const cabeza = crearElemento("span", "chat-ticket-cabeza");
-  cabeza.append(
-    crearElemento("span", "chat-ticket-id", `#${ticket.id}`),
-    crearElemento("span", "chat-ticket-titulo", ticket.title)
-  );
-  const etiquetas = crearElemento("span", "chat-ticket-etiquetas");
-  etiquetas.appendChild(crearElemento("span", claseBadge(ticket.state), ticket.state));
-  /* El Solicitante no ve la prioridad, igual que en el listado. */
-  const user = getUser();
-  if (!(user && user.role === "Solicitante")) {
-    etiquetas.appendChild(crearElemento("span", claseBadge(ticket.priority), ticket.priority));
-  }
-  tarjeta.append(cabeza, etiquetas);
-  return tarjeta;
-}
-
-function tarjetasMencionadas(texto) {
-  const ids = [...new Set([...String(texto).matchAll(/#(\d+)/g)].map((m) => Number(m[1])))]
-    .filter((id) => id > 0)
-    .slice(0, CHAT_MAX_TARJETAS);
-  if (!ids.length) return null;
-  const contenedor = crearElemento("div", "chat-tickets");
-  ids.forEach((id) => {
-    /* Un lugar por ticket para que queden en el orden en que se nombran. */
-    const lugar = contenedor.appendChild(crearElemento("div", "chat-ticket-lugar"));
-    consultarTicket(id).then((ticket) => {
-      if (!ticket || ticket.id === undefined) return;
-      lugar.appendChild(tarjetaTicket(ticket));
-      const lista = document.getElementById("chat-lista");
-      if (lista) seguirAlFinal(lista);
-    });
-  });
-  return contenedor;
-}
-
 /* Fila del asistente: el mensaje y, opcional, una nota debajo. */
 function filaAsistente() {
   const fila = crearElemento("div", "chat-fila asistente");
@@ -319,10 +263,6 @@ function burbuja(mensaje) {
   contenido.appendChild(el);
   const pie = pieDeMensaje(mensaje, !mensaje.error && !mensaje.saludo);
   if (pie) contenido.appendChild(pie);
-  if (!mensaje.error) {
-    const tarjetas = tarjetasMencionadas(mensaje.content);
-    if (tarjetas) contenido.appendChild(tarjetas);
-  }
   return fila;
 }
 
