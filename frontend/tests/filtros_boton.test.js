@@ -79,13 +79,17 @@ const esperar = async () => { for (let i = 0; i < 10; i += 1) await new Promise(
 const clic = (n) => n.listeners.click.forEach((fn) => fn());
 const enviar = (n) => n.listeners.submit.forEach((fn) => fn({ preventDefault() {} }));
 
-test("index.html: botón Filtros con embudo antes de Tabla/Tablero y «Aplicar filtros» en el recuadro", () => {
+test("index.html: botón Filtros con embudo antes de Tabla/Tablero y «Buscar» en el recuadro", () => {
   const barra = indexHtml.slice(indexHtml.indexOf('<div class="listado-barra">'), indexHtml.indexOf('<form id="form-filtros"'));
   assert.match(barra, /<div class="vista-tabs">\s*<button type="button" id="filtros-boton" class="vista-tab filtros-boton" aria-expanded="false" aria-controls="form-filtros"[^>]*><svg class="icono"[^>]*><path d="M3 5h18l-7 8\.5V19l-4 2v-7\.5z"\/><\/svg><span id="filtros-texto">Filtros<\/span><\/button>/);
   assert.ok(barra.indexOf('id="filtros-boton"') < barra.indexOf('id="ver-tabla"'));
   assert.doesNotMatch(barra.slice(barra.lastIndexOf("<div", barra.indexOf('id="filtros-boton"')), barra.indexOf('id="filtros-boton"')), /data-vista/, "también lo ve el Solicitante");
   assert.match(indexHtml, /<form id="form-filtros" class="filtros" hidden>/, "por defecto, cerrado");
-  assert.match(indexHtml, /<button type="submit" id="buscar">Aplicar filtros<\/button>/);
+  // «Buscar» (primario, el de siempre) junto a «Limpiar filtros», dentro del recuadro.
+  const form = indexHtml.slice(indexHtml.indexOf('<form id="form-filtros"'), indexHtml.indexOf("</form>"));
+  assert.match(form, /<button type="submit" id="buscar">Buscar<\/button>\s*<button type="button" id="limpiar" class="secundario">Limpiar filtros<\/button>/);
+  // Enter en «Buscar» envía el formulario: el campo está dentro y hay un botón submit.
+  assert.match(form, /<input\s+type="search"\s+id="search"/);
   assert.match(css, /\.vista-tabs \.filtros-boton \{\s*gap: 0\.4rem;/);
 });
 
@@ -107,6 +111,16 @@ test("por defecto cerrado; el botón lo abre y lo cierra y se recuerda", async (
 
   const abierto = await montar({ guardado: "1" });
   assert.equal(abierto.nodos.get("form-filtros").hidden, false, "se abre como quedó");
+});
+
+test("Buscar (o Enter en el campo) envía el formulario y pide el listado filtrado", async () => {
+  const { nodos, pedidos } = await montar({ guardado: "1" });
+  const antes = pedidos.length;
+  nodos.get("search").value = "impresora";
+  enviar(nodos.get("form-filtros"));
+  await esperar();
+  assert.equal(pedidos.length, antes + 1);
+  assert.match(pedidos.at(-1), /search=impresora/);
 });
 
 test("con filtros aplicados dice cuántos y queda resaltado; sin filtros vuelve a «Filtros»", async () => {
