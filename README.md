@@ -489,6 +489,46 @@ ticket #N? Esta acción no se puede deshacer.») y después se vuelve al listado
   (por ejemplo, `TICKETS: Laura Méndez (laura.mendez@adn.local, id 1) eliminó el
   ticket #6 «…» el 2026-10-19 15:30 UTC`).
 
+## Limpiar los datos de prueba
+
+Antes de empezar a usar la ticketera en la empresa se pueden borrar los datos
+de prueba con un comando:
+
+```bash
+docker compose exec ticketera python -m backend.limpiar_datos
+# fuera de Docker: python -m backend.limpiar_datos
+```
+
+1. Si el usuario de `ADMIN_INICIAL` no existe (o la variable está vacía),
+   avisa y no hace nada: es el único usuario que se conserva. Entra primero
+   con esa cuenta de Microsoft para que se cree.
+2. Copia la base a `/data/respaldo-antes-de-limpiar-<fecha-hora>.db` (fuera
+   de Docker, si no hay `/data`, en la carpeta de la base) y muestra la ruta.
+3. Pide escribir `BORRAR`. Con cualquier otra respuesta no borra nada (el
+   respaldo queda igual).
+4. Borra tickets, comentarios, historial, explicaciones de IA y todos los
+   usuarios excepto `ADMIN_INICIAL`, y muestra cuántos tickets, comentarios y
+   usuarios se borraron.
+
+Se conservan los correos procesados (`processed_emails`, con `ticket_id` en
+`NULL`), para que los correos viejos del buzón no vuelvan a crear tickets, y
+la sesión de Microsoft del buzón (`/data/msal_cache.json`). Los demás usuarios
+se vuelven a crear solos al entrar con Microsoft o al escribir al buzón, como
+Solicitantes.
+
+**Volver al respaldo.** Detén la app, pon el respaldo en el lugar de la base y
+vuelve a arrancarla (cambia el nombre por el que mostró el comando):
+
+```bash
+docker compose stop ticketera
+docker compose run --rm --no-deps --entrypoint sh ticketera -c \
+  'cp /data/respaldo-antes-de-limpiar-20261023-153000.db /data/ticketera.db'
+docker compose start ticketera
+```
+
+Fuera de Docker es lo mismo con `cp respaldo-antes-de-limpiar-….db ticketera.db`
+con la API apagada.
+
 ## Métricas
 
 El menú **«Métricas»** (`metricas.html`) lo ven solo **Supervisor y
