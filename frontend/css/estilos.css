@@ -3404,6 +3404,17 @@ td.con-avatar {
   margin-bottom: 0;
 }
 
+/* Botón «Filtros»: el embudo junto al texto; resaltado (.activa) cuando
+   hay filtros aplicados. */
+.vista-tabs .filtros-boton {
+  gap: 0.4rem;
+}
+
+.vista-tabs .filtros-boton .icono {
+  width: 16px;
+  height: 16px;
+}
+
 /* margin-left: auto la deja a la derecha aunque no esté «Todos / Mis
    tickets» (Solicitante). */
 .listado-opciones {

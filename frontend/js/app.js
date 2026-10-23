@@ -599,7 +599,55 @@ function renderPaginacion(total) {
 function irAPagina(pagina) {
   paginaActual = Math.max(0, pagina);
   marcarTarjetaActiva();
+  marcarBotonFiltros();
   fetchTickets();
+}
+
+/* --- Botón «Filtros» ---------------------------------------------------
+   Muestra u oculta el recuadro de filtros (se recuerda en este navegador;
+   por defecto, cerrado). Con filtros aplicados dice cuántos: «Filtros (2)». */
+const FILTROS_KEY = "filtros_abiertos";
+
+function leerFiltrosAbiertos() {
+  try {
+    return localStorage.getItem(FILTROS_KEY) === "1";
+  } catch (error) {
+    return false;
+  }
+}
+
+function mostrarFiltros(abiertos) {
+  const form = getElements().form;
+  const boton = document.getElementById("filtros-boton");
+  if (form) form.hidden = !abiertos;
+  if (boton) boton.setAttribute("aria-expanded", String(abiertos));
+}
+
+function alternarFiltros() {
+  const abiertos = !leerFiltrosAbiertos();
+  try {
+    localStorage.setItem(FILTROS_KEY, abiertos ? "1" : "0");
+  } catch (error) {
+    /* Abierto o cerrado vale solo para esta visita. */
+  }
+  mostrarFiltros(abiertos);
+}
+
+/* Los filtros con los que se pide el listado (sin «Mis tickets», que
+   tiene sus propios botones). */
+function contarFiltros() {
+  const filtros = getFilters();
+  return [filtros.search, filtros.category, filtros.priority, filtros.state].filter(Boolean).length;
+}
+
+function marcarBotonFiltros() {
+  const boton = document.getElementById("filtros-boton");
+  const texto = document.getElementById("filtros-texto");
+  if (!boton || !texto) return;
+  const cuantos = contarFiltros();
+  texto.textContent = cuantos ? `Filtros (${cuantos})` : "Filtros";
+  boton.classList.toggle("activa", cuantos > 0);
+  boton.setAttribute("aria-pressed", String(cuantos > 0));
 }
 
 /* Resalta la tarjeta cuyo filtro es el que está aplicado (si hay una). */
@@ -718,6 +766,10 @@ function init() {
     comoda.addEventListener("click", () => cambiarDensidad("comoda"));
   }
   aplicarDensidad();
+  const botonFiltros = document.getElementById("filtros-boton");
+  if (botonFiltros) botonFiltros.addEventListener("click", alternarFiltros);
+  mostrarFiltros(leerFiltrosAbiertos());
+  marcarBotonFiltros();
 
   cargarResumen();
   loadUsers().then(fetchTickets);

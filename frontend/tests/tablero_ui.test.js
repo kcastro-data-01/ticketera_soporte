@@ -95,7 +95,7 @@ test("index.html: Tabla/Tablero y Compacta/Cómoda en la fila de Todos / Mis tic
   assert.ok(indexHtml.indexOf('<div class="listado-barra">') >= 0, "la barra está arriba del formulario");
   const grupos = [...barra.matchAll(/<div class="vista-tabs"[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(grupos, ["Qué tickets ver", "Cómo ver los tickets", "Densidad de la tabla"], "Todos/Mis a la izquierda y la vista a la derecha");
-  assert.match(barra, /<div class="listado-opciones">\s*<div class="vista-tabs" role="group" aria-label="Cómo ver los tickets" data-vista="equipo">/);
+  assert.match(barra, /<div class="listado-opciones">[\s\S]*?id="filtros-boton"[\s\S]*?<div class="vista-tabs" role="group" aria-label="Cómo ver los tickets" data-vista="equipo">/, "Filtros antes de Tabla/Tablero");
   const css = fs.readFileSync(path.join(__dirname, "..", "css", "estilos.css"), "utf8");
   assert.match(css, /\.listado-barra \{\s*display: flex;\s*flex-wrap: wrap;\s*align-items: center;/);
   assert.match(css, /\.listado-opciones \{[^}]*margin-left: auto;/, "a la derecha también sin Todos / Mis tickets");
