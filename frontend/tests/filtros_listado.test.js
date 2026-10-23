@@ -1,8 +1,6 @@
-/* Botón «Filtros» del listado (app.js + index.html): muestra u oculta el
-   recuadro de filtros, se recuerda en localStorage (por defecto, cerrado) y
-   con filtros aplicados dice cuántos y queda resaltado. No cambia cómo se
-   filtra.
-   Ejecutar con: node --test frontend/tests/filtros_boton.test.js */
+/* Recuadro de filtros del listado (app.js + index.html): siempre visible,
+   con «Buscar» y «Limpiar filtros», y sin las tarjetas de resumen arriba.
+   Ejecutar con: node --test frontend/tests/filtros_listado.test.js */
 
 "use strict";
 
@@ -19,7 +17,6 @@ const css = leer("css/estilos.css");
 const IDS = [
   "form-filtros", "search", "category", "priority", "state", "limpiar", "estado-carga", "lista-tickets",
   "paginacion", "pagina-anterior", "pagina-siguiente", "pagina-info", "tabla-tickets", "tablero",
-  "filtros-boton", "filtros-texto",
 ];
 
 function nodo(tag) {
@@ -39,11 +36,10 @@ function nodo(tag) {
   };
 }
 
-async function montar({ guardado = null } = {}) {
+async function montar() {
   const nodos = new Map(IDS.map((id) => [id, nodo(id)]));
   nodos.get("form-filtros").campos = nodos;
-  nodos.get("form-filtros").hidden = true; // como en index.html
-  const store = new Map(guardado === null ? [] : [["filtros_abiertos", guardado]]);
+  const store = new Map();
   const pedidos = [];
   const sandbox = {
     document: {
@@ -79,70 +75,26 @@ const esperar = async () => { for (let i = 0; i < 10; i += 1) await new Promise(
 const clic = (n) => n.listeners.click.forEach((fn) => fn());
 const enviar = (n) => n.listeners.submit.forEach((fn) => fn({ preventDefault() {} }));
 
-test("index.html: botón Filtros con embudo antes de Tabla/Tablero y «Buscar» en el recuadro", () => {
-  const barra = indexHtml.slice(indexHtml.indexOf('<div class="listado-barra">'), indexHtml.indexOf('<form id="form-filtros"'));
-  assert.match(barra, /<div class="vista-tabs">\s*<button type="button" id="filtros-boton" class="vista-tab filtros-boton" aria-expanded="false" aria-controls="form-filtros"[^>]*><svg class="icono"[^>]*><path d="M3 5h18l-7 8\.5V19l-4 2v-7\.5z"\/><\/svg><span id="filtros-texto">Filtros<\/span><\/button>/);
-  assert.ok(barra.indexOf('id="filtros-boton"') < barra.indexOf('id="ver-tabla"'));
-  assert.doesNotMatch(barra.slice(barra.lastIndexOf("<div", barra.indexOf('id="filtros-boton"')), barra.indexOf('id="filtros-boton"')), /data-vista/, "también lo ve el Solicitante");
-  assert.match(indexHtml, /<form id="form-filtros" class="filtros" hidden>/, "por defecto, cerrado");
+test("index.html: sin tarjetas de resumen ni botón Filtros; el recuadro de filtros siempre visible", () => {
+  assert.doesNotMatch(indexHtml, /class="resumen|tarjeta-resumen|id="res-|id="etq-/);
+  assert.doesNotMatch(indexHtml, /filtros-boton|filtros-texto/);
+  assert.match(indexHtml, /<form id="form-filtros" class="filtros">/, "sin hidden");
+  const app = leer("js/app.js");
+  assert.doesNotMatch(app, /\/api\/tickets\/summary|tarjeta-resumen|filtros_abiertos/, "el listado ya no pide el resumen");
+  assert.doesNotMatch(css, /filtros-boton|tarjeta-icono|\.resumen \.tarjeta-resumen/);
   // «Buscar» (primario, el de siempre) junto a «Limpiar filtros», dentro del recuadro.
   const form = indexHtml.slice(indexHtml.indexOf('<form id="form-filtros"'), indexHtml.indexOf("</form>"));
   assert.match(form, /<button type="submit" id="buscar">Buscar<\/button>\s*<button type="button" id="limpiar" class="secundario">Limpiar filtros<\/button>/);
   // Enter en «Buscar» envía el formulario: el campo está dentro y hay un botón submit.
   assert.match(form, /<input\s+type="search"\s+id="search"/);
-  assert.match(css, /\.vista-tabs \.filtros-boton \{\s*gap: 0\.4rem;/);
-});
-
-test("por defecto cerrado; el botón lo abre y lo cierra y se recuerda", async () => {
-  const { nodos, store } = await montar();
-  const form = nodos.get("form-filtros");
-  const boton = nodos.get("filtros-boton");
-  assert.equal(form.hidden, true);
-  assert.equal(boton.atributos["aria-expanded"], "false");
-
-  clic(boton);
-  assert.equal(form.hidden, false);
-  assert.equal(boton.atributos["aria-expanded"], "true");
-  assert.equal(store.get("filtros_abiertos"), "1");
-
-  clic(boton);
-  assert.equal(form.hidden, true);
-  assert.equal(store.get("filtros_abiertos"), "0");
-
-  const abierto = await montar({ guardado: "1" });
-  assert.equal(abierto.nodos.get("form-filtros").hidden, false, "se abre como quedó");
 });
 
 test("Buscar (o Enter en el campo) envía el formulario y pide el listado filtrado", async () => {
-  const { nodos, pedidos } = await montar({ guardado: "1" });
+  const { nodos, pedidos } = await montar();
   const antes = pedidos.length;
   nodos.get("search").value = "impresora";
   enviar(nodos.get("form-filtros"));
   await esperar();
   assert.equal(pedidos.length, antes + 1);
   assert.match(pedidos.at(-1), /search=impresora/);
-});
-
-test("con filtros aplicados dice cuántos y queda resaltado; sin filtros vuelve a «Filtros»", async () => {
-  const { nodos, pedidos } = await montar({ guardado: "1" });
-  const boton = nodos.get("filtros-boton");
-  const texto = nodos.get("filtros-texto");
-  assert.equal(texto.textContent, "Filtros");
-  assert.equal(boton.classList.contains("activa"), false);
-
-  nodos.get("search").value = "vpn";
-  nodos.get("priority").value = "Alta";
-  enviar(nodos.get("form-filtros"));
-  await esperar();
-  assert.equal(texto.textContent, "Filtros (2)");
-  assert.equal(boton.classList.contains("activa"), true);
-  assert.equal(boton.atributos["aria-pressed"], "true");
-  // Filtra igual que antes: los mismos parámetros.
-  assert.match(pedidos.at(-1), /search=vpn/);
-  assert.match(pedidos.at(-1), /priority=Alta/);
-
-  clic(nodos.get("limpiar"));
-  await esperar();
-  assert.equal(texto.textContent, "Filtros");
-  assert.equal(boton.classList.contains("activa"), false);
 });

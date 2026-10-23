@@ -18,15 +18,11 @@ function regla(selector, desde = 0) {
   return css.slice(inicio, css.indexOf("\n}", inicio));
 }
 
-test("tarjetas de resumen: franja de 3 px con su color y número de 28 px en negrita", () => {
+test("tarjetas de métricas: franja de 3 px con su color y número de 28 px en negrita", () => {
   assert.match(regla(".tarjeta-resumen"), /border-left: 3px solid var\(--color-primario\);/);
-  const listado = regla(".resumen .tarjeta-resumen:has(.tarjeta-icono)");
-  assert.match(listado, /border-left-color: var\(--tono-texto\);/, "cada tarjeta del listado con su tono");
-  assert.doesNotMatch(listado, /border-left-width/, "la franja no se achica a 1 px");
   const numero = regla(".tarjeta-numero");
   assert.match(numero, /font-size: 28px;/);
   assert.match(numero, /font-weight: 700;/);
-  assert.doesNotMatch(regla(".resumen .tarjeta-resumen:has(.tarjeta-icono) .tarjeta-numero"), /font-size/);
 });
 
 test("tablas: filas alternadas con el fondo neutro y encabezados formales", () => {

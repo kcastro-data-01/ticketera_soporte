@@ -54,41 +54,6 @@
     </header>
 
     <main class="contenido">
-    <section class="resumen" aria-label="Resumen de tickets">
-      <!-- Al pulsar una tarjeta se filtra la tabla por ese estado. -->
-      <!-- data-vista="equipo": no se muestra en la vista simple del Solicitante. -->
-      <button type="button" class="tarjeta-resumen tono-azul" data-estado="Nuevo" data-vista="equipo" aria-pressed="false">
-        <span class="tarjeta-icono" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
-        <span class="tarjeta-numero" id="res-nuevos">—</span>
-        <span class="tarjeta-etiqueta">Nuevos</span>
-      </button>
-      <button type="button" class="tarjeta-resumen tono-violeta" data-estado="En proceso" data-vista="equipo" aria-pressed="false">
-        <span class="tarjeta-icono" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></span>
-        <span class="tarjeta-numero" id="res-en-proceso">—</span>
-        <span class="tarjeta-etiqueta">En proceso</span>
-      </button>
-      <button type="button" class="tarjeta-resumen tono-naranja" data-estado="Nuevo,En proceso" aria-pressed="false">
-        <span class="tarjeta-icono" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-        <span class="tarjeta-numero" id="res-pendientes">—</span>
-        <span class="tarjeta-etiqueta" id="etq-pendientes">Pendientes</span>
-      </button>
-      <button type="button" class="tarjeta-resumen tono-verde" data-estado="Resuelto,Cerrado" aria-pressed="false">
-        <span class="tarjeta-icono" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg></span>
-        <span class="tarjeta-numero" id="res-resueltos">—</span>
-        <span class="tarjeta-etiqueta" id="etq-resueltos">Resueltos</span>
-      </button>
-      <button type="button" class="tarjeta-resumen tono-rojo alerta" data-prioridad="Crítica" data-vista="equipo" aria-pressed="false">
-        <span class="tarjeta-icono" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17h.01"/></svg></span>
-        <span class="tarjeta-numero" id="res-criticos">—</span>
-        <span class="tarjeta-etiqueta">Críticos sin resolver</span>
-      </button>
-      <button type="button" class="tarjeta-resumen tono-azul destacada" data-mios="true" data-permiso="cambiar_estado" aria-pressed="false">
-        <span class="tarjeta-icono" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
-        <span class="tarjeta-numero" id="res-mios">—</span>
-        <span class="tarjeta-etiqueta">Asignados a mí</span>
-      </button>
-    </section>
-
     <!-- Una sola fila arriba de los filtros: «Todos / Mis tickets» a la
          izquierda y las opciones de vista a la derecha. -->
     <div class="listado-barra">
@@ -99,11 +64,6 @@
       <!-- A la derecha, cómo ver el listado; app.js recuerda las elecciones.
            El Solicitante solo ve la tabla (sin Tabla/Tablero). -->
       <div class="listado-opciones">
-        <!-- Muestra u oculta los filtros (app.js lo recuerda; por defecto
-             cerrados). Con filtros aplicados dice cuántos y se resalta. -->
-        <div class="vista-tabs">
-          <button type="button" id="filtros-boton" class="vista-tab filtros-boton" aria-expanded="false" aria-controls="form-filtros" aria-pressed="false"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/></svg><span id="filtros-texto">Filtros</span></button>
-        </div>
         <div class="vista-tabs" role="group" aria-label="Cómo ver los tickets" data-vista="equipo">
           <button type="button" id="ver-tabla" class="vista-tab activa" aria-pressed="true">Tabla</button>
           <button type="button" id="ver-tablero" class="vista-tab" aria-pressed="false">Tablero</button>
@@ -115,7 +75,7 @@
       </div>
     </div>
 
-    <form id="form-filtros" class="filtros" hidden>
+    <form id="form-filtros" class="filtros">
       <label class="campo campo-busqueda">
         <span>Buscar</span>
         <input

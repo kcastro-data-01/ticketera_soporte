@@ -4,7 +4,6 @@
 
 const API_TICKETS_URL = "/api/tickets";
 const API_USERS_URL = "/api/users";
-const API_SUMMARY_URL = "/api/tickets/summary";
 
 /* Tickets por página del listado. */
 const PAGE_SIZE = 20;
@@ -25,8 +24,6 @@ function esSolicitante() {
 const TEXTOS_SOLICITANTE = {
   "titulo-listado": "Mis solicitudes",
   "subtitulo-listado": "Consulte el estado de sus tickets de soporte",
-  "etq-pendientes": "Abiertas",
-  "etq-resueltos": "Resueltas",
   "opt-pendientes": "Abiertas",
   "opt-resueltos": "Resueltas",
   "th-asignado": "Atendido por",
@@ -598,74 +595,7 @@ function renderPaginacion(total) {
 
 function irAPagina(pagina) {
   paginaActual = Math.max(0, pagina);
-  marcarTarjetaActiva();
-  marcarBotonFiltros();
   fetchTickets();
-}
-
-/* --- Botón «Filtros» ---------------------------------------------------
-   Muestra u oculta el recuadro de filtros (se recuerda en este navegador;
-   por defecto, cerrado). Con filtros aplicados dice cuántos: «Filtros (2)». */
-const FILTROS_KEY = "filtros_abiertos";
-
-function leerFiltrosAbiertos() {
-  try {
-    return localStorage.getItem(FILTROS_KEY) === "1";
-  } catch (error) {
-    return false;
-  }
-}
-
-function mostrarFiltros(abiertos) {
-  const form = getElements().form;
-  const boton = document.getElementById("filtros-boton");
-  if (form) form.hidden = !abiertos;
-  if (boton) boton.setAttribute("aria-expanded", String(abiertos));
-}
-
-function alternarFiltros() {
-  const abiertos = !leerFiltrosAbiertos();
-  try {
-    localStorage.setItem(FILTROS_KEY, abiertos ? "1" : "0");
-  } catch (error) {
-    /* Abierto o cerrado vale solo para esta visita. */
-  }
-  mostrarFiltros(abiertos);
-}
-
-/* Los filtros con los que se pide el listado (sin «Mis tickets», que
-   tiene sus propios botones). */
-function contarFiltros() {
-  const filtros = getFilters();
-  return [filtros.search, filtros.category, filtros.priority, filtros.state].filter(Boolean).length;
-}
-
-function marcarBotonFiltros() {
-  const boton = document.getElementById("filtros-boton");
-  const texto = document.getElementById("filtros-texto");
-  if (!boton || !texto) return;
-  const cuantos = contarFiltros();
-  texto.textContent = cuantos ? `Filtros (${cuantos})` : "Filtros";
-  boton.classList.toggle("activa", cuantos > 0);
-  boton.setAttribute("aria-pressed", String(cuantos > 0));
-}
-
-/* Resalta la tarjeta cuyo filtro es el que está aplicado (si hay una). */
-function marcarTarjetaActiva() {
-  if (typeof document.querySelectorAll !== "function") return;
-  const filtros = getFilters();
-  const soloTarjeta = !filtros.search && !filtros.category;
-  document.querySelectorAll(".tarjeta-resumen").forEach((tarjeta) => {
-    const d = tarjeta.dataset || {};
-    const activa =
-      soloTarjeta &&
-      (d.estado || "") === filtros.state &&
-      (d.prioridad || "") === filtros.priority &&
-      (d.mios === "true") === Boolean(filtros.mios) &&
-      Boolean(d.estado || d.prioridad || d.mios);
-    tarjeta.classList.toggle("activa", activa);
-    tarjeta.setAttribute("aria-pressed", String(activa));
-  });
 }
 
 /* Cambia entre «Todos» y «Mis tickets» y vuelve a la primera página. */
@@ -679,46 +609,6 @@ function mostrarSoloMios(valor) {
     elements.vistaMios.setAttribute("aria-pressed", String(valor));
   }
   irAPagina(0);
-}
-
-/* Tarjetas del panel: números del resumen y, al pulsarlas, el filtro. */
-async function cargarResumen() {
-  const campos = {
-    "res-nuevos": "nuevos",
-    "res-en-proceso": "en_proceso",
-    "res-resueltos": "resueltos",
-    "res-criticos": "criticos_abiertos",
-    "res-mios": "mios_abiertos",
-  };
-  const zona = typeof document.querySelector === "function" ? document.querySelector(".resumen") : null;
-  marcarCargando(zona, true);
-  try {
-    const response = await fetchWithAuth(API_SUMMARY_URL);
-    if (!response.ok) return;
-    const resumen = await response.json();
-    Object.entries(campos).forEach(([id, campo]) => {
-      const nodo = document.getElementById(id);
-      if (nodo) nodo.textContent = String(resumen[campo] ?? "—");
-    });
-    /* Pendientes = sin resolver (Nuevo + En proceso). */
-    const pendientes = document.getElementById("res-pendientes");
-    if (pendientes) {
-      const total = Number(resumen.nuevos) + Number(resumen.en_proceso);
-      pendientes.textContent = Number.isFinite(total) ? String(total) : "—";
-    }
-  } catch (error) {
-    console.error("No se pudo cargar el resumen:", error);
-  } finally {
-    marcarCargando(zona, false);
-  }
-}
-
-function aplicarTarjeta(tarjeta) {
-  const elements = getElements();
-  elements.form.reset();
-  if (tarjeta.dataset.estado) elements.state.value = tarjeta.dataset.estado;
-  if (tarjeta.dataset.prioridad) elements.priority.value = tarjeta.dataset.prioridad;
-  mostrarSoloMios(tarjeta.dataset.mios === "true");
 }
 
 function init() {
@@ -744,9 +634,6 @@ function init() {
     elements.vistaMios.addEventListener("click", () => mostrarSoloMios(true));
   }
   if (typeof document.querySelectorAll === "function") {
-    document.querySelectorAll(".tarjeta-resumen").forEach((tarjeta) => {
-      tarjeta.addEventListener("click", () => aplicarTarjeta(tarjeta));
-    });
     document.querySelectorAll(".orden-columna").forEach((boton) => {
       boton.addEventListener("click", () => cambiarOrden(boton.dataset.orden));
     });
@@ -766,12 +653,6 @@ function init() {
     comoda.addEventListener("click", () => cambiarDensidad("comoda"));
   }
   aplicarDensidad();
-  const botonFiltros = document.getElementById("filtros-boton");
-  if (botonFiltros) botonFiltros.addEventListener("click", alternarFiltros);
-  mostrarFiltros(leerFiltrosAbiertos());
-  marcarBotonFiltros();
-
-  cargarResumen();
   loadUsers().then(fetchTickets);
 }
 

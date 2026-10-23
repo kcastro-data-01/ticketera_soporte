@@ -18,16 +18,13 @@ const indexHtml = leer("index.html");
 const IDS = [
   "form-filtros", "search", "category", "priority", "state", "limpiar", "estado-carga", "lista-tickets",
   "paginacion", "pagina-anterior", "pagina-siguiente", "pagina-info",
-  "res-nuevos", "res-en-proceso", "res-pendientes", "res-resueltos", "res-criticos", "res-mios",
-  "titulo-listado", "subtitulo-listado", "etq-pendientes", "etq-resueltos", "opt-pendientes", "opt-resueltos",
+  "titulo-listado", "subtitulo-listado", "opt-pendientes", "opt-resueltos",
   "th-asignado", "nuevo-ticket-solicitante", "sin-solicitudes", "tabla-tickets",
 ];
 
 const TEXTOS_INICIALES = {
   "titulo-listado": "Tickets",
   "subtitulo-listado": "Consulta y gestión de los tickets de soporte",
-  "etq-pendientes": "Pendientes",
-  "etq-resueltos": "Resueltos",
   "th-asignado": "Asignado a",
 };
 
@@ -73,7 +70,6 @@ async function montar(rol, tickets = TICKETS) {
     fetch: async (url) => ({
       ok: true, status: 200, headers: { get: () => String(tickets.length) },
       json: async () => {
-        if (url.includes("summary")) return { total: 5, nuevos: 2, en_proceso: 1, resueltos: 2, cerrados: 1, criticos_abiertos: 1, mios_abiertos: 0 };
         if (url.includes("/api/users")) return [{ id: 2, name: "José Solano" }];
         return tickets;
       },
@@ -92,16 +88,12 @@ async function montar(rol, tickets = TICKETS) {
 
 const textos = (fila) => fila.children.map((c) => String(c.textContent || (c.children[0] && c.children[0].textContent) || ""));
 
-test("Solicitante: títulos, botón «Nuevo ticket» y solo Abiertas y Resueltas", async () => {
+test("Solicitante: títulos, botón «Nuevo ticket» y sin lo del equipo", async () => {
   const { nodos, equipo, doc } = await montar("Solicitante");
   assert.equal(nodos.get("titulo-listado").textContent, "Mis solicitudes");
   assert.equal(nodos.get("subtitulo-listado").textContent, "Consulte el estado de sus tickets de soporte");
   assert.equal(nodos.get("nuevo-ticket-solicitante").hidden, false);
-  assert.equal(nodos.get("etq-pendientes").textContent, "Abiertas");
-  assert.equal(nodos.get("etq-resueltos").textContent, "Resueltas");
-  assert.equal(nodos.get("res-pendientes").textContent, "3", "Abiertas = Nuevo + En proceso");
-  assert.equal(nodos.get("res-resueltos").textContent, "2", "Resueltas = Resuelto + Cerrado");
-  assert.ok(equipo.every((el) => el.hidden), "tarjetas, filtros y columnas del equipo ocultos");
+  assert.ok(equipo.every((el) => el.hidden), "filtros, columnas y Tabla/Tablero del equipo ocultos");
   assert.equal(nodos.get("th-asignado").textContent, "Atendido por");
   assert.match(doc.title, /^Mis solicitudes/);
 });
@@ -130,7 +122,6 @@ for (const rol of ["Técnico", "Supervisor", "Administrador"]) {
   test(`${rol}: vista completa sin cambios`, async () => {
     const { nodos, equipo, filas } = await montar(rol);
     assert.equal(nodos.get("titulo-listado").textContent, "Tickets");
-    assert.equal(nodos.get("etq-pendientes").textContent, "Pendientes");
     assert.equal(nodos.get("th-asignado").textContent, "Asignado a");
     assert.equal(nodos.get("nuevo-ticket-solicitante").hidden, true);
     assert.ok(equipo.every((el) => !el.hidden));
@@ -146,14 +137,12 @@ for (const rol of ["Técnico", "Supervisor", "Administrador"]) {
   });
 }
 
-test("index.html marca como «equipo» Nuevos, En proceso, Críticos, Categoría, Prioridad y Tabla/Tablero", () => {
+test("index.html marca como «equipo» Categoría, Prioridad y Tabla/Tablero", () => {
   const marcados = [...indexHtml.matchAll(/<[^>]*data-vista="equipo"[^>]*>(?:\s*<[^>]*>)*\s*([^<]*)/g)].map((m) => m[0]);
-  assert.equal(marcados.length, 8);
-  for (const texto of ['data-estado="Nuevo"', 'data-estado="En proceso"', 'data-prioridad="Crítica"', ">Categoría", ">Prioridad", 'aria-label="Cómo ver los tickets"']) {
+  assert.equal(marcados.length, 5);
+  for (const texto of [">Categoría", ">Prioridad", 'aria-label="Cómo ver los tickets"']) {
     assert.ok(marcados.some((m) => m.includes(texto)), texto);
   }
-  assert.doesNotMatch(indexHtml, /data-estado="Nuevo,En proceso"[^>]*data-vista="equipo"/, "Pendientes/Abiertas queda");
-  assert.doesNotMatch(indexHtml, /data-estado="Resuelto,Cerrado"[^>]*data-vista="equipo"/, "Resueltos/Resueltas queda");
 });
 
 test("la categoría lleva su ícono (clase por categoría)", async () => {
