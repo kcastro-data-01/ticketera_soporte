@@ -84,7 +84,38 @@ def test_tecnico_gets_the_card_and_the_ai_line(client, session, ollama, tecnico,
     assert session.scalar(select(TicketExplanation)) is None, "no se genera ni se guarda una explicación"
 
 
+def test_explique_el_ticket_1_exactly(client, session, ollama, tecnico):
+    """El caso que se probó en la app: «explique» (usted) no se reconocía."""
+    ticket = ticket_de(session, usuario(session, "tec@tec.local"))
+    assert ticket.id == 1
+    datos = preguntar(client, tecnico, "Explique el ticket #1")
+    assert datos["fuente"] == "directa"
+    assert datos["respuesta"].split("\n")[-1] == LINEA_IA.format(id=1)
+    assert "- Estado: En proceso" in datos["respuesta"]
+    assert ollama.pedidos == []
+    eventos = preguntar(client, tecnico, "Explique el ticket #1", stream=True)
+    assert eventos[0]["t"].split("\n")[-1] == LINEA_IA.format(id=1)
+    assert ollama.pedidos == []
+
+
 @pytest.mark.parametrize("pregunta", [
+    # usted, tú y vos; con y sin tilde; con y sin «#»
+    "Explique el ticket #{id}",
+    "explique el ticket {id}",
+    "Explíqueme el ticket #{id}",
+    "¿Me puede explicar el ticket #{id}?",
+    "explícame el ticket #{id}",
+    "explica el ticket {id}",
+    "explicá el ticket {id}",
+    "podés explicarme el ticket {id}?",
+    "explique el {id}",
+    # errores de escritura
+    "explcame el tiket {id}",
+    "expilcame el ticket {id}",
+    "esplicame el tikete {id}",
+    "q pasa con el tiket {id}",
+    "d q trata el tiket {id}",
+    "resumime el tiket {id}",
     "explicame el tiket {id}",
     "Explicá el tikete #{id}",
     "qué pasa con el tiket {id}",
@@ -197,3 +228,42 @@ def test_ticket_a_explicar_needs_a_request_and_one_ticket():
     assert a.ticket_a_explicar(tecnico, "que pasa con el tiket 5") == 5
     # Ahora también para el Solicitante (recibe la ficha, sin la línea de IA).
     assert a.ticket_a_explicar(solicitante, "explicame el #3") == 3
+
+
+# --- La línea final también cuando responde la IA libre ---------------------------
+
+
+def test_free_ai_answer_about_one_ticket_ends_with_the_line(client, session, ollama, tecnico, solicitante):
+    """Si un pedido sobre un ticket igual llega a la IA libre («¿cómo resuelvo
+    el #N?»), el servidor agrega la misma línea final."""
+    laura = usuario(session, "so@x.local")
+    ticket = ticket_de(session, laura)
+    ollama.respuestas = ["La descripción explica que la impresora no imprime. Revise el tóner."]
+    datos = preguntar(client, tecnico, f"¿Cómo resuelvo el ticket #{ticket.id}?")
+    assert datos["fuente"] == "ia"
+    assert datos["respuesta"] == ("La descripción explica que la impresora no imprime. Revise el tóner."
+                                  "\n\n" + LINEA_IA.format(id=ticket.id))
+    datos = preguntar(client, solicitante, f"¿Cómo se soluciona mi ticket #{ticket.id}?")
+    assert datos["respuesta"].endswith("\n\n" + LINEA_DETALLE.format(id=ticket.id))
+
+
+def test_free_ai_streaming_also_ends_with_the_line(session, tecnico):
+    class Proveedor:
+        modelo = "falso"
+
+        def responder_stream(self, system, messages):
+            yield "Revise el tóner "
+            yield "y el papel."
+
+    jose = usuario(session, "tec@tec.local")
+    ticket = ticket_de(session, jose)
+    mensajes = [{"role": "user", "content": f"¿Cómo resuelvo el ticket #{ticket.id}?"}]
+    eventos = list(a.responder_stream(Proveedor(), session, jose, mensajes))
+    assert "".join(e.get("t", "") for e in eventos) == "Revise el tóner y el papel.\n\n" + LINEA_IA.format(id=ticket.id)
+    assert eventos[-1] == {"fin": True, "fuente": "ia"}
+
+
+def test_free_ai_answer_without_a_ticket_has_no_line(client, session, ollama, tecnico):
+    ollama.respuestas = ["Puede crear un ticket desde «Nuevo ticket»."]
+    datos = preguntar(client, tecnico, "¿Cómo creo un ticket?")
+    assert "Explicar con IA" not in datos["respuesta"]

@@ -1328,10 +1328,36 @@ _ESTE_TICKET = re.compile(r"\b(este|esta|aqui|aca)\b")
 
 
 # Pedidos de explicar o entender un ticket: el chat responde con su ficha.
+# «explique / explíqueme / explícame / explica / explicá / explicame»: «expli»
+# seguido de «c» (tú, vos) o de «qu» (usted). Las demás formas: «resumí»,
+# «qué pasa con», «de qué trata», «qué quiere», «no entiendo».
 _PIDE_EXPLICACION = re.compile(
-    r"\b(explic\w*|resum\w*|de que (se )?trata|que (quiere|pide|necesita)|"
-    r"que (le )?pasa|no (le )?entiendo)\b"
+    r"\b(expli(c|qu)\w*|resum\w*|(de|d) (que|q|ke) (se )?trata|(que|q|ke) (quiere|pide|necesita)|"
+    r"(que|q|ke|k|qe) (le )?pa[sz]a|no (le )?entiendo)\b"
 )
+# Formas de «explicar» y «resumir» para reconocerlas mal escritas
+# («explcame», «expilcame», «esplicame», «resumme»).
+_VERBOS_EXPLICAR = (
+    "explica", "explicar", "explicame", "explicamelo", "explicalo", "explicala", "explicale",
+    "explicas", "explicarme", "explique", "expliqueme", "expliquelo", "explicacion",
+    "resumi", "resume", "resumime", "resumilo", "resumir", "resumen",
+)
+# Número sin «ticket» ni «#»: «explique el 1», «resumime el número 3».
+_NUMERO_SUELTO = re.compile(r"\b(?:el|del|al)\s+(?:n(?:u|ú)mero\s+|nro\.?\s*)?#?\s*(\d+)\b")
+
+
+def _pide_explicacion(t: str) -> bool:
+    """¿La pregunta (normalizada) pide explicar un ticket? Acepta errores de
+    escritura en el verbo: 1 en palabras cortas, 2 en las de 8 letras o más."""
+    if _PIDE_EXPLICACION.search(t):
+        return True
+    for palabra in re.findall(r"[a-z]{5,}", t):
+        maximo = 1 if len(palabra) < 8 else 2
+        if any(_distancia(palabra, verbo) <= maximo for verbo in _VERBOS_EXPLICAR):
+            return True
+    return False
+
+
 # «este ticket» con errores comunes («este tiket», «esta tikete»).
 _ESTE_TICKET_EXPLICITO = re.compile(r"\b(este|esta|el)\s+(tick|tik)e?t?e?\b|\b(este|aqui|aca)\b")
 
@@ -1341,9 +1367,9 @@ def ticket_a_explicar(user: User, pregunta: str, ticket_actual: int | None = Non
     el tiket 5», «de qué trata este ticket»); si no, ``None``. El chat
     responde con su ficha (:func:`ficha_ticket`), sin IA."""
     t = _normalizar(pregunta)
-    if not _PIDE_EXPLICACION.search(t):
+    if not _pide_explicacion(t):
         return None
-    ids = tickets_mencionados(pregunta)
+    ids = tickets_mencionados(pregunta) or list(dict.fromkeys(int(n) for n in _NUMERO_SUELTO.findall(t)))
     if len(ids) == 1:
         return ids[0]
     if not ids and ticket_actual is not None and _ESTE_TICKET_EXPLICITO.search(t):
@@ -1375,14 +1401,18 @@ def _fecha_creacion(fecha: datetime) -> str:
     return f"{local.day} de {_MESES[local.month - 1]} de {local.year}, {_texto_hora(local)}"
 
 
+def linea_mas_informacion(ticket: Ticket, user: User) -> str:
+    """La línea final cuando se explica un ticket: «Explicar con IA» (con
+    enlace a esa pestaña) para quien tiene el permiso; si no, el detalle."""
+    if puede_explicar_ia(user):
+        return LINEA_EXPLICAR_IA.format(enlace=f"detalle.html?id={ticket.id}&pestana=ia")
+    return LINEA_VER_DETALLE.format(enlace=f"detalle.html?id={ticket.id}")
+
+
 def ficha_ticket(ticket: Ticket, user: User) -> Directa:
     """Datos básicos del ticket y, al final, adónde ir para saber más."""
     reporta = _persona(ticket.creator) if ticket.creator is not None else "no se sabe"
     asignado = _persona(ticket.assignee) if ticket.assignee is not None else "sin asignar"
-    if puede_explicar_ia(user):
-        cierre = LINEA_EXPLICAR_IA.format(enlace=f"detalle.html?id={ticket.id}&pestana=ia")
-    else:
-        cierre = LINEA_VER_DETALLE.format(enlace=f"detalle.html?id={ticket.id}")
     lineas = [
         _decir("ficha_ticket", user, id=_negrita(f"#{ticket.id}"), titulo=ticket.title),
         f"- Estado: {ticket.state}",
@@ -1393,7 +1423,7 @@ def ficha_ticket(ticket: Ticket, user: User) -> Directa:
         f"- Creado: {_fecha_creacion(ticket.created_at)}",
         f"- Descripción: {_recortar(ticket.description, FICHA_MAX_DESCRIPCION)}",
         "",
-        cierre,
+        linea_mas_informacion(ticket, user),
     ]
     # Sin ``principal``: la IA no la redacta (no se llama a Ollama).
     return Directa("\n".join(lineas))
@@ -1978,6 +2008,7 @@ def calcular_desde_interpretacion(session, user: User, datos: dict,
         if ticket is None:
             return None
         if tipo == "explicar_ticket":
+            logger.info("chat: ficha del ticket #%s (interpretado por la IA) — «%s»", ticket.id, pregunta)
             return ficha_ticket(ticket, user)
         return _estado_ticket(ticket, user)
     if tipo != "conteo":
@@ -2377,6 +2408,7 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
         ticket = ticket_service.get_visible_ticket(session, explicar_id, user)
         if ticket is None:
             return Directa(_ticket_no_encontrado(user, explicar_id)), None, pregunta
+        logger.info("chat: ficha del ticket #%s (pedido de explicación, sin IA) — «%s»", ticket.id, pregunta)
         return ficha_ticket(ticket, user), None, pregunta
     directa = calcular_directa(session, user, pregunta, ticket_actual)
     # Las reglas no la reconocieron: la IA la clasifica y el servidor calcula.
@@ -2399,6 +2431,22 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
         return Directa(_decir("no_encontre_persona")), None, pregunta
     max_tickets = getattr(proveedor, "max_tickets", MAX_TICKETS_IN_CONTEXT)
     return None, build_system(session, user, max_tickets, pregunta, ticket_actual), pregunta
+
+
+def _linea_para_la_ia(session, user: User, pregunta: str, ticket_actual: int | None) -> str | None:
+    """Si la IA libre responde sobre el contenido de un solo ticket visible
+    («¿cómo resuelvo el #5?», o un pedido de explicación que las reglas y la
+    interpretación no reconocieron), la misma línea final que la ficha."""
+    t = _normalizar(pregunta)
+    if not (_pide_explicacion(t) or _PIDE_CONTENIDO.search(t)):
+        return None
+    ids = tickets_mencionados(pregunta)
+    if not ids and ticket_actual is not None:
+        ids = [ticket_actual]
+    if len(ids) != 1:
+        return None
+    ticket = ticket_service.get_visible_ticket(session, ids[0], user)
+    return linea_mas_informacion(ticket, user) if ticket is not None else None
 
 
 def respuesta_sistema(user: User) -> str:
@@ -2437,6 +2485,9 @@ def responder_completo(proveedor, session, user: User, messages: list[dict],
     if limpio is None:
         logger.info("respuesta de la IA descartada (nombres internos o vacía): %r", texto[:200])
         return respuesta_sistema(user), "directa"
+    linea = _linea_para_la_ia(session, user, pregunta, ticket_actual)
+    if linea and linea not in limpio:
+        limpio = f"{limpio}\n\n{linea}"
     return limpio, "ia"
 
 
@@ -2493,6 +2544,9 @@ def responder_stream(proveedor, session, user: User, messages: list[dict],
         yield {"reemplazo": respuesta_sistema(user)}
         yield {"fin": True, "fuente": "directa"}
         return
+    linea = _linea_para_la_ia(session, user, pregunta, ticket_actual)
+    if linea and linea not in filtro.texto:
+        yield {"t": f"\n\n{linea}"}
     yield {"fin": True, "fuente": "ia"}
 
 
