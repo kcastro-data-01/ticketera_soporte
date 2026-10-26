@@ -213,12 +213,10 @@ cambió; si cambió, o con `?regenerar=true`, la pide a la IA y la guarda.
   "claridad": "poco detalle",
   "motivo_claridad": "La descripción tiene 2 palabras y no dice: …",
   "explicacion": {
-    "explicacion": "En este ticket, Laura Méndez reporta que …",
-    "resumen": "…",
-    "informacion_faltante": ["…"],
-    "preguntas_sugeridas": ["…"],
-    "puntos_clave": [],
-    "siguiente_paso": "…",
+    "explicacion": "Laura Méndez reporta que una impresora no funciona …",
+    "posibles_causas": ["…"],
+    "que_revisar_primero": ["…"],
+    "certeza": "baja",
     "categoria_sugerida": {"valor": "Hardware", "razon": "…"},
     "prioridad_sugerida": null
   },
@@ -230,8 +228,10 @@ cambió; si cambió, o con `?regenerar=true`, la pide a la IA y la guarda.
 ```
 
 `claridad` la calcula el servidor. `explicacion.explicacion` es el texto
-narrado (3 a 5 oraciones); viene vacío en explicaciones guardadas antes de que
-existiera, y el `POST` las genera de nuevo. `502` si la IA no está disponible o si
+narrado (2 a 4 oraciones); `posibles_causas` (máx. 3) y `que_revisar_primero`
+(máx. 4) no incluyen preguntas para la persona; `certeza` es `alta`, `media` o
+`baja` (siempre `baja` con «poco detalle»). Las explicaciones guardadas con un
+formato anterior se devuelven como `null` y el `POST` las genera de nuevo. `502` si la IA no está disponible o si
 devolvió dos veces un JSON inválido; `404` si el ticket no existe.
 
 ### `GET /api/metricas`

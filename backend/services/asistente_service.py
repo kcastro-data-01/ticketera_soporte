@@ -1350,7 +1350,7 @@ def ticket_a_explicar(user: User, pregunta: str, ticket_actual: int | None = Non
 
 
 # ---------- Ajustes de la última explicación (sin IA) ----------
-# «sin preguntas», «más corto», «solo las preguntas», «más detalle»: cambian
+# «más corto», «más detalle»: cambian
 # cómo se muestra la explicación que ya se generó en la conversación; no se
 # vuelve a llamar a la IA.
 
@@ -1359,16 +1359,12 @@ AJUSTE_MAX_PALABRAS = 10
 # Palabras de los pedidos: se corrigen los errores de escritura («preguntsa»,
 # «cortp», «resumilo») antes de buscar los patrones.
 _VOCABULARIO_AJUSTE = (
-    "preguntas", "pregunta", "corto", "corta", "breve", "resumen", "resumilo", "resumelo", "resumir",
-    "resumi", "resume", "linea", "oracion", "frase", "detalle", "detalles", "detallado", "detallada",
-    "detallalo", "completa", "completo", "mejor", "explicalo", "explicala", "explicame", "quita",
-    "quitale", "quitalas", "quitar", "saca", "sacale", "sacalas", "elimina", "eliminalas", "borra",
-    "solo", "solamente", "unicamente", "molestar", "quiero", "amplia", "amplialo",
+    "corto", "corta", "breve", "resumen", "resumilo", "resumelo", "resumir", "resumi", "resume",
+    "linea", "oracion", "frase", "detalle", "detalles", "detallado", "detallada", "detallalo",
+    "completa", "completo", "mejor", "explicalo", "explicala", "explicame", "solo", "amplia",
+    "amplialo",
 )
 _AJUSTES = (
-    ("solo_preguntas", r"\b(solo|solamente|unicamente|nada mas que)\b.*\bpregunta"),
-    ("sin_preguntas", r"\b(sin|no quiero|no (me )?(des|pongas|incluyas|agregues|muestres)|"
-                      r"quit\w*|sac\w*|elimin\w*|borr\w*)\b.*\bpregunta"),
     # «resume la situación» o «detallá los críticos» son preguntas nuevas: solo
     # cuentan «resumilo», «resumen» solo, «más detalle», «detallalo»…
     ("detalle", r"\b(mas|con) detall\w*|\bdetall\w*(lo|la)\b|^(los )?detalles?\b|"
@@ -1388,7 +1384,7 @@ def _corregir_palabra(palabra: str) -> str:
 
 def ajuste_pedido(pregunta: str) -> str | None:
     """Modo de :data:`explicacion_service.MODOS_CHAT` que pide el mensaje
-    («sin preguntas para no molestar» → «sin_preguntas»), o ``None``.
+    («más corto, por favor» → «corto»), o ``None``.
 
     Solo mensajes cortos y sin número de ticket: «resumí el #5» es pedir
     una explicación nueva."""

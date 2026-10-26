@@ -689,44 +689,50 @@ recibe los datos que el rol ya puede ver en la aplicación.
 ## Explicar con IA
 
 En el detalle de un ticket, **Técnico, Supervisor y Administrador** tienen el
-botón **«Explicar con IA»**. Sirve sobre todo para tickets con poco detalle o
-confusos. El panel muestra, con la nota «Generado por IA, revisalo antes de
+botón **«Explicar con IA»**. Interpreta el ticket con lo que trae y le dice al
+técnico por dónde empezar, **sin preguntarle nada a la persona** (el equipo no
+siempre puede preguntar). El panel muestra, con la nota «Generado por IA, revisalo antes de
 usarlo»:
 
-- Arriba de todo, la **explicación**: 3 a 5 oraciones con palabras de la IA,
-  como las diría un compañero (quién reporta, qué le pasa, qué quiere lograr,
-  qué falta saber y si la categoría o la prioridad no parecen correctas). Si la
-  IA copia los campos del ticket como lista («Título: …») se le pide de nuevo.
+- Arriba de todo, la **explicación**: 2 a 4 oraciones con palabras de la IA,
+  como las diría un compañero (quién reporta, qué le pasa y qué es lo más
+  probable que esté ocurriendo), con la **certeza** («alta», «media» o «baja»)
+  como etiqueta chica. Si la IA copia los campos del ticket como lista
+  («Título: …») se le pide de nuevo.
 - **Claridad** («poco detalle», «clara» o «confusa») y por qué. **La calcula el
   servidor, no la IA**:
   - *poco detalle*: menos de 15 palabras, o le faltan 3 o más de estos datos:
     qué equipo/programa, desde cuándo, qué error aparece, qué ya se intentó;
   - *confusa*: más de 120 palabras, u oraciones de más de 40 palabras en promedio;
   - *clara*: el resto.
-- **Preguntas sugeridas** (máx. 4), **puntos clave** ordenados (si el texto es
-  largo), **información que falta** (máx. 4) y **siguiente paso**.
+- **Posibles causas** (máx. 3, de la más probable a la menos) y **Qué revisar
+  primero** (máx. 4 pasos numerados que el técnico puede hacer solo). Son
+  sugerencias según el tipo de problema; la IA no debe inventar datos de la
+  persona.
 - **Categoría y prioridad sugeridas**, con su razón (opcionales; nunca se
   aplican solas).
-
-El botón **«Usar preguntas en un comentario»** copia las preguntas al cuadro
-«Nuevo comentario»: se revisan y se publican con «Agregar comentario» (nunca
-se publican solas).
 
 La última explicación se guarda: al abrir el ticket se muestra sin llamar a la
 IA. Si el ticket cambió (título, descripción, categoría, prioridad, estado o
 comentarios) aparece «El ticket cambió…» y «Explicar con IA» la genera de
-nuevo; **«Volver a explicar»** fuerza una nueva en cualquier momento.
+nuevo; **«Volver a explicar»** fuerza una nueva en cualquier momento. Las
+explicaciones guardadas con un formato anterior (con preguntas) no se muestran
+y se generan de nuevo la próxima vez que se pidan.
 
 Cómo se adapta a un modelo muy chico (`qwen3:0.6b`):
 
-- JSON corto con un **ejemplo completo** (entrada y salida) dentro del prompt;
+- JSON corto con **tres ejemplos completos** (entrada y salida) dentro del
+  prompt: impresora que «no sirve», correo que no deja entrar y un ticket de
+  red largo y confuso;
   Ollama recibe el esquema en `format`, `temperature` 0.1 y `think: false`.
 - Si el ticket es largo, se mandan solo el título, los primeros y últimos
   párrafos de la descripción y los últimos 3 comentarios (no pasa de `num_ctx`).
 - El servidor valida el JSON; si viene mal, reintenta una vez y, si vuelve a
   fallar, muestra «La IA no pudo generar una explicación válida». Si solo la
   categoría o la prioridad vienen mal, se descartan y el resto se muestra.
-- Si la IA no da preguntas o datos faltantes, se usan los que detectó el servidor.
+- Si un paso o una causa le pide al técnico preguntarle algo a la persona, se
+  quita (si no queda ninguno, se reintenta). Con *poco detalle* la certeza
+  queda siempre en «baja».
 - Si Ollama no responde: «La IA no está disponible en este momento» (detalle en
   `docker compose logs ticketera | grep IA:`).
 - El modelo se sigue eligiendo con `QWEN_MODELO`.
@@ -734,7 +740,9 @@ Cómo se adapta a un modelo muy chico (`qwen3:0.6b`):
 **Desde el chat**: si el equipo escribe «explicame el ticket #3», «de qué
 trata este ticket», «resumí el #3» o «no entiendo el ticket #3» (también con
 «tickete», «tiket», «tikete» o sin tildes), el chat usa esta misma explicación
-y responde con el texto narrado y las preguntas sugeridas. Solo para tickets
+y responde con el texto narrado, la certeza, las posibles causas y qué revisar
+primero. Después se puede pedir «más corto» (la explicación y el primer paso)
+o «más detalle» (agrega la categoría y la prioridad sugeridas). Solo para tickets
 que la persona puede ver; el Solicitante sigue con el chat normal. El chat no
 muestra la fuente debajo de cada mensaje (el campo `fuente` sigue llegando del
 servidor y queda en el log).
@@ -742,8 +750,8 @@ servidor y queda en el log).
 API: `GET /api/tickets/{id}/explicacion` (la guardada, sin IA) y
 `POST /api/tickets/{id}/explicacion[?regenerar=true]`.
 
-Para probarla con el modelo real y dos tickets de ejemplo («no sirve» y uno
-largo y confuso):
+Para probarla con el modelo real y tres tickets de ejemplo (impresora «no
+sirve», correo y uno de red largo y confuso):
 
 ```bash
 docker compose exec ticketera python -m backend.probar_explicar_ia

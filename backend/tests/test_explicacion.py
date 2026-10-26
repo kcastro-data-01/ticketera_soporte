@@ -1,5 +1,7 @@
-"""«Explicar con IA» con Ollama simulado: poco texto, texto largo y confuso,
-JSON inválido, Ollama caído, caché, permisos y el pedido desde el chat."""
+"""«Explicar con IA» con Ollama simulado: esquema nuevo (causas, qué revisar
+primero y certeza, sin preguntas), poco texto, texto largo y confuso, JSON
+inválido, Ollama caído, caché (también la de formato viejo), permisos y el
+pedido desde el chat."""
 
 import json
 import logging
@@ -18,13 +20,14 @@ from backend.tests.test_asistente import login_as
 from backend.tests.textos_asistente import es_forma
 
 BUENA = {
-    "explicacion": ("En este ticket, José Solano dice que algo no sirve, pero no cuenta qué es. "
-                    "Lo que busca es que se lo arreglen. Falta saber qué equipo falla y desde cuándo."),
-    "resumen": "La persona dice que algo no funciona, pero no dice qué.",
-    "informacion_faltante": ["Qué equipo falla", "Desde cuándo", "Qué error aparece", "Qué intentó", "Sobra"],
-    "preguntas_sugeridas": ["¿Qué equipo es?", "¿Desde cuándo pasa?", "¿Qué error ves?"],
-    "puntos_clave": [],
-    "siguiente_paso": "Llamar a la persona para preguntar qué equipo falla.",
+    "explicacion": ("José Solano reporta que algo no funciona, sin decir qué es. "
+                    "Por la categoría parece un programa que falla al abrir o se cierra solo."),
+    "posibles_causas": ["El programa se actualizó y quedó dañado", "Falta espacio en el disco",
+                        "Un problema de la cuenta", "Sobra"],
+    "que_revisar_primero": ["Revisar en la consola qué equipo tiene asignado José Solano",
+                            "Revisar el registro de errores del equipo", "Reinstalar el programa",
+                            "Probar con otra cuenta", "Sobra"],
+    "certeza": "media",
     "categoria_sugerida": {"valor": "Hardware", "razon": "Parece un equipo."},
     "prioridad_sugerida": {"valor": "Media", "razon": "No dice que esté detenida."},
 }
@@ -47,7 +50,7 @@ class OllamaFalso:
         return httpx.Response(200, json={"message": {"content": texto}})
 
     def ultimo_ticket(self) -> str:
-        return self.pedidos[-1]["messages"][3]["content"]
+        return self.pedidos[-1]["messages"][-1]["content"]
 
 
 @pytest.fixture
@@ -124,38 +127,98 @@ def test_little_text_end_to_end(client, session, ollama, tecnico):
     assert datos["modelo"] == "qwen3:0.6b"
     e = datos["explicacion"]
     assert e["explicacion"] == BUENA["explicacion"]
-    assert e["resumen"].startswith("La persona dice")
-    assert len(e["informacion_faltante"]) == 4  # máximo 4 aunque la IA mande 5
+    assert len(e["posibles_causas"]) == 3  # máximo 3 aunque la IA mande 4
+    assert len(e["que_revisar_primero"]) == 4  # máximo 4 aunque la IA mande 5
+    # Poco texto: certeza baja aunque la IA diga «media», y los pasos igual.
+    assert e["certeza"] == "baja"
+    assert e["que_revisar_primero"][0].startswith("Revisar en la consola")
     assert e["categoria_sugerida"] == {"valor": "Hardware", "razon": "Parece un equipo."}
+    for viejo in ("preguntas_sugeridas", "informacion_faltante", "resumen", "siguiente_paso", "puntos_clave"):
+        assert viejo not in e
 
     pedido = ollama.pedidos[0]
     assert pedido["think"] is False
     assert pedido["options"]["temperature"] == 0.1
     assert pedido["options"]["num_ctx"] == asistente_service.QWEN_CONTEXTO
-    assert pedido["format"]["required"] == [
-        "explicacion", "resumen", "informacion_faltante", "preguntas_sugeridas", "puntos_clave", "siguiente_paso"]
-    # Ejemplo completo (entrada y salida) antes del ticket real.
+    assert pedido["format"]["required"] == ["explicacion", "posibles_causas", "que_revisar_primero", "certeza"]
+    # Los tres ejemplos completos (entrada y salida) antes del ticket real.
     roles = [m["role"] for m in pedido["messages"]]
-    assert roles == ["system", "user", "assistant", "user"]
-    assert json.loads(pedido["messages"][2]["content"]) == ex.EJEMPLO_SALIDA
-    assert "no adivine" in pedido["messages"][0]["content"]
+    assert roles == ["system"] + ["user", "assistant"] * 3 + ["user"]
+    assert [json.loads(m["content"]) for m in pedido["messages"][2:7:2]] == [s for _, s in ex.EJEMPLOS]
+    assert "NO puede preguntarle nada a la persona" in pedido["messages"][0]["content"]
     texto = ollama.ultimo_ticket()
     assert "Título: No sirve" in texto and "no sirve" in texto
     assert "Datos que el sistema no encontró en el texto: Qué equipo" in texto
     assert "Reporta: no se sabe" in texto
 
 
-def test_prompt_has_the_printer_example_and_who_reports(client, session, ollama, tecnico):
+def test_prompt_has_the_three_examples_and_who_reports(client, session, ollama, tecnico):
     autor = session.scalar(select(User).where(User.email == "tec@tec.local"))
     ticket = nuevo_ticket(session, created_by_id=autor.id)
     client.post(f"/api/tickets/{ticket.id}/explicacion", headers=tecnico)
     mensajes = ollama.pedidos[0]["messages"]
-    assert "explicacion: de 3 a 5 oraciones" in mensajes[0]["content"]
-    assert "Título: Impresora\nReporta: Laura Méndez" in mensajes[1]["content"]
-    ejemplo = json.loads(mensajes[2]["content"])["explicacion"]
-    assert ejemplo.startswith("En este ticket, Laura Méndez reporta que una impresora no enciende.")
-    assert "parece un problema de Hardware" in ejemplo
+    assert "explicacion: de 2 a 4 oraciones" in mensajes[0]["content"]
+    assert "Título: Impresora\nReporta: Laura Méndez\nCategoría actual: Hardware" in mensajes[1]["content"]
+    assert "Descripción:\nno sirve" in mensajes[1]["content"]
+    assert "Título: No puedo entrar al correo" in mensajes[3]["content"]
+    assert "Categoría actual: Accesos" in mensajes[3]["content"]
+    assert "wifi" in mensajes[5]["content"] and len(mensajes[5]["content"]) > 500
+    assert [json.loads(m["content"])["certeza"] for m in mensajes[2:7:2]] == ["baja", "media", "media"]
     assert "Reporta: José Solano" in ollama.ultimo_ticket()
+
+
+def test_schema_and_prompt_have_no_questions():
+    propiedades = ex.ESQUEMA_IA["properties"]
+    assert "preguntas_sugeridas" not in propiedades and "informacion_faltante" not in propiedades
+    assert propiedades["certeza"]["enum"] == ["alta", "media", "baja"]
+    assert propiedades["posibles_causas"]["maxItems"] == 3
+    assert propiedades["que_revisar_primero"]["maxItems"] == 4
+    assert "preguntas_sugeridas" not in ex.INSTRUCCIONES
+    assert "informacion_faltante" not in ex.INSTRUCCIONES
+    assert "el usuario dijo que" in ex.INSTRUCCIONES  # se le prohíbe
+    for _, salida in ex.EJEMPLOS:
+        # Los ejemplos pasan la misma validación que la respuesta real.
+        validada = ex.validar_respuesta(json.dumps(salida, ensure_ascii=False))
+        assert validada["posibles_causas"] == salida["posibles_causas"]
+        assert validada["que_revisar_primero"] == salida["que_revisar_primero"]
+        assert "?" not in json.dumps(salida, ensure_ascii=False)
+
+
+def test_steps_that_ask_the_person_are_dropped():
+    respuesta = {**BUENA, "que_revisar_primero": [
+        "Preguntarle a la persona qué equipo es", "¿Desde cuándo pasa?",
+        "Pedirle al usuario una foto del error", "Revisar el registro de errores del equipo"]}
+    validada = ex.validar_respuesta(json.dumps(respuesta, ensure_ascii=False))
+    assert validada["que_revisar_primero"] == ["Revisar el registro de errores del equipo"]
+
+
+def test_only_questions_counts_as_invalid(client, session, ollama, tecnico):
+    ticket = nuevo_ticket(session)
+    solo_preguntas = {**BUENA, "que_revisar_primero": ["¿Qué equipo es?", "Preguntar desde cuándo pasa"]}
+    ollama.respuestas = [json.dumps(solo_preguntas, ensure_ascii=False), json.dumps(BUENA)]
+    resp = client.post(f"/api/tickets/{ticket.id}/explicacion", headers=tecnico)
+    assert resp.status_code == 200
+    assert len(ollama.pedidos) == 2
+
+
+@pytest.mark.parametrize("valor,claridad,esperada", [
+    ("alta", "clara", "alta"),
+    ("Media", "confusa", "media"),
+    ("BAJA", "clara", "baja"),
+    ("segura", "clara", "media"),  # inválida: se usa «media»
+    (None, "clara", "media"),
+    ("alta", "poco detalle", "baja"),  # poco texto: siempre baja
+])
+def test_certeza_is_normalized(valor, claridad, esperada):
+    respuesta = {**BUENA, "certeza": valor}
+    validada = ex.validar_respuesta(json.dumps(respuesta), {"claridad": claridad})
+    assert validada["certeza"] == esperada
+
+
+def test_long_explanation_is_cut_to_four_sentences():
+    larga = " ".join(f"Esta es la oración número {i} de la explicación." for i in range(1, 7))
+    validada = ex.validar_respuesta(json.dumps({**BUENA, "explicacion": larga}, ensure_ascii=False))
+    assert validada["explicacion"].endswith("número 4 de la explicación.")
 
 
 @pytest.mark.parametrize("mala", [
@@ -178,15 +241,15 @@ def test_long_and_confusing_ticket_sends_only_important_parts(client, session, o
     for i in range(6):
         session.add(Comment(ticket_id=ticket.id, author="José Solano", content=f"Comentario {i} " + "x" * 500))
     session.commit()
-    ollama.respuestas = [json.dumps({**BUENA, "puntos_clave": [
-        "La impresora HP 4020 marca error 49 desde el lunes.",
-        "Ya la reiniciaron y cambiaron el tóner.",
-        "Necesitan imprimir contratos el viernes.",
-    ]}, ensure_ascii=False)]
+    ollama.respuestas = [json.dumps({**BUENA, "posibles_causas": [
+        "La impresora HP 4020 tiene una falla en el fusor (error 49).",
+        "El firmware de la impresora está desactualizado.",
+    ], "certeza": "alta"}, ensure_ascii=False)]
 
     datos = client.post(f"/api/tickets/{ticket.id}/explicacion", headers=tecnico).json()
     assert datos["claridad"] == "confusa"
-    assert datos["explicacion"]["puntos_clave"][0].startswith("La impresora HP 4020")
+    assert datos["explicacion"]["posibles_causas"][0].startswith("La impresora HP 4020")
+    assert datos["explicacion"]["certeza"] == "alta"
 
     texto = ollama.ultimo_ticket()
     assert ex.OMITIDO in texto
@@ -224,7 +287,7 @@ def test_invalid_json_twice_shows_an_error(client, session, ollama, tecnico):
 
 def test_missing_required_field_counts_as_invalid(client, session, ollama, tecnico):
     ticket = nuevo_ticket(session)
-    sin_paso = {k: v for k, v in BUENA.items() if k != "siguiente_paso"}
+    sin_paso = {k: v for k, v in BUENA.items() if k != "que_revisar_primero"}
     ollama.respuestas = [json.dumps(sin_paso), json.dumps(BUENA)]
     assert client.post(f"/api/tickets/{ticket.id}/explicacion", headers=tecnico).status_code == 200
     assert len(ollama.pedidos) == 2
@@ -238,21 +301,13 @@ def test_bad_suggestions_are_dropped_and_the_rest_is_shown(client, session, olla
     assert resp.status_code == 200
     e = resp.json()["explicacion"]
     assert e["categoria_sugerida"] is None and e["prioridad_sugerida"] is None
-    assert e["resumen"] == BUENA["resumen"]
+    assert e["explicacion"] == BUENA["explicacion"]
     assert len(ollama.pedidos) == 1  # no hizo falta reintentar
-
-
-def test_empty_lists_are_filled_with_server_questions(client, session, ollama, tecnico):
-    ticket = nuevo_ticket(session)
-    ollama.respuestas = [json.dumps({**BUENA, "informacion_faltante": [], "preguntas_sugeridas": []})]
-    e = client.post(f"/api/tickets/{ticket.id}/explicacion", headers=tecnico).json()["explicacion"]
-    assert e["informacion_faltante"][0].startswith("Qué equipo")
-    assert e["preguntas_sugeridas"][0].startswith("¿Qué equipo")
 
 
 def test_json_inside_code_fence_is_accepted():
     texto = "```json\n" + json.dumps(BUENA) + "\n```"
-    assert ex.validar_respuesta(texto)["resumen"] == BUENA["resumen"]
+    assert ex.validar_respuesta(texto)["explicacion"] == BUENA["explicacion"]
 
 
 @pytest.mark.parametrize("error", [httpx.ConnectError("refused"), httpx.ReadTimeout("lento")])
@@ -280,7 +335,7 @@ def test_saved_explanation_is_reused_until_the_ticket_changes(client, session, o
 
     # Abrir el ticket otra vez: se usa la guardada, sin llamar a la IA.
     guardada = client.get(url, headers=tecnico).json()
-    assert guardada["vigente"] is True and guardada["explicacion"]["resumen"]
+    assert guardada["vigente"] is True and guardada["explicacion"]["que_revisar_primero"]
     assert client.post(url, headers=tecnico).json()["desde_cache"] is True
     assert len(ollama.pedidos) == 1
 
@@ -293,20 +348,33 @@ def test_saved_explanation_is_reused_until_the_ticket_changes(client, session, o
     assert "Es la impresora HP" in ollama.ultimo_ticket()
 
 
-def test_saved_explanation_without_narrative_is_generated_again(client, session, ollama, tecnico):
+VIEJA = {
+    "explicacion": "En este ticket, José Solano dice que algo no sirve. Falta saber qué equipo falla.",
+    "resumen": "Algo no funciona.",
+    "informacion_faltante": ["Qué equipo falla"],
+    "preguntas_sugeridas": ["¿Qué equipo es?"],
+    "puntos_clave": [],
+    "siguiente_paso": "Preguntar qué equipo falla.",
+}
+
+
+def test_saved_explanation_with_old_format_is_generated_again(client, session, ollama, tecnico):
     ticket = nuevo_ticket(session)
     url = f"/api/tickets/{ticket.id}/explicacion"
     client.post(url, headers=tecnico)
     guardada = session.scalar(select(TicketExplanation))
-    vieja = {k: v for k, v in BUENA.items() if k != "explicacion"}
-    guardada.content = json.dumps(vieja)  # como las guardadas antes del cambio
+    guardada.content = json.dumps(VIEJA, ensure_ascii=False)  # como las guardadas antes del cambio
     session.commit()
 
-    assert client.get(url, headers=tecnico).json()["explicacion"]["explicacion"] == ""
+    # Al abrir el ticket no se muestra (se pide de nuevo con el botón).
+    assert client.get(url, headers=tecnico).json()["explicacion"] is None
     nueva = client.post(url, headers=tecnico).json()
     assert nueva["desde_cache"] is False
-    assert nueva["explicacion"]["explicacion"] == BUENA["explicacion"]
+    assert nueva["explicacion"]["que_revisar_primero"]
+    assert "preguntas_sugeridas" not in nueva["explicacion"]
     assert len(ollama.pedidos) == 2
+    session.expire_all()
+    assert json.loads(session.scalar(select(TicketExplanation)).content)["version"] == ex.VERSION_EXPLICACION
 
 
 def test_regenerar_forces_a_new_call(client, session, ollama, tecnico):
@@ -367,7 +435,10 @@ def test_chat_explicar_tickete_uses_the_explanation_not_the_template(client, ses
     datos = resp.json()
     assert datos["fuente"] == "ia"
     assert datos["respuesta"].startswith(BUENA["explicacion"])
-    assert "Preguntas que puede hacerle:\n1. ¿Qué equipo es?" in datos["respuesta"]
+    assert "Certeza: baja" in datos["respuesta"]
+    assert "Posibles causas:\n- El programa se actualizó" in datos["respuesta"]
+    assert "Qué revisar primero:\n1. Revisar en la consola" in datos["respuesta"]
+    assert "pregunta" not in datos["respuesta"].lower() and "?" not in datos["respuesta"]
     # Ni la plantilla del ticket ni el chat libre: el pedido es el de «Explicar con IA».
     assert "Título:" not in datos["respuesta"] and "Categoría" not in datos["respuesta"]
     assert len(ollama.pedidos) == 1

@@ -3,9 +3,9 @@
    (GET, sin llamar a la IA). «Explicar con IA» la pide (POST; el servidor
    reutiliza la guardada si el ticket no cambió) y «Volver a explicar»
    fuerza una nueva (?regenerar=true).
-   Las preguntas sugeridas se pueden copiar al cuadro de comentario, pero
-   nunca se publican solas. Todo lo que llega del servidor se pinta como
-   texto (textContent), nunca como HTML. */
+   Muestra la explicación con su certeza, las posibles causas y qué revisar
+   primero. Todo lo que llega del servidor se pinta como texto
+   (textContent), nunca como HTML. */
 
 /* El servidor puede reintentar una vez si el JSON viene mal: hasta ~3 min. */
 const IA_LIMITE_MS = 200000;
@@ -13,7 +13,6 @@ const IA_NOTA = "Contenido generado automáticamente. Revíselo antes de utiliza
 const IA_NO_DISPONIBLE_TXT = "La IA no está disponible en este momento";
 
 let iaOcupada = false;
-let iaUltima = null;
 
 function iaTicketId() {
   const id = Number(new URLSearchParams(window.location.search).get("id"));
@@ -27,7 +26,6 @@ function iaElementos() {
     regenerar: document.getElementById("ia-regenerar"),
     estado: document.getElementById("ia-estado"),
     panel: document.getElementById("ia-panel"),
-    comentario: document.getElementById("contenido"),
   };
 }
 
@@ -75,7 +73,6 @@ function iaRenderizar(datos) {
     regenerar.hidden = true;
     return;
   }
-  iaUltima = datos;
 
   panel.appendChild(iaNodo("p", "ia-aviso", IA_NOTA));
   if (!datos.vigente) {
@@ -85,14 +82,12 @@ function iaRenderizar(datos) {
     );
   }
 
-  /* Arriba de todo, la explicación narrada; las guardadas antes de que
-     existiera no la traen y muestran el resumen en su lugar. */
-  if (e.explicacion) {
-    panel.appendChild(iaNodo("p", "ia-explicacion", e.explicacion));
-  } else {
-    panel.appendChild(iaNodo("h3", "", "Qué pide"));
-    panel.appendChild(iaNodo("p", "", e.resumen));
-  }
+  panel.appendChild(iaNodo("p", "ia-explicacion", e.explicacion));
+
+  const certeza = iaNodo("p");
+  certeza.appendChild(iaNodo("strong", "", "Certeza: "));
+  certeza.appendChild(iaNodo("span", `ia-certeza ${e.certeza}`, e.certeza));
+  panel.appendChild(certeza);
 
   const claridad = iaNodo("p");
   claridad.appendChild(iaNodo("strong", "", "Claridad: "));
@@ -100,24 +95,13 @@ function iaRenderizar(datos) {
   claridad.appendChild(document.createTextNode(` ${datos.motivo_claridad}`));
   panel.appendChild(claridad);
 
-  if (e.preguntas_sugeridas.length) {
-    panel.appendChild(iaNodo("h3", "", "Preguntas sugeridas"));
-    panel.appendChild(iaLista(e.preguntas_sugeridas, true));
-    const copiar = iaNodo("button", "secundario", "Usar preguntas en un comentario");
-    copiar.type = "button";
-    copiar.id = "ia-copiar";
-    copiar.addEventListener("click", () => iaUsarPreguntas());
-    const acciones = iaNodo("div", "acciones");
-    acciones.appendChild(copiar);
-    panel.appendChild(acciones);
+  if (e.posibles_causas.length) {
+    panel.appendChild(iaNodo("h3", "", "Posibles causas"));
+    panel.appendChild(iaLista(e.posibles_causas));
   }
-  if (e.puntos_clave.length) {
-    panel.appendChild(iaNodo("h3", "", "Puntos clave"));
-    panel.appendChild(iaLista(e.puntos_clave, true));
-  }
-  if (e.informacion_faltante.length) {
-    panel.appendChild(iaNodo("h3", "", "Información que falta"));
-    panel.appendChild(iaLista(e.informacion_faltante));
+  if (e.que_revisar_primero.length) {
+    panel.appendChild(iaNodo("h3", "", "Qué revisar primero"));
+    panel.appendChild(iaLista(e.que_revisar_primero, true));
   }
 
   const sugerencias = [
@@ -131,9 +115,6 @@ function iaRenderizar(datos) {
     );
   }
 
-  panel.appendChild(iaNodo("h3", "", "Siguiente paso"));
-  panel.appendChild(iaNodo("p", "", e.siguiente_paso));
-
   const pie = [datos.modelo && `Modelo: ${datos.modelo}`, datos.generada_en && `generado el ${iaFecha(datos.generada_en)}`]
     .filter(Boolean)
     .join(" · ");
@@ -142,26 +123,6 @@ function iaRenderizar(datos) {
   panel.hidden = false;
   explicar.hidden = true;
   regenerar.hidden = false;
-}
-
-/* Copia las preguntas al cuadro «Nuevo comentario»: el técnico las revisa
-   y decide si publicarlas con «Agregar comentario». */
-function iaUsarPreguntas() {
-  const { comentario } = iaElementos();
-  const preguntas = (iaUltima && iaUltima.explicacion && iaUltima.explicacion.preguntas_sugeridas) || [];
-  if (!comentario || !preguntas.length) return;
-  const texto =
-    "Para poder avanzar con este ticket necesito que me confirmes:\n" +
-    preguntas.map((p, i) => `${i + 1}. ${p}`).join("\n");
-  comentario.value = comentario.value.trim() ? `${comentario.value.trim()}\n\n${texto}` : texto;
-  /* El cuadro está en la pestaña Comentarios (detalle.js). */
-  if (typeof mostrarPestana === "function") mostrarPestana("comentarios");
-  comentario.focus();
-  if (typeof comentario.scrollIntoView === "function") comentario.scrollIntoView({ block: "center" });
-  iaEstado(
-    "Las preguntas se copiaron al comentario. Revíselas y seleccione «Agregar comentario» para publicarlas.",
-    "exito"
-  );
 }
 
 function iaBloquear(bloqueado) {

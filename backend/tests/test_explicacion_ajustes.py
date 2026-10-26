@@ -1,7 +1,7 @@
-"""Pedidos sobre la última explicación del chat («sin preguntas», «más
-corto», «solo las preguntas», «más detalle»): se arman con la explicación
-guardada, sin volver a llamar a la IA. Y el tono formal (usted) de los
-textos de la explicación."""
+"""Pedidos sobre la última explicación del chat («más corto», «más
+detalle»): se arman con la explicación guardada, sin volver a llamar a la
+IA. «sin preguntas» y «solo las preguntas» ya no existen (la explicación no
+trae preguntas). Y el tono formal (usted) de los textos de la explicación."""
 
 import json
 import re
@@ -12,6 +12,9 @@ from backend.services import asistente_service
 from backend.services import explicacion_service as ex
 from backend.tests.test_explicacion import BUENA, nuevo_ticket, ollama, tecnico  # noqa: F401
 from backend.tests.test_asistente import login_as
+
+
+CORTO = BUENA["explicacion"] + "\n\nPor dónde empezar: " + BUENA["que_revisar_primero"][0]
 
 
 def conversar(client, headers, mensajes, ticket_id=None):
@@ -32,34 +35,11 @@ def explicado(client, session, ollama, tecnico):
     return ticket, [f"explicá el ticket #{ticket.id}", primera["respuesta"]]
 
 
-def test_sin_preguntas_para_no_molestar(client, session, ollama, tecnico):
-    _, historia = explicado(client, session, ollama, tecnico)
-    datos = conversar(client, tecnico, historia + ["sin preguntas para no molestar"])
-    assert datos == {"respuesta": BUENA["explicacion"], "fuente": "directa"}
-    assert "Preguntas" not in datos["respuesta"]
-    assert len(ollama.pedidos) == 1, "no se vuelve a llamar a la IA"
-
-
-@pytest.mark.parametrize("pedido", ["no quiero preguntas", "quitá las preguntas", "sin pregutnas"])
-def test_variantes_sin_preguntas(client, session, ollama, tecnico, pedido):
-    _, historia = explicado(client, session, ollama, tecnico)
-    assert conversar(client, tecnico, historia + [pedido])["respuesta"] == BUENA["explicacion"]
-    assert len(ollama.pedidos) == 1
-
-
 @pytest.mark.parametrize("pedido", ["mas corto", "resumilo", "en una línea", "más cortp"])
-def test_mas_corto_es_solo_el_resumen(client, session, ollama, tecnico, pedido):
+def test_mas_corto_es_la_explicacion_y_el_primer_paso(client, session, ollama, tecnico, pedido):
     _, historia = explicado(client, session, ollama, tecnico)
     datos = conversar(client, tecnico, historia + [pedido])
-    assert datos == {"respuesta": BUENA["resumen"], "fuente": "directa"}
-    assert len(ollama.pedidos) == 1
-
-
-def test_solo_las_preguntas(client, session, ollama, tecnico):
-    _, historia = explicado(client, session, ollama, tecnico)
-    datos = conversar(client, tecnico, historia + ["solo las preguntas"])
-    assert datos["respuesta"] == ("Preguntas que puede hacerle:\n"
-                                  "1. ¿Qué equipo es?\n2. ¿Desde cuándo pasa?\n3. ¿Qué error ves?")
+    assert datos == {"respuesta": CORTO, "fuente": "directa"}
     assert len(ollama.pedidos) == 1
 
 
@@ -68,18 +48,19 @@ def test_mas_detalle_muestra_todos_los_campos(client, session, ollama, tecnico, 
     _, historia = explicado(client, session, ollama, tecnico)
     texto = conversar(client, tecnico, historia + [pedido])["respuesta"]
     assert texto.startswith(BUENA["explicacion"])
-    for parte in ["Resumen: " + BUENA["resumen"], "Información que falta:\n- Qué equipo falla",
-                  "Siguiente paso: " + BUENA["siguiente_paso"], "Categoría sugerida: Hardware (Parece un equipo.)",
-                  "Preguntas que puede hacerle:\n1. ¿Qué equipo es?"]:
+    for parte in ["Certeza: baja", "Posibles causas:\n- El programa se actualizó",
+                  "Qué revisar primero:\n1. Revisar en la consola", "4. Probar con otra cuenta",
+                  "Categoría sugerida: Hardware (Parece un equipo.)", "Prioridad sugerida: Media"]:
         assert parte in texto
+    assert "Pregunta" not in texto
     assert len(ollama.pedidos) == 1
 
 
 def test_ajustes_encadenados_usan_el_mismo_ticket(client, session, ollama, tecnico):
     _, historia = explicado(client, session, ollama, tecnico)
     corto = conversar(client, tecnico, historia + ["mas corto"])["respuesta"]
-    datos = conversar(client, tecnico, historia + ["mas corto", corto, "solo las preguntas"])
-    assert datos["respuesta"].startswith("Preguntas que puede hacerle:")
+    datos = conversar(client, tecnico, historia + ["mas corto", corto, "más detalle"])
+    assert "Categoría sugerida: Hardware" in datos["respuesta"]
     assert len(ollama.pedidos) == 1
 
 
@@ -88,12 +69,12 @@ def test_ajuste_del_ticket_abierto_en_pantalla(client, session, ollama, tecnico)
     primera = conversar(client, tecnico, ["explicame este ticket"], ticket_id=ticket.id)
     datos = conversar(client, tecnico, ["explicame este ticket", primera["respuesta"], "mas corto"],
                       ticket_id=ticket.id)
-    assert datos["respuesta"] == BUENA["resumen"]
+    assert datos["respuesta"] == CORTO
     assert len(ollama.pedidos) == 1
 
 
 @pytest.mark.parametrize("mensajes", [
-    ["sin preguntas para no molestar"],
+    ["más detalle"],
     ["hola", "¡Hola! ¿En qué le puedo ayudar?", "mas corto"],
 ])
 def test_sin_explicacion_previa_pregunta_de_que_ticket(client, session, ollama, tecnico, mensajes):
@@ -110,8 +91,9 @@ def test_ticket_hablado_sin_explicacion_guardada_pregunta_de_que_ticket(client, 
 
 
 @pytest.mark.parametrize("pregunta,modo", [
-    ("sin preguntas para no molestar", "sin_preguntas"),
-    ("solo las preguntsa", "solo_preguntas"),
+    ("sin preguntas para no molestar", None),
+    ("solo las preguntas", None),
+    ("quitá las preguntas", None),
     ("Más detalles por favor", "detalle"),
     ("resumí el #5", None),
     ("dame un resumen de los tickets criticos", None),
@@ -129,7 +111,7 @@ def test_deteccion_de_ajustes(pregunta, modo):
 def test_solicitante_no_usa_ajustes(client, session, ollama):
     headers = login_as(client, session, "Solicitante", "so@x.local", "Laura Méndez")
     ollama.respuestas = ["Le puedo ayudar con sus tickets."]
-    datos = conversar(client, headers, ["sin preguntas"])
+    datos = conversar(client, headers, ["mas corto"])
     assert datos["respuesta"] != "¿De qué ticket desea la explicación?"
 
 
@@ -140,17 +122,17 @@ TUTEO = re.compile(r"\b(podés|puedes|tenés|tienes|querés|quieres|intentaste|p
 
 
 def test_textos_de_la_explicacion_tratan_de_usted():
-    textos = [ex.INSTRUCCIONES, ex.REINTENTO, ex.MENSAJE_INVALIDA, ex.TITULO_PREGUNTAS,
-              ex.SIN_PREGUNTAS_GUARDADAS, asistente_service.PIDE_TICKET_A_EXPLICAR,
-              *(pregunta for _, _, pregunta in ex.DATOS_BASICOS),
-              *ex.EJEMPLO_SALIDA["preguntas_sugeridas"], ex.EJEMPLO_SALIDA["explicacion"]]
+    textos = [ex.INSTRUCCIONES, ex.REINTENTO, ex.MENSAJE_INVALIDA, ex.TITULO_CAUSAS, ex.TITULO_REVISAR,
+              asistente_service.PIDE_TICKET_A_EXPLICAR]
+    for _, salida in ex.EJEMPLOS:
+        textos += [salida["explicacion"], *salida["posibles_causas"], *salida["que_revisar_primero"]]
     for texto in textos:
         assert not TUTEO.search(texto), texto
-    assert "trate a las personas de usted" in ex.INSTRUCCIONES
-    assert "Preguntas que puede hacerle:" in ex.texto_para_chat({"explicacion": BUENA})
+    assert "tono formal (usted)" in ex.INSTRUCCIONES
+    assert "Qué revisar primero:" in ex.texto_para_chat({"explicacion": BUENA})
 
 
-def test_preguntas_base_del_servidor_en_usted():
-    preguntas = [p for _, _, p in ex.DATOS_BASICOS]
-    assert "¿Aparece algún mensaje de error? Si puede, copie el texto exacto o envíe una foto." in preguntas
-    assert "¿Qué intentó ya (reiniciar, revisar cables, cerrar y abrir el programa)?" in preguntas
+def test_modos_del_chat_sin_preguntas():
+    assert ex.MODOS_CHAT == ("completa", "corto", "detalle")
+    for modo in ex.MODOS_CHAT:
+        assert "pregunta" not in ex.texto_para_chat({"explicacion": BUENA}, modo).lower()

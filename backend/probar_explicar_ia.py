@@ -1,14 +1,14 @@
-"""Prueba «Explicar con IA» con el modelo real (Ollama) y dos tickets de ejemplo.
+"""Prueba «Explicar con IA» con el modelo real (Ollama) y tres tickets de ejemplo.
 
 Uso (con la app levantada en Docker):
 
     docker compose exec ticketera python -m backend.probar_explicar_ia
 
-Crea dos tickets de prueba —uno que dice solo «no sirve» y uno largo y
-confuso—, le pide la explicación a la IA configurada (``QWEN_MODELO``) y
-muestra el resultado y cuánto tardó. Los tickets quedan creados para que
-también los pruebes con el botón en la app; con ``--borrar`` se eliminan al
-final.
+Crea tres tickets de prueba —una impresora que «no sirve», un correo al que
+no se puede entrar y uno de red largo y confuso—, le pide la explicación a la
+IA configurada (``QWEN_MODELO``) y muestra el resultado y cuánto tardó. Los
+tickets quedan creados para que también los pruebes con el botón en la app;
+con ``--borrar`` se eliminan al final.
 """
 
 from __future__ import annotations
@@ -26,22 +26,28 @@ from backend.models import User
 from backend.schemas import TicketCreate
 from backend.services import asistente_service, explicacion_service, ticket_service
 
-CORTO = ("No sirve", "no sirve")
-LARGO = (
-    "Problema con la impresora y otras cosas",
-    "\n\n".join([
-        "Hola buenas, les escribo porque desde el lunes la impresora HP 4020 del segundo piso "
-        "marca error 49 cada vez que alguien manda a imprimir algo largo.",
-        "Mi compañera dice que a ella también le pasaba con la otra impresora el año pasado y que "
-        "se arregló sola, pero no sé si es lo mismo porque esa era de otra marca y estaba en otro piso.",
-        "También quería comentar que el aire acondicionado de la sala está muy frío y que la "
-        "cafetera no funciona bien desde hace semanas, aunque eso no es urgente para nada.",
-        "Además el wifi a veces anda lento en la tarde, pero creo que es porque hay mucha gente "
-        "conectada a esa hora y no sé si eso tiene algo que ver con la impresora o no.",
-        "Ya reinicié la impresora dos veces y cambié el tóner, pero sigue saliendo el mismo error.",
-        "Necesitamos imprimir los contratos del viernes, por favor ayúdenme lo antes posible.",
-    ]),
-)
+# (título, descripción, categoría)
+TICKETS = [
+    ("Impresora", "no sirve", "Hardware"),
+    ("No puedo entrar al correo",
+     "Desde ayer intento entrar al correo en la computadora de la oficina y no me deja.", "Accesos"),
+    (
+        "La red y varias cosas más",
+        "\n\n".join([
+            "Buenas, escribo porque desde hace como una semana la conexión en el área de ventas es "
+            "un desastre, a veces el cable funciona y a veces no, y el wifi en la sala de reuniones "
+            "se desconecta justo cuando hay videollamadas con clientes.",
+            "Un compañero dice que puede ser porque movieron unos muebles y quizás pisaron algún "
+            "cable, pero otro dice que es el proveedor de internet porque en su casa también anda mal.",
+            "También la impresora del pasillo hace un ruido raro y el proyector de la sala tarda en "
+            "encender, aunque eso es lo de menos.",
+            "Ya desconectamos y volvimos a conectar el cable de una de las computadoras y por un "
+            "rato funcionó, pero luego se volvió a caer.",
+            "Mañana tenemos una presentación importante con un cliente, ojalá lo puedan ver hoy.",
+        ]),
+        "Software",
+    ),
+]
 
 
 def main(argv=None) -> int:
@@ -60,9 +66,9 @@ def main(argv=None) -> int:
             print("No hay un Administrador activo: crea uno en la app primero.")
             return 1
         creados = []
-        for titulo, descripcion in (CORTO, LARGO):
+        for titulo, descripcion, categoria in TICKETS:
             ticket = ticket_service.create_ticket(session, TicketCreate(
-                title=titulo, description=descripcion, category="Software", priority="Media"), admin)
+                title=titulo, description=descripcion, category=categoria, priority="Media"), admin)
             creados.append(ticket.id)
             print("\n" + "=" * 70)
             print(f"Ticket #{ticket.id} «{titulo}» ({len(descripcion.split())} palabras)")

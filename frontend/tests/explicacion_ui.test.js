@@ -41,11 +41,10 @@ const DATOS = {
   claridad: "poco detalle",
   motivo_claridad: "La descripción tiene 2 palabras.",
   explicacion: {
-    resumen: "La persona dice que algo no sirve.",
-    informacion_faltante: ["Qué equipo falla"],
-    preguntas_sugeridas: ["¿Qué equipo es?", "¿Desde cuándo pasa?"],
-    puntos_clave: [],
-    siguiente_paso: "Preguntar qué equipo falla.",
+    explicacion: "Laura Méndez reporta que una impresora no funciona. Lo más común es que no tenga corriente.",
+    posibles_causas: ["La impresora está apagada", "Falta papel o tóner"],
+    que_revisar_primero: ["Revisar que esté encendida", "Revisar papel y tóner", "Imprimir una página de prueba"],
+    certeza: "baja",
     categoria_sugerida: { valor: "Hardware", razon: "Parece un equipo." },
     prioridad_sugerida: null,
   },
@@ -99,7 +98,7 @@ test("al abrir el ticket muestra la explicación guardada sin generar una nueva"
   assert.equal(ia.ids["ia-panel"].hidden, false);
   assert.match(panel, /Contenido generado automáticamente\. Revíselo antes de utilizarlo\./);
   assert.match(panel, /poco detalle/);
-  assert.match(panel, /La persona dice que algo no sirve/);
+  assert.match(panel, /Laura Méndez reporta que una impresora no funciona/);
   assert.match(panel, /Categoría sugerida: Hardware — Parece un equipo/);
   assert.doesNotMatch(panel, /Prioridad sugerida/);
   assert.equal(ia.ids["ia-regenerar"].hidden, false);
@@ -146,25 +145,6 @@ test("Volver a explicar pide una nueva con regenerar=true", async () => {
   assert.deepEqual(ia.llamadas.at(-1), { url: "/api/tickets/7/explicacion?regenerar=true", method: "POST" });
 });
 
-test("las preguntas se copian al comentario, sin publicarlo", async () => {
-  const ia = crear({ fetchImpl: async () => respuesta(200, DATOS) });
-  await ia.sandbox.iniciarExplicacion();
-  ia.ids.contenido.value = "Hola Ana.";
-  const copiar = buscar(ia.ids["ia-panel"], (n) => n.id === "ia-copiar");
-  assert.ok(copiar, "botón para copiar las preguntas");
-  const pestanas = [];
-  ia.sandbox.mostrarPestana = (nombre) => pestanas.push(nombre);
-  copiar.listeners.click[0]();
-  assert.deepEqual(pestanas, ["comentarios"], "abre la pestaña donde está el cuadro");
-  assert.equal(
-    ia.ids.contenido.value,
-    "Hola Ana.\n\nPara poder avanzar con este ticket necesito que me confirmes:\n1. ¿Qué equipo es?\n2. ¿Desde cuándo pasa?"
-  );
-  assert.equal(ia.ids.contenido.focused, true);
-  assert.equal(ia.llamadas.length, 1, "no se hizo ningún POST de comentario");
-  assert.match(ia.ids["ia-estado"].textContent, /Revíselas y seleccione «Agregar comentario»/);
-});
-
 test("errores: IA caída, JSON inválido y rol sin permiso", async () => {
   for (const [status, detail, esperado] of [
     [502, "La IA no está disponible en este momento", /La IA no está disponible/],
@@ -189,36 +169,40 @@ test("el Solicitante no activa la sección ni llama a la API", async () => {
 });
 
 test("lo que llega de la IA se pinta como texto, no como HTML", async () => {
-  const malicioso = { ...DATOS, explicacion: { ...DATOS.explicacion, resumen: "<img src=x onerror=alert(1)>" } };
+  const malicioso = { ...DATOS, explicacion: { ...DATOS.explicacion, explicacion: "<img src=x onerror=alert(1)>" } };
   const ia = crear({ fetchImpl: async () => respuesta(200, malicioso) });
   await ia.sandbox.iniciarExplicacion();
   const parrafo = buscar(ia.ids["ia-panel"], (n) => n.textContent === "<img src=x onerror=alert(1)>");
   assert.ok(parrafo && !("innerHTML" in parrafo && parrafo.innerHTML));
 });
 
-const NARRADA =
-  "En este ticket, Laura Méndez reporta que una impresora no enciende. Lo que busca es que la revisen.";
-
-test("la explicación narrada va arriba de todo y reemplaza «Qué pide»", async () => {
-  const datos = { ...DATOS, explicacion: { ...DATOS.explicacion, explicacion: NARRADA } };
-  const ia = crear({ fetchImpl: async () => respuesta(200, datos) });
+test("muestra la explicación, la certeza, las causas y qué revisar primero numerado", async () => {
+  const ia = crear({ fetchImpl: async () => respuesta(200, DATOS) });
   await ia.sandbox.iniciarExplicacion();
   const hijos = ia.ids["ia-panel"].children;
   const primera = hijos.findIndex((n) => n.className === "ia-explicacion");
-  assert.equal(hijos[primera].textContent, NARRADA);
+  assert.equal(hijos[primera].textContent, DATOS.explicacion.explicacion);
   // Antes solo puede ir el aviso de que la generó la IA.
   assert.deepEqual(hijos.slice(0, primera).map((n) => n.className), ["ia-aviso"]);
+  // La certeza, como etiqueta chica justo debajo.
+  const etiqueta = buscar(hijos[primera + 1], (n) => /ia-certeza/.test(n.className));
+  assert.equal(etiqueta.className, "ia-certeza baja");
+  assert.equal(etiqueta.textContent, "baja");
+
   const titulos = hijos.filter((n) => n.tag === "h3").map((n) => n.textContent);
-  assert.equal(titulos[0], "Preguntas sugeridas");
-  assert.ok(titulos.indexOf("Siguiente paso") > titulos.indexOf("Preguntas sugeridas"));
-  assert.ok(!titulos.includes("Qué pide"));
+  assert.deepEqual(titulos.slice(0, 2), ["Posibles causas", "Qué revisar primero"]);
+  const causas = hijos[hijos.findIndex((n) => n.textContent === "Posibles causas") + 1];
+  assert.equal(causas.tag, "ul");
+  assert.deepEqual(causas.children.map((n) => n.textContent), DATOS.explicacion.posibles_causas);
+  const pasos = hijos[hijos.findIndex((n) => n.textContent === "Qué revisar primero") + 1];
+  assert.equal(pasos.tag, "ol", "los pasos van numerados");
+  assert.deepEqual(pasos.children.map((n) => n.textContent), DATOS.explicacion.que_revisar_primero);
 });
 
-test("una explicación guardada sin texto narrado muestra el resumen", async () => {
-  const datos = { ...DATOS, explicacion: { ...DATOS.explicacion, explicacion: "" } };
-  const ia = crear({ fetchImpl: async () => respuesta(200, datos) });
+test("no hay sección de preguntas ni botón para copiarlas", async () => {
+  const ia = crear({ fetchImpl: async () => respuesta(200, DATOS) });
   await ia.sandbox.iniciarExplicacion();
-  const hijos = ia.ids["ia-panel"].children;
-  assert.ok(!hijos.some((n) => n.className === "ia-explicacion"));
-  assert.match(texto(ia.ids["ia-panel"]), /Qué pide.*La persona dice que algo no sirve/s);
+  assert.equal(buscar(ia.ids["ia-panel"], (n) => n.id === "ia-copiar"), null);
+  assert.doesNotMatch(texto(ia.ids["ia-panel"]), /Pregunta|Usar preguntas|Siguiente paso|Qué pide/);
+  assert.equal(typeof ia.sandbox.iaUsarPreguntas, "undefined");
 });

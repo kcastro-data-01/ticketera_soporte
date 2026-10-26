@@ -2836,6 +2836,28 @@ body.app {
   border-color: var(--color-exito);
 }
 
+/* Certeza de la IA: etiqueta chica debajo de la explicación. */
+.ia-certeza {
+  display: inline-block;
+  padding: 0 0.4rem;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+}
+
+.ia-certeza.alta {
+  color: var(--color-exito);
+}
+
+.ia-certeza.media {
+  color: var(--color-primario-oscuro);
+}
+
+.ia-certeza.baja {
+  color: var(--color-vacio);
+}
+
 .ia-panel h3 {
   margin: 0.9rem 0 0.35rem;
   font-size: var(--texto-md);

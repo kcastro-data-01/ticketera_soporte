@@ -1,4 +1,4 @@
-"""«Explicar con IA»: resumen, datos que faltan y preguntas para un ticket."""
+"""«Explicar con IA»: qué le pasa a un ticket, causas probables y qué revisar primero."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
