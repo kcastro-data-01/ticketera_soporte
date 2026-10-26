@@ -137,6 +137,13 @@ for (const rol of ["Técnico", "Supervisor", "Administrador"]) {
   });
 }
 
+test("Solicitante: los tickets asignados a él dicen «Asignado a usted»", async () => {
+  const asignado = { ...TICKETS[0], id: 9, title: "Impresora", assigned_to_id: 9 };
+  const { filas } = await montar("Solicitante", [asignado, ...TICKETS]);
+  assert.equal(textos(filas[0])[3], "Asignado a usted");
+  assert.equal(textos(filas[1])[3], "José Solano");
+});
+
 test("index.html marca como «equipo» Categoría, Prioridad y Tabla/Tablero", () => {
   const marcados = [...indexHtml.matchAll(/<[^>]*data-vista="equipo"[^>]*>(?:\s*<[^>]*>)*\s*([^<]*)/g)].map((m) => m[0]);
   assert.equal(marcados.length, 5);

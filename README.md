@@ -811,7 +811,14 @@ La ticketera puede revisar un buzón (por ejemplo `kcastro@data.cr`) cada minuto
 y crear un ticket con cada correo nuevo **que pida ayuda**. Los correos normales
 de la empresa (reuniones, facturas…) no se tocan, no se guardan y no reciben
 respuesta. Si el buzón es solo de soporte, `CORREO_FILTRO=todos` convierte cada
-correo en ticket.
+correo en ticket. Si el asunto empieza con **«Ticket:»** (sin importar
+mayúsculas), el correo siempre crea un ticket y el título va sin «Ticket:».
+
+Regla general: **quien escribe es el solicitante y quien recibe, el asignado**.
+Los correos que llegan al buzón quedan asignados al dueño del buzón
+(`CORREO_USUARIO`), sin reparto automático; los que el dueño envía, al
+destinatario (ver «Correos enviados» más abajo). El historial del ticket dice
+«Ticket creado desde correo enviado por <nombre> a <nombre>».
 
 ### ¿Cómo se decide que un correo «pide ayuda»?
 
@@ -836,7 +843,7 @@ Si un correo de soporte real no se detecta, agrega la frase a la lista.
 | Quién escribe (correo que pide ayuda) | Qué pasa |
 |---|---|
 | Usuario activo de la ticketera (mismo correo) | Se crea el ticket a su nombre (asunto = título, cuerpo = descripción, categoría y prioridad por palabras clave) y se le responde con el número y el enlace. |
-| Responde a «Ticket #N» de un ticket suyo | Se agrega como comentario a ese ticket. |
+| Responde a «Ticket #N», o en el hilo de un correo que ya es ticket (cabeceras In-Reply-To / References), de un ticket que creó o tiene asignado | Se agrega como comentario a ese ticket. |
 | Alguien sin cuenta del dominio de la empresa (`DOMINIO_EMPRESA`, p. ej. `data.cr`) | Se crea como **Solicitante** (nombre del correo, o lo que va antes de @) y se crea el ticket como a cualquier usuario, con su respuesta. En el registro: `Usuario creado desde el correo: <correo> (Solicitante)`. |
 | Alguien sin cuenta de otro dominio (o sin `DOMINIO_EMPRESA`) | **Se ignora**: no se crea ticket ni se responde; se marca como leído y se mueve. En el registro: `Correo ignorado: remitente externo sin cuenta <correo>`. |
 | Cuenta desactivada | Se le avisa que hable con un administrador. |
@@ -849,6 +856,29 @@ Graph. Cada correo que procesa se responde **en el mismo hilo**, se marca como
 leído y se mueve a la carpeta **Tickets-Procesados** (se crea sola). Los que
 no piden ayuda se quedan sin leer en la bandeja. Solo se procesan los correos
 que llegan después de activar la función.
+
+### Correos enviados
+
+La app también revisa **Elementos enviados** del buzón (mismo permiso
+`Mail.ReadWrite`). Un correo que el dueño envía a alguien de la empresa:
+
+| Caso | Qué pasa |
+|---|---|
+| Va a alguien de `DOMINIO_EMPRESA` en «Para» y pide ayuda (o el asunto empieza con «Ticket:») | Ticket a nombre del dueño, **asignado al primer destinatario de la empresa en «Para»** (CC no cuenta). Si no tiene cuenta, se crea con el nombre del encabezado y el correo en minúsculas; cuando entre con Microsoft, el login lo encuentra por correo y usa ese mismo usuario. |
+| Responde en el hilo de un ticket (In-Reply-To / References, o «Ticket #N» en el asunto) | Comentario del dueño en ese ticket. Nunca crea otro. |
+| Va solo a externos, solo al propio buzón, o solo en CC a la empresa | Se ignora. |
+| Lo envió la ticketera (confirmaciones y avisos: asunto de la app o cabecera `X-Ticketera`) | Se ignora. |
+| No pide ayuda | No crea ticket. |
+
+Cada enviado queda registrado por su `Message-ID` (nunca crea dos tickets). Los
+enviados **no se mueven ni se marcan**, y solo cuentan los enviados después de
+activar la función (marca `__inicio_enviados__` en `processed_emails`). Con
+`AVISAR_ASIGNADO=true` se le envía al asignado un correo con el número y el
+enlace (apagado por defecto mientras `APP_URL` sea `localhost`).
+
+El asignado ve el ticket en su lista aunque sea **Solicitante**, lo comenta y
+le cambia el estado (solo en los tickets asignados a él); no lo edita,
+reasigna ni borra.
 
 ### Requisitos en Microsoft Entra ID (Azure)
 
@@ -873,7 +903,9 @@ APP_URL=http://IP-O-NOMBRE-DEL-EQUIPO:8000
 ```
 
 Opcionales: `CORREO_CARPETA_PROCESADOS` (por defecto `Tickets-Procesados`),
-`CORREO_FILTRO` (`auto` o `todos`), `CORREO_INTERVALO` (segundos, 60) y
+`CORREO_FILTRO` (`auto` o `todos`), `CORREO_INTERVALO` (segundos, 60),
+`AVISAR_ASIGNADO` (`false`; `true` avisa por correo al asignado de un ticket
+creado desde un correo enviado) y
 `CORREO_M365_CACHE` (archivo de la caché de tokens; en Docker es
 `/data/msal_cache.json`, dentro del volumen `ticketera-data`; fuera de Docker,
 `.msal_cache.json` en la raíz, ignorado por Git).

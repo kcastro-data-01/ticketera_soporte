@@ -22,10 +22,8 @@ from backend.services.ticket_service import (
     UserNotFoundError,
 )
 from backend.models import User
-from backend.constants import UserRole
 from backend.routers.auth import (
     ROLES_ADMIN,
-    ROLES_EQUIPO,
     ROLES_GESTION,
     ROLES_TODOS,
     role_required,
@@ -109,11 +107,8 @@ def list_tickets(
         category=category,
         priority=priority,
         state=state,
-        created_by_id=(
-            current_user.id
-            if current_user.role == UserRole.REQUESTER.value
-            else None
-        ),
+        # El Solicitante: los que creó y los asignados a él.
+        visible_para=current_user,
         assigned_to_id=current_user.id if mios else None,
         limit=limit,
         offset=offset,
@@ -252,10 +247,14 @@ def change_ticket_state(
     payload: TicketStateUpdate,
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_EQUIPO)
+        role_required(ROLES_TODOS)
     ),
 ) -> TicketResponse:
     """Move a ticket through the allowed workflow transitions (RF3).
+
+    Técnico, Supervisor y Administrador cambian cualquier ticket; los demás
+    roles (Solicitante), solo los asignados a ellos (``403`` si no). Un
+    ticket que no puede ver responde ``404``.
 
     Only the forward linear moves are accepted: ``Nuevo → En proceso``,
     ``En proceso → Resuelto`` and ``Resuelto → Cerrado``. Any jump, step
@@ -263,6 +262,17 @@ def change_ticket_state(
     ``409 Conflict``. The new state comes from the existing ``TicketState``
     enum, so an unknown value is rejected with ``422``.
     """
+    visible = ticket_service.get_visible_ticket(session, ticket_id, current_user)
+    if visible is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticket {ticket_id} no encontrado",
+        )
+    if not ticket_service.can_change_state(visible, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos para acceder a este recurso",
+        )
     try:
         ticket = ticket_service.change_ticket_state(
             session, ticket_id, payload.state, current_user

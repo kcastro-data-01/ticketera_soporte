@@ -440,8 +440,12 @@ function renderTickets(tickets) {
       appendBadgeCell(row, ticket.priority, "celda-prioridad");
     }
     appendBadgeCell(row, ticket.state, "celda-estado");
+    const yo = typeof getUser === "function" ? getUser() : null;
     if (vistaSolicitante && (ticket.assigned_to_id === null || ticket.assigned_to_id === undefined)) {
       appendCell(row, "Pendiente de asignar", "celda-pendiente celda-asignado");
+    } else if (vistaSolicitante && yo && yo.id !== undefined && ticket.assigned_to_id === yo.id) {
+      /* Le llegó desde un correo: lo tiene que atender él. */
+      appendCell(row, "Asignado a usted", "celda-asignado celda-asignado-usted");
     } else {
       appendPersonaCell(row, assignedText(ticket));
     }

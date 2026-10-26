@@ -1,13 +1,20 @@
 """Crea tickets a partir de los correos que llegan al buzón de soporte.
 
+Regla general: **quien escribe es el solicitante y quien recibe, el
+asignado**.
+
 Cada ``CORREO_INTERVALO`` segundos (60 por defecto) un hilo en segundo plano
 revisa los correos **no leídos** de la bandeja de entrada con Microsoft Graph
-y, por cada correo nuevo que pide ayuda:
+y, por cada correo nuevo que pide ayuda (o cuyo asunto empieza con
+«Ticket:», que siempre crea un ticket):
 
 * Si el remitente es un usuario activo de la ticketera, se crea un ticket a
   su nombre (asunto = título, cuerpo = descripción, categoría y prioridad
-  según palabras clave) y se le responde con el número y el enlace.
-  Si el asunto trae «Ticket #N» de un ticket suyo, se agrega como comentario.
+  según palabras clave), asignado al dueño del buzón (``CORREO_USUARIO``),
+  y se le responde con el número y el enlace.
+  Si el asunto trae «Ticket #N» de un ticket suyo, o responde en el hilo de
+  un correo que ya es ticket (In-Reply-To / References), se agrega como
+  comentario.
 * Si el remitente no tiene cuenta y es del dominio de la empresa
   (``DOMINIO_EMPRESA``), se crea como Solicitante y se crea el ticket igual.
   Si es de otro dominio, el correo se ignora y queda en el log.
@@ -21,13 +28,22 @@ ignoran para no crear bucles, y se recuerda el ``Message-ID`` de cada correo
 para no procesarlo dos veces. Solo se procesan los que llegan después de
 activar la función.
 
+También se revisan los **Elementos enviados** del buzón (ver
+:func:`procesar_enviado`): un correo que el dueño envía a alguien de la
+empresa crea un ticket a nombre del dueño, asignado al primer destinatario
+de la empresa en «Para» (se crea su usuario si no existe). Las respuestas
+en el hilo de un ticket se agregan como comentario. Los enviados no se
+mueven ni se marcan; solo cuentan los enviados después de activar la
+función (marca ``__inicio_enviados__``). Con ``AVISAR_ASIGNADO`` encendida se
+le avisa al asignado por correo.
+
 El inicio de sesión (msal, device code) está en ``correo_auth``; la primera
 vez se ejecuta ``python -m backend.correo_login``.
 
 Configuración (variables de entorno, ver README): ``CORREO_ACTIVO``,
 ``CORREO_USUARIO``, ``CORREO_M365_TENANT``, ``CORREO_M365_CLIENT_ID``,
 ``CORREO_M365_CACHE``, ``CORREO_CARPETA_PROCESADOS``, ``CORREO_FILTRO``,
-``CORREO_INTERVALO``, ``DOMINIO_EMPRESA`` y ``APP_URL``.
+``CORREO_INTERVALO``, ``DOMINIO_EMPRESA``, ``AVISAR_ASIGNADO`` y ``APP_URL``.
 """
 
 from __future__ import annotations
@@ -66,6 +82,7 @@ MAX_DESCRIPCION = 5000
 MAX_TITULO = 200
 TITULO_POR_DEFECTO = "Solicitud recibida por correo"
 MARCA_INICIO = "__inicio__"
+MARCA_INICIO_ENVIADOS = "__inicio_enviados__"
 GRAPH_URL = "https://graph.microsoft.com/v1.0"
 CARPETA_PROCESADOS = "Tickets-Procesados"
 MAX_PAGINAS = 10  # hasta 500 no leídos por revisión (50 por página)
@@ -111,6 +128,21 @@ SEÑALES_SOPORTE: tuple[str, ...] = (
 )
 
 PATRON_TICKET = re.compile(r"ticket\s*#\s*(\d+)", re.IGNORECASE)
+# «Ticket: …» al inicio del asunto: siempre crea un ticket (sin el prefijo
+# en el título), aunque el texto no parezca una solicitud de ayuda.
+PREFIJO_TICKET = re.compile(r"^\s*ticket\s*:\s*", re.IGNORECASE)
+# Cabecera que la ticketera pone en los correos que envía: así los reconoce
+# en Elementos enviados y no los procesa.
+CABECERA_APP = "X-Ticketera"
+# Propiedades de Exchange con las cabeceras del hilo: Graph no siempre trae
+# ``internetMessageHeaders`` en los enviados, pero estas sí.
+PROPIEDAD_IN_REPLY_TO = "String 0x1042"
+PROPIEDAD_REFERENCES = "String 0x1039"
+PROPIEDAD_X_TICKETERA = "String {00020386-0000-0000-C000-000000000046} Name x-ticketera"
+_EXPANDIR_PROPIEDADES = "singleValueExtendedProperties($filter=" + " or ".join(
+    f"id eq '{p}'" for p in (PROPIEDAD_IN_REPLY_TO, PROPIEDAD_REFERENCES, PROPIEDAD_X_TICKETERA)) + ")"
+_SELECT_MENSAJE = ("id,internetMessageId,subject,from,toRecipients,body,uniqueBody,receivedDateTime,"
+                   "sentDateTime,internetMessageHeaders")
 # «RE:», «RV:», «FW:», «Fwd:», «RE[2]:»… (también repetidos) al inicio del asunto.
 PREFIJOS_RESPUESTA = re.compile(r"^\s*((re|rv|fw|fwd|aw|tr|reenviar)\s*(\[\d+\])?\s*:\s*)+", re.IGNORECASE)
 ASUNTO_INACTIVO = "No pudimos crear tu ticket"
@@ -144,6 +176,9 @@ class ConfigCorreo:
     # Los remitentes de este dominio sin cuenta se crean como Solicitante;
     # los de otros dominios se ignoran.
     dominio_empresa: str = ""
+    # Avisar por correo al asignado de un ticket creado desde un correo
+    # enviado (apagado mientras el enlace sea localhost).
+    avisar_asignado: bool = False
 
 
 def _activo(valor: str | None) -> bool:
@@ -169,6 +204,7 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         intervalo=max(15, int(env.get("CORREO_INTERVALO") or 60)),
         app_url=(env.get("APP_URL") or "http://localhost:8000").rstrip("/"),
         dominio_empresa=(env.get("DOMINIO_EMPRESA") or "").strip().lower().lstrip("@"),
+        avisar_asignado=_activo(env.get("AVISAR_ASIGNADO")),
     )
 
 
@@ -186,6 +222,12 @@ class CorreoEntrante:
     cuerpo: str
     fecha: datetime | None
     automatico: bool
+    # Destinatarios de «Para», en orden: (correo en minúsculas, nombre).
+    para: list[tuple[str, str]] = field(default_factory=list)
+    # Message-ID de los correos a los que responde (In-Reply-To y References).
+    en_respuesta_a: list[str] = field(default_factory=list)
+    # Lo envió la ticketera (trae la cabecera ``X-Ticketera``).
+    de_la_app: bool = False
 
 
 def _html_a_texto(html: str) -> str:
@@ -256,6 +298,11 @@ def _fecha_iso(valor: str | None) -> datetime | None:
     return fecha if fecha.tzinfo else fecha.replace(tzinfo=timezone.utc)
 
 
+def _ids_mensaje(texto: str) -> list[str]:
+    """Los Message-ID («<…>») de una cabecera In-Reply-To o References."""
+    return re.findall(r"<[^<>\s]+>", texto or "")
+
+
 def correo_desde_graph(mensaje: dict) -> CorreoEntrante:
     """Convierte un mensaje de Graph (``/me/messages``) en un :class:`CorreoEntrante`."""
     direccion = ((mensaje.get("from") or {}).get("emailAddress") or {})
@@ -270,6 +317,17 @@ def correo_desde_graph(mensaje: dict) -> CorreoEntrante:
         for c in mensaje.get("internetMessageHeaders") or []
     }
     message_id = (mensaje.get("internetMessageId") or "").strip() or f"<graph:{mensaje.get('id')}>"
+    propiedades = {(p.get("id") or "").lower(): p.get("value") or ""
+                   for p in mensaje.get("singleValueExtendedProperties") or []}
+    hilo = " ".join([cabeceras.get("in-reply-to", ""), cabeceras.get("references", ""),
+                     propiedades.get(PROPIEDAD_IN_REPLY_TO.lower(), ""),
+                     propiedades.get(PROPIEDAD_REFERENCES.lower(), "")])
+    para = []
+    for destinatario in mensaje.get("toRecipients") or []:
+        datos = destinatario.get("emailAddress") or {}
+        correo = (datos.get("address") or "").strip().lower()
+        if "@" in correo:
+            para.append((correo, (datos.get("name") or "").strip()))
 
     return CorreoEntrante(
         message_id=message_id[:500],
@@ -277,8 +335,11 @@ def correo_desde_graph(mensaje: dict) -> CorreoEntrante:
         nombre=(direccion.get("name") or "").strip(),
         asunto=asunto,
         cuerpo=cuerpo,
-        fecha=_fecha_iso(mensaje.get("receivedDateTime")),
+        fecha=_fecha_iso(mensaje.get("sentDateTime") or mensaje.get("receivedDateTime")),
         automatico=_es_automatico(cabeceras, remitente),
+        para=para,
+        en_respuesta_a=list(dict.fromkeys(_ids_mensaje(hilo))),
+        de_la_app=CABECERA_APP.lower() in cabeceras or bool(propiedades.get(PROPIEDAD_X_TICKETERA.lower())),
     )
 
 
@@ -305,8 +366,13 @@ def clasificar(asunto: str, cuerpo: str) -> tuple[TicketCategory, TicketPriority
     return categoria, prioridad
 
 
+def es_forzado(asunto: str) -> bool:
+    """¿El asunto empieza con «Ticket:»? Entonces siempre crea un ticket."""
+    return bool(PREFIJO_TICKET.match(asunto or ""))
+
+
 def _titulo(asunto: str) -> str:
-    titulo = asunto_base(asunto)
+    titulo = PREFIJO_TICKET.sub("", asunto_base(asunto), count=1)
     if len(titulo) < 3:
         return TITULO_POR_DEFECTO
     return titulo[:MAX_TITULO].strip()
@@ -361,6 +427,25 @@ def _respuesta_comentario(correo, usuario, ticket, config) -> Respuesta:
     )
 
 
+def _respuesta_asignado(asignado, autor, ticket, config) -> Respuesta:
+    """Aviso al asignado de un ticket creado desde un correo enviado
+    (solo con ``AVISAR_ASIGNADO``)."""
+    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    return Respuesta(
+        para=asignado.email,
+        asunto=f"Ticket #{ticket.id} creado: {ticket.title}",
+        texto=(
+            f"{_saludo(asignado.name)}\n\n"
+            f"{autor.name} te asignó el ticket #{ticket.id} a partir de su correo.\n\n"
+            f"Título: {ticket.title}\n"
+            f"Categoría: {ticket.category}\n"
+            f"Prioridad: {ticket.priority}\n\n"
+            f"Puedes verlo aquí: {enlace}\n\n"
+            "Mesa de ayuda"
+        ),
+    )
+
+
 def _respuesta_inactivo(correo, usuario) -> Respuesta:
     return Respuesta(
         para=correo.remitente,
@@ -392,17 +477,68 @@ def es_de_la_empresa(remitente: str, config: ConfigCorreo) -> bool:
     return bool(config.dominio_empresa) and remitente.rsplit("@", 1)[-1] == config.dominio_empresa
 
 
-def _crear_solicitante(session, correo: CorreoEntrante) -> User:
-    """Remitente interno sin cuenta: se crea con su nombre del correo (o lo
-    que va antes de @) y el rol de ``asignar_rol_inicial``."""
-    nombre = (correo.nombre or "").strip() or correo.remitente.split("@")[0]
-    usuario = User(name=nombre[:120], email=correo.remitente,
-                   role=asignar_rol_inicial(correo.remitente).value)
+def _usuario_por_correo(session, correo: str) -> User | None:
+    """El usuario con ese correo, sin importar mayúsculas."""
+    return session.scalar(select(User).where(func.lower(User.email) == correo.strip().lower()))
+
+
+def _crear_usuario(session, correo: str, nombre: str = "") -> User:
+    """Alguien de la empresa sin cuenta: se crea con el nombre del correo (o
+    lo que va antes de @), el correo en minúsculas y el rol de
+    ``asignar_rol_inicial``. Cuando inicie sesión con Microsoft, el login lo
+    encuentra por correo y usa este mismo usuario."""
+    correo = correo.strip().lower()
+    nombre = (nombre or "").strip() or correo.split("@")[0]
+    usuario = User(name=nombre[:120], email=correo, role=asignar_rol_inicial(correo).value)
     session.add(usuario)
     session.commit()
     session.refresh(usuario)
-    logger.info("Usuario creado desde el correo: %s (%s)", correo.remitente, usuario.role)
+    logger.info("Usuario creado desde el correo: %s (%s)", correo, usuario.role)
     return usuario
+
+
+def _crear_solicitante(session, correo: CorreoEntrante) -> User:
+    """Remitente interno sin cuenta (ver :func:`_crear_usuario`)."""
+    return _crear_usuario(session, correo.remitente, correo.nombre)
+
+
+def _dueno(session, config: ConfigCorreo) -> User:
+    """El usuario del buzón (``CORREO_USUARIO``): recibe los correos que
+    llegan y envía los de Elementos enviados. Se crea si no existe."""
+    return _usuario_por_correo(session, config.usuario) or _crear_usuario(session, config.usuario)
+
+
+def _origen(autor: User, asignado: User) -> str:
+    """Texto del historial de un ticket creado desde un correo."""
+    return f"Ticket creado desde correo enviado por {autor.name} a {asignado.name}"
+
+
+def _participa(ticket: Ticket, usuario: User) -> bool:
+    """¿Es quien creó el ticket o quien lo tiene asignado?"""
+    return usuario.id in (ticket.created_by_id, ticket.assigned_to_id)
+
+
+def _ticket_del_hilo(session, correo: CorreoEntrante) -> Ticket | None:
+    """El ticket del hilo al que responde el correo: por In-Reply-To /
+    References (un correo ya procesado que creó el ticket o lo comentó) o
+    por «Ticket #N» en el asunto."""
+    if correo.en_respuesta_a:
+        ticket_id = session.scalar(
+            select(ProcessedEmail.ticket_id)
+            .where(ProcessedEmail.message_id.in_(correo.en_respuesta_a),
+                   ProcessedEmail.ticket_id.is_not(None))
+            .order_by(ProcessedEmail.id.desc())
+            .limit(1)
+        )
+        if ticket_id is not None:
+            return session.get(Ticket, ticket_id)
+    numero = PATRON_TICKET.search(correo.asunto)
+    return session.get(Ticket, int(numero.group(1))) if numero else None
+
+
+def _descripcion(correo: CorreoEntrante, pie: str) -> str:
+    descripcion = correo.cuerpo or "(El correo no traía texto.)"
+    return descripcion[:MAX_DESCRIPCION] + f"\n\n— {pie}"
 
 
 def _sin_tildes(texto: str) -> str:
@@ -430,8 +566,9 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
     base = asunto_base(correo.asunto)
     es_aviso = any(p.search(base) for p in AVISOS_APP)
     es_confirmacion = any(p.search(base) for p in CONFIRMACIONES_APP)
-    numero = PATRON_TICKET.search(correo.asunto)
-    if not (es_aviso or numero or es_de_soporte(correo.asunto, correo.cuerpo, config)):
+    forzado = es_forzado(correo.asunto)
+    hilo = _ticket_del_hilo(session, correo)
+    if not (es_aviso or hilo or forzado or es_de_soporte(correo.asunto, correo.cuerpo, config)):
         # Correo normal de la empresa: no se toca ni se guarda.
         return "otro", None
 
@@ -464,18 +601,17 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
         _registrar(session, correo, "inactivo")
         return "inactivo", _respuesta_inactivo(correo, usuario)
 
-    # ¿Responde a un ticket suyo? → comentario en vez de ticket nuevo.
-    if numero:
-        ticket = session.get(Ticket, int(numero.group(1)))
-        if ticket is not None and ticket.created_by_id == usuario.id and correo.cuerpo:
-            ticket_service.create_comment(
-                session, ticket.id,
-                CommentCreate(content=correo.cuerpo[:MAX_DESCRIPCION]), usuario,
-            )
-            _registrar(session, correo, "comentario", ticket.id)
-            return "comentario", _respuesta_comentario(correo, usuario, ticket, config)
+    # ¿Responde a un ticket suyo (lo creó o lo tiene asignado)? → comentario
+    # en vez de ticket nuevo.
+    if hilo is not None and _participa(hilo, usuario) and correo.cuerpo:
+        ticket_service.create_comment(
+            session, hilo.id,
+            CommentCreate(content=correo.cuerpo[:MAX_DESCRIPCION]), usuario,
+        )
+        _registrar(session, correo, "comentario", hilo.id)
+        return "comentario", _respuesta_comentario(correo, usuario, hilo, config)
 
-    if es_confirmacion or not es_de_soporte(correo.asunto, correo.cuerpo, config):
+    if es_confirmacion or not (forzado or es_de_soporte(correo.asunto, correo.cuerpo, config)):
         # Responde a una confirmación de un ticket ajeno (o sin texto nuevo), o
         # nombra un ticket sin pedir ayuda: nunca crea un ticket nuevo.
         logger.info("Correo ignorado: «%s» de %s no es un comentario válido ni una solicitud nueva",
@@ -483,28 +619,109 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
         _registrar(session, correo, "ignorado")
         return "ignorado", None
 
+    # Quien escribe es el solicitante; quien recibe (el dueño del buzón), el
+    # asignado.
     categoria, prioridad = clasificar(correo.asunto, correo.cuerpo)
-    descripcion = correo.cuerpo or "(El correo no traía texto.)"
-    descripcion = descripcion[:MAX_DESCRIPCION] + f"\n\n— Recibido por correo de {correo.remitente}"
+    asignado = _dueno(session, config)
     ticket = ticket_service.create_ticket(
         session,
         TicketCreate(
             title=_titulo(correo.asunto),
-            description=descripcion,
+            description=_descripcion(correo, f"Recibido por correo de {correo.remitente}"),
             category=categoria,
             priority=prioridad,
         ),
         usuario,
+        asignado=asignado,
+        origen=_origen(usuario, asignado),
     )
     _registrar(session, correo, "ticket", ticket.id)
     return "ticket", _respuesta_ticket(correo, usuario, ticket, config)
 
 
-def fecha_de_inicio(session) -> datetime:
-    """Momento en que se activó la lectura del buzón (se crea la primera vez)."""
-    marca = session.scalar(select(ProcessedEmail).where(ProcessedEmail.message_id == MARCA_INICIO))
+def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo) -> tuple[str, Respuesta | None]:
+    """Un correo de Elementos enviados del dueño del buzón; devuelve
+    (resultado, aviso al asignado o ``None``).
+
+    * Lo envió la ticketera (confirmaciones y avisos) → ``ignorado``.
+    * No va a nadie de la empresa (solo externos, o solo al propio buzón) →
+      ``ignorado``. CC no cuenta.
+    * Responde en el hilo de un ticket del dueño (In-Reply-To / References o
+      «Ticket #N») → ``comentario`` del dueño.
+    * No pide ayuda y el asunto no empieza con «Ticket:» → ``otro``.
+    * Si no, ``ticket``: solicitante = el dueño; asignado = el primer
+      destinatario de la empresa en «Para» (se crea si no existe).
+
+    Todos quedan registrados por su Message-ID: el mismo correo nunca crea
+    dos tickets ni se revisa otra vez.
+    """
+    if session.scalar(select(ProcessedEmail.id).where(
+            ProcessedEmail.message_id == correo.message_id)) is not None:
+        return "repetido", None
+
+    # Lo que envía la app lleva su asunto tal cual (sin «RE:»); una respuesta
+    # del dueño a una confirmación sí cuenta (comentario en el ticket).
+    asunto = correo.asunto.strip()
+    if correo.de_la_app or any(p.search(asunto) for p in AVISOS_APP + CONFIRMACIONES_APP):
+        _registrar(session, correo, "ignorado")
+        return "ignorado", None
+
+    propio = config.usuario.strip().lower()
+    internos = [(c, n) for c, n in correo.para if c != propio and es_de_la_empresa(c, config)]
+    if not internos:
+        _registrar(session, correo, "ignorado")
+        return "ignorado", None
+
+    dueno = _dueno(session, config)
+    hilo = _ticket_del_hilo(session, correo)
+    if hilo is not None:
+        if _participa(hilo, dueno) and correo.cuerpo:
+            ticket_service.create_comment(
+                session, hilo.id, CommentCreate(content=correo.cuerpo[:MAX_DESCRIPCION]), dueno)
+            _registrar(session, correo, "comentario", hilo.id)
+            logger.info("Enviado «%s» → comentario en el ticket #%s", correo.asunto, hilo.id)
+            return "comentario", None
+        _registrar(session, correo, "ignorado")
+        return "ignorado", None
+
+    if not (es_forzado(correo.asunto) or es_de_soporte(correo.asunto, correo.cuerpo, config)):
+        # Correo normal a un compañero: se anota para no revisarlo de nuevo.
+        _registrar(session, correo, "otro")
+        return "otro", None
+
+    correo_asignado, nombre_asignado = internos[0]
+    asignado = _usuario_por_correo(session, correo_asignado) or _crear_usuario(
+        session, correo_asignado, nombre_asignado)
+    if not asignado.is_active:
+        logger.info("Enviado «%s» ignorado: %s está desactivado", correo.asunto, correo_asignado)
+        _registrar(session, correo, "ignorado")
+        return "ignorado", None
+
+    categoria, prioridad = clasificar(correo.asunto, correo.cuerpo)
+    ticket = ticket_service.create_ticket(
+        session,
+        TicketCreate(
+            title=_titulo(correo.asunto),
+            description=_descripcion(correo, f"Enviado por correo de {propio} a {correo_asignado}"),
+            category=categoria,
+            priority=prioridad,
+        ),
+        dueno,
+        asignado=asignado,
+        origen=_origen(dueno, asignado),
+    )
+    _registrar(session, correo, "ticket", ticket.id)
+    logger.info("Enviado «%s» → ticket #%s asignado a %s", correo.asunto, ticket.id, correo_asignado)
+    aviso = _respuesta_asignado(asignado, dueno, ticket, config) if config.avisar_asignado else None
+    return "ticket", aviso
+
+
+def fecha_de_inicio(session, nombre: str = MARCA_INICIO) -> datetime:
+    """Momento en que se activó la lectura del buzón (``MARCA_INICIO``) o de
+    Elementos enviados (``MARCA_INICIO_ENVIADOS``); se crea la primera vez."""
+    marca = session.scalar(select(ProcessedEmail).where(ProcessedEmail.message_id == nombre))
     if marca is None:
-        marca = ProcessedEmail(message_id=MARCA_INICIO, result="inicio")
+        marca = ProcessedEmail(message_id=nombre, result="inicio")
         session.add(marca)
         session.commit()
         session.refresh(marca)
@@ -550,8 +767,8 @@ class ClienteGraph:
         params = {
             "$filter": "isRead eq false",
             "$top": "50",
-            "$select": "id,internetMessageId,subject,from,body,uniqueBody,receivedDateTime,"
-                       "internetMessageHeaders",
+            "$select": _SELECT_MENSAJE,
+            "$expand": _EXPANDIR_PROPIEDADES,
         }
         for _ in range(MAX_PAGINAS):
             datos = self._pedir("GET", url, params=params,
@@ -562,6 +779,28 @@ class ClienteGraph:
                 break
             params = None  # el nextLink ya trae los parámetros
         return mensajes
+
+    def enviados(self, desde: datetime) -> list[dict]:
+        """Correos de Elementos enviados desde ``desde``, del más viejo al más
+        nuevo (hasta ``MAX_PAGINAS`` páginas de los más recientes)."""
+        mensajes: list[dict] = []
+        url = "/me/mailFolders/sentitems/messages"
+        params = {
+            "$filter": f"sentDateTime ge {desde.astimezone(timezone.utc):%Y-%m-%dT%H:%M:%SZ}",
+            "$orderby": "sentDateTime desc",
+            "$top": "50",
+            "$select": _SELECT_MENSAJE,
+            "$expand": _EXPANDIR_PROPIEDADES,
+        }
+        for _ in range(MAX_PAGINAS):
+            datos = self._pedir("GET", url, params=params,
+                                headers={"Prefer": 'outlook.body-content-type="text"'})
+            mensajes.extend(datos.get("value", []))
+            url = datos.get("@odata.nextLink")
+            if not url:
+                break
+            params = None
+        return list(reversed(mensajes))
 
     def id_carpeta(self, nombre: str) -> str:
         """Id de la carpeta (en la raíz del buzón); la crea si no existe."""
@@ -586,8 +825,10 @@ class ClienteGraph:
         mensaje = {
             "subject": respuesta.asunto,
             "body": {"contentType": "Text", "content": respuesta.texto},
-            # Pide a los servidores no contestar con respuestas automáticas.
-            "internetMessageHeaders": [{"name": "X-Auto-Response-Suppress", "value": "All"}],
+            # Pide a los servidores no contestar con respuestas automáticas y
+            # marca el correo como de la ticketera (no se procesa en Enviados).
+            "internetMessageHeaders": [{"name": "X-Auto-Response-Suppress", "value": "All"},
+                                       {"name": CABECERA_APP, "value": "1"}],
         }
         try:
             self._pedir("POST", f"/me/messages/{mensaje_id}/reply", json={"message": mensaje})
@@ -595,9 +836,26 @@ class ClienteGraph:
             if "→ 400" not in str(error):
                 raise
             # Si Graph no acepta la cabecera en /reply, se responde sin ella.
-            logger.info("Graph no aceptó X-Auto-Response-Suppress en la respuesta; se envía sin ella")
+            logger.info("Graph no aceptó las cabeceras en la respuesta; se envía sin ellas")
             del mensaje["internetMessageHeaders"]
             self._pedir("POST", f"/me/messages/{mensaje_id}/reply", json={"message": mensaje})
+
+
+    def enviar(self, respuesta: Respuesta) -> None:
+        """Correo nuevo (no una respuesta), marcado como de la ticketera."""
+        mensaje = {
+            "subject": respuesta.asunto,
+            "body": {"contentType": "Text", "content": respuesta.texto},
+            "toRecipients": [{"emailAddress": {"address": respuesta.para}}],
+            "internetMessageHeaders": [{"name": CABECERA_APP, "value": "1"}],
+        }
+        try:
+            self._pedir("POST", "/me/sendMail", json={"message": mensaje, "saveToSentItems": True})
+        except ErrorGraph as error:
+            if "→ 400" not in str(error):
+                raise
+            del mensaje["internetMessageHeaders"]
+            self._pedir("POST", "/me/sendMail", json={"message": mensaje, "saveToSentItems": True})
 
 
 def crear_cliente(config: ConfigCorreo) -> ClienteGraph:
@@ -619,6 +877,16 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
     puntual se registran y se sigue con el siguiente.
     """
     conteo: dict[str, int] = {}
+    # Primero los enviados: si alguien ya respondió a un correo recién
+    # enviado, su respuesta encuentra el hilo y no crea otro ticket.
+    try:
+        for resultado, cantidad in revisar_enviados(session_factory, config, cliente).items():
+            conteo[f"enviado_{resultado}"] = cantidad
+    except SinSesionError:
+        raise
+    except Exception:
+        logger.exception("No se pudieron revisar los Elementos enviados de %s", config.usuario)
+
     with session_factory() as session:
         inicio = fecha_de_inicio(session)
 
@@ -663,6 +931,34 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
             # Queda en la bandeja: la próxima vez sale como «repetido» y se
             # vuelve a intentar mover, sin responder otra vez.
             logger.exception("No se pudo mover el correo «%s»", correo.asunto)
+    return conteo
+
+
+def revisar_enviados(session_factory, config: ConfigCorreo, cliente: ClienteGraph) -> dict[str, int]:
+    """Procesa los Elementos enviados desde que se activó la función. No los
+    mueve ni los marca: cada uno queda registrado por su Message-ID."""
+    conteo: dict[str, int] = {}
+    with session_factory() as session:
+        inicio = fecha_de_inicio(session, MARCA_INICIO_ENVIADOS)
+    for mensaje in cliente.enviados(inicio):
+        correo = correo_desde_graph(mensaje)
+        if correo.fecha is not None and correo.fecha < inicio:
+            continue
+        with session_factory() as session:
+            try:
+                resultado, aviso = procesar_enviado(session, correo, config)
+            except Exception:
+                session.rollback()
+                logger.exception("No se pudo procesar el enviado %s", correo.message_id)
+                continue
+        conteo[resultado] = conteo.get(resultado, 0) + 1
+        if aviso is not None:
+            try:
+                cliente.enviar(aviso)
+            except SinSesionError:
+                raise
+            except Exception:
+                logger.exception("No se pudo avisar a %s", aviso.para)
     return conteo
 
 

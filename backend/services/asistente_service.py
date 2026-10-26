@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from backend.constants import TICKET_CATEGORIES, TICKET_PRIORITIES, TicketPriority, TicketState, UserRole
 from backend.models import Ticket, User
@@ -86,9 +86,9 @@ PERMISOS_POR_ROL = {
         "No edita ni asigna tickets ni administra usuarios."
     ),
     UserRole.REQUESTER.value: (
-        "Solo ve los tickets que él mismo creó; puede crear tickets y comentar en "
-        "los suyos. No cambia estados, no edita, no asigna, no ve el historial "
-        "global ni la lista de usuarios."
+        "Solo ve los tickets que él mismo creó y los que tiene asignados; puede "
+        "crear tickets, comentar en ellos y cambiar el estado de los asignados a él. "
+        "No edita, no asigna, no ve el historial global ni la lista de usuarios."
     ),
 }
 
@@ -187,11 +187,11 @@ def _ticket_line(ticket: Ticket) -> str:
 
 
 def _base_visible(user: User):
-    """Tickets que ``user`` puede ver (el Solicitante, solo los suyos)."""
+    """Tickets que ``user`` puede ver (el Solicitante, los que creó y los
+    asignados a él)."""
     base = select(Ticket)
-    if user.role == UserRole.REQUESTER.value:
-        base = base.where(Ticket.created_by_id == user.id)
-    return base
+    condicion = ticket_service.filtro_visible(user)
+    return base if condicion is None else base.where(condicion)
 
 
 def _abiertos():
@@ -1059,11 +1059,12 @@ def _personas_nombradas(session, user: User, t: str, para_conteo: bool = True) -
     quien tiene menos errores y, para contar tickets, quien puede tenerlos
     asignados antes que un Solicitante. Si sigue el empate se devuelven
     todos (la respuesta pregunta de quién). El Solicitante solo puede
-    nombrar a quienes atienden alguno de sus tickets."""
+    nombrar a quienes atienden o crearon alguno de sus tickets."""
     if user.role == UserRole.REQUESTER.value:
         candidatos = session.scalars(
-            select(User).where(User.id.in_(
-                select(Ticket.assigned_to_id).where(Ticket.created_by_id == user.id)
+            select(User).where(or_(
+                User.id.in_(select(Ticket.assigned_to_id).where(ticket_service.filtro_visible(user))),
+                User.id.in_(select(Ticket.created_by_id).where(Ticket.assigned_to_id == user.id)),
             ))
         ).all()
     else:

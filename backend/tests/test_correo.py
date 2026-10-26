@@ -82,18 +82,18 @@ def test_company_sender_without_account_is_created_as_requester_with_a_ticket(se
 
     # El segundo correo ya lo encuentra como usuario: otro ticket, sin duplicarlo.
     assert procesar(session, crear_correo(remitente="luis@data.cr", msg_id="<m2@x>"))[0] == "ticket"
-    assert len(session.scalars(select(User)).all()) == 1
+    assert len(session.scalars(select(User).where(User.email == "luis@data.cr")).all()) == 1
 
 
 def test_company_sender_without_name_uses_the_address(session):
     procesar(session, crear_correo(remitente="soporte.ti@data.cr", nombre=""))
-    assert session.scalars(select(User)).one().name == "soporte.ti"
+    assert session.scalars(select(User).where(User.email == "soporte.ti@data.cr")).one().name == "soporte.ti"
 
 
 def test_admin_inicial_writing_first_by_mail_is_administrator(session, monkeypatch):
     monkeypatch.setenv("ADMIN_INICIAL", "kristin@data.cr")
     procesar(session, crear_correo(remitente="kristin@data.cr", nombre="Kristin"))
-    assert session.scalars(select(User)).one().role == "Administrador"
+    assert session.scalars(select(User).where(User.email == "kristin@data.cr")).one().role == "Administrador"
 
 
 def test_external_sender_without_account_is_ignored_and_logged(session, log_correo):
@@ -272,8 +272,12 @@ def test_filter_from_env():
 class FakeGraph:
     """Simula los endpoints de Graph que usa la ticketera."""
 
-    def __init__(self, mensajes, carpetas=None, rechazar_cabecera=False, paginas=1):
+    def __init__(self, mensajes, carpetas=None, rechazar_cabecera=False, paginas=1, enviados=None):
         self.mensajes = {m["id"]: dict(m, isRead=False, carpeta="inbox") for m in mensajes}
+        # Elementos enviados: ya leídos, en su carpeta.
+        for m in enviados or []:
+            self.mensajes[m["id"]] = dict(m, isRead=True, carpeta="sentitems")
+        self.correos_nuevos = []  # /me/sendMail
         self.carpetas = dict(carpetas or {})  # nombre -> id
         self.respuestas = []  # (id, json enviado)
         self.llamadas = []
@@ -302,6 +306,15 @@ class FakeGraph:
                 datos["@odata.nextLink"] = (f"{cs.GRAPH_URL}/me/mailFolders/inbox/messages"
                                             f"?pagina={pagina + 1}")
             return httpx.Response(200, json=datos)
+        if request.method == "GET" and ruta == "/me/mailFolders/sentitems/messages":
+            desde = request.url.params["$filter"].removeprefix("sentDateTime ge ")
+            enviados = [m for m in self.mensajes.values()
+                        if m["carpeta"] == "sentitems" and m["sentDateTime"] >= desde]
+            enviados.sort(key=lambda m: m["sentDateTime"], reverse=True)
+            return httpx.Response(200, json={"value": enviados})
+        if request.method == "POST" and ruta == "/me/sendMail":
+            self.correos_nuevos.append(cuerpo)
+            return httpx.Response(202)
         if request.method == "GET" and ruta == "/me/mailFolders":
             nombre = request.url.params["$filter"].split("'")[1]
             valor = [{"id": self.carpetas[nombre]}] if nombre in self.carpetas else []
@@ -361,7 +374,8 @@ def test_revisar_buzon_replies_in_thread_marks_read_and_moves(factory, session, 
     enviado = graph.respuestas[0][1]["message"]
     assert enviado["subject"].startswith("Ticket #")
     assert enviado["body"]["contentType"] == "Text"
-    assert enviado["internetMessageHeaders"] == [{"name": "X-Auto-Response-Suppress", "value": "All"}]
+    assert enviado["internetMessageHeaders"] == [{"name": "X-Auto-Response-Suppress", "value": "All"},
+                                                 {"name": "X-Ticketera", "value": "1"}]
     # Se respondió antes de mover (después el id cambia).
     assert graph.llamadas.index(("POST", f"/me/messages/{nuevo['id']}/reply")) < \
         graph.llamadas.index(("POST", f"/me/messages/{nuevo['id']}/move"))

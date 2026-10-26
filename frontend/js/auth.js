@@ -92,6 +92,16 @@ const PERMISOS = {
   metricas: ["Administrador", "Supervisor"],
 };
 
+/* Cambiar el estado de un ticket: los roles de «cambiar_estado» en
+   cualquiera y, sea cual sea su rol, quien lo tiene asignado (espejo de
+   ticket_service.can_change_state). Editar, asignar y eliminar no cambian. */
+function puedeCambiarEstado(ticket) {
+  if (puede("cambiar_estado")) return true;
+  const user = getUser();
+  return Boolean(user && ticket && user.id !== undefined && user.id !== null
+    && ticket.assigned_to_id === user.id);
+}
+
 /* true si el usuario de la sesión tiene el permiso indicado. */
 function puede(permiso) {
   const user = getUser();
@@ -390,6 +400,9 @@ function describirHistorial(entry) {
   const despues = entry.new_value;
   switch (entry.action) {
     case "created":
+      /* Creado desde un correo: el servidor guarda «Ticket creado desde
+         correo enviado por … a …». */
+      if (entry.field === "correo") return { accion: "Creó el ticket", detalle: despues || "—" };
       return {
         accion: "Creó el ticket",
         detalle: despues ? `Asignado automáticamente a ${despues}` : "—",

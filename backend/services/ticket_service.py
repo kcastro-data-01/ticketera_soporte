@@ -112,7 +112,12 @@ def _audit_author(current_user: User | None) -> tuple[str | None, int | None]:
 
 
 def create_ticket(
-    session, payload: TicketCreate, current_user: User | None = None
+    session,
+    payload: TicketCreate,
+    current_user: User | None = None,
+    *,
+    asignado: User | None = None,
+    origen: str | None = None,
 ) -> Ticket:
     """Persist a new ticket.
 
@@ -126,6 +131,11 @@ def create_ticket(
     and the manual assignment endpoint (``PATCH .../assign``) remains
     available.
 
+    ``asignado`` (tickets que llegan por correo: quien recibe el correo)
+    reemplaza el reparto automático. ``origen`` es el texto que queda en el
+    historial de la creación («Ticket creado desde correo enviado por … a
+    …»).
+
     Registra una entrada de historial por la creación del ticket (RF9).
     """
     ticket = Ticket(
@@ -136,8 +146,9 @@ def create_ticket(
         created_by_id=current_user.id if current_user is not None else None,
     )
 
-    # Automatic round-robin assignment among active Support/Technician users.
-    assignee = pick_next_assignee(session)
+    # Automatic round-robin assignment among active Support/Technician users,
+    # unless the caller names the assignee.
+    assignee = asignado if asignado is not None else pick_next_assignee(session)
     if assignee is not None:
         ticket.assigned_to_id = assignee.id
 
@@ -146,14 +157,20 @@ def create_ticket(
     session.refresh(ticket)
     # Registry of creation in history (RF9), signed by the authenticated user
     author_name, author_id = _audit_author(current_user)
+    if origen:
+        # Creado desde un correo: el historial dice quién lo envió y a quién.
+        campo, valor = "correo", origen
+    else:
+        # Automatic assignee (if any), so the history explains who got it.
+        campo = "assigned_to_id" if assignee is not None else None
+        valor = assignee.name if assignee is not None else None
     session.add(
         History(
             ticket_id=ticket.id,
             action="created",
-            # Automatic assignee (if any), so the history explains who got it.
-            field="assigned_to_id" if assignee is not None else None,
+            field=campo,
             old_value=None,
-            new_value=assignee.name if assignee is not None else None,
+            new_value=valor,
             author=author_name,
             author_id=author_id,
         )
@@ -172,6 +189,7 @@ def list_tickets(
     state: TicketState | list[TicketState] | None = None,
     created_by_id: int | None = None,
     assigned_to_id: int | None = None,
+    visible_para: User | None = None,
     limit: int | None = None,
     offset: int = 0,
 ) -> tuple[list[Ticket], int]:
@@ -183,8 +201,9 @@ def list_tickets(
     ``search`` behaves as if it were not sent. When no criteria are given the
     query is identical to the plain listing. Read-only query: it never
     modifies the stored rows. ``created_by_id`` restricts the listing to the
-    tickets created by that user (used for the ``Solicitante`` role) and
-    ``assigned_to_id`` to the tickets assigned to that user ("Mis tickets").
+    tickets created by that user, ``assigned_to_id`` to the tickets assigned
+    to that user ("Mis tickets") and ``visible_para`` to the tickets that
+    user may see (:func:`filtro_visible`).
 
     Returns ``(page, total)``: ``total`` counts every matching ticket and
     ``page`` holds at most ``limit`` of them starting at ``offset`` (all of
@@ -192,6 +211,10 @@ def list_tickets(
     """
     statement = select(Ticket)
 
+    if visible_para is not None:
+        condicion = filtro_visible(visible_para)
+        if condicion is not None:
+            statement = statement.where(condicion)
     if created_by_id is not None:
         statement = statement.where(Ticket.created_by_id == created_by_id)
     if assigned_to_id is not None:
@@ -230,8 +253,9 @@ OPEN_STATES = (TicketState.NEW.value, TicketState.IN_PROGRESS.value)
 def ticket_summary(session, user: User) -> dict[str, int]:
     """Counters for the dashboard over the tickets ``user`` can see."""
     base = select(Ticket)
-    if user.role == UserRole.REQUESTER.value:
-        base = base.where(Ticket.created_by_id == user.id)
+    condicion = filtro_visible(user)
+    if condicion is not None:
+        base = base.where(condicion)
 
     def count(*conditions) -> int:
         statement = base.where(*conditions) if conditions else base
@@ -262,15 +286,30 @@ def get_ticket(session, ticket_id: int) -> Ticket | None:
     return session.get(Ticket, ticket_id)
 
 
+def filtro_visible(user: User):
+    """Condición SQL de los tickets que ``user`` puede ver, o ``None`` si los
+    ve todos. El Solicitante ve los que creó y los que tiene asignados (por
+    ejemplo, los que le llegaron desde un correo); los demás roles, todos."""
+    if user.role != UserRole.REQUESTER.value:
+        return None
+    return or_(Ticket.created_by_id == user.id, Ticket.assigned_to_id == user.id)
+
+
 def can_view_ticket(ticket: Ticket, user: User | None) -> bool:
     """Whether ``user`` may read ``ticket`` (and its comments and history).
 
-    A ``Solicitante`` only sees the tickets they created; every other role
-    sees all tickets.
+    A ``Solicitante`` only sees the tickets they created or that are
+    assigned to them; every other role sees all tickets.
     """
     if user is None or user.role != UserRole.REQUESTER.value:
         return True
-    return ticket.created_by_id == user.id
+    return user.id in (ticket.created_by_id, ticket.assigned_to_id)
+
+
+def can_change_state(ticket: Ticket, user: User) -> bool:
+    """Técnico, Supervisor y Administrador cambian el estado de cualquier
+    ticket; cualquier otro rol, solo el de los tickets asignados a él."""
+    return user.role != UserRole.REQUESTER.value or ticket.assigned_to_id == user.id
 
 
 def get_visible_ticket(session, ticket_id: int, user: User | None) -> Ticket | None:

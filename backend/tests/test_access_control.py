@@ -160,16 +160,21 @@ def test_solicitante_cannot_assign_ticket(client, auth_client):
 
 
 def test_solicitante_cannot_change_state(client, auth_client):
-    """Un Solicitante no puede cambiar el estado de un ticket."""
-    ticket = create_ticket(auth_client)
+    """Un Solicitante no puede cambiar el estado de un ticket que no tiene
+    asignado: 403 en uno suyo, 404 en uno ajeno (no se revela que existe)."""
+    ajeno = create_ticket(auth_client)
     token = register_requester(client)
+    propio = client.post("/api/tickets", json={
+        "title": "Mi impresora", "description": "No imprime desde ayer.",
+        "category": "Hardware", "priority": "Media"}, headers=headers(token)).json()
 
-    resp = client.patch(
-        f"/api/tickets/{ticket['id']}/state",
-        json={"state": "En proceso"},
-        headers=headers(token),
-    )
-    assert resp.status_code == 403
+    for ticket, codigo in ((propio, 403), (ajeno, 404)):
+        resp = client.patch(
+            f"/api/tickets/{ticket['id']}/state",
+            json={"state": "En proceso"},
+            headers=headers(token),
+        )
+        assert resp.status_code == codigo
 
 
 def test_solicitante_cannot_create_user(client):

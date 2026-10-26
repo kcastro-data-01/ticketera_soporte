@@ -284,7 +284,9 @@
             </p>
           </section>
 
-          <section class="seccion" aria-label="Cambio de estado del ticket" data-permiso="cambiar_estado">
+          <!-- Sin el permiso cambiar_estado se oculta; detalle.js la vuelve a
+               mostrar si el ticket está asignado a quien lo ve. -->
+          <section id="seccion-estado" class="seccion" aria-label="Cambio de estado del ticket" data-permiso="cambiar_estado">
             <h2>Cambio de estado</h2>
             <div class="filtros formulario">
               <div class="campo">

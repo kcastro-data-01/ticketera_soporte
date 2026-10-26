@@ -238,6 +238,9 @@ function renderTicket(ticket) {
       : String(ticket.assigned_to_id);
 
   renderEstadoControl(ticket);
+  /* El asignado cambia el estado de sus tickets aunque su rol no pueda. */
+  const seccionEstado = document.getElementById("seccion-estado");
+  if (seccionEstado) seccionEstado.hidden = !puedeCambiarEstado(ticket);
 }
 
 /* Muestra el estado actual y solo ofrece los destinos posibles desde él.

@@ -36,6 +36,8 @@ services:
       # «auto»: solo correos que piden ayuda; «todos»: buzón solo de soporte.
       CORREO_FILTRO: ${CORREO_FILTRO:-auto}
       CORREO_INTERVALO: ${CORREO_INTERVALO:-60}
+      # Avisar por correo al asignado de un ticket creado desde un enviado.
+      AVISAR_ASIGNADO: ${AVISAR_ASIGNADO:-false}
       # Dirección con la que los demás abren la app (va en los correos).
       APP_URL: ${APP_URL:-http://localhost:8000}
     volumes:

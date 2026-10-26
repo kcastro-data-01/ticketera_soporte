@@ -147,11 +147,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Solo los suyos</td></tr>
+                <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Los suyos y los asignados a él</td></tr>
                 <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
-                <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>Sí</td><td>En los suyos</td></tr>
+                <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>Sí</td><td>En los suyos y los asignados a él</td></tr>
                 <tr><td>Editar ticket</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-                <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+                <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Solo en los asignados a él</td></tr>
                 <tr><td>Asignar ticket</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
                 <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
                 <tr><td>Métricas</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
@@ -186,6 +186,9 @@
             <li>El asunto se usa como título y el texto como descripción. La respuesta automática indica el número del ticket y el enlace para consultarlo.</li>
             <li>Si se responde al correo de un ticket («Ticket #N»), la respuesta se agrega como comentario de ese ticket.</li>
             <li>Si quien escribe no tiene cuenta y su correo es de la empresa, se le crea una cuenta de Solicitante y se crea el ticket igual. Los correos de fuera de la empresa se ignoran. Si su cuenta está desactivada, se le pide que se comunique con un administrador.</li>
+            <li>Quien escribe el correo es el solicitante y quien lo recibe, el asignado: los correos que llegan al buzón quedan asignados a su dueño.</li>
+            <li>Los correos que el dueño del buzón envía a alguien de la empresa también crean un ticket, asignado al primer destinatario de la empresa en «Para» (si no tiene cuenta, se le crea). Al iniciar sesión con Microsoft ve ese ticket en su lista y puede comentarlo y cambiarle el estado.</li>
+            <li>Si el asunto empieza con «Ticket:», el correo siempre crea un ticket (sin «Ticket:» en el título), aunque no parezca una solicitud de ayuda.</li>
           </ul>
         </div>
       </details>
