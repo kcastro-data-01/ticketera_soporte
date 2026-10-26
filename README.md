@@ -860,15 +860,27 @@ que llegan después de activar la función.
 ### Correos enviados
 
 La app también revisa **Elementos enviados** del buzón (mismo permiso
-`Mail.ReadWrite`). Un correo que el dueño envía a alguien de la empresa:
+`Mail.ReadWrite`). De lo que envía el dueño, **solo crea ticket el asunto que
+empieza con «Ticket:»** (sin importar mayúsculas); sin ese prefijo no crea nada,
+aunque parezca pedir ayuda y aunque `CORREO_FILTRO=todos`:
 
 | Caso | Qué pasa |
 |---|---|
-| Va a alguien de `DOMINIO_EMPRESA` en «Para» y pide ayuda (o el asunto empieza con «Ticket:») | Ticket a nombre del dueño, **asignado al primer destinatario de la empresa en «Para»** (CC no cuenta). Si no tiene cuenta, se crea con el nombre del encabezado y el correo en minúsculas; cuando entre con Microsoft, el login lo encuentra por correo y usa ese mismo usuario. |
-| Responde en el hilo de un ticket (In-Reply-To / References, o «Ticket #N» en el asunto) | Comentario del dueño en ese ticket. Nunca crea otro. |
+| Asunto «Ticket: …» y va a alguien de `DOMINIO_EMPRESA` en «Para» | Ticket a nombre del dueño (título sin «Ticket:»), **asignado al primer destinatario de la empresa en «Para»** (CC no cuenta). Si no tiene cuenta, se crea con el nombre del encabezado y el correo en minúsculas; cuando entre con Microsoft, el login lo encuentra por correo y usa ese mismo usuario. |
+| Responde en el hilo de un ticket | Comentario del dueño en ese ticket. Nunca crea otro. |
 | Va solo a externos, solo al propio buzón, o solo en CC a la empresa | Se ignora. |
 | Lo envió la ticketera (confirmaciones y avisos: asunto de la app o cabecera `X-Ticketera`) | Se ignora. |
-| No pide ayuda | No crea ticket. |
+| Sin «Ticket:» al inicio del asunto | No crea ticket. |
+
+**Cómo se reconoce el hilo** (en la bandeja y en enviados), en este orden:
+cabeceras In-Reply-To / References, el `conversationId` de Graph (se guarda en
+`processed_emails.conversation_id`) y «Ticket #N» en el asunto. Comprobado con
+el buzón real: en los correos recibidos Graph trae In-Reply-To y References en
+`internetMessageHeaders`; en Elementos enviados no (ahí solo están las
+cabeceras `X-…` de quien envía), así que se leen de las propiedades
+extendidas de Exchange; `conversationId` viene siempre. Graph también conserva
+la cabecera `X-Ticketera` de las confirmaciones; las enviadas antes de usarla
+se reconocen por el asunto.
 
 Cada enviado queda registrado por su `Message-ID` (nunca crea dos tickets). Los
 enviados **no se mueven ni se marcan**, y solo cuentan los enviados después de

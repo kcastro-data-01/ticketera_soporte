@@ -99,3 +99,8 @@ test("ayuda: la tabla de permisos explica lo del Solicitante asignado", () => {
   assert.match(ayuda, /<td>Cambiar estado<\/td>(<td>Sí<\/td>){3}<td>Solo en los asignados a él<\/td>/);
   assert.match(ayuda, /<td>Ver tickets<\/td>.*<td>Los suyos y los asignados a él<\/td>/);
 });
+
+test("ayuda: los correos enviados crean ticket solo con «Ticket:»", () => {
+  assert.match(ayuda, /Los correos que el dueño del buzón envía crean un ticket <strong>solo si el asunto empieza con «Ticket:»<\/strong>/);
+  assert.match(ayuda, /Las respuestas en el mismo hilo de un ticket/);
+});

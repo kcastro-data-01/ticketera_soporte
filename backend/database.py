@@ -92,9 +92,11 @@ def init_db(target_engine=None) -> None:
     from backend.migrate_categories import migrate_categories
     from backend.migrate_add_ticket_created_by import migrate_add_ticket_created_by
     from backend.migrate_remove_support_role import migrate_remove_support_role
+    from backend.migrate_add_email_conversation_id import migrate_add_email_conversation_id
 
     migrate_add_password_hash(db_engine)
     migrate_add_history_author_id(db_engine)
     migrate_categories(db_engine)
     migrate_add_ticket_created_by(db_engine)
     migrate_remove_support_role(db_engine)
+    migrate_add_email_conversation_id(db_engine)

@@ -187,8 +187,9 @@
             <li>Si se responde al correo de un ticket («Ticket #N»), la respuesta se agrega como comentario de ese ticket.</li>
             <li>Si quien escribe no tiene cuenta y su correo es de la empresa, se le crea una cuenta de Solicitante y se crea el ticket igual. Los correos de fuera de la empresa se ignoran. Si su cuenta está desactivada, se le pide que se comunique con un administrador.</li>
             <li>Quien escribe el correo es el solicitante y quien lo recibe, el asignado: los correos que llegan al buzón quedan asignados a su dueño.</li>
-            <li>Los correos que el dueño del buzón envía a alguien de la empresa también crean un ticket, asignado al primer destinatario de la empresa en «Para» (si no tiene cuenta, se le crea). Al iniciar sesión con Microsoft ve ese ticket en su lista y puede comentarlo y cambiarle el estado.</li>
-            <li>Si el asunto empieza con «Ticket:», el correo siempre crea un ticket (sin «Ticket:» en el título), aunque no parezca una solicitud de ayuda.</li>
+            <li>Si el asunto de un correo que llega empieza con «Ticket:», siempre crea un ticket (sin «Ticket:» en el título), aunque no parezca una solicitud de ayuda.</li>
+            <li>Los correos que el dueño del buzón envía crean un ticket <strong>solo si el asunto empieza con «Ticket:»</strong> y van a alguien de la empresa: queda asignado al primer destinatario de la empresa en «Para» (si no tiene cuenta, se le crea). Al iniciar sesión con Microsoft ve ese ticket en su lista y puede comentarlo y cambiarle el estado. Sin «Ticket:» no se crea nada.</li>
+            <li>Las respuestas en el mismo hilo de un ticket (también las que envía el dueño) se agregan como comentario y nunca crean otro ticket.</li>
           </ul>
         </div>
       </details>

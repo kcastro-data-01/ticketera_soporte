@@ -269,6 +269,18 @@ def test_filter_from_env():
 # --- Graph simulado -------------------------------------------------------------
 
 
+def test_reply_with_only_the_conversation_id_is_a_comment(session, usuario):
+    """Sin In-Reply-To ni «Ticket #N», el hilo se encuentra por conversationId."""
+    original = crear_correo(msg_id="<pide@data.cr>")
+    original["conversationId"] = "AAQk-conv"
+    assert procesar(session, original)[0] == "ticket"
+    respuesta = crear_correo(asunto="Más datos", cuerpo="Es la impresora HP.", msg_id="<sigue@data.cr>")
+    respuesta["conversationId"] = "AAQk-conv"
+    assert procesar(session, respuesta, CONFIG_FILTRO)[0] == "comentario"
+    assert len(session.scalars(select(Ticket)).all()) == 1
+    assert session.scalars(select(Comment)).one().content == "Es la impresora HP."
+
+
 class FakeGraph:
     """Simula los endpoints de Graph que usa la ticketera."""
 

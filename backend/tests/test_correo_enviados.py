@@ -20,10 +20,13 @@ _ids = count(1)
 YO = "kcastro@data.cr"
 
 
-def crear_enviado(para=(("Pedro@Data.cr", "Pedro Rojas"),), asunto="La impresora no imprime",
+def crear_enviado(para=(("Pedro@Data.cr", "Pedro Rojas"),), asunto="Ticket: La impresora no imprime",
                   cuerpo="Pedro, la impresora del segundo piso no imprime desde ayer.",
-                  msg_id=None, fecha=None, en_respuesta_a=None, cabeceras=None, propiedades=None) -> dict:
-    """Mensaje con la forma de /me/mailFolders/sentitems/messages."""
+                  msg_id=None, fecha=None, en_respuesta_a=None, cabeceras=None, propiedades=None,
+                  conversacion=None) -> dict:
+    """Mensaje con la forma de /me/mailFolders/sentitems/messages. Como en el
+    buzón real, In-Reply-To llega solo como propiedad extendida (los enviados
+    no traen esas cabeceras en ``internetMessageHeaders``)."""
     fecha = fecha or datetime.now(timezone.utc) + timedelta(minutes=1)
     extendidas = [{"id": k, "value": v} for k, v in (propiedades or {}).items()]
     if en_respuesta_a:
@@ -31,6 +34,7 @@ def crear_enviado(para=(("Pedro@Data.cr", "Pedro Rojas"),), asunto="La impresora
     return {
         "id": f"ENV{next(_ids)}",
         "internetMessageId": msg_id or f"<enviado{next(_ids)}@data.cr>",
+        "conversationId": conversacion or f"conv-enviado-{next(_ids)}",
         "subject": asunto,
         "from": {"emailAddress": {"name": "Kristin Castro", "address": YO}},
         "toRecipients": [{"emailAddress": {"address": c, "name": n}} for c, n in para],
@@ -132,15 +136,30 @@ def test_same_message_id_never_creates_two_tickets(session, yo):
     assert len(session.scalars(select(Ticket)).all()) == 1
 
 
-def test_filter_applies_unless_the_subject_starts_with_ticket(session, yo):
-    normal = crear_enviado(asunto="Almuerzo del viernes", cuerpo="¿Vamos a las 12?")
-    assert enviar(session, normal, CONFIG_FILTRO) == ("otro", None)
+@pytest.mark.parametrize("config", [CONFIG, CONFIG_FILTRO], ids=["filtro-todos", "filtro-auto"])
+def test_sent_mail_without_ticket_prefix_never_creates_a_ticket(session, yo, config):
+    """De lo que envío, solo crea ticket el asunto «Ticket: …», aunque el texto
+    pida ayuda y aunque CORREO_FILTRO sea «todos»."""
+    pide_ayuda = crear_enviado(asunto="La impresora no imprime, ayuda por favor",
+                               cuerpo="Pedro, no funciona la impresora; necesito soporte.")
+    assert enviar(session, pide_ayuda, config) == ("otro", None)
     # Queda anotado: no se vuelve a revisar.
-    assert enviar(session, normal, CONFIG_FILTRO) == ("repetido", None)
+    assert enviar(session, pide_ayuda, config) == ("repetido", None)
+    assert session.scalars(select(Ticket)).all() == []
+    assert pedro(session) is None, "tampoco se crea el usuario del destinatario"
 
-    forzado = crear_enviado(asunto="TICKET: Cambiar el tóner", cuerpo="Cuando pueda.")
-    assert enviar(session, forzado, CONFIG_FILTRO)[0] == "ticket"
+
+@pytest.mark.parametrize("asunto", ["Ticket: Cambiar el tóner", "TICKET: Cambiar el tóner",
+                                    "  ticket:Cambiar el tóner"])
+def test_ticket_prefix_creates_and_is_removed_from_the_title(session, yo, asunto):
+    assert enviar(session, crear_enviado(asunto=asunto, cuerpo="Cuando pueda."), CONFIG_FILTRO)[0] == "ticket"
     assert session.scalars(select(Ticket)).one().title == "Cambiar el tóner"
+
+
+def test_ticket_prefix_must_be_at_the_start(session, yo):
+    for asunto in ("RE: Ticket: Cambiar el tóner", "Sobre el Ticket: tóner", "Ticket #5 tóner"):
+        assert enviar(session, crear_enviado(asunto=asunto), CONFIG)[0] in ("otro", "ignorado")
+    assert session.scalars(select(Ticket)).all() == []
 
 
 def test_inactive_recipient_is_ignored(session, yo):
@@ -193,6 +212,40 @@ def test_reply_chain_is_one_ticket_with_comments(session, yo):
     comentarios = session.scalars(select(Comment).where(Comment.ticket_id == ticket.id)).all()
     assert [(c.author, c.content) for c in comentarios] == [
         ("Pedro Rojas", "Ya la revisé, era el cable."), ("Kristin Castro", "Gracias, Pedro.")]
+
+
+def test_conversation_id_finds_the_thread_without_reply_headers(session, yo):
+    """Si la respuesta no trae In-Reply-To/References, el hilo se encuentra
+    por el conversationId: la respuesta de Pedro (bandeja) y la mía
+    (enviados) son comentarios del mismo ticket."""
+    original = crear_enviado(msg_id="<conv-original@data.cr>", conversacion="AAQk-hilo-1")
+    assert enviar(session, original)[0] == "ticket"
+    ticket = session.scalars(select(Ticket)).one()
+    guardado = session.scalar(select(ProcessedEmail).where(ProcessedEmail.message_id == "<conv-original@data.cr>"))
+    assert guardado.conversation_id == "AAQk-hilo-1"
+
+    de_pedro = crear_correo(remitente="pedro@data.cr", nombre="Pedro Rojas", asunto="Sobre la impresora",
+                            cuerpo="Ya cambié el cable.", msg_id="<conv-pedro@data.cr>")
+    de_pedro["conversationId"] = "AAQk-hilo-1"
+    assert cs.procesar_correo(session, cs.correo_desde_graph(de_pedro), CONFIG_FILTRO)[0] == "comentario"
+
+    mia = crear_enviado(asunto="RE: La impresora no imprime", cuerpo="Gracias.", conversacion="AAQk-hilo-1")
+    assert enviar(session, mia, CONFIG_FILTRO) == ("comentario", None)
+
+    assert len(session.scalars(select(Ticket)).all()) == 1
+    assert [c.content for c in session.scalars(select(Comment).where(Comment.ticket_id == ticket.id))] == [
+        "Ya cambié el cable.", "Gracias."]
+
+
+def test_app_confirmation_in_the_same_conversation_is_not_a_comment(session, yo):
+    enviar(session, crear_enviado(conversacion="AAQk-hilo-2"))
+    ticket = session.scalars(select(Ticket)).one()
+    confirmacion = crear_enviado(asunto=f"Ticket #{ticket.id} creado: {ticket.title}", conversacion="AAQk-hilo-2",
+                                 cabeceras={"X-Ticketera": "1"})
+    vieja = crear_enviado(asunto=f"Ticket #{ticket.id} creado: {ticket.title}", conversacion="AAQk-hilo-2")
+    assert enviar(session, confirmacion)[0] == "ignorado"
+    assert enviar(session, vieja)[0] == "ignorado", "las anteriores a X-Ticketera, por el asunto"
+    assert session.scalars(select(Comment)).all() == []
 
 
 def test_reply_with_ticket_number_in_subject_is_a_comment(session, yo):

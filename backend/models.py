@@ -245,6 +245,9 @@ class ProcessedEmail(Base):
     ``inicio`` (marca de cuándo se activó la lectura del buzón: los correos
     anteriores no se procesan). ``registro`` (se le pedía registrarse) solo
     queda en correos viejos.
+
+    ``conversation_id`` es el ``conversationId`` de Graph: si una respuesta
+    no trae In-Reply-To/References, el ticket del hilo se busca por él.
     """
 
     __tablename__ = "processed_emails"
@@ -252,6 +255,7 @@ class ProcessedEmail(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     message_id: Mapped[str] = mapped_column(String(500), nullable=False, unique=True, index=True)
     sender: Mapped[str | None] = mapped_column(String(255), index=True)
+    conversation_id: Mapped[str | None] = mapped_column(String(500), index=True)
     result: Mapped[str] = mapped_column(String(20), nullable=False)
     ticket_id: Mapped[int | None] = mapped_column(
         ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True
