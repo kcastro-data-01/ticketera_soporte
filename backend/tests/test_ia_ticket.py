@@ -82,7 +82,12 @@ def test_two_tickets_give_two_different_prompts_with_full_content(client, sessio
 
     for t in (t1, t2):
         resp = preguntar(client, headers, f"¿Cómo resuelvo el ticket #{t.id}?")
-        assert resp.json() == {"respuesta": "Respuesta de Qwen", "fuente": "ia"}
+        # El servidor agrega la línea final con el enlace a «Explicar con IA».
+        assert resp.json() == {
+            "respuesta": "Respuesta de Qwen\n\nSi necesita más información, como las posibles causas y qué "
+                         f"revisar primero, [abra el ticket y use «Explicar con IA»](detalle.html?id={t.id}&pestana=ia).",
+            "fuente": "ia",
+        }
 
     p1, p2 = ollama.system(0), ollama.system(1)
     assert p1 != p2
