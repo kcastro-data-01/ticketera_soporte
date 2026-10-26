@@ -118,6 +118,25 @@ test("formato: el texto de la IA nunca va a innerHTML", () => {
   assert.doesNotMatch(cuerpo, /innerHTML/);
 });
 
+test("formato: el enlace del servidor al detalle (con la pestaña de IA) es un enlace", () => {
+  const { sandbox } = montar();
+  const el = nodo("div");
+  sandbox.pintarTexto(el, "Si necesita más información, [abra el ticket y use «Explicar con IA»](detalle.html?id=5&pestana=ia).");
+  const [enlace] = todos(el, "chat-enlace");
+  assert.equal(enlace.tag, "a");
+  assert.equal(enlace.href, "detalle.html?id=5&pestana=ia");
+  assert.equal(enlace.textContent, "abra el ticket y use «Explicar con IA»");
+  assert.equal(texto(el), "Si necesita más información, abra el ticket y use «Explicar con IA».");
+});
+
+test("formato: un enlace a otro destino se muestra como texto", () => {
+  const { sandbox } = montar();
+  const el = nodo("div");
+  sandbox.pintarTexto(el, "[clic aquí](javascript:alert(1)) y [otro](https://ejemplo.com)");
+  assert.deepEqual(todos(el, "chat-enlace"), []);
+  assert.match(texto(el), /\[clic aquí\]\(javascript:alert\(1\)\)/);
+});
+
 test("formato: frases comunes con dos puntos no se vuelven títulos", () => {
   const { sandbox } = montar();
   const el = nodo("div");
@@ -266,6 +285,17 @@ test("copiar: ícono en cada respuesta; copia el texto y muestra «Copiado» un 
   reloj.fn();
   assert.equal(aviso.hidden, true);
   assert.equal(boton.classList.contains("copiado"), false);
+});
+
+test("copiar: los enlaces se copian como su texto", async () => {
+  const copiado = [];
+  const chat = montar({
+    guardado: [{ role: "assistant", content: "Vea el [detalle completo en el ticket](detalle.html?id=5).", hora: "2026-10-22T15:00:05Z" }],
+    extra: { navigator: { clipboard: { writeText: async (t) => { copiado.push(t); } } } },
+  });
+  clic(chat.boton);
+  await todos(chat.lista, "chat-copiar")[0].listeners.click[0]();
+  assert.deepEqual(copiado, ["Vea el detalle completo en el ticket."]);
 });
 
 test("copiar: el saludo no lleva botón; si el portapapeles falla no dice «Copiado»", async () => {

@@ -538,6 +538,12 @@ VARIANTES = {
         "Revisé el ticket {id} «{titulo}»: está en estado {estado}, tiene prioridad {prioridad} y {asignado}.",
         "El ticket {id} «{titulo}» se encuentra en estado {estado}; su prioridad es {prioridad} y {asignado}.",
     ),
+    # Ficha de un ticket que se pide explicar.
+    "ficha_ticket": (
+        "Estos son los datos del ticket {id} «{titulo}»:",
+        "Le comparto los datos del ticket {id} «{titulo}»:",
+        "El ticket {id} «{titulo}» tiene estos datos:",
+    ),
     "ticket_no_encontrado": (
         "No encontré el ticket {id} entre los tickets que puede ver.",
         "El ticket {id} no aparece entre los tickets que usted puede consultar.",
@@ -1321,23 +1327,19 @@ _PIDE_CONTENIDO = re.compile(
 _ESTE_TICKET = re.compile(r"\b(este|esta|aqui|aca)\b")
 
 
-# Pedidos de explicar o entender un ticket: van a «Explicar con IA».
+# Pedidos de explicar o entender un ticket: el chat responde con su ficha.
 _PIDE_EXPLICACION = re.compile(
     r"\b(explic\w*|resum\w*|de que (se )?trata|que (quiere|pide|necesita)|"
-    r"no (le )?entiendo)\b"
+    r"que (le )?pasa|no (le )?entiendo)\b"
 )
 # «este ticket» con errores comunes («este tiket», «esta tikete»).
 _ESTE_TICKET_EXPLICITO = re.compile(r"\b(este|esta|el)\s+(tick|tik)e?t?e?\b|\b(este|aqui|aca)\b")
 
 
 def ticket_a_explicar(user: User, pregunta: str, ticket_actual: int | None = None) -> int | None:
-    """Ticket a explicar con «Explicar con IA» si la pregunta lo pide
-    («explicá el #3», «de qué trata este ticket»); si no, ``None``.
-
-    Solo para el equipo (como el botón): el Solicitante sigue con el chat.
-    """
-    if user.role == UserRole.REQUESTER.value:
-        return None
+    """Ticket del que se pide la explicación («explicá el #3», «qué pasa con
+    el tiket 5», «de qué trata este ticket»); si no, ``None``. El chat
+    responde con su ficha (:func:`ficha_ticket`), sin IA."""
     t = _normalizar(pregunta)
     if not _PIDE_EXPLICACION.search(t):
         return None
@@ -1349,103 +1351,52 @@ def ticket_a_explicar(user: User, pregunta: str, ticket_actual: int | None = Non
     return None
 
 
-# ---------- Ajustes de la última explicación (sin IA) ----------
-# «más corto», «más detalle»: cambian
-# cómo se muestra la explicación que ya se generó en la conversación; no se
-# vuelve a llamar a la IA.
+# ---------- Ficha del ticket que se pide explicar (sin IA) ----------
+# «explicame el ticket #5»: el chat no genera la explicación; muestra los
+# datos básicos y remite al botón «Explicar con IA» del detalle (o, para
+# quien no lo tiene, al detalle del ticket).
 
-PIDE_TICKET_A_EXPLICAR = "¿De qué ticket desea la explicación?"
-AJUSTE_MAX_PALABRAS = 10
-# Palabras de los pedidos: se corrigen los errores de escritura («preguntsa»,
-# «cortp», «resumilo») antes de buscar los patrones.
-_VOCABULARIO_AJUSTE = (
-    "corto", "corta", "breve", "resumen", "resumilo", "resumelo", "resumir", "resumi", "resume",
-    "linea", "oracion", "frase", "detalle", "detalles", "detallado", "detallada", "detallalo",
-    "completa", "completo", "mejor", "explicalo", "explicala", "explicame", "solo", "amplia",
-    "amplialo",
-)
-_AJUSTES = (
-    # «resume la situación» o «detallá los críticos» son preguntas nuevas: solo
-    # cuentan «resumilo», «resumen» solo, «más detalle», «detallalo»…
-    ("detalle", r"\b(mas|con) detall\w*|\bdetall\w*(lo|la)\b|^(los )?detalles?\b|"
-                r"\bexplic\w*(lo|la)? mejor\b|\bmas complet[oa]\b|\bampli\w*(lo|la)\b|\bmas informacion\b"),
-    ("corto", r"\b(mas )?(corto|corta|breve)\b|\bresum\w*(lo|la)\b|\ben una (linea|oracion|frase)\b|"
-              r"^(dame |solo )?(el |un )?(resumen|resumi|resume|resumir)( por favor| porfa)?$"),
-)
+FICHA_MAX_DESCRIPCION = 200
+LINEA_EXPLICAR_IA = ("Si necesita más información, como las posibles causas y qué revisar primero, "
+                     "[abra el ticket y use «Explicar con IA»]({enlace}).")
+LINEA_VER_DETALLE = "Puede ver el [detalle completo en el ticket]({enlace})."
 
 
-def _corregir_palabra(palabra: str) -> str:
-    if len(palabra) < 4 or palabra in _VOCABULARIO_AJUSTE:
-        return palabra
-    candidatas = [(errores, v) for v in _VOCABULARIO_AJUSTE
-                  if (errores := _parecido(palabra, v)) is not None]
-    return min(candidatas)[1] if candidatas else palabra
+def puede_explicar_ia(user: User) -> bool:
+    """Permiso ``explicar_ia``: Técnico, Supervisor y Administrador."""
+    return user.role != UserRole.REQUESTER.value
 
 
-def ajuste_pedido(pregunta: str) -> str | None:
-    """Modo de :data:`explicacion_service.MODOS_CHAT` que pide el mensaje
-    («más corto, por favor» → «corto»), o ``None``.
-
-    Solo mensajes cortos y sin número de ticket: «resumí el #5» es pedir
-    una explicación nueva."""
-    t = _normalizar(pregunta)
-    if re.search(r"\d", t):
-        return None
-    palabras = re.findall(r"[a-z]+", _SALUDO_AL_INICIO.sub("", t.lstrip("¿¡ ")))
-    if not palabras or len(palabras) > AJUSTE_MAX_PALABRAS:
-        return None
-    corregido = " ".join(_corregir_palabra(p) for p in palabras)
-    # «resumen de los tickets críticos», «listado completo»: es una consulta,
-    # no un ajuste de la explicación.
-    if re.search(r"\b(tickets|tikets|tiquetes)\b", t) or _es_conteo(t):
-        return None
-    return next((modo for modo, patron in _AJUSTES if re.search(patron, corregido)), None)
+def _fecha_creacion(fecha: datetime) -> str:
+    """«20 de octubre de 2026, 9:15 a. m.» en hora de Costa Rica."""
+    if fecha.tzinfo is None:
+        fecha = fecha.replace(tzinfo=timezone.utc)
+    local = fecha.astimezone(ZONA_COSTA_RICA)
+    return f"{local.day} de {_MESES[local.month - 1]} de {local.year}, {_texto_hora(local)}"
 
 
-def _ticket_de_mensaje(user: User, texto: str, ticket_actual: int | None) -> int | None:
-    """Ticket que pidió explicar un mensaje anterior («explicá el #3»,
-    «explicame el 7», «explicá este ticket»)."""
-    ticket_id = ticket_a_explicar(user, texto, ticket_actual)
-    if ticket_id is not None:
-        return ticket_id
-    t = _normalizar(texto)
-    if not _PIDE_EXPLICACION.search(t):
-        return None
-    numeros = list(dict.fromkeys(re.findall(r"\b\d+\b", t)))
-    if len(numeros) == 1:
-        return int(numeros[0])
-    return ticket_actual if not numeros else None
-
-
-def ticket_explicado_antes(user: User, messages: list[dict], ticket_actual: int | None = None) -> int | None:
-    """Ticket de la explicación anterior de la conversación: el que pidió el
-    último mensaje del usuario que no fue a su vez un ajuste."""
-    for mensaje in reversed(messages[:-1]):
-        if mensaje.get("role") != "user":
-            continue
-        texto = mensaje.get("content") or ""
-        if ajuste_pedido(texto) is not None:
-            continue
-        return _ticket_de_mensaje(user, texto, ticket_actual)
-    return None
-
-
-def ajustar_ultima_explicacion(session, user: User, messages: list[dict],
-                               ticket_actual: int | None = None) -> Directa | None:
-    """Si el mensaje pide ajustar la última explicación, la respuesta del
-    servidor con la explicación guardada en ese modo; si no, ``None``."""
-    if user.role == UserRole.REQUESTER.value:
-        return None
-    modo = ajuste_pedido(messages[-1]["content"])
-    if modo is None:
-        return None
-    from backend.services import explicacion_service
-
-    ticket_id = ticket_explicado_antes(user, messages, ticket_actual)
-    ticket = ticket_service.get_visible_ticket(session, ticket_id, user) if ticket_id else None
-    texto = explicacion_service.ajustar_guardada(ticket, modo) if ticket is not None else None
-    limpio = limpiar_respuesta_ia(texto) if texto else None
-    return Directa(limpio or PIDE_TICKET_A_EXPLICAR)
+def ficha_ticket(ticket: Ticket, user: User) -> Directa:
+    """Datos básicos del ticket y, al final, adónde ir para saber más."""
+    reporta = _persona(ticket.creator) if ticket.creator is not None else "no se sabe"
+    asignado = _persona(ticket.assignee) if ticket.assignee is not None else "sin asignar"
+    if puede_explicar_ia(user):
+        cierre = LINEA_EXPLICAR_IA.format(enlace=f"detalle.html?id={ticket.id}&pestana=ia")
+    else:
+        cierre = LINEA_VER_DETALLE.format(enlace=f"detalle.html?id={ticket.id}")
+    lineas = [
+        _decir("ficha_ticket", user, id=_negrita(f"#{ticket.id}"), titulo=ticket.title),
+        f"- Estado: {ticket.state}",
+        f"- Prioridad: {ticket.priority}",
+        f"- Categoría: {ticket.category}",
+        f"- Reporta: {reporta}",
+        f"- Asignado a: {asignado}",
+        f"- Creado: {_fecha_creacion(ticket.created_at)}",
+        f"- Descripción: {_recortar(ticket.description, FICHA_MAX_DESCRIPCION)}",
+        "",
+        cierre,
+    ]
+    # Sin ``principal``: la IA no la redacta (no se llama a Ollama).
+    return Directa("\n".join(lineas))
 
 
 # ---------- Saludos (sin IA) ----------
@@ -2009,10 +1960,10 @@ def interpretar(proveedor, pregunta: str) -> dict | None:
 
 
 def calcular_desde_interpretacion(session, user: User, datos: dict,
-                                  ticket_actual: int | None = None, pregunta: str = ""):
-    """``(directa, ticket a explicar)`` calculados por el servidor con la
-    interpretación de la IA, o ``None`` si la pregunta sigue a la IA libre
-    (tipo «otra», persona o ticket que no existen, o algo que no se cuenta)."""
+                                  ticket_actual: int | None = None, pregunta: str = "") -> Directa | None:
+    """Respuesta calculada por el servidor con la interpretación de la IA, o
+    ``None`` si la pregunta sigue a la IA libre (tipo «otra», persona o
+    ticket que no existen, o algo que no se cuenta)."""
     tipo = datos["tipo"]
     t = _normalizar(pregunta)
     if tipo in ("estado_ticket", "explicar_ticket"):
@@ -2027,9 +1978,8 @@ def calcular_desde_interpretacion(session, user: User, datos: dict,
         if ticket is None:
             return None
         if tipo == "explicar_ticket":
-            # Como el botón «Explicar con IA»: solo el equipo.
-            return None if user.role == UserRole.REQUESTER.value else (None, ticket)
-        return _estado_ticket(ticket, user), None
+            return ficha_ticket(ticket, user)
+        return _estado_ticket(ticket, user)
     if tipo != "conteo":
         return None
 
@@ -2043,7 +1993,7 @@ def calcular_desde_interpretacion(session, user: User, datos: dict,
         if (persona and rol) or estado not in (None, "todos", "pendientes") or datos["periodo"]:
             return None
         if rol:
-            return _conteo_rol(session, user, rol, ROLES_INTERPRETACION[rol]), None
+            return _conteo_rol(session, user, rol, ROLES_INTERPRETACION[rol])
         # El nombre tiene que estar en la pregunta, aunque sea con errores
         # («jsoe» → «jose»), y no copiado de un ejemplo.
         en_pregunta = re.findall(r"[a-z]+", t)
@@ -2053,8 +2003,8 @@ def calcular_desde_interpretacion(session, user: User, datos: dict,
         personas = _personas_nombradas(session, user, _normalizar(persona))
         if not personas:
             # Nunca a la IA libre: daría el conteo de otra persona.
-            return Directa(_decir("no_encontre_persona")), None
-        return _conteo_persona(session, user, personas), None
+            return Directa(_decir("no_encontre_persona"))
+        return _conteo_persona(session, user, personas)
     if estado in (None, "todos") and not (re.search(r"\b(total|todos)\b", t) or _solo_pide_el_total(t)):
         # El modelo pudo perder el estado («cuantos tikets nuevos ai»): no
         # se responde el total por error.
@@ -2062,7 +2012,7 @@ def calcular_desde_interpretacion(session, user: User, datos: dict,
     clave = "total" if estado in (None, "todos") else estado
     periodo = _periodo(PERIODOS_INTERPRETACION[datos["periodo"]]) if datos["periodo"] else None
     directa = _conteo(session, user, clave, periodo)
-    return (directa, None) if directa is not None else None
+    return directa
 
 
 class _FiltroPensamiento:
@@ -2414,24 +2364,20 @@ def pregunta_efectiva(session, user: User, messages: list[dict]) -> str:
 
 
 def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actual: int | None):
-    """``(directa, system, ticket_a_explicar)``: la respuesta directa si la
-    hay; si la pregunta pide explicar un ticket visible, ese ticket; si no,
-    el prompt para la IA. ``pregunta`` es la que se respondió (la consulta
-    completa si era un seguimiento)."""
+    """``(directa, system, pregunta)``: la respuesta directa si la hay (la
+    ficha si pide explicar un ticket); si no, el prompt para la IA.
+    ``pregunta`` es la que se respondió (la consulta completa si era un
+    seguimiento)."""
     pregunta = pregunta_efectiva(session, user, messages)
-    # Antes que los ajustes: «¿qué hora es en Costa Rica?» no pide «más corta».
     fecha_hora = respuesta_fecha_hora(messages[-1]["content"], user=user) if messages else None
     if fecha_hora is not None:
-        return Directa(fecha_hora), None, None, messages[-1]["content"]
-    ajustada = ajustar_ultima_explicacion(session, user, messages, ticket_actual)
-    if ajustada is not None:
-        return ajustada, None, None, pregunta
+        return Directa(fecha_hora), None, messages[-1]["content"]
     explicar_id = ticket_a_explicar(user, pregunta, ticket_actual)
     if explicar_id is not None:
         ticket = ticket_service.get_visible_ticket(session, explicar_id, user)
         if ticket is None:
-            return Directa(_ticket_no_encontrado(user, explicar_id)), None, None, pregunta
-        return None, None, ticket, pregunta
+            return Directa(_ticket_no_encontrado(user, explicar_id)), None, pregunta
+        return ficha_ticket(ticket, user), None, pregunta
     directa = calcular_directa(session, user, pregunta, ticket_actual)
     # Las reglas no la reconocieron: la IA la clasifica y el servidor calcula.
     # Si no sirve, «No entendí…» se mantiene y lo demás va a la IA libre.
@@ -2440,38 +2386,19 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
             datos = interpretar(proveedor, pregunta)
         except IATardo:
             # No se llama a la IA libre detrás: también se pasaría del tiempo.
-            return directa or Directa(MENSAJE_IA_OCUPADA), None, None, pregunta
-        calculado = datos and calcular_desde_interpretacion(session, user, datos, ticket_actual, pregunta)
-        if calculado:
-            interpretada, ticket = calculado
-            return interpretada, None, ticket, pregunta
+            return directa or Directa(MENSAJE_IA_OCUPADA), None, pregunta
+        interpretada = datos and calcular_desde_interpretacion(session, user, datos, ticket_actual, pregunta)
+        if interpretada:
+            return interpretada, None, pregunta
     if directa is not None:
-        return directa, None, None, pregunta
+        return directa, None, pregunta
     t = _normalizar(pregunta)
     if _pide_conteo_persona(t) and nombra_persona_desconocida(t):
         # La IA libre nunca cuenta los tickets de una persona: podría hablar
         # de otra (la del mensaje anterior, por ejemplo).
-        return Directa(_decir("no_encontre_persona")), None, None, pregunta
+        return Directa(_decir("no_encontre_persona")), None, pregunta
     max_tickets = getattr(proveedor, "max_tickets", MAX_TICKETS_IN_CONTEXT)
-    return None, build_system(session, user, max_tickets, pregunta, ticket_actual), None, pregunta
-
-
-def _explicar_ticket(proveedor, session, user: User, ticket: Ticket) -> str:
-    """La explicación narrada (servicio «Explicar con IA») para el chat.
-    Si la IA falla lanza ``AsistenteNoDisponible`` con el mensaje genérico:
-    nunca se responde con una plantilla en su lugar."""
-    from backend.services import explicacion_service
-
-    try:
-        texto = explicacion_service.explicacion_para_chat(session, proveedor, ticket, user)
-    except explicacion_service.ExplicacionInvalida as error:
-        _registrar_falla(proveedor, user, ticket.id, error)
-        raise AsistenteNoDisponible(MENSAJE_NO_DISPONIBLE) from error
-    limpio = limpiar_respuesta_ia(texto)
-    if limpio is None:
-        _registrar_falla(proveedor, user, ticket.id, "la explicación nombraba lo interno")
-        raise AsistenteNoDisponible(MENSAJE_NO_DISPONIBLE)
-    return limpio
+    return None, build_system(session, user, max_tickets, pregunta, ticket_actual), pregunta
 
 
 def respuesta_sistema(user: User) -> str:
@@ -2495,11 +2422,9 @@ def responder_completo(proveedor, session, user: User, messages: list[dict],
     se registra el detalle y se lanza ``AsistenteNoDisponible`` con
     :data:`MENSAJE_NO_DISPONIBLE` (nunca un texto inventado).
     """
-    directa, system, ticket, pregunta = _preparar(proveedor, session, user, messages, ticket_actual)
+    directa, system, pregunta = _preparar(proveedor, session, user, messages, ticket_actual)
     if directa is not None:
         return _texto_directa(proveedor, pregunta, directa)
-    if ticket is not None:
-        return _explicar_ticket(proveedor, session, user, ticket), "ia"
     try:
         texto = proveedor.responder(system, messages)
     except AsistenteNoDisponible as error:
@@ -2525,20 +2450,11 @@ def responder_stream(proveedor, session, user: User, messages: list[dict],
                      ticket_actual: int | None = None):
     """Eventos para el chat: ``{"t": texto}`` por partes, ``{"error": msg}``
     si el proveedor falla y ``{"fin": True, "fuente": …}`` al terminar."""
-    directa, system, ticket, pregunta = _preparar(proveedor, session, user, messages, ticket_actual)
+    directa, system, pregunta = _preparar(proveedor, session, user, messages, ticket_actual)
     if directa is not None:
         texto, fuente = _texto_directa(proveedor, pregunta, directa)
         yield {"t": texto}
         yield {"fin": True, "fuente": fuente}
-        return
-    if ticket is not None:
-        try:
-            texto = _explicar_ticket(proveedor, session, user, ticket)
-        except (AsistenteNoDisponible, AsistenteNoConfigurado, AsistenteOcupado):
-            yield {"error": MENSAJE_NO_DISPONIBLE}
-            return
-        yield {"t": texto}
-        yield {"fin": True, "fuente": "ia"}
         return
     stream = getattr(proveedor, "responder_stream", None)
 

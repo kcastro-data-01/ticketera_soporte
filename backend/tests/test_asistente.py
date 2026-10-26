@@ -408,7 +408,7 @@ def test_empty_group_answer(client, session, fake_claude):
 
 @pytest.mark.parametrize(
     "pregunta",
-    ["Resume la situación de mi trabajo", "Hola, ¿quién eres?", "¿Qué le pasa al ticket #1?"],
+    ["Resume la situación de mi trabajo", "Hola, ¿quién eres?", "¿Cómo resuelvo el ticket #1?"],
 )
 def test_how_to_and_open_questions_go_to_ai(client, session, fake_claude, pregunta):
     headers = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
@@ -425,7 +425,12 @@ def test_requester_cannot_ask_for_other_tickets_by_number(client, session, fake_
     resp = ask(client, headers, f"¿En qué estado está el ticket #{ajeno.id}?")
     assert es_forma(resp.json()["respuesta"], "ticket_no_encontrado", id=f"#{ajeno.id}")
 
-    ask(client, headers, f"Explícame el ticket #{ajeno.id}")
+    # «Explícame…» responde el servidor (sin IA) con la misma respuesta.
+    resp = ask(client, headers, f"Explícame el ticket #{ajeno.id}")
+    assert es_forma(resp.json()["respuesta"], "ticket_no_encontrado", id=f"#{ajeno.id}")
+    assert "Servidor interno caído" not in resp.json()["respuesta"]
+
+    ask(client, headers, f"¿Cómo se resuelve el ticket #{ajeno.id}?")
     system = fake_claude.system_text()
     assert "Servidor interno caído" not in system
     assert f"Ticket #{ajeno.id}: no existe o no está entre los que esta persona puede ver." in system
@@ -439,7 +444,7 @@ def test_named_ticket_details_reach_the_ai(client, session, fake_claude):
     session.add(Comment(ticket_id=ticket.id, author="Laura", content="Ya cambié el tóner"))
     session.commit()
 
-    ask(client, headers, f"¿Qué pasa con el ticket #{ticket.id}?")
+    ask(client, headers, f"¿Cómo resuelvo el ticket #{ticket.id}?")
     system = fake_claude.system_text()
     assert f"Detalle del ticket #{ticket.id}:" in system
     assert "Descripción: Descripción" in system
@@ -719,7 +724,7 @@ def test_requester_counts_only_own_tickets(client, session, fake_claude, equipo)
 
 def test_ai_receives_the_role_next_to_each_name(client, session, fake_claude, equipo):
     e = equipo
-    ask(client, e.headers, f"¿Qué le pasa al ticket #{e.de_laura.id}?")
+    ask(client, e.headers, f"¿Cómo resuelvo el ticket #{e.de_laura.id}?")
     system = fake_claude.system_text()
     assert f"#{e.de_laura.id} «Impresora» (Red, prioridad Alta, estado Nuevo, asignado a Laura Méndez (Administrador))" in system
     assert "Asignado a: Laura Méndez (Administrador)" in system

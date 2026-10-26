@@ -882,11 +882,15 @@ function iniciarPestanas() {
       mostrarPestana(vecina.dataset.pestana, { enfocar: true });
     });
   });
-  let guardada = null;
-  try {
-    guardada = localStorage.getItem(PESTANA_KEY);
-  } catch (error) {
-    guardada = null;
+  /* «detalle.html?id=N&pestana=ia» (enlace del chat) abre esa pestaña; si
+     no, la última que se usó. */
+  let guardada = new URLSearchParams(window.location.search).get("pestana");
+  if (!guardada) {
+    try {
+      guardada = localStorage.getItem(PESTANA_KEY);
+    } catch (error) {
+      guardada = null;
+    }
   }
   mostrarPestana(guardada);
 }

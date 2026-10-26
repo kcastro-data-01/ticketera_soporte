@@ -1,10 +1,11 @@
 """«Explicar con IA» con Ollama simulado: esquema nuevo (causas, qué revisar
 primero y certeza, sin preguntas), poco texto, texto largo y confuso, JSON
-inválido, Ollama caído, caché (también la de formato viejo), permisos y el
-pedido desde el chat."""
+inválido, Ollama caído, caché (también la de formato viejo) y permisos. El
+chat ya no la genera: ver ``test_chat_ficha.py``."""
 
 import json
 import logging
+import re
 
 import httpx
 import pytest
@@ -17,7 +18,6 @@ from backend.services import asistente_service
 from backend.services import explicacion_service as ex
 from backend.services.asistente_service import ProveedorQwen
 from backend.tests.test_asistente import login_as
-from backend.tests.textos_asistente import es_forma
 
 BUENA = {
     "explicacion": ("José Solano reporta que algo no funciona, sin decir qué es. "
@@ -415,112 +415,16 @@ def test_missing_ticket_and_login(client, session, ollama, tecnico):
     assert client.post("/api/tickets/1/explicacion").status_code == 401
 
 
-# --- Desde el chat -----------------------------------------------------------------
+# --- Tono formal ----------------------------------------------------------------
+
+TUTEO = re.compile(r"\b(podés|puedes|tenés|tienes|querés|quieres|intentaste|probaste|copia el|envía una|"
+                   r"tu|tus|eres|responde en|usa solo|inventes|adivines|di qué|ti)\b", re.I)
 
 
-def preguntar(client, headers, texto, ticket_id=None, stream=False):
-    cuerpo = {"messages": [{"role": "user", "content": texto}]}
-    if ticket_id is not None:
-        cuerpo["ticket_id"] = ticket_id
-    if stream:
-        resp = client.post("/api/asistente/stream", json=cuerpo, headers=headers)
-        return [json.loads(linea) for linea in resp.text.splitlines() if linea.strip()]
-    return client.post("/api/asistente", json=cuerpo, headers=headers)
-
-
-def test_chat_explicar_tickete_uses_the_explanation_not_the_template(client, session, ollama, tecnico):
-    ticket = nuevo_ticket(session)
-    resp = preguntar(client, tecnico, f"explicar tickete #{ticket.id}")
-    assert resp.status_code == 200
-    datos = resp.json()
-    assert datos["fuente"] == "ia"
-    assert datos["respuesta"].startswith(BUENA["explicacion"])
-    assert "Certeza: baja" in datos["respuesta"]
-    assert "Posibles causas:\n- El programa se actualizó" in datos["respuesta"]
-    assert "Qué revisar primero:\n1. Revisar en la consola" in datos["respuesta"]
-    assert "pregunta" not in datos["respuesta"].lower() and "?" not in datos["respuesta"]
-    # Ni la plantilla del ticket ni el chat libre: el pedido es el de «Explicar con IA».
-    assert "Título:" not in datos["respuesta"] and "Categoría" not in datos["respuesta"]
-    assert len(ollama.pedidos) == 1
-    assert ollama.pedidos[0]["format"] == ex.ESQUEMA_IA
-    assert session.scalar(select(TicketExplanation)) is not None  # queda guardada para el panel
-
-
-@pytest.mark.parametrize("pregunta", [
-    "explicame el tiket {id}",
-    "Explicá el tikete #{id}",
-    "de qué trata el ticket {id}?",
-    "qué quiere la persona del #{id}",
-    "no entiendo el ticket #{id}",
-    "resumí el ticket {id}",
-])
-def test_chat_detects_explanation_requests_with_typos(client, session, ollama, tecnico, pregunta):
-    ticket = nuevo_ticket(session)
-    datos = preguntar(client, tecnico, pregunta.format(id=ticket.id)).json()
-    assert datos["fuente"] == "ia"
-    assert datos["respuesta"].startswith(BUENA["explicacion"])
-    assert ollama.pedidos[0]["format"] == ex.ESQUEMA_IA
-
-
-def test_chat_explains_este_ticket_on_screen_and_streams(client, session, ollama, tecnico):
-    ticket = nuevo_ticket(session)
-    eventos = preguntar(client, tecnico, "explicame este ticket", ticket_id=ticket.id, stream=True)
-    assert eventos[0]["t"].startswith(BUENA["explicacion"])
-    assert eventos[-1] == {"fin": True, "fuente": "ia"}
-    # La segunda vez se reutiliza la guardada (sigue siendo texto de la IA).
-    preguntar(client, tecnico, "explicame este ticket", ticket_id=ticket.id, stream=True)
-    assert len(ollama.pedidos) == 1
-
-
-def test_chat_explanation_when_ollama_fails_is_an_error_not_a_template(client, session, ollama, tecnico):
-    ticket = nuevo_ticket(session)
-    ollama.error = httpx.ConnectError("refused")
-    eventos = preguntar(client, tecnico, f"explicar ticket #{ticket.id}", stream=True)
-    assert eventos == [{"error": "La IA no está disponible en este momento"}]
-    assert preguntar(client, tecnico, f"explicar ticket #{ticket.id}").status_code == 502
-
-
-def test_chat_invalid_explanation_twice_is_an_error(client, session, ollama, tecnico):
-    ticket = nuevo_ticket(session)
-    ollama.respuestas = ["esto no es json"]
-    eventos = preguntar(client, tecnico, f"explicar ticket #{ticket.id}", stream=True)
-    assert eventos == [{"error": "La IA no está disponible en este momento"}]
-
-
-def test_chat_explanation_of_missing_ticket_is_a_server_answer(client, session, ollama, tecnico):
-    datos = preguntar(client, tecnico, "explicar ticket #999").json()
-    assert datos["fuente"] == "directa"
-    assert es_forma(datos["respuesta"], "ticket_no_encontrado", id="#999"), datos
-    assert ollama.pedidos == []
-
-
-def test_requester_keeps_the_normal_chat(client, session, ollama):
-    headers = login_as(client, session, "Solicitante", "so@x.local", "Laura Méndez")
-    propio = nuevo_ticket(session, created_by_id=session.scalar(
-        select(User).where(User.email == "so@x.local")).id)
-    ajeno = nuevo_ticket(session)
-    ollama.respuestas = ["Tu ticket trata de algo que no funciona."]
-
-    datos = preguntar(client, headers, f"explicame mi ticket #{propio.id}").json()
-    assert datos["fuente"] == "ia"
-    assert "format" not in ollama.pedidos[-1]  # chat normal, no «Explicar con IA»
-    assert session.scalar(select(TicketExplanation)) is None
-
-    # Un ticket ajeno nunca llega al modelo con su contenido.
-    preguntar(client, headers, f"explicame el ticket #{ajeno.id}")
-    system = ollama.pedidos[-1]["messages"][0]["content"]
-    assert f"Ticket #{ajeno.id}: no existe o no está entre los que esta persona puede ver." in system
-
-
-def test_ticket_a_explicar_needs_a_request_and_one_ticket(session):
-    tecnico = User(name="T", email="t@t", role="Técnico")
-    assert ex_chat("¿cuál es el estado del #3?", tecnico) is None
-    assert ex_chat("explicame el #3 y el #4", tecnico) is None
-    assert ex_chat("explicame cómo crear un ticket", tecnico) is None
-    assert ex_chat("explicame", tecnico, ticket_actual=7) is None
-    assert ex_chat("explicame este", tecnico, ticket_actual=7) == 7
-    assert ex_chat("explicame el #3", tecnico, ticket_actual=7) == 3
-
-
-def ex_chat(pregunta, user, ticket_actual=None):
-    return asistente_service.ticket_a_explicar(user, pregunta, ticket_actual)
+def test_textos_de_la_explicacion_tratan_de_usted():
+    textos = [ex.INSTRUCCIONES, ex.REINTENTO, ex.MENSAJE_INVALIDA]
+    for _, salida in ex.EJEMPLOS:
+        textos += [salida["explicacion"], *salida["posibles_causas"], *salida["que_revisar_primero"]]
+    for texto in textos:
+        assert not TUTEO.search(texto), texto
+    assert "tono formal (usted)" in ex.INSTRUCCIONES

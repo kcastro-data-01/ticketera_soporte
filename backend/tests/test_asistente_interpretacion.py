@@ -130,8 +130,7 @@ def test_interpreted_period_uses_the_same_count_as_the_rules(session, tickets):
     datos = leer_interpretacion(_json(estado="pendientes", periodo="semana"))
     # Con la misma semilla las dos dicen el resultado de la misma forma.
     asistente_service._azar.seed(7)
-    directa, ticket = calcular_desde_interpretacion(session, jose, datos, pregunta="cunatos pendientes hay esta semana")
-    assert ticket is None
+    directa = calcular_desde_interpretacion(session, jose, datos, pregunta="cunatos pendientes hay esta semana")
     asistente_service._azar.seed(7)
     assert directa == calcular_directa(session, jose, "cuantos pendientes esta semana")
 
@@ -273,15 +272,12 @@ def test_ticket_state(client, ia, tickets):
                     asignado="está asignado a Carlos Solís (Técnico)"), respuesta
 
 
-def test_explain_ticket_uses_explain_with_ai(client, ia, tickets, monkeypatch):
+def test_explain_ticket_interpreted_shows_the_ticket_card(client, ia, tickets):
     headers, t = tickets
-    from backend.services import explicacion_service
-
-    monkeypatch.setattr(explicacion_service, "explicacion_para_chat",
-                        lambda session, proveedor, ticket, user: f"Explicación del #{ticket.id}")
     ia.json = _json("explicar_ticket", ticket=t["Nuevo"].id)
-    respuesta = _respuesta(ask(client, headers, f"q kiere decir el tiket {t['Nuevo'].id}"), "ia")
-    assert respuesta == f"Explicación del #{t['Nuevo'].id}"
+    respuesta = _respuesta(ask(client, headers, f"q kiere decir el tiket {t['Nuevo'].id}"), "directa")
+    assert f"«{t['Nuevo'].title}»" in respuesta.splitlines()[0]
+    assert respuesta.endswith(f"(detalle.html?id={t['Nuevo'].id}&pestana=ia).")
 
 
 def test_free_ai_gets_the_counts_by_state(client, ia, tickets):

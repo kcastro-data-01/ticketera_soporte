@@ -212,7 +212,7 @@ def test_interpreted_name_may_be_corrected_by_the_ai(session, gente):
 
     ana = session.query(User).filter_by(email="ana@tec.local").one()
     # La IA corrigió «jsoe» a «jose»: antes se descartaba por no estar tal cual.
-    directa, _ = calcular_desde_interpretacion(session, ana, _datos("jose solano"), None, "q onda los tikets d jsoe solano")
+    directa = calcular_desde_interpretacion(session, ana, _datos("jose solano"), None, "q onda los tikets d jsoe solano")
     assert es_de_jose(directa.texto, gente), directa.texto
 
 
@@ -220,7 +220,7 @@ def test_interpreted_unknown_name_never_reaches_the_free_ai(session, gente):
     from backend.services.asistente_service import calcular_desde_interpretacion
 
     ana = session.query(User).filter_by(email="ana@tec.local").one()
-    directa, _ = calcular_desde_interpretacion(session, ana, _datos("fernanda"), None, "q onda los tikets d fernanda")
+    directa = calcular_desde_interpretacion(session, ana, _datos("fernanda"), None, "q onda los tikets d fernanda")
     assert directa.texto in NO_ENCONTRE_PERSONA
     # Un nombre que la IA inventó (no está en la pregunta) se descarta.
     assert calcular_desde_interpretacion(session, ana, _datos("maria"), None, "que significa prioridad alta") is None

@@ -120,10 +120,30 @@ function crearElemento(tag, clase, texto) {
   return el;
 }
 
-/* Escribe una línea con «**negrita**» y «#N» como enlace al detalle del
-   ticket. Usa nodos de texto: nada de lo que responde el servidor se
-   interpreta como HTML. */
+/* Enlaces «[texto](detalle.html?id=N)» que arma el servidor (con
+   «&pestana=ia» para abrir la explicación). Solo al detalle de un ticket:
+   cualquier otro destino se muestra como texto. */
+const ENLACE_DETALLE = /(\[[^\]\n]+\]\(detalle\.html\?id=\d+(?:&pestana=[a-z]+)?\))/;
+
+/* Escribe una línea con «**negrita**», «#N» como enlace al detalle del
+   ticket y los enlaces de ENLACE_DETALLE. Usa nodos de texto: nada de lo
+   que responde el servidor se interpreta como HTML. */
 function pintarLinea(elemento, texto) {
+  String(texto).split(ENLACE_DETALLE).forEach((pedazo) => {
+    const enlace = /^\[([^\]\n]+)\]\((detalle\.html\?id=\d+(?:&pestana=[a-z]+)?)\)$/.exec(pedazo);
+    if (enlace) {
+      const a = document.createElement("a");
+      a.className = "chat-enlace";
+      a.href = enlace[2];
+      a.textContent = enlace[1];
+      elemento.appendChild(a);
+    } else if (pedazo) {
+      pintarFormato(elemento, pedazo);
+    }
+  });
+}
+
+function pintarFormato(elemento, texto) {
   String(texto).split(/(\*\*[^*\n]+\*\*)/).forEach((trozo) => {
     const negrita = /^\*\*([^*\n]+)\*\*$/.exec(trozo);
     const destino = negrita ? elemento.appendChild(document.createElement("strong")) : elemento;
@@ -204,6 +224,13 @@ function horaDeMensaje(mensaje) {
   return `${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
 }
 
+/* La respuesta sin el formato: sin «**» y con los enlaces como su texto. */
+function textoParaCopiar(contenido) {
+  return String(contenido)
+    .replace(/\[([^\]\n]+)\]\(detalle\.html\?id=\d+(?:&pestana=[a-z]+)?\)/g, "$1")
+    .replace(/\*\*/g, "");
+}
+
 /* Botón con ícono que copia la respuesta (sin los «**» del formato) y
    muestra «Copiado» un segundo. */
 function botonCopiar(contenido) {
@@ -217,7 +244,7 @@ function botonCopiar(contenido) {
   let reloj = null;
   boton.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(String(contenido).replace(/\*\*/g, ""));
+      await navigator.clipboard.writeText(textoParaCopiar(contenido));
     } catch {
       return;
     }

@@ -23,7 +23,7 @@ const PESTANAS = [
   ["ia", "seccion-ia", "explicar_ia"],
 ];
 
-function montar({ rol = "Técnico", guardada = null } = {}) {
+function montar({ rol = "Técnico", guardada = null, search = "?id=1" } = {}) {
   const store = new Map([["access_token", "t"], ["user", JSON.stringify({ name: "Ana", role: rol })]]);
   if (guardada) store.set("detalle_pestana", guardada);
   const nodo = (id) => ({
@@ -49,7 +49,7 @@ function montar({ rol = "Técnico", guardada = null } = {}) {
       querySelectorAll: (sel) => (sel === "#pestanas-detalle [role=tab]" ? pestanas : []),
       addEventListener() {},
     },
-    window: { location: { search: "?id=1", href: "" } },
+    window: { location: { search, href: "" } },
     localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
     console: { error() {} },
     URLSearchParams, Date, Number,
@@ -115,4 +115,16 @@ test("el Solicitante no ve la pestaña de IA aunque fuera la última abierta", (
   assert.equal(d.activa(), "comentarios");
   assert.deepEqual(d.visibles(), ["seccion-comentarios"], "el panel de IA no se abre");
   assert.equal(d.store.get("detalle_pestana"), "comentarios");
+});
+
+test("el enlace del chat (?pestana=ia) abre la explicación aunque se recordara otra", () => {
+  const d = montar({ guardada: "historial", search: "?id=1&pestana=ia" });
+  assert.equal(d.activa(), "ia");
+  assert.deepEqual(d.visibles(), ["seccion-ia"]);
+});
+
+test("con ?pestana=ia el Solicitante igual abre Comentarios", () => {
+  const d = montar({ rol: "Solicitante", search: "?id=1&pestana=ia" });
+  assert.equal(d.activa(), "comentarios");
+  assert.deepEqual(d.visibles(), ["seccion-comentarios"]);
 });

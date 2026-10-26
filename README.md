@@ -737,15 +737,19 @@ Cómo se adapta a un modelo muy chico (`qwen3:0.6b`):
   `docker compose logs ticketera | grep IA:`).
 - El modelo se sigue eligiendo con `QWEN_MODELO`.
 
-**Desde el chat**: si el equipo escribe «explicame el ticket #3», «de qué
-trata este ticket», «resumí el #3» o «no entiendo el ticket #3» (también con
-«tickete», «tiket», «tikete» o sin tildes), el chat usa esta misma explicación
-y responde con el texto narrado, la certeza, las posibles causas y qué revisar
-primero. Después se puede pedir «más corto» (la explicación y el primer paso)
-o «más detalle» (agrega la categoría y la prioridad sugeridas). Solo para tickets
-que la persona puede ver; el Solicitante sigue con el chat normal. El chat no
-muestra la fuente debajo de cada mensaje (el campo `fuente` sigue llegando del
-servidor y queda en el log).
+**Desde el chat**: «explicame el ticket #3», «qué pasa con el tiket 5», «de
+qué trata este ticket», «resumí el #3» o «no entiendo el ticket #3» (también
+con «tickete», «tiket», «tikete» o sin tildes) **no llaman a la IA**: el
+servidor responde con la ficha del ticket (número, título, estado, prioridad,
+categoría, quién lo reporta, a quién está asignado, cuándo se creó y los
+primeros ~200 caracteres de la descripción). Al final, el equipo ve «Si
+necesita más información, como las posibles causas y qué revisar primero,
+abra el ticket y use «Explicar con IA».», con un enlace que abre el detalle en
+la pestaña de la explicación (`detalle.html?id=N&pestana=ia`); el Solicitante
+ve «Puede ver el detalle completo en el ticket.» con el enlace al detalle. Si
+el ticket no existe o la persona no puede verlo, responde «No encontré el
+ticket…». El chat no muestra la fuente debajo de cada mensaje (el campo
+`fuente` sigue llegando del servidor y queda en el log).
 
 API: `GET /api/tickets/{id}/explicacion` (la guardada, sin IA) y
 `POST /api/tickets/{id}/explicacion[?regenerar=true]`.
