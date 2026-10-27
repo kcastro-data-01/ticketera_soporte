@@ -760,6 +760,9 @@ def detectar_consulta(pregunta: str) -> str | None:
         return None
     if _PIDE_TIEMPO.search(t):
         return None
+    # «¿cuántos tickets se le pueden asignar a una persona?» es una regla.
+    if es_pregunta_de_regla(t):
+        return None
     pide_lista = re.search(rf"\b({_CUANTOS}|cuales|cual|que tickets|{_HAY}|lista\w*|muestra\w*|mostrar|"
                            r"dime|ver|tengo|pendientes?|abiertos?)\b", t)
     # Preguntas cortas de seguimiento («¿en proceso?», «y los críticos?»).
@@ -1316,6 +1319,96 @@ def respuesta_guia(user: User, pregunta: str) -> str | None:
     return None
 
 
+# ---------- Reglas de la ticketera (sin IA) ----------
+# «¿Cuántos tickets se le pueden asignar a una persona?» no es un conteo: es
+# una pregunta sobre cómo funciona la app. Se responde con la regla real del
+# código (ticket_service, routers/tickets, correo_service).
+
+_PUEDE = r"p[ue]e?d[ae]n?"  # puede, pueden, puden, pede…
+_LIMITE = r"(maxim\w*|maxm\w*|macim\w*|limit\w*|limte\w*|topes?)"
+# Palabras que marcan una pregunta de reglas o límites, con o sin errores.
+_PIDE_REGLA = re.compile(
+    rf"\b(se (le |les )?{_PUEDE}|{_PUEDE} tener|{_LIMITE}|como maximo)\b"
+    rf"|\b(quien|quienes|que rol\w*)\b.*\b{_PUEDE}\b"
+    r"|\bcomo se (reparten|reparte|distribuyen|distribuye|asignan|asigna|crean|crea|generan)\b"
+    r"|\bque (ve|ven|puede ver|pueden ver)\b"
+)
+_HABLA_DE_CARGA = re.compile(rf"\b({_TICKET}|{_ASIGNADO}|persona\w*|tecnic\w*|usuario\w*)\b")
+_QUIEN = r"\b(quien|quienes|que rol\w*)\b"
+
+REGLA_LIMITE = (
+    "La ticketera no tiene un límite de tickets por persona: no hay un máximo ni un tope. "
+    "Cada ticket nuevo se asigna automáticamente al Técnico activo con menos tickets "
+    "asignados (se cuentan todos los que tiene, en cualquier estado; si hay empate, al "
+    "que se registró primero), y así la carga se reparte. Un Administrador o un Supervisor "
+    "también puede asignar tickets manualmente, sin tope."
+)
+REGLA_QUIEN_ASIGNA = (
+    "Solo el Administrador y el Supervisor pueden asignar o reasignar tickets, desde el "
+    "detalle del ticket, en «Asignación». El Técnico y el Solicitante no asignan. Además, "
+    "cada ticket nuevo se asigna automáticamente al Técnico activo con menos tickets asignados."
+)
+REGLA_REPARTO = (
+    "Cada ticket nuevo se asigna automáticamente al Técnico activo con menos tickets "
+    "asignados (se cuentan todos los que tiene, en cualquier estado); si hay empate, al "
+    "que se registró primero. Si no hay ningún Técnico activo, el ticket queda sin asignar. "
+    "Después, un Administrador o un Supervisor puede reasignarlo manualmente. Los tickets "
+    "que llegan por correo se asignan al dueño del buzón de soporte."
+)
+REGLA_QUIEN_CAMBIA_ESTADO = (
+    "El Técnico, el Supervisor y el Administrador pueden cambiar el estado de cualquier "
+    "ticket; el Solicitante, solo el de los tickets que tiene asignados. El orden es "
+    "Nuevo → En proceso → Resuelto → Cerrado, sin saltar pasos ni volver atrás, y un "
+    "ticket Cerrado ya no cambia."
+)
+REGLA_SOLICITANTE = (
+    "Un Solicitante solo ve los tickets que él mismo creó y los que tiene asignados. "
+    "Puede crear tickets, comentar en ellos y cambiar el estado de los que tiene "
+    "asignados. No ve el historial global, las métricas ni la lista de usuarios."
+)
+REGLA_CORREO = (
+    "Cuando la función de correo está activa, la ticketera revisa el buzón de soporte cada "
+    "minuto. Un correo que pide ayuda (o cuyo asunto empieza con «Ticket:») crea un ticket "
+    "a nombre de quien lo escribe, asignado al dueño del buzón, y se le responde con el "
+    "número del ticket. Si la persona responde en el mismo hilo o el asunto trae «Ticket #N», "
+    "se agrega como comentario. Quien no tiene cuenta y es del dominio de la empresa queda "
+    "creado como Solicitante; los correos de otros dominios se ignoran. Además, un correo "
+    "que el dueño del buzón envía con el asunto «Ticket: …» crea un ticket asignado al "
+    "primer destinatario de la empresa."
+)
+
+# (cómo se reconoce, en la pregunta normalizada; la regla), en orden.
+REGLAS_APP = [
+    (lambda t: (re.search(rf"\b{_LIMITE}\b", t) or re.search(rf"\b{_CUANTOS}\b", t))
+     and _HABLA_DE_CARGA.search(t) and not re.search(r"\bestados?\b", t), REGLA_LIMITE),
+    (lambda t: re.search(rf"{_QUIEN}.*\b{_ASIGNADO}", t), REGLA_QUIEN_ASIGNA),
+    (lambda t: re.search(r"\b(reparten|reparte|reparto|distribuy\w*|automatic\w*)\b", t)
+     or re.search(rf"\bcomo se {_ASIGNADO}", t), REGLA_REPARTO),
+    (lambda t: re.search(rf"{_QUIEN}.*\b(estados?|cerrar|cierra\w*|resolver|resuelv\w*)\b", t),
+     REGLA_QUIEN_CAMBIA_ESTADO),
+    (lambda t: re.search(r"\bsolicitantes?\b", t), REGLA_SOLICITANTE),
+    (lambda t: re.search(r"\b(correos?|e-?mails?|mails?)\b", t), REGLA_CORREO),
+]
+# Para la IA, cuando la pregunta es de reglas pero no hay una preparada.
+REGLAS_PARA_IA = "Reglas de la ticketera (son las reales; no inventes otras):\n" + "\n".join(
+    f"- {regla}" for _, regla in REGLAS_APP
+)
+
+
+def es_pregunta_de_regla(t: str) -> bool:
+    """¿La pregunta (normalizada) es sobre reglas o límites de la app
+    («se pueden», «máximo», «quién puede…») y no un conteo?"""
+    return bool(_PIDE_REGLA.search(t))
+
+
+def respuesta_regla(pregunta: str) -> str | None:
+    """La regla real que responde la pregunta, o ``None``."""
+    t = _normalizar(pregunta)
+    if not es_pregunta_de_regla(t):
+        return None
+    return next((regla for coincide, regla in REGLAS_APP if coincide(t)), None)
+
+
 # Preguntas sobre el contenido de un ticket (qué le pasa, cómo se arregla):
 # siempre van a la IA con el detalle del ticket, nunca a la guía fija.
 _PIDE_CONTENIDO = re.compile(
@@ -1664,6 +1757,11 @@ def calcular_directa(session, user: User, pregunta: str,
             return Directa(_ticket_no_encontrado(user, ids[0]))
         return _estado_ticket(ticket, user)
     if not ids:
+        # Reglas de la app antes que los conteos: «¿cuál es el máximo de
+        # tickets por persona?» no cuenta los tickets de nadie.
+        regla = respuesta_regla(pregunta)
+        if regla is not None:
+            return Directa(regla)
         # Antes que la guía: «quiero ver los tickets asignados a técnicos» es
         # un conteo, no «cómo asignar».
         conteo = respuesta_por_persona(session, user, t) or respuesta_por_rol(session, user, t)
@@ -1672,7 +1770,8 @@ def calcular_directa(session, user: User, pregunta: str,
     guia = respuesta_guia(user, pregunta)
     if guia is not None:
         return Directa(guia)
-    if ids:
+    if ids or es_pregunta_de_regla(t):
+        # Una regla sin respuesta preparada va a la IA con las reglas.
         return None
 
     clave = detectar_consulta(pregunta)
@@ -2418,9 +2517,12 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
         logger.info("chat: ficha del ticket #%s (pedido de explicación, sin IA) — «%s»", ticket.id, pregunta)
         return ficha_ticket(ticket, user), None, pregunta
     directa = calcular_directa(session, user, pregunta, ticket_actual)
+    t = _normalizar(pregunta)
+    regla = directa is None and es_pregunta_de_regla(t)
     # Las reglas no la reconocieron: la IA la clasifica y el servidor calcula.
-    # Si no sirve, «No entendí…» se mantiene y lo demás va a la IA libre.
-    if (directa is None or directa.texto in NO_ENTENDI) and interpretar_con_ia_activo():
+    # Si no sirve, «No entendí…» se mantiene y lo demás va a la IA libre. Una
+    # pregunta de reglas no es un conteo: va directo a la IA libre.
+    if (directa is None or directa.texto in NO_ENTENDI) and not regla and interpretar_con_ia_activo():
         try:
             datos = interpretar(proveedor, pregunta)
         except IATardo:
@@ -2431,13 +2533,15 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
             return interpretada, None, pregunta
     if directa is not None:
         return directa, None, pregunta
-    t = _normalizar(pregunta)
-    if _pide_conteo_persona(t) and nombra_persona_desconocida(t):
+    if not regla and _pide_conteo_persona(t) and nombra_persona_desconocida(t):
         # La IA libre nunca cuenta los tickets de una persona: podría hablar
         # de otra (la del mensaje anterior, por ejemplo).
         return Directa(_decir("no_encontre_persona")), None, pregunta
     max_tickets = getattr(proveedor, "max_tickets", MAX_TICKETS_IN_CONTEXT)
-    return None, build_system(session, user, max_tickets, pregunta, ticket_actual), pregunta
+    system = build_system(session, user, max_tickets, pregunta, ticket_actual)
+    if regla:
+        system += "\n" + REGLAS_PARA_IA
+    return None, system, pregunta
 
 
 def _linea_para_la_ia(session, user: User, pregunta: str, ticket_actual: int | None) -> str | None:
