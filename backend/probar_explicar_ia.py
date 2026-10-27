@@ -53,6 +53,8 @@ TICKETS = [
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--borrar", action="store_true", help="eliminar los tickets de prueba al final")
+    parser.add_argument("--solo", metavar="TEXTO",
+                        help="probar solo los tickets cuyo título contiene TEXTO (p. ej. impresora)")
     args = parser.parse_args(argv)
 
     init_db()
@@ -66,7 +68,8 @@ def main(argv=None) -> int:
             print("No hay un Administrador activo: crea uno en la app primero.")
             return 1
         creados = []
-        for titulo, descripcion, categoria in TICKETS:
+        tickets = [t for t in TICKETS if not args.solo or args.solo.lower() in t[0].lower()]
+        for titulo, descripcion, categoria in tickets:
             ticket = ticket_service.create_ticket(session, TicketCreate(
                 title=titulo, description=descripcion, category=categoria, priority="Media"), admin)
             creados.append(ticket.id)
@@ -80,6 +83,8 @@ def main(argv=None) -> int:
                 print(f"ERROR: {error}  (detalle en: docker compose logs ticketera | grep IA:)")
                 continue
             print(f"Tardó {time.monotonic() - inicio:.1f} s")
+            if getattr(proveedor, "ultimos_tokens", None):
+                print(f"Tokens: {proveedor.ultimos_tokens}")
             print(f"Claridad (servidor): {datos['claridad']} — {datos['motivo_claridad']}")
             print(f"Explicación: {datos['explicacion']['explicacion']}")
             print(json.dumps(datos["explicacion"], ensure_ascii=False, indent=2))

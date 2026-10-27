@@ -139,12 +139,13 @@ def test_little_text_end_to_end(client, session, ollama, tecnico):
     pedido = ollama.pedidos[0]
     assert pedido["think"] is False
     assert pedido["options"]["temperature"] == 0.1
-    assert pedido["options"]["num_ctx"] == asistente_service.QWEN_CONTEXTO
+    assert pedido["options"]["num_ctx"] == ex.EXPLICACION_NUM_CTX == 2048
     assert pedido["format"]["required"] == ["explicacion", "posibles_causas", "que_revisar_primero", "certeza"]
-    # Los tres ejemplos completos (entrada y salida) antes del ticket real.
+    # Un solo ejemplo completo (entrada y salida) antes del ticket real.
     roles = [m["role"] for m in pedido["messages"]]
-    assert roles == ["system"] + ["user", "assistant"] * 3 + ["user"]
-    assert [json.loads(m["content"]) for m in pedido["messages"][2:7:2]] == [s for _, s in ex.EJEMPLOS]
+    assert roles == ["system", "user", "assistant", "user"]
+    assert len(ex.EJEMPLOS) == 1
+    assert json.loads(pedido["messages"][2]["content"]) == ex.EJEMPLOS[0][1]
     assert "NO puede preguntarle nada a la persona" in pedido["messages"][0]["content"]
     texto = ollama.ultimo_ticket()
     assert "Título: No sirve" in texto and "no sirve" in texto
@@ -152,7 +153,7 @@ def test_little_text_end_to_end(client, session, ollama, tecnico):
     assert "Reporta: no se sabe" in texto
 
 
-def test_prompt_has_the_three_examples_and_who_reports(client, session, ollama, tecnico):
+def test_prompt_has_the_example_and_who_reports(client, session, ollama, tecnico):
     autor = session.scalar(select(User).where(User.email == "tec@tec.local"))
     ticket = nuevo_ticket(session, created_by_id=autor.id)
     client.post(f"/api/tickets/{ticket.id}/explicacion", headers=tecnico)
@@ -160,10 +161,8 @@ def test_prompt_has_the_three_examples_and_who_reports(client, session, ollama, 
     assert "explicacion: de 2 a 4 oraciones" in mensajes[0]["content"]
     assert "Título: Impresora\nReporta: Laura Méndez\nCategoría actual: Hardware" in mensajes[1]["content"]
     assert "Descripción:\nno sirve" in mensajes[1]["content"]
-    assert "Título: No puedo entrar al correo" in mensajes[3]["content"]
-    assert "Categoría actual: Accesos" in mensajes[3]["content"]
-    assert "wifi" in mensajes[5]["content"] and len(mensajes[5]["content"]) > 500
-    assert [json.loads(m["content"])["certeza"] for m in mensajes[2:7:2]] == ["baja", "media", "media"]
+    assert json.loads(mensajes[2]["content"])["certeza"] == "baja"
+    assert len(mensajes) == 4
     assert "Reporta: José Solano" in ollama.ultimo_ticket()
 
 
@@ -256,9 +255,9 @@ def test_long_and_confusing_ticket_sends_only_important_parts(client, session, o
     assert "desde el lunes la impresora HP 4020" in texto  # primer párrafo
     assert "contratos del viernes" in texto  # último párrafo
     assert "Comentario 5" in texto and "Comentario 2" not in texto  # últimos 3
-    # Todo el pedido entra holgado en num_ctx (≈ 4 caracteres por token).
+    # Todo el pedido entra en num_ctx con lugar para la respuesta.
     total = sum(len(m["content"]) for m in ollama.pedidos[0]["messages"])
-    assert total < 4096 * 2.5
+    assert total < ex.EXPLICACION_NUM_CTX * 2.7
 
 
 def test_invalid_json_is_retried_once(client, session, ollama, tecnico, caplog, monkeypatch):
