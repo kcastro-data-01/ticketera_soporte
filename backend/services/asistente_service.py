@@ -69,28 +69,59 @@ MAX_TICKETS_IN_CONTEXT = 15
 # Un modelo local en CPU lee el prompt despacio: se le envían menos tickets.
 QWEN_MAX_TICKETS = 2
 
-# Qué puede hacer cada rol (espejo de la tabla de permisos de ayuda.html).
-PERMISOS_POR_ROL = {
-    UserRole.ADMIN.value: (
-        "Ve todos los tickets; crea, comenta, edita, asigna, cambia el estado y "
-        "elimina cualquier ticket; consulta el historial global; administra usuarios "
-        "(crear, editar, cambiar el rol, desactivar y reactivar)."
-    ),
-    UserRole.SUPERVISOR.value: (
-        "Ve todos los tickets; crea, comenta, edita, asigna y cambia el estado de "
-        "cualquier ticket; consulta el historial global. No administra usuarios."
-    ),
-    UserRole.TECHNICIAN.value: (
-        "Ve todos los tickets y recibe tickets por asignación automática; crea, "
-        "comenta y cambia el estado de los tickets; consulta el historial global. "
-        "No edita ni asigna tickets ni administra usuarios."
-    ),
-    UserRole.REQUESTER.value: (
-        "Solo ve los tickets que él mismo creó y los que tiene asignados; puede "
-        "crear tickets, comentar en ellos y cambiar el estado de los asignados a él. "
-        "No edita, no asigna, no ve el historial global ni la lista de usuarios."
-    ),
+# Roles en el orden de la tabla «Permisos por rol» de ayuda.html.
+ROLES_TABLA = (UserRole.ADMIN.value, UserRole.SUPERVISOR.value,
+               UserRole.TECHNICIAN.value, UserRole.REQUESTER.value)
+# Para qué sirve cada rol («Roles del sistema» en ayuda.html).
+DESCRIPCION_ROL = {
+    UserRole.ADMIN.value: "Tiene permisos completos",
+    UserRole.SUPERVISOR.value: "Supervisa el trabajo del equipo",
+    UserRole.TECHNICIAN.value: "Atiende los tickets (recibe las asignaciones automáticas)",
+    UserRole.REQUESTER.value: "Quien crea el ticket",
 }
+# La tabla «Permisos por rol» de ayuda.html, tal cual (una prueba la compara):
+# (acción en la tabla, cómo se dice en una oración, valor por rol en ROLES_TABLA).
+_SUYOS = "Los suyos y los asignados a él"
+TABLA_PERMISOS = [
+    ("Ver tickets", "ver tickets", ("Todos", "Todos", "Todos", _SUYOS)),
+    ("Crear ticket", "crear tickets", ("Sí", "Sí", "Sí", "Sí")),
+    ("Comentar", "comentar", ("Sí", "Sí", "Sí", "En los suyos y los asignados a él")),
+    ("Editar ticket", "editar tickets", ("Sí", "Sí", "No", "No")),
+    ("Cambiar estado", "cambiar el estado", ("Sí", "Sí", "Sí", "Solo en los asignados a él")),
+    ("Asignar ticket", "asignar tickets", ("Sí", "Sí", "No", "No")),
+    ("Historial global", "ver el historial global", ("Sí", "Sí", "Sí", "No")),
+    ("Métricas", "ver las métricas", ("Sí", "Sí", "No", "No")),
+    ("Explicar con IA", "usar «Explicar con IA»", ("Sí", "Sí", "Sí", "No")),
+    ("Eliminar ticket", "eliminar tickets", ("Sí", "No", "No", "No")),
+    ("Administrar usuarios", "administrar usuarios", ("Sí", "No", "No", "No")),
+]
+
+
+def _lista_y(partes: list[str], conjuncion: str = "y") -> str:
+    return partes[0] if len(partes) == 1 else f"{', '.join(partes[:-1])} {conjuncion} {partes[-1]}"
+
+
+def permisos_del_rol(rol: str) -> str:
+    """Qué hace el rol y qué puede y no puede hacer, armado con
+    :data:`TABLA_PERMISOS` (la misma tabla de ayuda.html)."""
+    columna = ROLES_TABLA.index(rol)
+    puede, no_puede = [], []
+    for _accion, frase, valores in TABLA_PERMISOS:
+        valor = valores[columna]
+        if valor == "No":
+            no_puede.append(frase)
+        elif valor in ("Sí", "Todos"):
+            puede.append(f"{frase} (todos)" if valor == "Todos" else frase)
+        else:
+            puede.append(f"{frase} ({valor[0].lower()}{valor[1:]})")
+    texto = f"{DESCRIPCION_ROL[rol]}. Puede {_lista_y(puede)}."
+    if no_puede:
+        texto += f" No puede {_lista_y(no_puede, 'ni')}."
+    return texto
+
+
+# Qué puede hacer cada rol (la tabla de permisos de ayuda.html).
+PERMISOS_POR_ROL = {rol: permisos_del_rol(rol) for rol in ROLES_TABLA}
 
 GUIA_APP = """\
 Guía de la aplicación (Sistema de Tickets de American Data Networks):
@@ -1390,15 +1421,78 @@ REGLAS_APP = [
     (lambda t: re.search(r"\b(correos?|e-?mails?|mails?)\b", t), REGLA_CORREO),
 ]
 # Para la IA, cuando la pregunta es de reglas pero no hay una preparada.
-REGLAS_PARA_IA = "Reglas de la ticketera (son las reales; no inventes otras):\n" + "\n".join(
-    f"- {regla}" for _, regla in REGLAS_APP
+REGLAS_PARA_IA = (
+    "Reglas de la ticketera (son las reales; no inventes otras):\n"
+    + "\n".join(f"- {regla}" for _, regla in REGLAS_APP)
+    + "\nPermisos de cada rol (son exactamente estos; no agregues ni quites ninguno):\n"
+    + "\n".join(f"- {rol}: {PERMISOS_POR_ROL[rol]}" for rol in ROLES_TABLA)
+    + "\nCuando hables de un rol, habla del rol: no le pongas nombres de personas ni "
+    "digas quién tiene ese rol, salvo que la pregunta sea sobre una persona concreta."
 )
 
 
+# ---------- Roles y permisos (sin IA) ----------
+# «¿Qué hace el técnico y el solicitante?»: los permisos reales de cada rol
+# (PERMISOS_POR_ROL, la tabla de ayuda.html), una línea por rol y sin nombres
+# de personas.
+
+# Cómo se nombra cada rol (sin tildes; se aceptan errores de escritura).
+_FORMAS_ROL = {
+    UserRole.ADMIN.value: ("administrador", "administradores", "admin", "admins"),
+    UserRole.SUPERVISOR.value: ("supervisor", "supervisores"),
+    UserRole.TECHNICIAN.value: ("tecnico", "tecnicos"),
+    UserRole.REQUESTER.value: ("solicitante", "solicitantes"),
+}
+_PIDE_PERMISOS = re.compile(
+    r"\b(que|q|ke)\s+(hace|hacen|ase|asen|haces|puede hacer|pueden hacer|pued\w* hacer|permite\w*)\b"
+    r"|\bpermis\w*|\bpermi?s[io]\w*|\bpara que (sirve|sirven|esta|estan)\b|\bfuncion\w*|\batribucion\w*"
+)
+_TODOS_LOS_ROLES = re.compile(r"\b(cada rol|los roles|todos los roles|roles)\b")
+# Verbos parecidos a un rol que no lo nombran («administrar usuarios»).
+_NO_ES_ROL = frozenset("administrar administra administran supervisar supervisa solicitar solicita "
+                       "solicitud solicitudes tecnica tecnicas".split())
+
+
+def _es_rol(palabra: str, forma: str) -> bool:
+    if palabra == forma:
+        return True
+    if len(forma) < 6 or len(palabra) < 5 or palabra in _NO_ES_ROL:
+        return False
+    return _distancia(palabra, forma) <= (1 if len(forma) <= 7 else 2)
+
+
+def roles_nombrados(t: str) -> list[str]:
+    """Roles que nombra la pregunta normalizada, en el orden en que aparecen."""
+    encontrados: list[str] = []
+    for palabra in re.findall(r"[a-z]+", t):
+        rol = next((r for r, formas in _FORMAS_ROL.items()
+                    if any(_es_rol(palabra, f) for f in formas)), None)
+        if rol is not None and rol not in encontrados:
+            encontrados.append(rol)
+    return encontrados
+
+
+def pide_permisos(t: str) -> bool:
+    """¿La pregunta normalizada es sobre qué hace o qué puede hacer un rol?"""
+    return bool(_PIDE_PERMISOS.search(t) and (roles_nombrados(t) or _TODOS_LOS_ROLES.search(t)))
+
+
+def respuesta_permisos(pregunta: str) -> str | None:
+    """Los permisos de los roles que nombra la pregunta (todos si pregunta
+    por «los roles»), una línea por rol; ``None`` si no es de permisos.
+    Nunca lleva nombres de personas: es la tabla fija."""
+    t = _normalizar(pregunta)
+    if not pide_permisos(t):
+        return None
+    roles = roles_nombrados(t) or list(ROLES_TABLA)
+    return "\n".join(f"{_negrita(rol)}: {PERMISOS_POR_ROL[rol]}" for rol in roles)
+
+
 def es_pregunta_de_regla(t: str) -> bool:
-    """¿La pregunta (normalizada) es sobre reglas o límites de la app
-    («se pueden», «máximo», «quién puede…») y no un conteo?"""
-    return bool(_PIDE_REGLA.search(t))
+    """¿La pregunta (normalizada) es sobre reglas, límites o permisos de la
+    app («se pueden», «máximo», «quién puede…», «qué hace el técnico») y no
+    un conteo?"""
+    return bool(_PIDE_REGLA.search(t) or pide_permisos(t))
 
 
 def respuesta_regla(pregunta: str) -> str | None:
@@ -1757,8 +1851,12 @@ def calcular_directa(session, user: User, pregunta: str,
             return Directa(_ticket_no_encontrado(user, ids[0]))
         return _estado_ticket(ticket, user)
     if not ids:
-        # Reglas de la app antes que los conteos: «¿cuál es el máximo de
-        # tickets por persona?» no cuenta los tickets de nadie.
+        # Permisos y reglas de la app antes que los conteos: «¿qué hace el
+        # técnico?» o «¿cuál es el máximo de tickets por persona?» no
+        # cuentan los tickets de nadie.
+        permisos = respuesta_permisos(pregunta)
+        if permisos is not None:
+            return Directa(permisos)
         regla = respuesta_regla(pregunta)
         if regla is not None:
             return Directa(regla)
@@ -2470,9 +2568,17 @@ def _es_conteo(t: str) -> bool:
 def _seguimiento(session, user: User, pregunta: str, anterior: str | None) -> str | None:
     """La pregunta completa que quiso hacer un seguimiento («y ayer?»), armada
     con ``anterior`` (ya normalizada y resuelta), o ``None`` si no es uno."""
-    if not anterior or not _es_conteo(anterior):
+    if not anterior:
         return None
     palabras = re.findall(r"[a-z0-9]+", _normalizar(pregunta))
+    # «¿qué hace el técnico?» → «y el solicitante?»: los permisos de ese rol.
+    if (pide_permisos(anterior) and palabras and palabras[0] in ("y", "e")
+            and len(palabras) <= SEGUIMIENTO_MAX_PALABRAS):
+        roles = roles_nombrados(" ".join(palabras[1:]))
+        if roles:
+            return "que puede hacer " + " y ".join(f"el {rol.lower()}" for rol in roles)
+    if not _es_conteo(anterior):
+        return None
     if len(palabras) < 2 or palabras[0] not in ("y", "e") or len(palabras) > SEGUIMIENTO_MAX_PALABRAS:
         return None
     resto = " ".join(p for p in palabras[1:] if p not in _RELLENO_SEGUIMIENTO)
