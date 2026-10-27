@@ -52,7 +52,7 @@ def test_requester_greeting_does_not_offer_explanations(client, session, fake_cl
 
 
 def test_greeting_with_a_question_is_not_just_a_greeting(client, tecnico, fake_claude):
-    ask(client, tecnico, "hola, que significa prioridad alta?")
+    ask(client, tecnico, "hola, que hago si la impresora no imprime?")
     assert fake_claude.calls, "la pregunta sigue su camino normal"
 
 
@@ -77,7 +77,7 @@ def es_ayuda(texto: str) -> bool:
 
 def test_free_ai_mentioning_datos_visibles_never_reaches_the_user(client, tecnico, fake_claude):
     fake_claude.text = "Hola. No tienes datos en <datos_visibles> sobre tu rol. Si te gusta, ¡puedo ayudarte!"
-    datos = ask(client, tecnico, "que significa prioridad alta").json()
+    datos = ask(client, tecnico, "que hago si la impresora no imprime").json()
     assert datos["fuente"] == "directa"
     assert es_ayuda(datos["respuesta"]), datos["respuesta"]
     assert "datos_visibles" not in datos["respuesta"]
@@ -85,7 +85,7 @@ def test_free_ai_mentioning_datos_visibles_never_reaches_the_user(client, tecnic
 
 def test_free_ai_in_stream_is_replaced(client, tecnico, fake_claude):
     fake_claude.text = "No tienes datos en <datos_visibles> sobre tu rol."
-    lista = eventos(client, tecnico, "que significa prioridad alta")
+    lista = eventos(client, tecnico, "que hago si la impresora no imprime")
     assert all("datos_visibles" not in e.get("t", "") for e in lista), "la etiqueta nunca se muestra"
     assert any(es_ayuda(e.get("reemplazo", "")) for e in lista), lista
     assert lista[-1] == {"fin": True, "fuente": "directa"}
@@ -93,7 +93,7 @@ def test_free_ai_in_stream_is_replaced(client, tecnico, fake_claude):
 
 def test_harmless_tags_are_removed_and_the_answer_kept(client, tecnico, fake_claude):
     fake_claude.text = "La prioridad <b>Alta</b> se atiende antes que la Media."
-    datos = ask(client, tecnico, "que significa prioridad alta").json()
+    datos = ask(client, tecnico, "que hago si la impresora no imprime").json()
     assert datos == {"respuesta": "La prioridad Alta se atiende antes que la Media.", "fuente": "ia"}
 
 

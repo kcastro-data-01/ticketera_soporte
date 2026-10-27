@@ -129,7 +129,7 @@ def test_counts_by_role_still_work(client, ia, admin):
 
 
 def test_rule_question_reaching_the_ai_has_real_permissions(client, ia, admin):
-    _respuesta(ask(client, admin, "quienes pueden ver las metricas?"), "ia")
+    _respuesta(ask(client, admin, "quienes pueden usar el chat?"), "ia")
 
     system = ia.calls[0]["system"]
     assert REGLAS_PARA_IA in system

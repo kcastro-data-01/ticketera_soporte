@@ -188,7 +188,7 @@ def test_what_the_rules_did_not_understand_is_interpreted(client, ia, tickets):
 def test_goes_to_the_free_ai(client, ia, tickets, interpretacion):
     headers, _ = tickets
     ia.json = interpretacion
-    respuesta = _respuesta(ask(client, headers, "que significa prioridad alta"), "ia")
+    respuesta = _respuesta(ask(client, headers, "que hago si la impresora no imprime"), "ia")
     assert respuesta == "Respuesta de la IA libre."
     assert len(ia.interpretaciones) == 1
 
@@ -324,7 +324,7 @@ def test_read_interpretation_accepts_json_in_a_code_block():
     "pregunta, interpretacion",
     [
         # El modelo copió el 12 o «maria» de los ejemplos: no están en la pregunta.
-        ("que es un ticket critico", _json("estado_ticket", ticket=12)),
+        ("que hago con un ticket critico", _json("estado_ticket", ticket=12)),
         ("cuantos tikets tiene alguien", _json(persona="carlos")),
     ],
 )

@@ -125,6 +125,8 @@ PERMISOS_POR_ROL = {rol: permisos_del_rol(rol) for rol in ROLES_TABLA}
 
 GUIA_APP = """\
 Guía de la aplicación (Sistema de Tickets de American Data Networks):
+- «La ticketera» es esta aplicación (el sistema de tickets), no una persona ni \
+un rol. Si preguntan cómo funciona, describe la aplicación.
 - Menú lateral: Tickets (listado), Nuevo ticket, Historial (no para Solicitante), \
 Métricas (solo Supervisor y Administrador: cola de hoy, resueltos, tiempo promedio \
 de resolución, correo frente a web y gráficos por estado, categoría, persona y día), \
@@ -1488,6 +1490,211 @@ def respuesta_permisos(pregunta: str) -> str | None:
     return "\n".join(f"{_negrita(rol)}: {PERMISOS_POR_ROL[rol]}" for rol in roles)
 
 
+# ---------- Preguntas sobre la app (sin IA) ----------
+# «¿Cómo funciona la ticketera?», «¿qué significa cada estado?», «¿cómo
+# cierro sesión?»: respuestas fijas en tono formal, según el rol de quien
+# pregunta (con lo que dicen ayuda.html y el código). La IA libre las
+# inventaba («La ticketera es la persona que…»).
+
+_TICKETERA = r"(ticketera|tiketera|tiquetera|tickectera|ticketra|tikcetera|sistema|app|aplicacion|programa|plataforma)"
+_COMO = r"(como|komo|cmo|coomo)"
+# El verbo va pegado a la app («explicame el sistema»): «explicame el
+# problema del sistema» habla de un ticket, no de la ticketera.
+_PIDE_GENERAL = re.compile(
+    rf"\b({_COMO} (funciona|funsiona|funcina|fucniona|se usa|uso|trabaja)|que es|q es|para que (sirve|es)|"
+    r"que hace|explica\w*|esplica\w*|de que se trata|en que consiste)\s+"
+    rf"(el |la |esta |este |esa |ese |de la |del )?{_TICKETERA}\b"
+    rf"|^({_COMO} se usa|{_COMO} (funciona|funsiona)|para que sirve( esto| esta app)?)\W*$"
+)
+_ESTADOS_APP = r"(estados?|nuevo|en proceso|resuelto|cerrado)"
+_SIGNIFICA = r"(que significa|que significan|q significa|significado|que quiere decir|que es|que son|diferencia\w*)"
+_ES_EQUIPO = (UserRole.ADMIN.value, UserRole.SUPERVISOR.value, UserRole.TECHNICIAN.value)
+_ES_GESTION = (UserRole.ADMIN.value, UserRole.SUPERVISOR.value)
+
+
+def _app_general(user: User) -> str:
+    lineas = [
+        "La ticketera es la aplicación de soporte de la empresa: sirve para registrar los "
+        "problemas o pedidos (tickets) y darles seguimiento hasta que se resuelven.",
+        "- **Crear un ticket**: desde «Nuevo ticket» en el menú lateral o, si el buzón de "
+        "soporte está activo, enviando un correo.",
+        "- **Estados**: cada ticket pasa por Nuevo → En proceso → Resuelto → Cerrado, en ese orden.",
+    ]
+    if user.role == UserRole.REQUESTER.value:
+        lineas.append("- **Seguimiento**: un Técnico atiende su ticket; usted ve en «Tickets» los "
+                      "que creó, su estado y quién los atiende, y puede comentar en ellos.")
+    elif user.role in _ES_GESTION:
+        lineas.append("- **Asignación**: cada ticket nuevo se asigna automáticamente al Técnico con "
+                      "menos tickets; usted puede reasignarlo desde el detalle del ticket. En "
+                      "«Métricas» ve cómo va el trabajo del equipo.")
+    else:
+        lineas.append("- **Asignación**: cada ticket nuevo se asigna automáticamente al Técnico con "
+                      "menos tickets; los suyos están en la pestaña «Mis tickets».")
+    lineas.append("Cada rol ve y hace cosas distintas. Puede preguntarme qué hace cada rol.")
+    return "\n".join(lineas)
+
+
+def _app_mis_tickets(user: User) -> str:
+    if user.role == UserRole.REQUESTER.value:
+        return ("En «Tickets», en el menú lateral, se abre «Mis solicitudes»: ahí están los "
+                "tickets que usted creó y los que tiene asignados, con su estado.")
+    return ("En «Tickets», en el menú lateral, pulse la pestaña «Mis tickets»: muestra los "
+            "tickets asignados a usted. La pestaña «Todos» muestra todos los tickets.")
+
+
+def _app_estados(user: User) -> str:
+    return (
+        "Los tickets siguen siempre el mismo orden:\n"
+        "- **Nuevo**: recién creado, todavía nadie empezó a trabajarlo.\n"
+        "- **En proceso**: alguien está trabajando en él.\n"
+        "- **Resuelto**: ya se le dio solución.\n"
+        "- **Cerrado**: terminado definitivamente; ya no cambia más.\n"
+        "Los estados solo avanzan (Nuevo → En proceso → Resuelto → Cerrado), sin saltar pasos "
+        "ni volver atrás."
+    )
+
+
+def _app_prioridad(user: User) -> str:
+    texto = ("La prioridad indica qué tan urgente es un ticket: Baja, Media, Alta o Crítica. "
+             "Se elige al crear el ticket.")
+    if user.role in _ES_GESTION:
+        return texto + " Después usted puede cambiarla con «Editar ticket»."
+    return texto + " Después solo la cambia un Administrador o un Supervisor."
+
+
+def _app_categoria(user: User) -> str:
+    texto = ("La categoría indica de qué tipo es el problema: Hardware (equipos), Software "
+             "(programas), Red (internet, wifi, VPN) o Accesos (cuentas y permisos). Se elige al "
+             "crear el ticket.")
+    if user.role in _ES_GESTION:
+        return texto + " Después usted puede cambiarla con «Editar ticket»."
+    return texto + " Después solo la cambia un Administrador o un Supervisor."
+
+
+def _app_eliminar(user: User) -> str:
+    if user.role == UserRole.ADMIN.value:
+        return ("Abra el ticket y pulse «Eliminar». Solo el Administrador puede eliminar "
+                "tickets, y la acción no se puede deshacer.")
+    return ("Solo el Administrador puede eliminar un ticket, y la acción no se puede deshacer. "
+            "Si hace falta, pídaselo a un Administrador.")
+
+
+def _app_reabrir(user: User) -> str:
+    return ("No: un ticket Cerrado ya no cambia, y los estados no vuelven atrás. Si el problema "
+            "vuelve a aparecer, cree un ticket nuevo con «Nuevo ticket» y mencione el número "
+            "del anterior en la descripción.")
+
+
+def _app_iniciar_sesion(user: User) -> str:
+    return ("En la página de inicio, pulse «Iniciar sesión con Microsoft» y entre con su cuenta "
+            "de la empresa. La ticketera no tiene contraseña propia; la primera vez, su cuenta "
+            "se crea sola como Solicitante.")
+
+
+def _app_cerrar_sesion(user: User) -> str:
+    return "En el menú lateral, pulse su nombre y elija «Cerrar sesión»."
+
+
+def _app_metricas(user: User) -> str:
+    if user.role in _ES_GESTION:
+        return ("En «Métricas», en el menú lateral: la cola de hoy, los tickets resueltos, el "
+                "tiempo promedio de resolución, los tickets por correo frente a los de la web y "
+                "gráficos por estado, categoría, persona y día.")
+    return "Las métricas solo las ven el Supervisor y el Administrador."
+
+
+def _app_quien_atiende(user: User) -> str:
+    columna = "«Atendido por»" if user.role == UserRole.REQUESTER.value else "«Asignado a»"
+    return (f"En el listado de «Tickets», la columna {columna} muestra la persona responsable; "
+            "en el detalle del ticket aparece en «Asignado a».")
+
+
+def _app_tiempo(user: User) -> str:
+    texto = ("La ticketera no fija un plazo de resolución: depende del problema y de su "
+             "prioridad.")
+    if user.role in _ES_GESTION:
+        return texto + " El tiempo promedio de resolución está en «Métricas»."
+    return texto + " Puede seguir el estado de su ticket en «Tickets»."
+
+
+def _app_explicar_ia(user: User) -> str:
+    if user.role in _ES_EQUIPO:
+        return ("Abra el detalle de un ticket y pulse «Explicar con IA»: muestra qué es lo más "
+                "probable que esté pasando, las posibles causas y qué revisar primero. «Volver a "
+                "explicar» la genera de nuevo.")
+    return "«Explicar con IA» lo usan el Técnico, el Supervisor y el Administrador."
+
+
+def _app_detalle(user: User) -> str:
+    return ("En «Tickets», pulse el ticket en el listado: se abre su detalle, con los datos, "
+            "los comentarios y el historial de cambios.")
+
+
+def _app_correo(user: User) -> str:
+    return REGLA_CORREO
+
+
+def _app_cambiar_estado_solicitante(user: User) -> str | None:
+    if user.role != UserRole.REQUESTER.value:
+        return None  # la guía de siempre
+    return ("Como Solicitante, solo puede cambiar el estado de los tickets que tiene asignados: "
+            "abra el ticket y, en «Cambio de estado», elija el estado siguiente y pulse «Cambiar "
+            "estado». Los de los demás los cambia el Técnico asignado, un Supervisor o un "
+            "Administrador.")
+
+
+# (cómo se reconoce en la pregunta normalizada, respuesta según el usuario), en orden.
+PREGUNTAS_APP = [
+    (lambda t: _PIDE_GENERAL.search(t), _app_general),
+    (lambda t: re.search(r"\b(cerr\w*|cierr\w*|salir|termin\w*) (la |mi )?sesion\b|\b(log ?out|desloguear\w*)\b", t),
+     _app_cerrar_sesion),
+    (lambda t: re.search(r"\b(inici\w*|abr\w*|empez\w*) (la |mi )?sesion\b|\b(login|loguear\w*)\b"
+                         r"|\bcomo (entro|ingreso|accedo|me conecto)\b", t), _app_iniciar_sesion),
+    (lambda t: re.search(rf"\b(correo|correos|mail|email|e-mail)\b", t)
+     and re.search(r"\b(crea\w*|creo|mand\w*|envi\w*|abr\w*|hac\w*|hago|llega\w*|funciona\w*)\b", t),
+     _app_correo),
+    (lambda t: re.search(r"\b(reabr\w*|reabier\w*|volver a abrir|abrir de nuevo|abrirlo de nuevo|reactivar un ticket)\b", t),
+     _app_reabrir),
+    (lambda t: re.search(rf"\b(elimin\w*|borr\w*)\b.*\b{_TICKET}\b|\b{_TICKET}\b.*\b(elimin\w*|borr\w*)", t),
+     _app_eliminar),
+    (lambda t: re.search(r"\b(donde|como)\b.*\b(veo|ver|encuentro|estan|reviso|miro|busco)\b.*"
+                         rf"\b(mis {_TICKET}|mis solicitudes|mis casos)\b", t), _app_mis_tickets),
+    (lambda t: re.search(rf"\b{_SIGNIFICA}\b.*\b{_ESTADOS_APP}\b|\bcada estado\b|\blos estados\b", t)
+     and not re.search(rf"\b{_CUANTOS}\b", t), _app_estados),
+    (lambda t: re.search(r"\bprioridad\w*|\bcritic\w*", t)
+     and re.search(rf"\b{_SIGNIFICA}\b|\b(que|cuales|cuantas) prioridades\b|\bniveles?\b", t)
+     and not re.search(rf"\b{_CUANTOS}\b|\bhay {_TICKET}", t), _app_prioridad),
+    (lambda t: re.search(r"\bcategori\w*", t)
+     and re.search(rf"\b{_SIGNIFICA}\b|\b(que|cuales|cuantas) categorias\b|\btipos?\b", t)
+     and not re.search(rf"\b{_CUANTOS}\b|\bhay {_TICKET}", t), _app_categoria),
+    (lambda t: re.search(r"\bmetricas?\b", t) and not re.search(rf"\b{_CUANTOS}\b", t), _app_metricas),
+    (lambda t: re.search(r"\bquien (me |lo |la )?(atiende|esta atendiendo|tiene mi|resuelve mi|ve mi)\b", t),
+     _app_quien_atiende),
+    (lambda t: re.search(r"\b(cuanto|que tanto)\b.*\b(tarda\w*|demora\w*|dura)\b"
+                         r"|\btiempo (promedio|de respuesta|de resolucion)\b", t), _app_tiempo),
+    (lambda t: re.search(r"\bexplicar con (ia|la ia|inteligencia)\b", t), _app_explicar_ia),
+    (lambda t: re.search(r"\b(donde|como)\b.*\b(veo|ver|abro|abrir|entro)\b.*\bdetalle\b", t), _app_detalle),
+    (lambda t: re.search(r"\b(como|donde)\b.*\b(cambi\w*|muevo|mover|paso|pasar)\b.*\bestados?\b", t)
+     or re.search(rf"\bcomo\b.*\b(cierro|cerrar|resuelvo|marco)\b.*\b{_TICKET}\b", t),
+     _app_cambiar_estado_solicitante),
+]
+
+
+def respuesta_app(user: User, pregunta: str) -> str | None:
+    """Respuesta fija a una pregunta común sobre la app, o ``None``."""
+    t = _normalizar(pregunta)
+    # «¿cuántos tickets llegaron por correo?» cuenta; «¿cuánto tarda…?», no.
+    cuenta = re.search(rf"\b{_CUANTOS}\b", t)
+    for coincide, responder_a in PREGUNTAS_APP:
+        if cuenta and responder_a is not _app_tiempo:
+            continue
+        if coincide(t):
+            texto = responder_a(user)
+            if texto is not None:
+                return texto
+    return None
+
+
 def es_pregunta_de_regla(t: str) -> bool:
     """¿La pregunta (normalizada) es sobre reglas, límites o permisos de la
     app («se pueden», «máximo», «quién puede…», «qué hace el técnico») y no
@@ -1835,6 +2042,15 @@ def calcular_directa(session, user: User, pregunta: str,
         return Directa(fecha_hora)
     t = _normalizar(pregunta)
     ids = tickets_mencionados(pregunta)
+    if not ids and not _ESTE_TICKET_EXPLICITO.search(t):
+        # Permisos y preguntas sobre la app, aunque haya un ticket en
+        # pantalla: «¿qué significa cada estado?» no habla de ese ticket.
+        permisos = respuesta_permisos(pregunta)
+        if permisos is not None:
+            return Directa(permisos)
+        app = respuesta_app(user, pregunta)
+        if app is not None:
+            return Directa(app)
     # «¿cuántos tickets se resolvieron?» cuenta: no habla del ticket en pantalla.
     cuenta = re.search(rf"\b{_CUANTOS}\b", t)
     if not ids and ticket_actual is not None and (
@@ -1851,12 +2067,8 @@ def calcular_directa(session, user: User, pregunta: str,
             return Directa(_ticket_no_encontrado(user, ids[0]))
         return _estado_ticket(ticket, user)
     if not ids:
-        # Permisos y reglas de la app antes que los conteos: «¿qué hace el
-        # técnico?» o «¿cuál es el máximo de tickets por persona?» no
-        # cuentan los tickets de nadie.
-        permisos = respuesta_permisos(pregunta)
-        if permisos is not None:
-            return Directa(permisos)
+        # Reglas de la app antes que los conteos: «¿cuál es el máximo de
+        # tickets por persona?» no cuenta los tickets de nadie.
         regla = respuesta_regla(pregunta)
         if regla is not None:
             return Directa(regla)

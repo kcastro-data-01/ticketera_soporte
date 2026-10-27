@@ -80,7 +80,7 @@ def test_who_can_assign_is_the_rule_even_for_a_technician(client, ia, tecnico):
 
 
 def test_rule_question_without_answer_goes_to_ai_with_the_rules(client, ia, tecnico):
-    respuesta = _respuesta(ask(client, tecnico, "quienes pueden ver las metricas?"), "ia")
+    respuesta = _respuesta(ask(client, tecnico, "quienes pueden usar el chat?"), "ia")
 
     assert respuesta == "Respuesta de la IA libre."
     assert ia.interpretaciones == []  # no se clasifica como conteo
@@ -109,6 +109,6 @@ def test_new_tickets_are_still_counted(client, session, ia, tecnico):
 
 
 def test_ai_context_has_no_rules_for_other_questions(client, ia, tecnico):
-    _respuesta(ask(client, tecnico, "que significa la prioridad critica?"), "ia")
+    _respuesta(ask(client, tecnico, "como resuelvo un problema con la impresora?"), "ia")
 
     assert REGLAS_PARA_IA not in ia.calls[0]["system"]
