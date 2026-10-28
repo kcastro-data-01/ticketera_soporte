@@ -307,7 +307,7 @@ def can_view_ticket(ticket: Ticket, user: User | None) -> bool:
 
 
 def can_change_state(ticket: Ticket, user: User) -> bool:
-    """Técnico, Supervisor y Administrador cambian el estado de cualquier
+    """Técnico y Administrador cambian el estado de cualquier
     ticket; cualquier otro rol, solo el de los tickets asignados a él."""
     return user.role != UserRole.REQUESTER.value or ticket.assigned_to_id == user.id
 

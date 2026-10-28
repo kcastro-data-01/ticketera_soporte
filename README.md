@@ -43,6 +43,10 @@ filtrarlos, y consultar su historial de cambios.
   `node:test` (52 pruebas en cuatro ficheros) y documentación en
   [docs/api.md](docs/api.md).
 
+- Tres roles: Administrador, Técnico y Solicitante. Editar, asignar, eliminar,
+  métricas y usuarios son solo del Administrador. Al arrancar, una migración
+  pasa a Técnico a quien todavía tenga el rol Supervisor, que ya no existe
+  (queda en el log), y la API responde `422` si se intenta usar.
 - Permisos por rol: el servidor aplica la tabla de permisos (ver
   `ayuda.html`) y la interfaz oculta los botones y menús que el rol no puede
   usar. El Solicitante solo ve, comenta y consulta el historial de los tickets
@@ -356,7 +360,7 @@ Devuelve `200 OK` con el ticket solicitado (mismos campos que el listado) o
 ```bash
 curl -X POST http://127.0.0.1:8000/api/users \
   -H "Content-Type: application/json" \
-  -d '{"name": "Ana Pérez", "email": "ana@soporte.local", "role": "Soporte"}'
+  -d '{"name": "Ana Pérez", "email": "ana@soporte.local", "role": "Técnico"}'
 
 curl http://127.0.0.1:8000/api/users
 ```
@@ -366,7 +370,7 @@ usa con `LOGIN_LOCAL=true`, de 6 a 72 caracteres, y `PATCH /api/users/{id}`
 la acepta para restablecerla) devuelve `201` con `{id, name, email, role}` (si `role`
 se omite, se guarda `Técnico`). Errores:
 `422` si `name` está vacío, el `email` no tiene formato válido o el `role` no
-es `Administrador`/`Supervisor`/`Técnico`/`Solicitante`; `409 Conflict` si el email ya está registrado.
+es `Administrador`/`Técnico`/`Solicitante`; `409 Conflict` si el email ya está registrado.
 `GET /api/users` devuelve `200` con los usuarios **activos** disponibles
 para asignar (solo lectura, orden por id).
 
@@ -533,8 +537,8 @@ con la API apagada.
 
 ## Métricas
 
-El menú **«Métricas»** (`metricas.html`) lo ven solo **Supervisor y
-Administrador**; a los demás roles no les aparece y la API les responde `403`.
+El menú **«Métricas»** (`metricas.html`) lo ve solo el
+**Administrador**; a los demás roles no les aparece y la API les responde `403`.
 Todos los números los calcula el servidor (sin IA) y se filtran por un rango de
 días en hora de Costa Rica (por defecto, los últimos 30 días contando hoy;
 máximo 366).
@@ -690,7 +694,7 @@ recibe los datos que el rol ya puede ver en la aplicación.
 
 ## Explicar con IA
 
-En el detalle de un ticket, **Técnico, Supervisor y Administrador** tienen el
+En el detalle de un ticket, **Técnico y Administrador** tienen el
 botón **«Explicar con IA»**. Interpreta el ticket con lo que trae y le dice al
 técnico por dónde empezar, **sin preguntarle nada a la persona** (el equipo no
 siempre puede preguntar). El panel muestra, con la nota «Generado por IA, revisalo antes de

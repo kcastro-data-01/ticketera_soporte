@@ -75,7 +75,7 @@
           <ul>
             <li><strong>Creación de tickets</strong>: Altas de nuevos tickets con título, descripción, categoría y prioridad</li>
             <li><strong>Gestión de estados</strong>: Flujo de estados <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
-            <li><strong>Asignación de tickets</strong>: Asignación a usuarios con roles <code>Administrador</code>, <code>Supervisor</code>, <code>Técnico</code> y <code>Solicitante</code></li>
+            <li><strong>Asignación de tickets</strong>: Asignación a usuarios con roles <code>Administrador</code>, <code>Técnico</code> y <code>Solicitante</code></li>
             <li><strong>Comentarios</strong>: Cada comentario queda firmado con el nombre del usuario que lo escribió</li>
             <li><strong>Búsqueda y filtros</strong>: Búsqueda por título/descripción y filtros por categoría, prioridad y estado</li>
           </ul>
@@ -127,10 +127,9 @@
         <summary>Roles y permisos</summary>
         <div class="ayuda-cuerpo">
           <h3>Roles del sistema</h3>
-          <p>El sistema cuenta con 4 roles de usuario:</p>
+          <p>El sistema cuenta con 3 roles de usuario:</p>
           <ul>
             <li><strong>Administrador</strong>: Tiene permisos completos</li>
-            <li><strong>Supervisor</strong>: Supervisa el trabajo del equipo</li>
             <li><strong>Técnico</strong>: Atiende los tickets (recibe las asignaciones automáticas)</li>
             <li><strong>Solicitante</strong>: Quien crea el ticket</li>
           </ul>
@@ -142,23 +141,22 @@
                 <tr>
                   <th>Acción</th>
                   <th>Administrador</th>
-                  <th>Supervisor</th>
                   <th>Técnico</th>
                   <th>Solicitante</th>
                 </tr>
               </thead>
               <tbody>
-                <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Todos</td><td>Los suyos y los asignados a él</td></tr>
-                <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
-                <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>Sí</td><td>En los suyos y los asignados a él</td></tr>
-                <tr><td>Editar ticket</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-                <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Sí</td><td>Solo en los asignados a él</td></tr>
-                <tr><td>Asignar ticket</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-                <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
-                <tr><td>Métricas</td><td>Sí</td><td>Sí</td><td>No</td><td>No</td></tr>
-                <tr><td>Explicar con IA</td><td>Sí</td><td>Sí</td><td>Sí</td><td>No</td></tr>
-                <tr><td>Eliminar ticket</td><td>Sí</td><td>No</td><td>No</td><td>No</td></tr>
-                <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td><td>No</td></tr>
+                <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Los suyos y los asignados a él</td></tr>
+                <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+                <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>En los suyos y los asignados a él</td></tr>
+                <tr><td>Editar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
+                <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Solo en los asignados a él</td></tr>
+                <tr><td>Asignar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
+                <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+                <tr><td>Métricas</td><td>Sí</td><td>No</td><td>No</td></tr>
+                <tr><td>Explicar con IA</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+                <tr><td>Eliminar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
+                <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td></tr>
               </tbody>
             </table>
           </div>
@@ -171,7 +169,7 @@
           <p>El botón del asistente está abajo a la derecha en todas las pantallas. Responde preguntas sobre la ticketera y sobre los tickets que su rol puede ver: por ejemplo, cuántos tickets hay pendientes o en qué estado está uno.</p>
           <ul>
             <li>Solo usa la información que su rol ya ve en la aplicación: el Solicitante recibe respuestas solo sobre sus propios tickets.</li>
-            <li>El Técnico, el Supervisor y el Administrador pueden pedirle que explique un ticket indicando su número (por ejemplo, «Explique el ticket #1»).</li>
+            <li>El Técnico y el Administrador pueden pedirle que explique un ticket indicando su número (por ejemplo, «Explique el ticket #1»).</li>
             <li>La conversación se borra al cerrar la pestaña o la sesión, o con el botón «Nueva conversación».</li>
             <li>Las respuestas automáticas pueden contener errores: verifique la información importante en el detalle del ticket.</li>
           </ul>

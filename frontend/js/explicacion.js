@@ -1,5 +1,5 @@
-/* «Explicar con IA» en el detalle del ticket (Técnico, Supervisor y
-   Administrador). Al abrir el ticket muestra la última explicación guardada
+/* «Explicar con IA» en el detalle del ticket (Técnico y Administrador).
+   Al abrir el ticket muestra la última explicación guardada
    (GET, sin llamar a la IA). «Explicar con IA» la pide (POST; el servidor
    reutiliza la guardada si el ticket no cambió) y «Volver a explicar»
    fuerza una nueva (?regenerar=true).

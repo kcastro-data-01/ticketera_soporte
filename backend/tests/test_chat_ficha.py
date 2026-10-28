@@ -142,7 +142,7 @@ def test_este_ticket_on_screen_and_streaming(client, session, ollama, tecnico):
     assert ollama.pedidos == []
 
 
-@pytest.mark.parametrize("rol", ["Supervisor", "Administrador"])
+@pytest.mark.parametrize("rol", ["Administrador"])
 def test_other_team_roles_also_get_the_ai_line(client, session, ollama, rol):
     headers = login_as(client, session, rol, "eq@x.local", "Persona Equipo")
     ticket = ticket_de(session, usuario(session, "eq@x.local"))

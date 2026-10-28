@@ -537,11 +537,11 @@ def test_warm_up_only_runs_with_qwen_and_ollama_url(monkeypatch):
         # El Solicitante sí cambia el estado de los tickets asignados a él.
         ("Solicitante", "¿Cómo cierro un ticket?", "Como Solicitante, solo puede cambiar el estado de los tickets que tiene asignados"),
         ("Técnico", "¿cómo cierro un ticket?", "Abre el ticket. En la columna derecha, en «Cambio de estado»"),
-        ("Técnico", "¿cómo asigno un ticket?", "Con tu rol (Técnico) no puedes asignar tickets. Pídeselo a un Administrador o a un Supervisor."),
-        ("Supervisor", "¿cómo asigno un ticket?", "Abre el ticket desde el listado."),
+        ("Técnico", "¿cómo asigno un ticket?", "Con tu rol (Técnico) no puedes asignar tickets. Pídeselo a un Administrador."),
+        ("Administrador", "¿cómo asigno un ticket?", "Abre el ticket desde el listado."),
         ("Solicitante", "¿Cómo creo un ticket nuevo?", "Pulsa «Nuevo ticket» en el menú lateral."),
         ("Solicitante", "¿cómo cambio mi contraseña?", "Se entra con la cuenta de Microsoft de la empresa: la ticketera no guarda contraseñas."),
-        ("Supervisor", "olvidé la contraseña de Carlos, ¿cómo la restablezco?", "Se entra con la cuenta de Microsoft de la empresa"),
+        ("Técnico", "olvidé la contraseña de Carlos, ¿cómo la restablezco?", "Se entra con la cuenta de Microsoft de la empresa"),
         ("Administrador", "¿cómo agrego un usuario?", "Entra a «Usuarios». En «Agregar usuario»"),
         ("Solicitante", "¿dónde veo el historial?", "Como Solicitante no tienes el historial general"),
         ("Técnico", "¿qué puedo hacer?", "Tu rol es Técnico."),
@@ -645,14 +645,8 @@ def test_count_by_role_when_none_says_who_has_them(client, session, fake_claude,
     assert datos["fuente"] == "directa"
 
 
-def test_count_by_role_supervisors_and_admins(client, session, fake_claude, equipo):
+def test_count_by_role_admins(client, session, fake_claude, equipo):
     e = equipo
-    sup = ask(client, e.headers, "¿Cuántos tickets tienen los supervisores?").json()["respuesta"]
-    asignados = (f"#{e.de_laura.id} a Laura Méndez (Administrador), #{e.c1.id} a Carlos Solís (Técnico), "
-                 f"#{e.c2.id} a Carlos Solís (Técnico), #{e.de_jose.id} a José Solano (Técnico)")
-    assert es_forma(sup, "rol_cero", tickets="tickets", rol="supervisores",
-                    despues=f" Los que están asignados: {asignados}."), sup
-
     admin = ask(client, e.headers, "cuantos tickets tiene el administrador").json()["respuesta"]
     assert es_forma(admin, "rol", n=UNO, tickets="ticket", asignados="asignado", rol="administradores",
                     detalle=f"Laura Méndez (Administrador) tiene 1 (#{e.de_laura.id})"), admin
@@ -674,13 +668,13 @@ def test_count_by_person(client, session, fake_claude, equipo):
 
 
 def test_count_by_person_with_two_matches_asks_which(client, session, fake_claude, equipo):
-    _persona(session, "Carlos Mora", "Supervisor", "cmora@x.local")
+    _persona(session, "Carlos Mora", "Administrador", "cmora@x.local")
     datos = ask(client, equipo.headers, "cuantos tickets tiene Carlos").json()
     assert es_forma(datos["respuesta"], "persona_varias",
-                    personas="Carlos Solís (Técnico) y Carlos Mora (Supervisor)"), datos["respuesta"]
+                    personas="Carlos Solís (Técnico) y Carlos Mora (Administrador)"), datos["respuesta"]
     # Con el nombre completo no hay duda.
     completo = ask(client, equipo.headers, "cuantos tickets tiene Carlos Mora").json()["respuesta"]
-    assert es_forma(completo, "persona_cero", persona="Carlos Mora (Supervisor)", tickets="tickets"), completo
+    assert es_forma(completo, "persona_cero", persona="Carlos Mora (Administrador)", tickets="tickets"), completo
 
 
 def test_count_by_unknown_person_is_not_sent_to_the_ai(client, session, fake_claude, equipo):

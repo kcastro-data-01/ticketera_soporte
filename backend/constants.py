@@ -39,7 +39,6 @@ class UserRole(str, Enum):
     """Roles of the minimal users used to assign tickets (RF4)."""
 
     ADMIN = "Administrador"
-    SUPERVISOR = "Supervisor"
     TECHNICIAN = "Técnico"
     REQUESTER = "Solicitante"
 
@@ -63,6 +62,10 @@ LEGACY_CATEGORY_MAP: dict[str, str] = {
 # Role removed from the system: its users become ``Técnico``. Only read by
 # ``backend.migrate_remove_support_role``; the API never accepts it.
 LEGACY_SUPPORT_ROLE = "Soporte"
+
+# Role removed later: its users become ``Técnico`` too. Only read by
+# ``backend.migrate_remove_supervisor_role``; the API answers 422 to it.
+LEGACY_SUPERVISOR_ROLE = "Supervisor"
 
 # Roles whose active users take part in the automatic round-robin assignment
 # of new tickets. The remaining roles never receive a ticket automatically,

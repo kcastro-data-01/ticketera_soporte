@@ -96,7 +96,7 @@ test("historial: el ticket creado desde un correo dice quién lo envió y a qui�
 });
 
 test("ayuda: la tabla de permisos explica lo del Solicitante asignado", () => {
-  assert.match(ayuda, /<td>Cambiar estado<\/td>(<td>Sí<\/td>){3}<td>Solo en los asignados a él<\/td>/);
+  assert.match(ayuda, /<td>Cambiar estado<\/td>(<td>Sí<\/td>){2}<td>Solo en los asignados a él<\/td>/);
   assert.match(ayuda, /<td>Ver tickets<\/td>.*<td>Los suyos y los asignados a él<\/td>/);
 });
 

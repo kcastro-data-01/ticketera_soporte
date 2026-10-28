@@ -1,5 +1,5 @@
 /* Contador junto a «Tickets» en el menú lateral (auth.js): Nuevos sin
-   asignar para Administrador y Supervisor, los suyos sin resolver para el
+   asignar para el Administrador, los suyos sin resolver para el
    Técnico; el Solicitante no lo ve y con 0 no se muestra.
    Ejecutar con: node --test frontend/tests/contador_menu.test.js */
 
@@ -51,8 +51,8 @@ async function montar(role, respuestas = {}) {
   return { etiqueta, enlace, pedidos };
 }
 
-test("Administrador y Supervisor: cuenta los Nuevos sin asignar", async () => {
-  for (const role of ["Administrador", "Supervisor"]) {
+test("Administrador: cuenta los Nuevos sin asignar", async () => {
+  for (const role of ["Administrador"]) {
     const { etiqueta, enlace, pedidos } = await montar(role, { nuevos: NUEVOS });
     assert.deepEqual(pedidos, ["/api/tickets?state=Nuevo"], role);
     assert.equal(etiqueta.textContent, "2");

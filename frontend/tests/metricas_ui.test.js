@@ -49,7 +49,7 @@ const DATOS = {
   por_dia: [{ fecha: "2026-10-18", total: 3 }, { fecha: "2026-10-19", total: 1 }],
 };
 
-function crear({ rol = "Supervisor", fetchImpl, conChart = true, variables = null }) {
+function crear({ rol = "Administrador", fetchImpl, conChart = true, variables = null }) {
   const ids = {};
   for (const id of ["form-rango", "desde", "hasta", "aplicar", "estado-carga", "m-abiertos", "m-en-proceso",
     "m-resueltos", "m-promedio", "m-origen", "m-origen-nota",
@@ -202,8 +202,8 @@ test("errores: rango inválido y rol sin permiso", async () => {
   }
 });
 
-test("el permiso «metricas» es solo para Supervisor y Administrador", () => {
-  for (const [rol, puede] of [["Administrador", true], ["Supervisor", true], ["Técnico", false], ["Solicitante", false]]) {
+test("el permiso «metricas» es solo para el Administrador", () => {
+  for (const [rol, puede] of [["Administrador", true], ["Técnico", false], ["Solicitante", false]]) {
     const { sandbox } = crear({ rol, fetchImpl: async () => ok(DATOS) });
     assert.equal(sandbox.puede("metricas"), puede, rol);
   }

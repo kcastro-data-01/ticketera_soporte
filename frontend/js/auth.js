@@ -82,14 +82,14 @@ async function fetchWithAuth(url, options = {}) {
    El servidor es quien realmente bloquea; aquí solo se ocultan los
    botones y enlaces que el rol no puede usar. */
 const PERMISOS = {
-  editar: ["Administrador", "Supervisor"],
-  asignar: ["Administrador", "Supervisor"],
-  cambiar_estado: ["Administrador", "Supervisor", "Técnico"],
-  historial_global: ["Administrador", "Supervisor", "Técnico"],
+  editar: ["Administrador"],
+  asignar: ["Administrador"],
+  cambiar_estado: ["Administrador", "Técnico"],
+  historial_global: ["Administrador", "Técnico"],
   usuarios: ["Administrador"],
   eliminar: ["Administrador"],
-  explicar_ia: ["Administrador", "Supervisor", "Técnico"],
-  metricas: ["Administrador", "Supervisor"],
+  explicar_ia: ["Administrador", "Técnico"],
+  metricas: ["Administrador"],
 };
 
 /* Cambiar el estado de un ticket: los roles de «cambiar_estado» en
@@ -302,8 +302,8 @@ function crearMenuUsuario(doc = document) {
   return menu;
 }
 
-/* Contador junto a «Tickets» en el menú lateral: para Administrador y
-   Supervisor, los tickets Nuevos sin asignar; para el Técnico, los suyos
+/* Contador junto a «Tickets» en el menú lateral: para el Administrador,
+   los tickets Nuevos sin asignar; para el Técnico, los suyos
    sin resolver (Nuevo o En proceso). El Solicitante no lo ve y con 0 no
    se muestra. Usa los endpoints del listado y del resumen. */
 async function contarParaMenu(user) {
@@ -313,7 +313,7 @@ async function contarParaMenu(user) {
     const resumen = await response.json();
     return { cantidad: Number(resumen.mios_abiertos), texto: "asignados a usted sin resolver" };
   }
-  if (user.role === "Administrador" || user.role === "Supervisor") {
+  if (user.role === "Administrador") {
     const response = await fetchWithAuth("/api/tickets?state=Nuevo");
     if (!response.ok) return null;
     const tickets = await response.json();

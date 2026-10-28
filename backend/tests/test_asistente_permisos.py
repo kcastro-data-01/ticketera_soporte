@@ -15,6 +15,7 @@ from backend.services.asistente_service import (
     REGLAS_PARA_IA,
     ROLES_TABLA,
     TABLA_PERMISOS,
+    TRES_ROLES,
     detectar_consulta,
     roles_nombrados,
 )
@@ -86,19 +87,22 @@ def test_technician_and_requester_one_line_each_without_ai(client, ia, admin):
 
 
 @pytest.mark.parametrize("pregunta,roles", [
-    ("que puede hacer un supervisor", ["Supervisor"]),
     ("permisos del administrador", ["Administrador"]),
     ("que hace el tecnico", ["Técnico"]),
     ("¿Qué permisos tiene el Solicitante?", ["Solicitante"]),
-    ("para que sirve el rol de supervisor?", ["Supervisor"]),
     ("q hace el tecnco y el solisitante", ["Técnico", "Solicitante"]),
     ("que puede hacer el adminsitrador", ["Administrador"]),
-    ("que hace cada rol?", list(ROLES_TABLA)),
+    ("que hace cada rol?", None),
+    # El rol Supervisor ya no existe: se contesta con los 3 que hay.
+    ("que puede hacer un supervisor", None),
+    ("para que sirve el rol de supervisor?", None),
 ])
 def test_role_questions_are_answered_by_the_server(client, ia, admin, pregunta, roles):
     respuesta = _respuesta(ask(client, admin, pregunta), "directa")
 
-    assert respuesta == "\n".join(linea(rol) for rol in roles)
+    lineas = [TRES_ROLES, *map(linea, ROLES_TABLA)] if roles is None else map(linea, roles)
+    assert respuesta == "\n".join(lineas)
+    assert "Supervisor" not in respuesta
     sin_nombres(respuesta)
     assert ia.interpretaciones == [] and ia.calls == []
 

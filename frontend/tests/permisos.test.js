@@ -30,7 +30,8 @@ function loadAuth(role) {
 
 const TABLA = {
   Administrador: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: true, eliminar: true, explicar_ia: true },
-  Supervisor: { editar: true, asignar: true, cambiar_estado: true, historial_global: true, usuarios: false, eliminar: false, explicar_ia: true },
+  // El rol Supervisor ya no existe: no tiene ningún permiso.
+  Supervisor: { editar: false, asignar: false, cambiar_estado: false, historial_global: false, usuarios: false, eliminar: false, explicar_ia: false },
   Técnico: { editar: false, asignar: false, cambiar_estado: true, historial_global: true, usuarios: false, eliminar: false, explicar_ia: true },
   Solicitante: { editar: false, asignar: false, cambiar_estado: false, historial_global: false, usuarios: false, eliminar: false, explicar_ia: false },
 };
@@ -89,4 +90,17 @@ test("detalle.html: Editar e Imprimir a la izquierda y Eliminar aparte a la dere
   assert.match(barra, /id="eliminar" class="peligro accion-aparte"/);
   const css = fs.readFileSync(path.join(__dirname, "..", "css", "estilos.css"), "utf8");
   assert.match(css, /\.acciones-principales \.accion-aparte \{\s*margin-left: auto;/);
+});
+
+test("Supervisor no aparece en auth.js, usuarios.html ni usuarios.js (3 roles)", () => {
+  for (const archivo of ["js/auth.js", "usuarios.html", "js/usuarios.js", "js/asistente.js"]) {
+    const texto = fs.readFileSync(path.join(__dirname, "..", archivo), "utf8");
+    assert.doesNotMatch(texto, /supervis/i, archivo);
+  }
+  const html = fs.readFileSync(path.join(__dirname, "..", "usuarios.html"), "utf8");
+  for (const id of ["rol", "editar-rol"]) {
+    const select = html.slice(html.indexOf(`id="${id}"`), html.indexOf("</select>", html.indexOf(`id="${id}"`)));
+    const opciones = [...select.matchAll(/<option value="([^"]+)"/g)].map((m) => m[1]).sort();
+    assert.deepEqual(opciones, ["Administrador", "Solicitante", "Técnico"], id);
+  }
 });

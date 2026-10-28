@@ -31,10 +31,9 @@ ROLES_ADMIN = {UserRole.ADMIN.value}
 # Grupos de la tabla de permisos (ver ayuda.html → "Permisos por rol").
 # Todos los roles: ver tickets (el Solicitante solo los suyos), crear y comentar.
 ROLES_TODOS = {role.value for role in UserRole}
-# Todos menos el Solicitante: cambiar estado e historial global.
+# Todos menos el Solicitante: cambiar estado, historial global y «Explicar con IA».
+# Lo demás (editar, asignar, métricas, eliminar y usuarios) es solo ROLES_ADMIN.
 ROLES_EQUIPO = ROLES_TODOS - {UserRole.REQUESTER.value}
-# Gestión de tickets: editar y asignar.
-ROLES_GESTION = {UserRole.ADMIN.value, UserRole.SUPERVISOR.value}
 
 
 def role_required(allowed_roles: set[str]) -> callable:

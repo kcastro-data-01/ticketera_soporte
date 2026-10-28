@@ -34,7 +34,7 @@ Documentación de los endpoints **realmente implementados** en el código
 | `DELETE` | `/api/tickets/{ticket_id}` | Eliminar un ticket (solo Administrador) |
 | `GET` | `/api/tickets/{ticket_id}/explicacion` | Última explicación de la IA (sin generar) |
 | `POST` | `/api/tickets/{ticket_id}/explicacion` | Explicar el ticket con IA (`?regenerar=true` fuerza una nueva) |
-| `GET` | `/api/metricas` | Métricas de tickets para Supervisor y Administrador (`?desde=&hasta=`) |
+| `GET` | `/api/metricas` | Métricas de tickets, solo para el Administrador (`?desde=&hasta=`) |
 | `POST` | `/api/tickets/{ticket_id}/comments` | Agregar un comentario |
 | `GET` | `/api/tickets/{ticket_id}/comments` | Listar comentarios (cronológico) |
 | `GET` | `/api/tickets/{ticket_id}/history` | Historial de cambios (solo lectura) |
@@ -202,7 +202,7 @@ curl -X DELETE http://localhost:8000/api/tickets/6 -H "Authorization: Bearer $TO
 
 ### `GET` / `POST /api/tickets/{ticket_id}/explicacion`
 
-«Explicar con IA», para Técnico, Supervisor y Administrador (Solicitante:
+«Explicar con IA», para Técnico y Administrador (Solicitante:
 `403`). `GET` devuelve la explicación guardada sin llamar a la IA
 (`explicacion: null` si nunca se explicó). `POST` la reutiliza si el ticket no
 cambió; si cambió, o con `?regenerar=true`, la pide a la IA y la guarda.
@@ -236,7 +236,7 @@ devolvió dos veces un JSON inválido; `404` si el ticket no existe.
 
 ### `GET /api/metricas`
 
-Solo **Supervisor y Administrador** (Técnico y Solicitante: `403`; sin sesión:
+Solo el **Administrador** (Técnico y Solicitante: `403`; sin sesión:
 `401`). Lo calcula el servidor, sin IA. `desde` y `hasta` son días
 `YYYY-MM-DD` en hora de Costa Rica, con los dos extremos incluidos; por
 defecto, los últimos 30 días hasta hoy. `422` si `desde` es posterior a `hasta`,
@@ -339,7 +339,7 @@ Crea el usuario mínimo usado para asignación y firma (sin autenticación).
 | `name` | string | obligatorio, no vacío, máx. 120 |
 | `email` | string | formato de email válido, máx. 255, **único** |
 | `password` | string | obligatorio, entre 6 y 72 caracteres; se guarda cifrada y nunca se devuelve |
-| `role` | enum | `Administrador` \| `Supervisor` \| `Técnico` \| `Solicitante`; opcional, por defecto `Técnico` |
+| `role` | enum | `Administrador` \| `Técnico` \| `Solicitante`; opcional, por defecto `Técnico` |
 
 **Respuestas:** `201` con `{id, name, email, role}` · `422` si `name` está
 vacío, el email no cumple el formato, la contraseña falta o no cumple el largo,

@@ -10,7 +10,6 @@ const API_USERS_URL = "/api/users";
 const ROLES_VALIDOS = [
   "Técnico",
   "Administrador",
-  "Supervisor",
   "Solicitante",
 ];
 
@@ -177,7 +176,6 @@ function appendCell(row, text) {
 /* Color de la etiqueta de cada rol. */
 const CLASES_ROL = {
   Administrador: "rol-administrador",
-  Supervisor: "rol-supervisor",
   Técnico: "rol-tecnico",
   Solicitante: "rol-solicitante",
 };

@@ -3773,11 +3773,6 @@ td.con-avatar {
   color: var(--etiqueta-violeta-texto);
 }
 
-.rol-supervisor {
-  background: var(--etiqueta-azul-fondo);
-  color: var(--etiqueta-azul-texto);
-}
-
 .rol-tecnico {
   background: var(--etiqueta-verde-fondo);
   color: var(--etiqueta-verde-texto);

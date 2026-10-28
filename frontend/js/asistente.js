@@ -36,7 +36,6 @@ const SUGERENCIAS_EQUIPO = [
 ];
 const SUGERENCIAS_POR_ROL = {
   Administrador: SUGERENCIAS_EQUIPO,
-  Supervisor: SUGERENCIAS_EQUIPO,
   Técnico: SUGERENCIAS_EQUIPO,
   Solicitante: [
     "¿Cómo va mi solicitud?",

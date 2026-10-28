@@ -1,5 +1,5 @@
 /* Listado (frontend/js/app.js + index.html): vista simple solo para el
-   Solicitante; Técnico, Supervisor y Administrador ven la vista completa.
+   Solicitante; Técnico y Administrador ven la vista completa.
    Ejecutar con: node --test frontend/tests/listado_solicitante.test.js */
 
 "use strict";
@@ -118,7 +118,7 @@ test("Solicitante sin tickets: «Todavía no ha creado solicitudes» con «Nuevo
   assert.match(indexHtml, /<div id="sin-solicitudes"[^>]*>\s*<p>Todavía no ha creado solicitudes\.<\/p>\s*<a href="crear\.html" class="enlace-boton">Nuevo ticket<\/a>/);
 });
 
-for (const rol of ["Técnico", "Supervisor", "Administrador"]) {
+for (const rol of ["Técnico", "Administrador"]) {
   test(`${rol}: vista completa sin cambios`, async () => {
     const { nodos, equipo, filas } = await montar(rol);
     assert.equal(nodos.get("titulo-listado").textContent, "Tickets");
@@ -163,7 +163,7 @@ test("la categoría lleva su ícono (clase por categoría)", async () => {
 
 test("filas Críticas y Altas destacadas solo en la vista del equipo", async () => {
   const conCritica = [...TICKETS, { ...TICKETS[1], id: 9, priority: "Crítica" }];
-  const equipo = await montar("Supervisor", conCritica);
+  const equipo = await montar("Técnico", conCritica);
   assert.deepEqual(equipo.filas.map((f) => f.className), ["fila-alta", "", "fila-critica"]);
   const solicitante = await montar("Solicitante", conCritica);
   assert.ok(solicitante.filas.every((f) => !f.className), "el Solicitante no ve la prioridad");

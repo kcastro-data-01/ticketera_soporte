@@ -1,7 +1,7 @@
 """Tests for the user roles (Task 22).
 
-The system accepts ``Administrador``, ``Supervisor``, ``Técnico`` and
-``Solicitante`` (``Soporte`` was removed). Only the active users with the
+The system accepts ``Administrador``, ``Técnico`` and ``Solicitante``
+(``Soporte`` and ``Supervisor`` were removed: the API answers 422). Only the active users with the
 ``Técnico`` role take part in the automatic round-robin assignment of new tickets; every
 role can still be assigned manually, and no row is ever deleted.
 """
@@ -241,9 +241,9 @@ def test_manual_assignment_can_unassign(auth_client):
     assert len(real_users) == 1
 
 
-def test_manual_assignment_to_supervisor_is_accepted(auth_client):
-    supervisor = create_user(
-        auth_client, "Sonia", "sonia@soporte.local", role=UserRole.SUPERVISOR.value
+def test_manual_assignment_to_admin_is_accepted(auth_client):
+    admin = create_user(
+        auth_client, "Sonia", "sonia@soporte.local", role=UserRole.ADMIN.value
     )
     technician = create_user(
         auth_client, "Tomás", "tomas@soporte.local", role=UserRole.TECHNICIAN.value
@@ -252,9 +252,9 @@ def test_manual_assignment_to_supervisor_is_accepted(auth_client):
     ticket = create_ticket(auth_client)
     assert ticket["assigned_to_id"] == technician["id"]
 
-    ticket = assign(auth_client, ticket["id"], supervisor["id"])
+    ticket = assign(auth_client, ticket["id"], admin["id"])
 
-    assert ticket["assigned_to_id"] == supervisor["id"]
+    assert ticket["assigned_to_id"] == admin["id"]
 
 
 def test_removed_support_role_is_rejected(auth_client):

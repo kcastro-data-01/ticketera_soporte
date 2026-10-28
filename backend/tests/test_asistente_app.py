@@ -70,8 +70,8 @@ def test_summary_for_a_requester_has_no_metrics_or_assigning(client, session, ia
     assert "Puede preguntarme qué hace cada rol." in respuesta
 
 
-def test_summary_for_a_supervisor_mentions_reassigning_and_metrics(client, session, ia):
-    respuesta = _respuesta(preguntar(client, session, "Supervisor", "que es la ticketera"), "directa")
+def test_summary_for_an_admin_mentions_reassigning_and_metrics(client, session, ia):
+    respuesta = _respuesta(preguntar(client, session, "Administrador", "que es la ticketera"), "directa")
 
     assert "puede reasignarlo" in respuesta and "«Métricas»" in respuesta
 
@@ -95,8 +95,8 @@ def test_summary_does_not_detail_the_permissions_table(client, session, ia):
     ("Técnico", "que diferencia hay entre resuelto y cerrado", "**Cerrado**: terminado definitivamente"),
     ("Técnico", "que es la prioridad", "Baja, Media, Alta o Crítica"),
     ("Técnico", "que significa prioridad critica", "Baja, Media, Alta o Crítica"),
-    ("Solicitante", "que prioridades hay", "solo la cambia un Administrador o un Supervisor"),
-    ("Supervisor", "que prioridades hay", "usted puede cambiarla con «Editar ticket»"),
+    ("Solicitante", "que prioridades hay", "solo la cambia un Administrador."),
+    ("Administrador", "que prioridades hay", "usted puede cambiarla con «Editar ticket»"),
     ("Técnico", "que categorias hay", "Hardware (equipos), Software (programas), Red"),
     ("Técnico", "como elimino un ticket", "Solo el Administrador puede eliminar un ticket"),
     ("Administrador", "como borro un ticket", "Abra el ticket y pulse «Eliminar»"),
@@ -104,12 +104,12 @@ def test_summary_does_not_detail_the_permissions_table(client, session, ia):
     ("Técnico", "como creo un ticket por correo", REGLA_CORREO),
     ("Técnico", "como inicio sesion", "«Iniciar sesión con Microsoft»"),
     ("Técnico", "como cierro sesion", "elija «Cerrar sesión»"),
-    ("Solicitante", "donde veo las metricas", "solo las ven el Supervisor y el Administrador"),
+    ("Solicitante", "donde veo las metricas", "solo las ve el Administrador"),
     ("Administrador", "donde veo las metricas", "tiempo promedio de resolución"),
     ("Solicitante", "quien me atiende", "«Atendido por»"),
     ("Técnico", "cuanto tarda en resolverse un ticket", "no fija un plazo de resolución"),
     ("Técnico", "como uso explicar con ia", "pulse «Explicar con IA»"),
-    ("Solicitante", "que es explicar con ia", "lo usan el Técnico, el Supervisor y el Administrador"),
+    ("Solicitante", "que es explicar con ia", "lo usan el Técnico y el Administrador"),
     ("Técnico", "como veo el detalle de un ticket", "se abre su detalle"),
     ("Solicitante", "como cambio el estado", "solo puede cambiar el estado de los tickets que tiene asignados"),
     ("Solicitante", "como cierro un ticket", "solo puede cambiar el estado de los tickets que tiene asignados"),

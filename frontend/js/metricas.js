@@ -1,4 +1,4 @@
-/* Página de métricas (Supervisor y Administrador): consulta
+/* Página de métricas (solo Administrador): consulta
    GET /api/metricas?desde=&hasta= y pinta tarjetas y gráficos (Chart.js).
    Los números los calcula el servidor; aquí solo se muestran.
    Cada gráfico tiene debajo su tabla («Ver datos»); si Chart.js no carga

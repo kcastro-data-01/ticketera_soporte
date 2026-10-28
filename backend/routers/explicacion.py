@@ -45,7 +45,7 @@ def ver_explicacion(
 @router.post(
     "/{ticket_id}/explicacion",
     response_model=ExplicacionResponse,
-    summary="Explicar un ticket con IA (Técnico, Supervisor y Administrador)",
+    summary="Explicar un ticket con IA (Técnico y Administrador)",
 )
 def explicar_ticket(
     ticket_id: int,

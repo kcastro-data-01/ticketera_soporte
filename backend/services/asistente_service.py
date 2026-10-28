@@ -79,12 +79,10 @@ MAX_TICKETS_IN_CONTEXT = 15
 QWEN_MAX_TICKETS = 2
 
 # Roles en el orden de la tabla «Permisos por rol» de ayuda.html.
-ROLES_TABLA = (UserRole.ADMIN.value, UserRole.SUPERVISOR.value,
-               UserRole.TECHNICIAN.value, UserRole.REQUESTER.value)
+ROLES_TABLA = (UserRole.ADMIN.value, UserRole.TECHNICIAN.value, UserRole.REQUESTER.value)
 # Para qué sirve cada rol («Roles del sistema» en ayuda.html).
 DESCRIPCION_ROL = {
     UserRole.ADMIN.value: "Tiene permisos completos",
-    UserRole.SUPERVISOR.value: "Supervisa el trabajo del equipo",
     UserRole.TECHNICIAN.value: "Atiende los tickets (recibe las asignaciones automáticas)",
     UserRole.REQUESTER.value: "Quien crea el ticket",
 }
@@ -92,17 +90,17 @@ DESCRIPCION_ROL = {
 # (acción en la tabla, cómo se dice en una oración, valor por rol en ROLES_TABLA).
 _SUYOS = "Los suyos y los asignados a él"
 TABLA_PERMISOS = [
-    ("Ver tickets", "ver tickets", ("Todos", "Todos", "Todos", _SUYOS)),
-    ("Crear ticket", "crear tickets", ("Sí", "Sí", "Sí", "Sí")),
-    ("Comentar", "comentar", ("Sí", "Sí", "Sí", "En los suyos y los asignados a él")),
-    ("Editar ticket", "editar tickets", ("Sí", "Sí", "No", "No")),
-    ("Cambiar estado", "cambiar el estado", ("Sí", "Sí", "Sí", "Solo en los asignados a él")),
-    ("Asignar ticket", "asignar tickets", ("Sí", "Sí", "No", "No")),
-    ("Historial global", "ver el historial global", ("Sí", "Sí", "Sí", "No")),
-    ("Métricas", "ver las métricas", ("Sí", "Sí", "No", "No")),
-    ("Explicar con IA", "usar «Explicar con IA»", ("Sí", "Sí", "Sí", "No")),
-    ("Eliminar ticket", "eliminar tickets", ("Sí", "No", "No", "No")),
-    ("Administrar usuarios", "administrar usuarios", ("Sí", "No", "No", "No")),
+    ("Ver tickets", "ver tickets", ("Todos", "Todos", _SUYOS)),
+    ("Crear ticket", "crear tickets", ("Sí", "Sí", "Sí")),
+    ("Comentar", "comentar", ("Sí", "Sí", "En los suyos y los asignados a él")),
+    ("Editar ticket", "editar tickets", ("Sí", "No", "No")),
+    ("Cambiar estado", "cambiar el estado", ("Sí", "Sí", "Solo en los asignados a él")),
+    ("Asignar ticket", "asignar tickets", ("Sí", "No", "No")),
+    ("Historial global", "ver el historial global", ("Sí", "Sí", "No")),
+    ("Métricas", "ver las métricas", ("Sí", "No", "No")),
+    ("Explicar con IA", "usar «Explicar con IA»", ("Sí", "Sí", "No")),
+    ("Eliminar ticket", "eliminar tickets", ("Sí", "No", "No")),
+    ("Administrar usuarios", "administrar usuarios", ("Sí", "No", "No")),
 ]
 
 
@@ -136,8 +134,9 @@ GUIA_APP = """\
 Guía de la aplicación (Sistema de Tickets de American Data Networks):
 - «La ticketera» es esta aplicación (el sistema de tickets), no una persona ni \
 un rol. Si preguntan cómo funciona, describe la aplicación.
+- Hay 3 roles: Administrador, Técnico y Solicitante (no hay otros).
 - Menú lateral: Tickets (listado), Nuevo ticket, Historial (no para Solicitante), \
-Métricas (solo Supervisor y Administrador: cola de hoy, resueltos, tiempo promedio \
+Métricas (solo Administrador: cola de hoy, resueltos, tiempo promedio \
 de resolución, correo frente a web y gráficos por estado, categoría, persona y día), \
 Usuarios (solo Administrador), Ayuda y Mi cuenta.
 - Crear un ticket: menú «Nuevo ticket»; se indica título, descripción, categoría \
@@ -412,7 +411,7 @@ def build_context(
         lines.extend(_detalle_ticket(session, user, ticket_id))
 
     # Solo quienes asignan o administran ven el equipo; nunca correos.
-    if user.role in (UserRole.ADMIN.value, UserRole.SUPERVISOR.value):
+    if user.role == UserRole.ADMIN.value:
         users = session.scalars(select(User).order_by(User.id)).all()
         lines.append("Usuarios del sistema:")
         lines.extend(
@@ -948,7 +947,6 @@ def _lista_tickets(tickets: list[Ticket], total: int) -> list[str]:
 # (patrón en la pregunta normalizada, rol guardado, cómo se nombra en plural)
 ROLES_EN_PREGUNTA = [
     (r"\btecnic\w*", UserRole.TECHNICIAN.value, "técnicos"),
-    (r"\bsupervisor\w*", UserRole.SUPERVISOR.value, "supervisores"),
     (r"\b(administrador\w*|admins?)\b", UserRole.ADMIN.value, "administradores"),
 ]
 _PIDE_CONTEO = re.compile(
@@ -1041,7 +1039,7 @@ def _palabras_nombre(nombre: str) -> list[str]:
 
 
 NO_ENCONTRE_PERSONA = VARIANTES["no_encontre_persona"]
-ROLES_CON_TICKETS = (UserRole.TECHNICIAN.value, UserRole.SUPERVISOR.value, UserRole.ADMIN.value)
+ROLES_CON_TICKETS = (UserRole.TECHNICIAN.value, UserRole.ADMIN.value)
 
 # Palabras de las preguntas que nunca son un nombre (sin tildes). Además de
 # estas, tampoco cuentan las formas de «ticket», «cuántos» y «asignado».
@@ -1210,9 +1208,9 @@ def _conteo_persona(session, user: User, personas: list[User]) -> Directa:
 # tildes; roles que pueden hacerlo; qué es la acción; pasos; a quién acudir
 # si el rol no puede). Se revisan en orden: las más específicas primero.
 
-TODOS = ("Administrador", "Supervisor", "Técnico", "Solicitante")
-EQUIPO = ("Administrador", "Supervisor", "Técnico")
-GESTION = ("Administrador", "Supervisor")
+TODOS = ("Administrador", "Técnico", "Solicitante")
+EQUIPO = ("Administrador", "Técnico")
+GESTION = ("Administrador",)
 SOLO_ADMIN = ("Administrador",)
 
 GUIA_POR_ACCION = [
@@ -1261,7 +1259,7 @@ GUIA_POR_ACCION = [
         "Abre el ticket desde el listado. En la columna derecha, en «Asignación», "
         "elige a la persona en «Persona asignada» y pulsa «Guardar asignación». Los "
         "tickets nuevos ya se asignan solos al Técnico con menos tickets.",
-        "a un Administrador o a un Supervisor",
+        "a un Administrador",
     ),
     (
         r"(cambi\w* (el |de )?estado|estado de(l)? ticket|cerr(ar|o)|cierr\w*|"
@@ -1271,7 +1269,7 @@ GUIA_POR_ACCION = [
         "Abre el ticket. En la columna derecha, en «Cambio de estado», elige el "
         "estado siguiente en «Pasar a» y pulsa «Cambiar estado». El orden es Nuevo → "
         "En proceso → Resuelto → Cerrado, y un ticket Cerrado ya no cambia.",
-        "al Técnico asignado, a un Supervisor o a un Administrador",
+        "al Técnico asignado o a un Administrador",
     ),
     (
         r"(edit|modific|correg|actualiz)\w*|(cambi\w* (el |la )?(titulo|descripcion|categoria|prioridad))",
@@ -1279,7 +1277,7 @@ GUIA_POR_ACCION = [
         "editar un ticket",
         "Abre el ticket y pulsa «Editar ticket». Cambia el título, la descripción, "
         "la categoría o la prioridad y pulsa «Guardar cambios».",
-        "a un Administrador o a un Supervisor",
+        "a un Administrador",
     ),
     (
         r"(crear|creo|abrir|abro|registr|levant|report|hacer|hago|nuevo)\w*.*\b(ticket|solicitud|caso|incidencia)s?\b"
@@ -1382,11 +1380,11 @@ REGLA_LIMITE = (
     "La ticketera no tiene un límite de tickets por persona: no hay un máximo ni un tope. "
     "Cada ticket nuevo se asigna automáticamente al Técnico activo con menos tickets "
     "asignados (se cuentan todos los que tiene, en cualquier estado; si hay empate, al "
-    "que se registró primero), y así la carga se reparte. Un Administrador o un Supervisor "
-    "también puede asignar tickets manualmente, sin tope."
+    "que se registró primero), y así la carga se reparte. Un Administrador también "
+    "puede asignar tickets manualmente, sin tope."
 )
 REGLA_QUIEN_ASIGNA = (
-    "Solo el Administrador y el Supervisor pueden asignar o reasignar tickets, desde el "
+    "Solo el Administrador puede asignar o reasignar tickets, desde el "
     "detalle del ticket, en «Asignación». El Técnico y el Solicitante no asignan. Además, "
     "cada ticket nuevo se asigna automáticamente al Técnico activo con menos tickets asignados."
 )
@@ -1394,11 +1392,11 @@ REGLA_REPARTO = (
     "Cada ticket nuevo se asigna automáticamente al Técnico activo con menos tickets "
     "asignados (se cuentan todos los que tiene, en cualquier estado); si hay empate, al "
     "que se registró primero. Si no hay ningún Técnico activo, el ticket queda sin asignar. "
-    "Después, un Administrador o un Supervisor puede reasignarlo manualmente. Los tickets "
+    "Después, un Administrador puede reasignarlo manualmente. Los tickets "
     "que llegan por correo se asignan al dueño del buzón de soporte."
 )
 REGLA_QUIEN_CAMBIA_ESTADO = (
-    "El Técnico, el Supervisor y el Administrador pueden cambiar el estado de cualquier "
+    "El Técnico y el Administrador pueden cambiar el estado de cualquier "
     "ticket; el Solicitante, solo el de los tickets que tiene asignados. El orden es "
     "Nuevo → En proceso → Resuelto → Cerrado, sin saltar pasos ni volver atrás, y un "
     "ticket Cerrado ya no cambia."
@@ -1454,17 +1452,19 @@ REGLAS_PARA_IA = (
 # Cómo se nombra cada rol (sin tildes; se aceptan errores de escritura).
 _FORMAS_ROL = {
     UserRole.ADMIN.value: ("administrador", "administradores", "admin", "admins"),
-    UserRole.SUPERVISOR.value: ("supervisor", "supervisores"),
     UserRole.TECHNICIAN.value: ("tecnico", "tecnicos"),
     UserRole.REQUESTER.value: ("solicitante", "solicitantes"),
 }
 _PIDE_PERMISOS = re.compile(
     r"\b(que|q|ke)\s+(hace|hacen|ase|asen|haces|puede hacer|pueden hacer|pued\w* hacer|permite\w*)\b"
     r"|\bpermis\w*|\bpermi?s[io]\w*|\bpara que (sirve|sirven|esta|estan)\b|\bfuncion\w*|\batribucion\w*"
+    r"|\b(que|cuales|cuantos)\s+roles\b"
 )
-_TODOS_LOS_ROLES = re.compile(r"\b(cada rol|los roles|todos los roles|roles)\b")
+# Un rol que ya no existe («¿qué hace un supervisor?») se contesta con los 3 que hay.
+_TODOS_LOS_ROLES = re.compile(r"\b(cada rol|los roles|todos los roles|roles|supervisor\w*)\b")
+TRES_ROLES = "La ticketera tiene 3 roles: Administrador, Técnico y Solicitante."
 # Verbos parecidos a un rol que no lo nombran («administrar usuarios»).
-_NO_ES_ROL = frozenset("administrar administra administran supervisar supervisa solicitar solicita "
+_NO_ES_ROL = frozenset("administrar administra administran solicitar solicita "
                        "solicitud solicitudes tecnica tecnicas".split())
 
 
@@ -1499,8 +1499,10 @@ def respuesta_permisos(pregunta: str) -> str | None:
     t = _normalizar(pregunta)
     if not pide_permisos(t):
         return None
-    roles = roles_nombrados(t) or list(ROLES_TABLA)
-    return "\n".join(f"{_negrita(rol)}: {PERMISOS_POR_ROL[rol]}" for rol in roles)
+    roles = roles_nombrados(t)
+    lineas = [] if roles else [TRES_ROLES]
+    lineas += [f"{_negrita(rol)}: {PERMISOS_POR_ROL[rol]}" for rol in roles or ROLES_TABLA]
+    return "\n".join(lineas)
 
 
 # ---------- Preguntas sobre la app (sin IA) ----------
@@ -1521,8 +1523,8 @@ _PIDE_GENERAL = re.compile(
 )
 _ESTADOS_APP = r"(estados?|nuevo|en proceso|resuelto|cerrado)"
 _SIGNIFICA = r"(que significa|que significan|q significa|significado|que quiere decir|que es|que son|diferencia\w*)"
-_ES_EQUIPO = (UserRole.ADMIN.value, UserRole.SUPERVISOR.value, UserRole.TECHNICIAN.value)
-_ES_GESTION = (UserRole.ADMIN.value, UserRole.SUPERVISOR.value)
+_ES_EQUIPO = (UserRole.ADMIN.value, UserRole.TECHNICIAN.value)
+_ES_GESTION = (UserRole.ADMIN.value,)
 
 
 def _app_general(user: User) -> str:
@@ -1543,7 +1545,8 @@ def _app_general(user: User) -> str:
     else:
         lineas.append("- **Asignación**: cada ticket nuevo se asigna automáticamente al Técnico con "
                       "menos tickets; los suyos están en la pestaña «Mis tickets».")
-    lineas.append("Cada rol ve y hace cosas distintas. Puede preguntarme qué hace cada rol.")
+    lineas.append("Hay 3 roles (Administrador, Técnico y Solicitante) y cada uno ve y hace cosas "
+                  "distintas. Puede preguntarme qué hace cada rol.")
     return "\n".join(lineas)
 
 
@@ -1572,7 +1575,7 @@ def _app_prioridad(user: User) -> str:
              "Se elige al crear el ticket.")
     if user.role in _ES_GESTION:
         return texto + " Después usted puede cambiarla con «Editar ticket»."
-    return texto + " Después solo la cambia un Administrador o un Supervisor."
+    return texto + " Después solo la cambia un Administrador."
 
 
 def _app_categoria(user: User) -> str:
@@ -1581,7 +1584,7 @@ def _app_categoria(user: User) -> str:
              "crear el ticket.")
     if user.role in _ES_GESTION:
         return texto + " Después usted puede cambiarla con «Editar ticket»."
-    return texto + " Después solo la cambia un Administrador o un Supervisor."
+    return texto + " Después solo la cambia un Administrador."
 
 
 def _app_eliminar(user: User) -> str:
@@ -1613,7 +1616,7 @@ def _app_metricas(user: User) -> str:
         return ("En «Métricas», en el menú lateral: la cola de hoy, los tickets resueltos, el "
                 "tiempo promedio de resolución, los tickets por correo frente a los de la web y "
                 "gráficos por estado, categoría, persona y día.")
-    return "Las métricas solo las ven el Supervisor y el Administrador."
+    return "Las métricas solo las ve el Administrador."
 
 
 def _app_quien_atiende(user: User) -> str:
@@ -1635,7 +1638,7 @@ def _app_explicar_ia(user: User) -> str:
         return ("Abra el detalle de un ticket y pulse «Explicar con IA»: muestra qué es lo más "
                 "probable que esté pasando, las posibles causas y qué revisar primero. «Volver a "
                 "explicar» la genera de nuevo.")
-    return "«Explicar con IA» lo usan el Técnico, el Supervisor y el Administrador."
+    return "«Explicar con IA» lo usan el Técnico y el Administrador."
 
 
 def _app_detalle(user: User) -> str:
@@ -1652,8 +1655,7 @@ def _app_cambiar_estado_solicitante(user: User) -> str | None:
         return None  # la guía de siempre
     return ("Como Solicitante, solo puede cambiar el estado de los tickets que tiene asignados: "
             "abra el ticket y, en «Cambio de estado», elija el estado siguiente y pulse «Cambiar "
-            "estado». Los de los demás los cambia el Técnico asignado, un Supervisor o un "
-            "Administrador.")
+            "estado». Los de los demás los cambia el Técnico asignado o un Administrador.")
 
 
 # (cómo se reconoce en la pregunta normalizada, respuesta según el usuario), en orden.
@@ -1797,7 +1799,7 @@ LINEA_VER_DETALLE = "Puede ver el [detalle completo en el ticket]({enlace})."
 
 
 def puede_explicar_ia(user: User) -> bool:
-    """Permiso ``explicar_ia``: Técnico, Supervisor y Administrador."""
+    """Permiso ``explicar_ia``: Técnico y Administrador."""
     return user.role != UserRole.REQUESTER.value
 
 
@@ -2320,7 +2322,7 @@ o resumir un ticket con número; «otra» para todo lo demás (cómo usar la app
 terminados, finalizados, solucionados), cerrados, todos (todos los tickets), o null.
 - periodo: hoy, ayer, semana (esta semana), mes (este mes), ultimos_7 (últimos 7 días), o null.
 - persona: el nombre de la persona tal como aparece, o null.
-- rol: Técnico, Supervisor o Administrador si pregunta por un rol, o null.
+- rol: Técnico o Administrador si pregunta por un rol, o null.
 - ticket: el número del ticket, o null."""
 
 
@@ -2444,7 +2446,7 @@ def calcular_desde_interpretacion(session, user: User, datos: dict,
         return None
 
     estado, persona, rol = datos["estado"], datos["persona"], datos["rol"]
-    # «los supervisores» a veces llega también como persona.
+    # «los técnicos» a veces llega también como persona.
     if persona and rol and any(re.search(patron, _normalizar(persona))
                                for patron, r, _ in ROLES_EN_PREGUNTA if r == rol):
         persona = None

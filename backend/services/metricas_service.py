@@ -1,4 +1,4 @@
-"""Métricas de la mesa de soporte (Supervisor y Administrador). Sin IA.
+"""Métricas de la mesa de soporte (solo Administrador). Sin IA.
 
 * **Hoy** (sin importar el rango): tickets abiertos (Nuevo + En proceso) y en
   proceso, y los abiertos de cada persona asignada.

@@ -59,7 +59,6 @@ def test_deleting_keeps_processed_email_record_without_ticket(auth_client, sessi
 
 
 @pytest.mark.parametrize("rol,correo", [
-    ("Supervisor", "sup@test.local"),
     ("Técnico", "tec@test.local"),
     ("Solicitante", "soli@test.local"),
 ])

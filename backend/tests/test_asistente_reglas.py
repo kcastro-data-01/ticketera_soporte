@@ -76,7 +76,7 @@ def test_who_can_assign_is_the_rule_even_for_a_technician(client, ia, tecnico):
     # Antes: «Con tu rol (Técnico) no puedes asignar tickets.»
     respuesta = _respuesta(ask(client, tecnico, "quien puede asignar tickets"), "directa")
 
-    assert "Solo el Administrador y el Supervisor" in respuesta
+    assert "Solo el Administrador puede asignar" in respuesta
 
 
 def test_rule_question_without_answer_goes_to_ai_with_the_rules(client, ia, tecnico):

@@ -242,16 +242,16 @@ def login_role(client, session, role: str, email: str) -> str:
     return login.json()["access_token"]
 
 
-def test_supervisor_can_update_and_assign(client, auth_client, session):
-    """Un Supervisor edita y asigna tickets."""
+def test_admin_can_update_and_assign(client, auth_client, session):
+    """Un Administrador edita y asigna tickets."""
     token = login_role(
-        client, session, UserRole.SUPERVISOR.value, "supervisor.test@correo.local"
+        client, session, UserRole.ADMIN.value, "admin.test@correo.local"
     )
     ticket = create_ticket(auth_client)
 
     resp = client.patch(
         f"/api/tickets/{ticket['id']}",
-        json={"title": "Editado por supervisor"},
+        json={"title": "Editado por el administrador"},
         headers=headers(token),
     )
     assert resp.status_code == 200

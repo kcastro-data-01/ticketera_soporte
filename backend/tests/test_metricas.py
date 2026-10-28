@@ -50,7 +50,7 @@ def metricas(client, headers, **params):
 
 def test_counts_cards_states_categories_and_people(client, session, admin):
     carlos = persona(session, "Carlos Solís", "Técnico", "carlos@x.local")
-    sup = persona(session, "Marta Rojas", "Supervisor", "marta@x.local")
+    sup = persona(session, "Marta Rojas", "Técnico", "marta@x.local")
     ticket(session, cr("2026-10-02"), "Nuevo", "Hardware", carlos)
     ticket(session, cr("2026-10-03"), "En proceso", "Red", carlos)
     ticket(session, cr("2026-10-04"), "En proceso", "Software", sup)
@@ -72,7 +72,7 @@ def test_counts_cards_states_categories_and_people(client, session, admin):
     assert categorias == {"Hardware": 2, "Software": 1, "Red": 2, "Accesos": 1}
     assert m["por_persona"] == [
         {"id": carlos.id, "nombre": "Carlos Solís", "rol": "Técnico", "activo": True, "abiertos": 2, "resueltos": 1},
-        {"id": sup.id, "nombre": "Marta Rojas", "rol": "Supervisor", "activo": True, "abiertos": 1, "resueltos": 1},
+        {"id": sup.id, "nombre": "Marta Rojas", "rol": "Técnico", "activo": True, "abiertos": 1, "resueltos": 1},
     ]
     assert m["sin_asignar_abiertos"] == 1
 
@@ -156,7 +156,7 @@ def test_bad_date_format_is_422(client, session, admin):
 
 
 @pytest.mark.parametrize("rol,codigo", [
-    ("Administrador", 200), ("Supervisor", 200), ("Técnico", 403), ("Solicitante", 403),
+    ("Administrador", 200), ("Técnico", 403), ("Solicitante", 403),
 ])
 def test_permissions(client, session, rol, codigo):
     headers = login_as(client, session, rol, "p@x.local", "Persona")

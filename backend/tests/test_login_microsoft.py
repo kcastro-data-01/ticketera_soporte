@@ -66,11 +66,11 @@ def test_valid_token_creates_a_requester_and_returns_the_app_session(client, ses
 
 
 def test_existing_user_keeps_the_role(client, session):
-    session.add(User(name="Laura M.", email="laura@data.cr", role="Supervisor"))
+    session.add(User(name="Laura M.", email="laura@data.cr", role="Técnico"))
     session.commit()
     resp = entrar(client, id_token())
     assert resp.status_code == 200
-    assert yo(client, resp)["role"] == "Supervisor"
+    assert yo(client, resp)["role"] == "Técnico"
     assert session.scalar(select(User).where(User.email == "laura@data.cr")).name == "Laura M."
 
 

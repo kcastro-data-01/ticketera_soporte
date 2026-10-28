@@ -40,13 +40,12 @@ def test_priorities_are_the_approved_four():
 def test_user_roles():
     assert USER_ROLES == (
         "Administrador",
-        "Supervisor",
         "Técnico",
         "Solicitante",
     )
     assert UserRole.ADMIN.value == "Administrador"
     assert not hasattr(UserRole, "SUPPORT")
-    assert UserRole.SUPERVISOR.value == "Supervisor"
+    assert not hasattr(UserRole, "SUPERVISOR")
     assert UserRole.TECHNICIAN.value == "Técnico"
     assert UserRole.REQUESTER.value == "Solicitante"
 

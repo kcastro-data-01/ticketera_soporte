@@ -24,7 +24,6 @@ from backend.services.ticket_service import (
 from backend.models import User
 from backend.routers.auth import (
     ROLES_ADMIN,
-    ROLES_GESTION,
     ROLES_TODOS,
     role_required,
 )
@@ -193,7 +192,7 @@ def update_ticket(
     payload: TicketUpdate,
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_GESTION)
+        role_required(ROLES_ADMIN)
     ),
 ) -> TicketResponse:
     """Update title, description, category and/or priority of a ticket."""
@@ -216,7 +215,7 @@ def assign_ticket(
     payload: TicketAssignment,
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_GESTION)
+        role_required(ROLES_ADMIN)
     ),
 ) -> TicketResponse:
     """Assign a user to a ticket; ``assigned_to_id: null`` unassigns it (RF4)."""
@@ -252,7 +251,7 @@ def change_ticket_state(
 ) -> TicketResponse:
     """Move a ticket through the allowed workflow transitions (RF3).
 
-    Técnico, Supervisor y Administrador cambian cualquier ticket; los demás
+    Técnico y Administrador cambian cualquier ticket; los demás
     roles (Solicitante), solo los asignados a ellos (``403`` si no). Un
     ticket que no puede ver responde ``404``.
 

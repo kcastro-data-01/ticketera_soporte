@@ -423,7 +423,6 @@ def test_explanation_is_deleted_with_the_ticket(client, session, ollama, auth_cl
 
 @pytest.mark.parametrize("rol,correo,codigo", [
     ("Técnico", "t@x.local", 200),
-    ("Supervisor", "s@x.local", 200),
     ("Administrador", "a@x.local", 200),
     ("Solicitante", "so@x.local", 403),
 ])
