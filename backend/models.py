@@ -292,3 +292,19 @@ class TicketExplanation(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utc_now)
 
     ticket: Mapped[Ticket] = relationship(back_populates="explanation")
+
+
+class MsalCache(Base):
+    """Caché de tokens de msal del buzón de soporte (una sola fila, ``id=1``).
+
+    Antes era un archivo (``CORREO_M365_CACHE``); en la base sirve igual en
+    Docker y en Vercel, donde no hay disco que dure entre llamadas.
+    ``content`` es lo que devuelve ``SerializableTokenCache.serialize()``:
+    tiene tokens, no se muestra en ninguna ruta de la API.
+    """
+
+    __tablename__ = "msal_cache"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utc_now)

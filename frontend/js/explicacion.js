@@ -4,15 +4,18 @@
    reutiliza la guardada si el ticket no cambió) y «Volver a explicar»
    fuerza una nueva (?regenerar=true).
    Muestra la explicación con su certeza, las posibles causas y qué revisar
-   primero. Todo lo que llega del servidor se pinta como texto
+   primero. Con la IA apagada (versión de Vercel, ia_disponible: false en el
+   GET) no hay botones: solo la explicación guardada, si la hay, y un aviso. Todo lo que llega del servidor se pinta como texto
    (textContent), nunca como HTML. */
 
 /* El servidor puede reintentar una vez si el JSON viene mal: hasta ~3 min. */
 const IA_LIMITE_MS = 200000;
 const IA_NOTA = "Contenido generado automáticamente. Revíselo antes de utilizarlo.";
 const IA_NO_DISPONIBLE_TXT = "La IA no está disponible en este momento";
+const IA_APAGADA_TXT = "La explicación con IA no está disponible en esta versión.";
 
 let iaOcupada = false;
+let iaDisponible = true;
 
 function iaTicketId() {
   const id = Number(new URLSearchParams(window.location.search).get("id"));
@@ -69,7 +72,7 @@ function iaRenderizar(datos) {
   panel.replaceChildren();
   if (!e) {
     panel.hidden = true;
-    explicar.hidden = false;
+    explicar.hidden = !iaDisponible;
     regenerar.hidden = true;
     return;
   }
@@ -122,7 +125,7 @@ function iaRenderizar(datos) {
 
   panel.hidden = false;
   explicar.hidden = true;
-  regenerar.hidden = false;
+  regenerar.hidden = !iaDisponible;
 }
 
 function iaBloquear(bloqueado) {
@@ -178,6 +181,12 @@ async function iaCargarGuardada() {
     const response = await fetchWithAuth(`/api/tickets/${ticketId}/explicacion`);
     if (!response.ok) return;
     const datos = await response.json();
+    if (datos && datos.ia_disponible === false) {
+      iaDisponible = false;
+      iaRenderizar(datos);
+      iaEstado(IA_APAGADA_TXT);
+      return;
+    }
     if (datos && datos.explicacion) iaRenderizar(datos);
   } catch (error) {
     console.error("GET explicacion:", error);

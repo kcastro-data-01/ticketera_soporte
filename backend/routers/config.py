@@ -9,6 +9,7 @@ from backend.constants import (
     TICKET_STATES,
     USER_ROLES,
 )
+from backend.services.asistente_service import ia_activa
 
 router = APIRouter(prefix="/api", tags=["Configuración"])
 
@@ -24,6 +25,8 @@ class ConfigResponse(BaseModel):
     states: list[str]
     priorities: list[str]
     roles: list[str]
+    # False con la IA apagada (Vercel): se oculta «Explicar con IA».
+    ia_disponible: bool
 
 
 @router.get(
@@ -42,4 +45,5 @@ def get_config() -> ConfigResponse:
         states=list(TICKET_STATES),
         priorities=list(TICKET_PRIORITIES),
         roles=list(USER_ROLES),
+        ia_disponible=ia_activa(),
     )

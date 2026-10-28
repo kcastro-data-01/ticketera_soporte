@@ -1,0 +1,17 @@
+# Lo que no se sube a Vercel (el frontend sí: lo sirve la CDN).
+.venv
+.pytest_cache
+**/__pycache__
+*.db
+*.sqlite3
+backups
+docs
+backend/tests
+frontend/tests
+ticketera_soporte
+INVENTARIO.md
+.env
+.env.*
+Dockerfile
+docker-compose.yml
+.dockerignore

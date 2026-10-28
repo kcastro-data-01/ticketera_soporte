@@ -465,7 +465,8 @@ class ExplicacionResponse(BaseModel):
 
     ``claridad`` y ``motivo_claridad`` los calcula el servidor (no la IA).
     ``explicacion`` es ``null`` si el ticket nunca se explicó. ``vigente`` es
-    ``false`` si el ticket cambió desde que se explicó.
+    ``false`` si el ticket cambió desde que se explicó. ``ia_disponible`` es
+    ``false`` con la IA apagada (Vercel): no se ofrece «Explicar con IA».
     """
 
     ticket_id: int
@@ -476,6 +477,7 @@ class ExplicacionResponse(BaseModel):
     generada_en: datetime | None
     modelo: str | None
     desde_cache: bool
+    ia_disponible: bool = True
 
 
 class MetricasTarjetas(BaseModel):

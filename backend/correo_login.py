@@ -7,7 +7,9 @@ Uso (una vez, y de nuevo si la sesión vence):
 
 Muestra un código para escribir en https://microsoft.com/devicelogin; hay que
 entrar con la cuenta del buzón (``CORREO_USUARIO``). Lee ``CORREO_M365_TENANT``,
-``CORREO_M365_CLIENT_ID`` y ``CORREO_M365_CACHE`` del entorno.
+``CORREO_M365_CLIENT_ID`` y ``DATABASE_URL`` del entorno: los tokens quedan en
+esa base (tabla ``msal_cache``). Para la versión de Vercel se ejecuta desde la
+compu con ``DATABASE_URL`` apuntando a Neon (ver README → «Publicar en Vercel»).
 """
 
 from __future__ import annotations
@@ -15,10 +17,10 @@ from __future__ import annotations
 import os
 import sys
 
-from backend.services.correo_auth import SinSesionError, iniciar_sesion, ruta_cache
+from backend.services.correo_auth import SinSesionError, almacen_desde_entorno, iniciar_sesion
 
 
-def main(env=None, imprimir=print, iniciar=iniciar_sesion) -> int:
+def main(env=None, imprimir=print, iniciar=iniciar_sesion, session_factory=None) -> int:
     env = os.environ if env is None else env
     tenant = (env.get("CORREO_M365_TENANT") or "").strip()
     client_id = (env.get("CORREO_M365_CLIENT_ID") or "").strip()
@@ -27,7 +29,11 @@ def main(env=None, imprimir=print, iniciar=iniciar_sesion) -> int:
         imprimir("Faltan CORREO_M365_TENANT y/o CORREO_M365_CLIENT_ID en el archivo .env.")
         return 1
 
-    cache = ruta_cache(env.get("CORREO_M365_CACHE"))
+    from backend.database import init_db
+
+    if session_factory is None:
+        init_db()  # la tabla msal_cache existe aunque la app no haya arrancado
+    cache = almacen_desde_entorno(env, session_factory)
     try:
         resultado = iniciar(tenant, client_id, cache, imprimir=imprimir)
     except SinSesionError as error:

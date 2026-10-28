@@ -45,7 +45,13 @@ vez se ejecuta ``python -m backend.correo_login``.
 Configuración (variables de entorno, ver README): ``CORREO_ACTIVO``,
 ``CORREO_USUARIO``, ``CORREO_M365_TENANT``, ``CORREO_M365_CLIENT_ID``,
 ``CORREO_M365_CACHE``, ``CORREO_CARPETA_PROCESADOS``, ``CORREO_FILTRO``,
-``CORREO_INTERVALO``, ``DOMINIO_EMPRESA``, ``AVISAR_ASIGNADO`` y ``APP_URL``.
+``CORREO_INTERVALO``, ``CORREO_MODO``, ``DOMINIO_EMPRESA``, ``AVISAR_ASIGNADO``
+y ``APP_URL``.
+
+``CORREO_MODO``: ``hilo`` (Docker, por defecto) revisa el buzón en un hilo
+cada ``CORREO_INTERVALO`` segundos; ``cron`` (por defecto en Vercel, donde no
+hay hilos en segundo plano) no arranca el hilo: cada llamada a
+``POST /api/cron/correo`` hace un ciclo con :func:`revisar_una_vez`.
 """
 
 from __future__ import annotations
@@ -54,6 +60,7 @@ import logging
 import os
 import re
 import threading
+import time
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -64,10 +71,11 @@ import httpx
 from sqlalchemy import func, select
 
 from backend.constants import TicketCategory, TicketPriority
+from backend.entorno import en_vercel
 from backend.models import ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate
 from backend.services import ticket_service
-from backend.services.correo_auth import ProveedorToken, SinSesionError, ruta_cache
+from backend.services.correo_auth import AlmacenBD, ProveedorToken, SinSesionError, ruta_cache
 from backend.services.login_microsoft import asignar_rol_inicial
 
 logger = logging.getLogger(__name__)
@@ -186,6 +194,8 @@ class ConfigCorreo:
     # Avisar por correo al asignado de un ticket creado desde un correo
     # enviado (apagado mientras el enlace sea localhost).
     avisar_asignado: bool = False
+    # «hilo» (Docker) o «cron» (Vercel: lo dispara POST /api/cron/correo).
+    modo: str = "hilo"
 
 
 def _activo(valor: str | None) -> bool:
@@ -212,7 +222,17 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         app_url=(env.get("APP_URL") or "http://localhost:8000").rstrip("/"),
         dominio_empresa=(env.get("DOMINIO_EMPRESA") or "").strip().lower().lstrip("@"),
         avisar_asignado=_activo(env.get("AVISAR_ASIGNADO")),
+        modo=modo_desde_entorno(env),
     )
+
+
+def modo_desde_entorno(env=None) -> str:
+    """``CORREO_MODO``: «cron» o «hilo»; si no está, «cron» en Vercel."""
+    env = os.environ if env is None else env
+    valor = (env.get("CORREO_MODO") or "").strip().lower()
+    if valor in ("cron", "hilo"):
+        return valor
+    return "cron" if en_vercel(env) else "hilo"
 
 
 # --- Lectura del correo ---------------------------------------------------
@@ -762,9 +782,10 @@ class ErrorGraph(Exception):
 class ClienteGraph:
     """Lo mínimo de Microsoft Graph que usa la ticketera (permisos delegados)."""
 
-    def __init__(self, token: ProveedorToken, http: httpx.Client | None = None):
+    def __init__(self, token: ProveedorToken, http: httpx.Client | None = None,
+                 timeout: float = 60):
         self._token = token
-        self._http = http or httpx.Client(timeout=60)
+        self._http = http or httpx.Client(timeout=timeout)
         self._carpetas: dict[str, str] = {}
 
     def _pedir(self, metodo: str, url: str, **kwargs) -> dict:
@@ -881,19 +902,31 @@ class ClienteGraph:
             self._pedir("POST", "/me/sendMail", json={"message": mensaje, "saveToSentItems": True})
 
 
-def crear_cliente(config: ConfigCorreo) -> ClienteGraph:
-    token = ProveedorToken(config.m365_tenant, config.m365_client_id, config.usuario,
-                           config.cache_path)
-    return ClienteGraph(token)
+def crear_cliente(config: ConfigCorreo, session_factory=None) -> ClienteGraph:
+    """Cliente de Graph con los tokens de la base (importa el archivo de
+    caché de antes si la base todavía no los tiene). En modo cron cada pedido
+    espera menos (la llamada entera tiene que terminar en ~25 s)."""
+    almacen = AlmacenBD(session_factory, importar_de=config.cache_path)
+    token = ProveedorToken(config.m365_tenant, config.m365_client_id, config.usuario, almacen)
+    return ClienteGraph(token, timeout=TIMEOUT_GRAPH_CRON if config.modo == "cron" else 60)
+
+
+def _sin_tiempo(hasta: float | None) -> bool:
+    return hasta is not None and time.monotonic() >= hasta
 
 
 def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
-                  avisados: set | None = None) -> dict[str, int]:
+                  avisados: set | None = None, hasta: float | None = None) -> dict[str, int]:
     """Revisa los no leídos una vez y procesa los que piden ayuda.
 
     ``avisados`` (opcional) recuerda entre revisiones los correos que ya se
     anotaron en el registro como «no parece solicitud de ayuda»: como quedan
     sin leer, si no se anotarían de nuevo cada minuto.
+
+    ``hasta`` (opcional, ``time.monotonic()``): al llegar no se toman más
+    correos; los que quedan siguen sin leer y salen en la próxima revisión
+    (el modo cron tiene que terminar dentro del tiempo de la función). En el
+    resultado queda ``pendientes`` con cuántos no se alcanzaron.
 
     Devuelve cuántos correos terminaron en cada resultado. Un error de token
     (``SinSesionError``) sube a quien llama; los errores de un correo
@@ -903,7 +936,7 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
     # Primero los enviados: si alguien ya respondió a un correo recién
     # enviado, su respuesta encuentra el hilo y no crea otro ticket.
     try:
-        for resultado, cantidad in revisar_enviados(session_factory, config, cliente).items():
+        for resultado, cantidad in revisar_enviados(session_factory, config, cliente, hasta).items():
             conteo[f"enviado_{resultado}"] = cantidad
     except SinSesionError:
         raise
@@ -913,9 +946,14 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
     with session_factory() as session:
         inicio = fecha_de_inicio(session)
 
+    if _sin_tiempo(hasta):
+        return conteo
     mensajes = cliente.no_leidos()
     carpeta_id = None
-    for mensaje in mensajes:
+    for posicion, mensaje in enumerate(mensajes):
+        if _sin_tiempo(hasta):
+            conteo["pendientes"] = len(mensajes) - posicion
+            break
         correo = correo_desde_graph(mensaje)
         if correo.fecha is not None and correo.fecha < inicio:
             continue  # Llegó antes de activar la función: no se toca.
@@ -957,13 +995,18 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
     return conteo
 
 
-def revisar_enviados(session_factory, config: ConfigCorreo, cliente: ClienteGraph) -> dict[str, int]:
+def revisar_enviados(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
+                     hasta: float | None = None) -> dict[str, int]:
     """Procesa los Elementos enviados desde que se activó la función. No los
-    mueve ni los marca: cada uno queda registrado por su Message-ID."""
+    mueve ni los marca: cada uno queda registrado por su Message-ID (los
+    que no se alcanzan antes de ``hasta`` se procesan en la próxima)."""
     conteo: dict[str, int] = {}
     with session_factory() as session:
         inicio = fecha_de_inicio(session, MARCA_INICIO_ENVIADOS)
     for mensaje in cliente.enviados(inicio):
+        if _sin_tiempo(hasta):
+            conteo["pendientes"] = conteo.get("pendientes", 0) + 1
+            continue
         correo = correo_desde_graph(mensaje)
         if correo.fecha is not None and correo.fecha < inicio:
             continue
@@ -1019,6 +1062,9 @@ def iniciar_lector(session_factory=None) -> bool:
     if config is None:
         logger.info("lectura del buzón apagada (CORREO_ACTIVO no está en 1)")
         return False
+    if config.modo == "cron":
+        logger.info("lectura del buzón por cron (CORREO_MODO=cron): POST /api/cron/correo")
+        return False
     if _hilo is not None and _hilo.is_alive():
         return False
     if not (config.m365_tenant and config.m365_client_id):
@@ -1028,7 +1074,8 @@ def iniciar_lector(session_factory=None) -> bool:
 
         session_factory = SessionLocal
     _detener.clear()
-    _hilo = threading.Thread(target=_bucle, args=(session_factory, config, crear_cliente(config)),
+    _hilo = threading.Thread(target=_bucle,
+                             args=(session_factory, config, crear_cliente(config, session_factory)),
                              name="lector-correo", daemon=True)
     _hilo.start()
     return True
@@ -1036,3 +1083,33 @@ def iniciar_lector(session_factory=None) -> bool:
 
 def detener_lector() -> None:
     _detener.set()
+
+
+# --- Una revisión por llamada (modo cron, Vercel) ----------------------------
+
+# cron-job.org corta la llamada a los 30 s: se deja de tomar correos a los 25.
+LIMITE_CRON = 25.0
+TIMEOUT_GRAPH_CRON = 15.0
+
+
+class CorreoApagado(Exception):
+    """``CORREO_ACTIVO`` no está encendido (o falta ``CORREO_USUARIO``)."""
+
+
+def revisar_una_vez(session_factory=None, limite: float = LIMITE_CRON,
+                    crear=crear_cliente) -> dict[str, int]:
+    """Un ciclo (Elementos enviados y bandeja de entrada) que deja de tomar
+    correos a los ``limite`` segundos. Lanza :class:`CorreoApagado` o
+    ``SinSesionError`` (hay que ejecutar ``correo_login``)."""
+    hasta = time.monotonic() + limite
+    config = config_desde_entorno()
+    if config is None:
+        raise CorreoApagado("la lectura del buzón está apagada (CORREO_ACTIVO)")
+    if session_factory is None:
+        from backend.database import SessionLocal
+
+        session_factory = SessionLocal
+    conteo = revisar_buzon(session_factory, config, crear(config, session_factory), hasta=hasta)
+    if conteo:
+        logger.info("revisión del buzón por cron: %s", conteo)
+    return conteo

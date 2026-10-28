@@ -7,11 +7,13 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
+from backend.entorno import en_vercel
 from backend.services import asistente_service, correo_service
 from backend.routers.asistente import router as asistente_router
 from backend.routers.auth import router as auth_router
 from backend.routers.comentarios import router as comments_router
 from backend.routers.config import router as config_router
+from backend.routers.cron import router as cron_router
 from backend.routers.explicacion import router as explicacion_router
 from backend.routers.metricas import router as metricas_router
 from backend.routers.history import router as history_router
@@ -27,7 +29,8 @@ async def lifespan(application: FastAPI):
     # pregunta del asistente no espere a que el modelo se cargue.
     asistente_service.iniciar_precarga()
     # Si CORREO_ACTIVO está encendido, revisa el buzón de soporte y crea
-    # tickets con los correos que llegan.
+    # tickets con los correos que llegan (en modo cron no hay hilo: lo hace
+    # POST /api/cron/correo).
     correo_service.iniciar_lector()
     yield
     correo_service.detener_lector()
@@ -38,6 +41,10 @@ app = FastAPI(
     description="API del sistema de ticketera de soporte (práctica de pasantes).",
     version="0.1.0",
     lifespan=lifespan,
+    # En Vercel (público) no se publica la documentación de la API.
+    docs_url=None if en_vercel() else "/docs",
+    redoc_url=None if en_vercel() else "/redoc",
+    openapi_url=None if en_vercel() else "/openapi.json",
 )
 
 
@@ -56,9 +63,12 @@ app.include_router(config_router)
 app.include_router(asistente_router)
 app.include_router(explicacion_router)
 app.include_router(metricas_router)
+app.include_router(cron_router)
 
 # Serve the frontend (Task 11) from the same origin as the API, so the
 # browser can call /api/* without CORS. Registered last: every route above
-# keeps its priority over this catch-all mount.
+# keeps its priority over this catch-all mount. On Vercel the CDN serves the
+# frontend (vercel.json) and the folder is not inside the function.
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+if FRONTEND_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

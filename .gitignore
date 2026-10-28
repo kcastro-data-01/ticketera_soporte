@@ -29,3 +29,11 @@ Thumbs.db
 
 # Caché de tokens de Microsoft 365 (correo)
 .msal_cache.json
+
+# Otros archivos de entorno (p. ej. .env.neon con la cadena de Neon); el
+# ejemplo sí se sube.
+.env.*
+!.env.example
+
+# Vercel CLI
+.vercel

@@ -11,6 +11,9 @@ httpx>=0.28.0
 # Correo con Microsoft Graph (inicio de sesión device code)
 msal>=1.31.0
 
+# Postgres (Neon, en Vercel); en Docker se sigue usando SQLite
+psycopg[binary]>=3.2.0
+
 # Autenticación
 PyJWT>=2.9.0
 passlib[bcrypt]>=1.7.4

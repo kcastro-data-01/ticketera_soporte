@@ -206,3 +206,19 @@ test("no hay sección de preguntas ni botón para copiarlas", async () => {
   assert.doesNotMatch(texto(ia.ids["ia-panel"]), /Pregunta|Usar preguntas|Siguiente paso|Qué pide/);
   assert.equal(typeof ia.sandbox.iaUsarPreguntas, "undefined");
 });
+
+test("con la IA apagada (Vercel) no hay botones y se avisa; la guardada se sigue viendo", async () => {
+  const sin = crear({ fetchImpl: async () => respuesta(200, { ...DATOS, explicacion: null, ia_disponible: false }) });
+  await sin.sandbox.iniciarExplicacion();
+  assert.equal(sin.ids["ia-explicar"].hidden, true);
+  assert.equal(sin.ids["ia-regenerar"].hidden, true);
+  assert.equal(sin.ids["ia-panel"].hidden, true);
+  assert.match(sin.ids["ia-estado"].textContent, /no está disponible en esta versión/);
+
+  const guardada = crear({ fetchImpl: async () => respuesta(200, { ...DATOS, ia_disponible: false }) });
+  await guardada.sandbox.iniciarExplicacion();
+  assert.equal(guardada.ids["ia-panel"].hidden, false);
+  assert.match(texto(guardada.ids["ia-panel"]), /Laura Méndez reporta/);
+  assert.equal(guardada.ids["ia-explicar"].hidden, true);
+  assert.equal(guardada.ids["ia-regenerar"].hidden, true, "sin «Volver a explicar»");
+});

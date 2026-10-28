@@ -39,3 +39,11 @@ Thumbs.db
 .idea
 *.swp
 *.log
+
+# Solo para Vercel
+api
+vercel.json
+.vercelignore
+.python-version
+.vercel
+.env.*
