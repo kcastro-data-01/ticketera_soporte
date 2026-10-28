@@ -154,7 +154,9 @@ def test_login_command_requires_tenant_and_client():
     assert "CORREO_M365_TENANT" in salida[0]
 
 
-def test_login_command_success_and_warns_on_other_account(tmp_path):
+def test_login_command_success_and_warns_on_other_account(tmp_path, engine):
+    from sqlalchemy.orm import sessionmaker
+
     salida = []
     usados = []
 
@@ -165,8 +167,12 @@ def test_login_command_success_and_warns_on_other_account(tmp_path):
 
     env = {"CORREO_M365_TENANT": "t", "CORREO_M365_CLIENT_ID": "c",
            "CORREO_USUARIO": "kcastro@data.cr", "CORREO_M365_CACHE": str(tmp_path / "c.json")}
-    assert correo_login.main(env=env, imprimir=salida.append, iniciar=iniciar) == 0
-    assert usados == [("t", "c", tmp_path / "c.json")]
+    assert correo_login.main(env=env, imprimir=salida.append, iniciar=iniciar,
+                             session_factory=sessionmaker(bind=engine)) == 0
+    # Los tokens van a la base; el archivo de antes solo se importa.
+    [(tenant, client_id, almacen)] = usados
+    assert (tenant, client_id) == ("t", "c")
+    assert isinstance(almacen, ca.AlmacenBD) and almacen.importar_de == tmp_path / "c.json"
     assert any("devicelogin" in s for s in salida)
     assert any("otra@data.cr" in s for s in salida)
     assert any("ATENCIÓN" in s for s in salida)
@@ -178,5 +184,6 @@ def test_login_command_reports_failure(tmp_path):
 
     salida = []
     env = {"CORREO_M365_TENANT": "t", "CORREO_M365_CLIENT_ID": "c"}
-    assert correo_login.main(env=env, imprimir=salida.append, iniciar=iniciar) == 1
+    assert correo_login.main(env=env, imprimir=salida.append, iniciar=iniciar,
+                             session_factory=lambda: None) == 1
     assert "AADSTS7000218" in salida[0]
