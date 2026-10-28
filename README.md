@@ -918,9 +918,10 @@ Opcionales: `CORREO_CARPETA_PROCESADOS` (por defecto `Tickets-Procesados`),
 `CORREO_FILTRO` (`auto` o `todos`), `CORREO_INTERVALO` (segundos, 60),
 `AVISAR_ASIGNADO` (`false`; `true` avisa por correo al asignado de un ticket
 creado desde un correo enviado) y
-`CORREO_M365_CACHE` (archivo de la caché de tokens; en Docker es
-`/data/msal_cache.json`, dentro del volumen `ticketera-data`; fuera de Docker,
-`.msal_cache.json` en la raíz, ignorado por Git).
+`CORREO_M365_CACHE` (archivo de la caché de tokens de antes; en Docker es
+`/data/msal_cache.json`). Los tokens ahora se guardan en la base de datos
+(tabla `msal_cache`); si la tabla está vacía y ese archivo existe, se importa
+solo una vez y no hace falta volver a iniciar sesión. El archivo no se borra.
 
 ### Primer inicio de sesión
 
@@ -930,8 +931,8 @@ docker compose exec ticketera python -m backend.correo_login
 ```
 
 Muestra un código: ábrelo en <https://microsoft.com/devicelogin>, escribe el
-código y entra con la cuenta del buzón. Los tokens quedan en la caché y la app
-los renueva sola; no hace falta reiniciar. Sin Docker: `python -m backend.correo_login`.
+código y entra con la cuenta del buzón. Los tokens quedan en la base de datos
+y la app los renueva sola; no hace falta reiniciar. Sin Docker: `python -m backend.correo_login`.
 
 Para ver qué está pasando:
 
@@ -943,3 +944,146 @@ Si aparece «sesión de Microsoft no iniciada o vencida», vuelve a ejecutar
 `correo_login` (pasa si se cambió la contraseña de la cuenta, se revocó la
 sesión o estuvo apagada mucho tiempo). La app no se cae: sigue intentando
 cada minuto.
+
+## Publicar en Vercel
+
+La misma app corre en Docker (SQLite + Ollama, como siempre) y en Vercel
+(<https://tickets-americandata.vercel.app>, plan gratis). Se elige por
+variables de entorno; Vercel define `VERCEL=1` solo, y con eso cambian estos
+valores por defecto (cada uno se puede forzar con su variable):
+
+| | Docker | Vercel |
+|---|---|---|
+| Base de datos (`DATABASE_URL`) | SQLite en el volumen | Postgres en Neon |
+| IA (`ASISTENTE_PROVEEDOR`) | `qwen` | `ninguno` (apagada) |
+| Correo (`CORREO_MODO`) | `hilo`: revisa cada `CORREO_INTERVALO` s | `cron`: lo llama cron-job.org |
+| Caché de tokens del buzón | tabla `msal_cache` | tabla `msal_cache` |
+| `/docs` y `/openapi.json` | visibles | apagados |
+| Contraseña (`LOGIN_LOCAL`) | según `.env` | siempre apagada |
+
+Archivos: `vercel.json` (frontend estático desde `frontend/`, `/api/*` y
+`/health` a la función `api/index.py`, encabezado `X-Robots-Tag: noindex`),
+`.vercelignore` y `.python-version`. Docker no los usa.
+
+Con la IA apagada el chat sigue respondiendo lo que calcula el servidor
+(conteos, fichas de tickets, fecha y hora…); lo que iría a la IA libre
+contesta que el chat libre no está disponible. En el detalle del ticket no
+aparece el botón «Explicar con IA» (si hay una explicación copiada de Docker,
+se ve, sin «Volver a explicar»).
+
+### Pasos, en orden
+
+1. **Código en GitHub.** Mergear la rama a `main` y subirla (Vercel publica
+   cada push a `main`; los demás pushes crean *previews*).
+2. **Proyecto en Vercel.** *Add New → Project →* importar el repositorio,
+   nombre `tickets-americandata`, *Framework Preset: Other*. No tocar los
+   comandos (los define `vercel.json`).
+3. **Base Neon.** En el proyecto: *Storage → Create Database → Neon* (o
+   *Marketplace → Neon*) y conectarla al proyecto. Crea `DATABASE_URL`
+   (con pooler, la usa la app) y `DATABASE_URL_UNPOOLED` (sin pooler, para
+   copiar datos y para `correo_login` desde la compu). Dejarla conectada solo
+   al entorno **Production**.
+4. **Variables** (*Settings → Environment Variables*, entorno
+   **Production** solamente, así los previews no tocan la base ni el buzón):
+
+   | Variable | Valor |
+   |---|---|
+   | `JWT_SECRET_KEY` | aleatoria (ver abajo). Sin ella la app no arranca |
+   | `CRON_SECRET` | otra aleatoria |
+   | `CORREO_M365_TENANT` | el mismo de `.env` (GUID del tenant o `data.cr`) |
+   | `CORREO_M365_CLIENT_ID` | el mismo de `.env` |
+   | `ADMIN_INICIAL` | `kcastro@data.cr` |
+   | `DOMINIO_EMPRESA` | `data.cr` |
+   | `CORREO_ACTIVO` | `1` |
+   | `CORREO_USUARIO` | el buzón de soporte |
+   | `CORREO_FILTRO` | `auto` (o `todos`) |
+   | `CORREO_CARPETA_PROCESADOS` | `Tickets-Procesados` |
+   | `AVISAR_ASIGNADO` | `true` (ya hay un enlace público) |
+   | `APP_URL` | `https://tickets-americandata.vercel.app` |
+
+   `DATABASE_URL` ya la puso Neon. Para generar las claves:
+   `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`.
+   Ningún secreto va al repositorio: `.env` y `.env.*` están en `.gitignore`.
+5. **Apagar el correo en Docker** antes de copiar (y dejarlo apagado mientras
+   Vercel lea el buzón): en `.env`, `CORREO_ACTIVO=0` y
+   `docker compose up -d ticketera`. Si los dos leen el mismo buzón se crean
+   tickets y respuestas repetidos.
+6. **Copiar los datos de Docker a Neon** (con la imagen nueva:
+   `docker compose up -d --build ticketera`). La cadena va en una variable
+   para que no quede en el historial:
+
+   ```bash
+   read -rs DESTINO_URL   # pegar DATABASE_URL_UNPOOLED de Neon y Enter
+   export DESTINO_URL
+   docker compose exec -e DESTINO_URL ticketera python -m backend.copiar_a_postgres
+   unset DESTINO_URL
+   ```
+
+   Muestra cuántas filas hay en cada tabla en origen y destino. Si Neon ya
+   tiene datos no copia nada (`--reemplazar` los borra y copia de nuevo).
+   Copia también los tokens del buzón: si ya estaban en Docker, el paso 7 se
+   puede saltar.
+7. **Primer inicio de sesión del buzón contra Neon** (desde la compu, con
+   device code). Crear `.env.neon` (ignorado por Git) con:
+
+   ```
+   DATABASE_URL=<DATABASE_URL_UNPOOLED de Neon>
+   ```
+
+   y ejecutar:
+
+   ```bash
+   docker run --rm -it --env-file .env --env-file .env.neon \
+     ticketera_soporte-ticketera python -m backend.correo_login
+   ```
+
+   Abrir <https://microsoft.com/devicelogin>, escribir el código y entrar con
+   el buzón. Los tokens quedan en Neon; Vercel los lee y los renueva solo.
+   Repetirlo solo si el cron empieza a responder «La sesión del buzón no está
+   iniciada o venció» (contraseña cambiada, sesión revocada, ~90 días sin uso).
+8. **Microsoft Entra ID.** *App registrations →* la app de la ticketera *→
+   Authentication →* en la plataforma **Single-page application** agregar la
+   URI `https://tickets-americandata.vercel.app/login.html` (dejar la de
+   `http://localhost:8000/login.html` para Docker) y guardar. En *Overview*,
+   *Supported account types* tiene que ser «Accounts in this organizational
+   directory only». El backend además rechaza invitados (otro `idp`) y
+   correos que no sean `@data.cr`.
+9. **Redeploy** (*Deployments → … → Redeploy*) para que tome las variables.
+   Probar: entrar con Microsoft, ver el tablero, abrir un ticket, preguntar
+   en el chat «¿cuántos tickets nuevos hay?».
+10. **cron-job.org.** *Create cronjob*:
+    * URL: `https://tickets-americandata.vercel.app/api/cron/correo`
+    * *Advanced → Request method:* `POST`
+    * *Advanced → Headers:* `Authorization` = `Bearer <CRON_SECRET>`
+    * *Schedule:* cada minuto (ver el límite de Neon abajo: conviene solo en
+      horario laboral, p. ej. lunes a viernes de 7 a 19, y un segundo cronjob
+      cada 15 minutos fuera de ese horario).
+    * *Notifications:* avisar si falla.
+
+    Con *Test run* tiene que responder `200` y
+    `{"estado": "ok", "conteo": {…}}`. `401`: el encabezado no coincide con
+    `CRON_SECRET`; `404`: falta `CRON_SECRET` en Vercel; `503`: correo
+    apagado o sesión del buzón vencida (paso 7).
+
+### Lo que no funciona igual que en Docker
+
+* **IA:** sin «Explicar con IA», sin chat libre y sin redacción ni
+  interpretación con IA (siempre las respuestas fijas del sistema).
+* **Correo:** como máximo una revisión por minuto (la que dispara
+  cron-job.org), de hasta ~25 s: si llegan muchos correos juntos, se reparten
+  en varios minutos (`pendientes` en la respuesta). Si cron-job.org falla, no
+  se leen correos. El aviso «correo ignorado» del log se repite en cada
+  revisión (no hay memoria entre llamadas).
+* **Neon gratis:** 0,5 GB de datos. La base se suspende tras 5 minutos sin uso
+  y la primera consulta tarda ~1 s más. Un cron cada minuto la mantiene
+  despierta todo el día y puede gastar las horas de cómputo gratis del mes:
+  revisar el consumo en la consola de Neon y, si hace falta, usar el horario
+  laboral del paso 10.
+* **Vercel Hobby:** la primera petición después de un rato tarda 1–3 s
+  (arranque en frío); los logs duran poco; no hay disco (todo va a Neon);
+  límites mensuales de invocaciones y CPU (el cron usa ~43 000 llamadas al
+  mes). Los términos del plan Hobby son para uso **no comercial**: para la
+  empresa correspondería el plan Pro.
+* **Datos separados:** Docker (SQLite) y Vercel (Neon) son bases distintas.
+  El código se edita en Docker y llega a Vercel al subir a `main`; los datos
+  no viajan entre una y otra.
