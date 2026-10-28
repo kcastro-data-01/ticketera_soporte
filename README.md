@@ -60,7 +60,9 @@ filtrarlos, y consultar su historial de cambios.
   usuario desactivado no inicia sesión y pierde la sesión abierta.
 - No hay registro público: la cuenta se crea sola al entrar por primera vez
   con Microsoft (como Solicitante, o Administrador si es `ADMIN_INICIAL`) o
-  al escribir al buzón de soporte desde el dominio de la empresa.
+  cuando el dueño del buzón le envía un correo que se vuelve ticket (queda
+  como asignado). Escribir al buzón sin cuenta no la crea: se le pide entrar
+  primero con Microsoft.
 
 - Asistente de IA (botón «Asistente» abajo a la derecha, `POST /api/asistente`):
   responde preguntas sobre la app con Claude. El servidor solo le entrega los
@@ -843,13 +845,16 @@ Si un correo de soporte real no se detecta, agrega la frase a la lista.
 | Quién escribe (correo que pide ayuda) | Qué pasa |
 |---|---|
 | Usuario activo de la ticketera (mismo correo) | Se crea el ticket a su nombre (asunto = título, cuerpo = descripción, categoría y prioridad por palabras clave) y se le responde con el número y el enlace. |
-| Responde a «Ticket #N», o en el hilo de un correo que ya es ticket (cabeceras In-Reply-To / References), de un ticket que creó o tiene asignado | Se agrega como comentario a ese ticket. |
-| Alguien sin cuenta del dominio de la empresa (`DOMINIO_EMPRESA`, p. ej. `data.cr`) | Se crea como **Solicitante** (nombre del correo, o lo que va antes de @) y se crea el ticket como a cualquier usuario, con su respuesta. En el registro: `Usuario creado desde el correo: <correo> (Solicitante)`. |
+| Responde en el hilo de un correo que ya es ticket (In-Reply-To / References / `conversationId`) | Se agrega como **comentario** si es el solicitante, el asignado o **cualquier usuario activo que estuvo en el hilo** (en «Para» o CC). |
+| Escribe «[Ticket #N]» (o «Ticket #N») en el asunto, sin responder en el hilo | Comentario solo si es el solicitante o el asignado de ese ticket (así nadie comenta un ticket ajeno con solo escribir el número). |
+| Alguien sin cuenta del dominio de la empresa (`DOMINIO_EMPRESA`, p. ej. `data.cr`) | **No se crea ni el usuario ni el ticket.** Se le responde en el hilo: «Para crear tickets por correo, primero ingrese a la ticketera con su cuenta de Microsoft de la empresa: `APP_URL`. Después vuelva a enviar su solicitud.» (con `X-Auto-Response-Suppress` y `X-Ticketera`). El correo queda registrado (`sin_cuenta`), así no se le responde dos veces. Solo si el correo pasa el filtro: a un correo normal de un compañero sin cuenta no se le responde. |
+| Alguien sin cuenta que responde en el hilo de un ticket | Se ignora (no comenta ni recibe el aviso). En el registro: `Comentario ignorado: <correo> no tiene cuenta en la ticketera (ticket #N)`. |
 | Alguien sin cuenta de otro dominio (o sin `DOMINIO_EMPRESA`) | **Se ignora**: no se crea ticket ni se responde; se marca como leído y se mueve. En el registro: `Correo ignorado: remitente externo sin cuenta <correo>`. |
 | Cuenta desactivada | Se le avisa que hable con un administrador. |
 | Respuestas automáticas, rebotes, «noreply», o el propio buzón | Nunca se responden (evita bucles). |
-| Responde o reenvía un aviso de la app («No pudimos crear tu ticket», o un «Registrate para crear tickets» viejo: ya no se envía), con o sin `RE:`/`RV:`/`FW:`/`Fwd:` | Se ignora: nunca crea un ticket. Se marca como leído y se mueve. |
-| Responde a «Ticket #N creado» o «Comentario agregado al ticket #N» | Si es el dueño del ticket y escribió algo, se agrega como **comentario**; si no, se ignora. Nunca crea un ticket nuevo. |
+| Responde o reenvía un aviso de la app («Ingrese a la ticketera para crear tickets», «No pudimos crear tu ticket», o un «Registrate para crear tickets» viejo), con o sin `RE:`/`RV:`/`FW:`/`Fwd:` | Se ignora: nunca crea un ticket. Se marca como leído y se mueve. |
+| Responde a «Ticket #N creado», «Comentario agregado al ticket #N», «[Ticket #N] Se le asignó…» o «[Ticket #N] Nuevo comentario…» | Si puede comentar (ver arriba) y escribió algo, se agrega como **comentario**; si no, se ignora. Nunca crea un ticket nuevo. |
+| Un aviso de la app que el buzón se mandó a sí mismo (p. ej. un comentario en un ticket asignado al dueño) | No se toca: queda sin leer en la bandeja para que el dueño lo vea. |
 
 La app lee los correos **no leídos** de la bandeja de entrada con Microsoft
 Graph. Cada correo que procesa se responde **en el mismo hilo**, se marca como
@@ -860,17 +865,20 @@ que llegan después de activar la función.
 ### Correos enviados
 
 La app también revisa **Elementos enviados** del buzón (mismo permiso
-`Mail.ReadWrite`). De lo que envía el dueño, **solo crea ticket el asunto que
-empieza con «Ticket:»** (sin importar mayúsculas); sin ese prefijo no crea nada,
-aunque parezca pedir ayuda y aunque `CORREO_FILTRO=todos`:
+`Mail.ReadWrite`). Lo que envía el dueño a alguien de la empresa usa el
+**mismo filtro** que lo que llega (`CORREO_FILTRO`): con `auto`, solo crean
+ticket los que parecen pedir ayuda o reportar un problema («No me funciona la
+impresora» sí; «Gracias por el informe» no). Si el asunto empieza con
+**«Ticket:»**, crea siempre (y el título va sin «Ticket:»). Ojo: con
+`CORREO_FILTRO=todos`, **todo** correo enviado a un compañero crea un ticket.
 
 | Caso | Qué pasa |
 |---|---|
-| Asunto «Ticket: …» y va a alguien de `DOMINIO_EMPRESA` en «Para» | Ticket a nombre del dueño (título sin «Ticket:»), **asignado al primer destinatario de la empresa en «Para»** (CC no cuenta). Si no tiene cuenta, se crea con el nombre del encabezado y el correo en minúsculas; cuando entre con Microsoft, el login lo encuentra por correo y usa ese mismo usuario. |
-| Responde en el hilo de un ticket | Comentario del dueño en ese ticket. Nunca crea otro. |
+| Pasa el filtro (o asunto «Ticket: …») y va a alguien de `DOMINIO_EMPRESA` en «Para» | Ticket a nombre del dueño, **asignado al primer destinatario de la empresa en «Para»** (CC no cuenta). Si no tiene cuenta, se crea con el nombre del encabezado y el correo en minúsculas; cuando entre con Microsoft, el login lo encuentra por correo y usa ese mismo usuario y ve el ticket. |
+| Responde en el hilo de un ticket (o con «Ticket #N» en uno donde participa) | Comentario del dueño en ese ticket. Nunca crea otro. |
 | Va solo a externos, solo al propio buzón, o solo en CC a la empresa | Se ignora. |
 | Lo envió la ticketera (confirmaciones y avisos: asunto de la app o cabecera `X-Ticketera`) | Se ignora. |
-| Sin «Ticket:» al inicio del asunto | No crea ticket. |
+| No pasa el filtro ni empieza con «Ticket:» | No crea ticket (queda anotado y no se revisa otra vez). |
 
 **Cómo se reconoce el hilo** (en la bandeja y en enviados), en este orden:
 cabeceras In-Reply-To / References, el `conversationId` de Graph (se guarda en
@@ -885,8 +893,22 @@ se reconocen por el asunto.
 Cada enviado queda registrado por su `Message-ID` (nunca crea dos tickets). Los
 enviados **no se mueven ni se marcan**, y solo cuentan los enviados después de
 activar la función (marca `__inicio_enviados__` en `processed_emails`). Con
-`AVISAR_ASIGNADO=true` se le envía al asignado un correo con el número y el
-enlace (apagado por defecto mientras `APP_URL` sea `localhost`).
+`AVISAR_ASIGNADO=true` se le envía al asignado un correo «Se le asignó el
+ticket #N» con el enlace a `APP_URL` y «[Ticket #N]» en el asunto (si responde,
+la respuesta vuelve como comentario). Apagado por defecto mientras `APP_URL`
+sea `localhost`.
+
+### Avisos de comentarios hechos en la app
+
+Con `AVISAR_COMENTARIOS=true`, cuando alguien agrega un comentario **desde la
+app**, el solicitante y el asignado reciben «[Ticket #N] Nuevo comentario en el
+ticket #N» con el texto, quién lo escribió y el enlace (menos quien lo
+escribió). Si responden, la respuesta vuelve como comentario. Los comentarios
+que **llegan por correo no avisan** (así no se arma un ciclo). Si el envío
+falla, el comentario se guarda igual y el error queda en el registro
+(`No se pudo avisar por correo el comentario del ticket #N`). Por defecto está
+encendido en Vercel y apagado en Docker. Funciona igual en modo `hilo` y
+`cron`: el aviso sale en la misma petición del comentario.
 
 El asignado ve el ticket en su lista aunque sea **Solicitante**, lo comenta y
 le cambia el estado (solo en los tickets asignados a él); no lo edita,
@@ -917,7 +939,8 @@ APP_URL=http://IP-O-NOMBRE-DEL-EQUIPO:8000
 Opcionales: `CORREO_CARPETA_PROCESADOS` (por defecto `Tickets-Procesados`),
 `CORREO_FILTRO` (`auto` o `todos`), `CORREO_INTERVALO` (segundos, 60),
 `AVISAR_ASIGNADO` (`false`; `true` avisa por correo al asignado de un ticket
-creado desde un correo enviado) y
+creado desde un correo enviado), `AVISAR_COMENTARIOS` (`false` en Docker,
+`true` en Vercel: avisa por correo los comentarios hechos en la app) y
 `CORREO_M365_CACHE` (archivo de la caché de tokens de antes; en Docker es
 `/data/msal_cache.json`). Los tokens ahora se guardan en la base de datos
 (tabla `msal_cache`); si la tabla está vacía y ese archivo existe, se importa
@@ -999,6 +1022,7 @@ se ve, sin «Volver a explicar»).
    | `CORREO_FILTRO` | `auto` (o `todos`) |
    | `CORREO_CARPETA_PROCESADOS` | `Tickets-Procesados` |
    | `AVISAR_ASIGNADO` | `true` (ya hay un enlace público) |
+   | `AVISAR_COMENTARIOS` | `true` (ya es el valor por defecto en Vercel; queda explícito) |
    | `APP_URL` | `https://tickets-americandata.vercel.app` |
 
    `DATABASE_URL` ya la puso Neon. Para generar las claves:

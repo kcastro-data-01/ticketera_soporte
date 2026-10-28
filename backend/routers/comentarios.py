@@ -7,7 +7,7 @@ from backend.database import get_session
 from backend.models import User
 from backend.routers.auth import ROLES_TODOS, role_required
 from backend.schemas import CommentCreate, CommentResponse
-from backend.services import ticket_service
+from backend.services import correo_service, ticket_service
 from backend.services.ticket_service import TicketNotFoundError
 
 router = APIRouter(prefix="/api/tickets", tags=["Comentarios"])
@@ -47,6 +47,10 @@ def create_comment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ticket {ticket_id} no encontrado",
         )
+    # Aviso por correo al solicitante y al asignado (AVISAR_COMENTARIOS). Si
+    # falla, el comentario queda guardado igual y el error va al log.
+    correo_service.avisar_comentario(
+        session, ticket_service.get_ticket(session, ticket_id), comment, current_user)
     return CommentResponse.model_validate(comment)
 
 

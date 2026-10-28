@@ -69,31 +69,39 @@ def test_known_user_gets_a_ticket_and_a_reply(session, usuario):
     assert f"http://ticketera.data.cr/detalle.html?id={ticket.id}" in respuesta.texto
 
 
-def test_company_sender_without_account_is_created_as_requester_with_a_ticket(session):
+def test_company_sender_without_account_gets_a_notice_and_no_ticket(session, log_correo):
+    """Sin cuenta: ni usuario ni ticket; se le pide entrar primero con Microsoft."""
     resultado, respuesta = procesar(session, crear_correo(remitente="Luis@Data.cr", nombre="Luis Mora"))
-    assert resultado == "ticket"
-    luis = session.scalars(select(User).where(User.email == "luis@data.cr")).one()
-    assert (luis.name, luis.role, luis.password_hash) == ("Luis Mora", "Solicitante", None)
-    ticket = session.scalars(select(Ticket)).one()
-    assert ticket.created_by_id == luis.id
+    assert resultado == "sin_cuenta"
+    assert session.scalars(select(User)).first() is None
+    assert session.scalars(select(Ticket)).first() is None
     assert respuesta.para == "luis@data.cr"
-    assert f"#{ticket.id}" in respuesta.asunto
-    assert "registr" not in respuesta.texto.lower()
-
-    # El segundo correo ya lo encuentra como usuario: otro ticket, sin duplicarlo.
-    assert procesar(session, crear_correo(remitente="luis@data.cr", msg_id="<m2@x>"))[0] == "ticket"
-    assert len(session.scalars(select(User).where(User.email == "luis@data.cr")).all()) == 1
-
-
-def test_company_sender_without_name_uses_the_address(session):
-    procesar(session, crear_correo(remitente="soporte.ti@data.cr", nombre=""))
-    assert session.scalars(select(User).where(User.email == "soporte.ti@data.cr")).one().name == "soporte.ti"
+    assert respuesta.asunto == cs.ASUNTO_SIN_CUENTA
+    assert respuesta.texto.startswith("Hola Luis Mora,")
+    assert ("Para crear tickets por correo, primero ingrese a la ticketera con su cuenta de "
+            "Microsoft de la empresa: http://ticketera.data.cr. Después vuelva a enviar su "
+            "solicitud.") in respuesta.texto
+    assert session.scalar(select(ProcessedEmail.result).where(
+        ProcessedEmail.message_id == "<m1@data.cr>")) == "sin_cuenta"
+    assert "luis@data.cr no tiene cuenta en la ticketera" in log_correo.text
 
 
-def test_admin_inicial_writing_first_by_mail_is_administrator(session, monkeypatch):
-    monkeypatch.setenv("ADMIN_INICIAL", "kristin@data.cr")
-    procesar(session, crear_correo(remitente="kristin@data.cr", nombre="Kristin"))
-    assert session.scalars(select(User).where(User.email == "kristin@data.cr")).one().role == "Administrador"
+def test_company_sender_without_account_and_without_name(session):
+    _, respuesta = procesar(session, crear_correo(remitente="soporte.ti@data.cr", nombre=""))
+    assert respuesta.texto.startswith("Hola,\n")
+
+
+def test_company_sender_without_account_normal_mail_is_left_alone(session):
+    """Un correo normal (no pide ayuda) de alguien sin cuenta no recibe el aviso."""
+    correo = crear_correo(remitente="luis@data.cr", asunto="Reunión del viernes", cuerpo="Nos vemos a las 10.")
+    assert procesar(session, correo, CONFIG_FILTRO) == ("otro", None)
+    assert session.scalars(select(ProcessedEmail)).first() is None
+
+
+def test_reply_to_the_no_account_notice_creates_nothing(session, usuario):
+    mensaje = crear_correo(asunto=f"RE: {cs.ASUNTO_SIN_CUENTA}", cuerpo="Ya entré, no funciona la impresora")
+    assert procesar(session, mensaje, CONFIG_FILTRO) == ("ignorado", None)
+    assert session.scalars(select(Ticket)).first() is None
 
 
 def test_external_sender_without_account_is_ignored_and_logged(session, log_correo):
@@ -520,14 +528,16 @@ def test_registered_sender_creates_ticket_as_requester_and_gets_confirmation(fac
 def test_company_sender_without_account_end_to_end(factory, session, log_correo):
     mensaje = crear_correo(remitente="Luis@Data.cr", nombre="Luis")
     graph = FakeGraph([mensaje])
-    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"ticket": 1}
-    ticket = session.scalars(select(Ticket)).one()
-    assert session.get(User, ticket.created_by_id).email == "luis@data.cr"
+    assert cs.revisar_buzon(factory, CONFIG, graph.cliente) == {"sin_cuenta": 1}
+    assert session.scalars(select(Ticket)).first() is None
+    assert session.scalars(select(User)).first() is None
     [(respondido, enviado)] = graph.respuestas
-    assert respondido == mensaje["id"]
-    assert enviado["message"]["subject"] == f"Ticket #{ticket.id} creado: {ticket.title}"
+    assert respondido == mensaje["id"]  # en el mismo hilo
+    assert enviado["message"]["subject"] == cs.ASUNTO_SIN_CUENTA
+    assert enviado["message"]["internetMessageHeaders"] == [
+        {"name": "X-Auto-Response-Suppress", "value": "All"}, {"name": "X-Ticketera", "value": "1"}]
     assert graph.no_leidos() == []
-    assert "Usuario creado desde el correo: luis@data.cr (Solicitante)" in log_correo.text
+    assert "Usuario creado desde el correo" not in log_correo.text
 
 
 def test_external_sender_end_to_end_is_moved_without_reply(factory, session, log_correo):

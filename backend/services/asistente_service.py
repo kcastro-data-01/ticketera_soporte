@@ -1410,13 +1410,17 @@ REGLA_SOLICITANTE = (
 )
 REGLA_CORREO = (
     "Cuando la función de correo está activa, la ticketera revisa el buzón de soporte cada "
-    "minuto. Un correo que pide ayuda (o cuyo asunto empieza con «Ticket:») crea un ticket "
-    "a nombre de quien lo escribe, asignado al dueño del buzón, y se le responde con el "
-    "número del ticket. Si la persona responde en el mismo hilo o el asunto trae «Ticket #N», "
-    "se agrega como comentario. Quien no tiene cuenta y es del dominio de la empresa queda "
-    "creado como Solicitante; los correos de otros dominios se ignoran. Además, un correo "
-    "que el dueño del buzón envía con el asunto «Ticket: …» crea un ticket asignado al "
-    "primer destinatario de la empresa."
+    "minuto. Quien envía el correo es el solicitante y quien lo recibe, el asignado. Un correo que pide "
+    "ayuda (o cuyo asunto empieza con «Ticket:») de un usuario con cuenta crea un ticket a "
+    "su nombre, asignado al dueño del buzón, y se le responde con el número del ticket. "
+    "Quien es del dominio de la empresa y no tiene cuenta recibe una sola respuesta: primero "
+    "debe ingresar a la ticketera con su cuenta de Microsoft y volver a enviar la solicitud; "
+    "los correos de otros dominios se ignoran. Los correos que el dueño del buzón envía a "
+    "alguien de la empresa siguen el mismo filtro y crean un ticket asignado al primer "
+    "destinatario de la empresa. Responder en el hilo de un ticket o con «[Ticket #N]» en "
+    "el asunto agrega un comentario; pueden hacerlo el solicitante, el asignado y los "
+    "usuarios activos que estén en el hilo. Un comentario hecho en la ticketera se avisa por "
+    "correo al solicitante y al asignado, si ese aviso está activo."
 )
 
 # (cómo se reconoce, en la pregunta normalizada; la regla), en orden.

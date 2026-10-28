@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 
 from backend.models import Comment, History, ProcessedEmail, Ticket, User
 from backend.services import correo_service as cs
-from backend.tests.test_correo import CONFIG, CONFIG_FILTRO, FakeGraph, crear_correo, factory  # noqa: F401
+from backend.tests.test_correo import CONFIG, CONFIG_FILTRO, FakeGraph, crear_correo, factory, usuario  # noqa: F401
 from backend.tests.test_login_microsoft import entrar, id_token, tenant_simulado  # noqa: F401
 
 _ids = count(1)
@@ -136,17 +136,28 @@ def test_same_message_id_never_creates_two_tickets(session, yo):
     assert len(session.scalars(select(Ticket)).all()) == 1
 
 
-@pytest.mark.parametrize("config", [CONFIG, CONFIG_FILTRO], ids=["filtro-todos", "filtro-auto"])
-def test_sent_mail_without_ticket_prefix_never_creates_a_ticket(session, yo, config):
-    """De lo que envío, solo crea ticket el asunto «Ticket: …», aunque el texto
-    pida ayuda y aunque CORREO_FILTRO sea «todos»."""
-    pide_ayuda = crear_enviado(asunto="La impresora no imprime, ayuda por favor",
-                               cuerpo="Pedro, no funciona la impresora; necesito soporte.")
-    assert enviar(session, pide_ayuda, config) == ("otro", None)
+def test_sent_mail_uses_the_same_filter_as_incoming_mail(session, yo):
+    """Lo que envío usa el mismo CORREO_FILTRO que lo que llega: un correo
+    que pide ayuda crea el ticket aunque no empiece con «Ticket:»."""
+    pide_ayuda = crear_enviado(asunto="No me funciona la impresora", cuerpo="Pedro, ¿la podés revisar?")
+    assert enviar(session, pide_ayuda, CONFIG_FILTRO) == ("ticket", None)
+    ticket = session.scalars(select(Ticket)).one()
+    assert (ticket.title, ticket.assigned_to_id, ticket.created_by_id) == (
+        "No me funciona la impresora", pedro(session).id, yo.id)
+
+
+def test_sent_mail_that_does_not_ask_for_help_creates_nothing(session, yo):
+    gracias = crear_enviado(asunto="Gracias por el informe", cuerpo="Pedro, lo reviso mañana.")
+    assert enviar(session, gracias, CONFIG_FILTRO) == ("otro", None)
     # Queda anotado: no se vuelve a revisar.
-    assert enviar(session, pide_ayuda, config) == ("repetido", None)
+    assert enviar(session, gracias, CONFIG_FILTRO) == ("repetido", None)
     assert session.scalars(select(Ticket)).all() == []
     assert pedro(session) is None, "tampoco se crea el usuario del destinatario"
+
+
+def test_sent_mail_with_filter_todos_always_creates(session, yo):
+    gracias = crear_enviado(asunto="Gracias por el informe", cuerpo="Pedro, lo reviso mañana.")
+    assert enviar(session, gracias, CONFIG)[0] == "ticket"
 
 
 @pytest.mark.parametrize("asunto", ["Ticket: Cambiar el tóner", "TICKET: Cambiar el tóner",
@@ -158,7 +169,8 @@ def test_ticket_prefix_creates_and_is_removed_from_the_title(session, yo, asunto
 
 def test_ticket_prefix_must_be_at_the_start(session, yo):
     for asunto in ("RE: Ticket: Cambiar el tóner", "Sobre el Ticket: tóner", "Ticket #5 tóner"):
-        assert enviar(session, crear_enviado(asunto=asunto), CONFIG)[0] in ("otro", "ignorado")
+        correo = crear_enviado(asunto=asunto, cuerpo="Cuando pueda.")
+        assert enviar(session, correo, CONFIG_FILTRO)[0] in ("otro", "ignorado")
     assert session.scalars(select(Ticket)).all() == []
 
 
@@ -175,7 +187,8 @@ def test_avisar_asignado_prepares_the_mail_when_enabled(session, yo):
     ticket = session.scalars(select(Ticket)).one()
     assert resultado == "ticket"
     assert aviso.para == "pedro@data.cr"
-    assert aviso.asunto == f"Ticket #{ticket.id} creado: {ticket.title}"
+    assert aviso.asunto == f"[Ticket #{ticket.id}] Se le asignó el ticket #{ticket.id}: {ticket.title}"
+    assert f"Se le asignó el ticket #{ticket.id}" in aviso.texto
     assert f"http://ticketera.data.cr/detalle.html?id={ticket.id}" in aviso.texto
 
 
@@ -260,7 +273,7 @@ def test_reply_with_ticket_number_in_subject_is_a_comment(session, yo):
 # --- Correos que llegan: asignados al dueño del buzón -------------------------------
 
 
-def test_incoming_mail_is_assigned_to_the_mailbox_owner(session, yo):
+def test_incoming_mail_is_assigned_to_the_mailbox_owner(session, yo, usuario):  # noqa: F811
     resultado, _ = cs.procesar_correo(session, cs.correo_desde_graph(crear_correo()), CONFIG)
     assert resultado == "ticket"
     ticket = session.scalars(select(Ticket)).one()
@@ -269,14 +282,14 @@ def test_incoming_mail_is_assigned_to_the_mailbox_owner(session, yo):
     assert creado.new_value == "Ticket creado desde correo enviado por Ana Pérez a Kristin Castro"
 
 
-def test_incoming_mail_is_not_round_robin_even_with_technicians(session, yo):
+def test_incoming_mail_is_not_round_robin_even_with_technicians(session, yo, usuario):  # noqa: F811
     session.add(User(name="Técnico Uno", email="t1@data.cr", role="Técnico"))
     session.commit()
     cs.procesar_correo(session, cs.correo_desde_graph(crear_correo()), CONFIG)
     assert session.scalars(select(Ticket)).one().assigned_to_id == yo.id
 
 
-def test_incoming_subject_ticket_prefix_always_creates_and_is_removed(session, yo):
+def test_incoming_subject_ticket_prefix_always_creates_and_is_removed(session, yo, usuario):  # noqa: F811
     correo = crear_correo(asunto="ticket: Revisar el proyector", cuerpo="Cuando pueda.")
     assert cs.procesar_correo(session, cs.correo_desde_graph(correo), CONFIG_FILTRO)[0] == "ticket"
     assert session.scalars(select(Ticket)).one().title == "Revisar el proyector"
