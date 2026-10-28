@@ -140,9 +140,8 @@ def test_registered_sender_gets_ticket_and_confirmation(modo, entorno, factory, 
 
 
 @pytest.mark.parametrize("modo", MODOS)
-def test_sent_help_request_without_prefix_creates_assigned_ticket_and_notice(modo, entorno, factory, session,
-                                                                            gente):
-    enviado = crear_enviado(para=(("nueva@data.cr", "Nueva Persona"),), asunto="No me funciona la impresora",
+def test_sent_ticket_prefix_creates_assigned_ticket_and_notice(modo, entorno, factory, session, gente):
+    enviado = crear_enviado(para=(("nueva@data.cr", "Nueva Persona"),), asunto="Ticket: No me funciona la impresora",
                             cuerpo="¿La podés revisar?")
     graph = FakeGraph([], enviados=[enviado])
     revisar(modo, factory, graph, entorno)
@@ -158,6 +157,15 @@ def test_sent_help_request_without_prefix_creates_assigned_ticket_and_notice(mod
     assert mensaje["subject"].startswith(f"[Ticket #{ticket.id}] Se le asignó el ticket #{ticket.id}")
     assert f"{APP_URL}/detalle.html?id={ticket.id}" in mensaje["body"]["content"]
     assert {"name": "X-Ticketera", "value": "1"} in mensaje["internetMessageHeaders"]
+
+
+@pytest.mark.parametrize("modo", MODOS)
+def test_sent_help_request_without_prefix_creates_nothing(modo, entorno, factory, session, gente):
+    enviado = crear_enviado(asunto="No me funciona la impresora", cuerpo="¿La podés revisar?")
+    graph = FakeGraph([], enviados=[enviado])
+    revisar(modo, factory, graph, entorno)
+    assert session.scalars(select(Ticket)).all() == []
+    assert graph.correos_nuevos == []
 
 
 @pytest.mark.parametrize("modo", MODOS)

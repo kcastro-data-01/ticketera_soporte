@@ -34,10 +34,18 @@ los que llegan después de activar la función.
 
 También se revisan los **Elementos enviados** del buzón (ver
 :func:`procesar_enviado`): un correo que el dueño envía a alguien de la
-empresa con el **mismo filtro** que los que llegan (``CORREO_FILTRO``; el
-asunto «Ticket: …» siempre crea) crea un ticket a nombre del dueño, asignado
-al primer destinatario de la empresa en «Para» (se crea su usuario si no
-existe). Las respuestas en el hilo de un ticket se agregan como comentario.
+empresa crea un ticket **solo si el asunto empieza con «Ticket:»**, a nombre
+del dueño y asignado al primer destinatario de la empresa en «Para» (se crea
+su usuario si no existe).
+
+Contra los ciclos de correos: todo correo que manda la app se registra
+(``aviso_app``, por Message-ID y conversationId, con el ticket del que habla)
+**antes** de enviarlo, y después se ignora en Enviados y en la bandeja; si
+Graph no conserva la cabecera ``X-Ticketera``, se reconoce por el asunto y
+por las frases fijas del texto. Un correo cuya conversación ya se procesó
+nunca crea un ticket nuevo (comentario o ignorado), y en un ciclo no se crean
+más de ``MAX_TICKETS_POR_CICLO`` tickets (el resto espera a la próxima
+revisión y queda una alerta en el log). Las respuestas en el hilo de un ticket se agregan como comentario.
 Los enviados no se mueven ni se marcan; solo cuentan los enviados después de
 activar la función (marca ``__inicio_enviados__``). Con ``AVISAR_ASIGNADO``
 encendida se le avisa al asignado por correo («[Ticket #N] Se le asignó…»).
@@ -169,6 +177,18 @@ _SELECT_MENSAJE = ("id,internetMessageId,conversationId,subject,from,toRecipient
 PREFIJOS_RESPUESTA = re.compile(r"^\s*((re|rv|fw|fwd|aw|tr|reenviar)\s*(\[\d+\])?\s*:\s*)+", re.IGNORECASE)
 ASUNTO_INACTIVO = "No pudimos crear tu ticket"
 ASUNTO_SIN_CUENTA = "Ingrese a la ticketera para crear tickets"
+# Frases fijas de los correos de la app: si Graph pierde la cabecera
+# X-Ticketera, el texto igual los delata (sin tildes y en minúsculas).
+FRASES_APP = tuple(re.compile(f, re.IGNORECASE) for f in (
+    r"recibimos tu solicitud y creamos el ticket #\d+",
+    r"agregamos tu mensaje como comentario del ticket #\d+",
+    r"se le asigno el ticket #\d+, creado a partir del correo de",
+    r"agrego un comentario en el ticket #\d+",
+    r"para crear tickets por correo, primero ingrese a la ticketera",
+    r"tu cuenta en la ticketera de soporte esta desactivada",
+))
+# Freno de seguridad: tickets nuevos como máximo en una revisión del buzón.
+MAX_TICKETS_POR_CICLO = 5
 # Asuntos que envía la app. Los avisos nunca se procesan; las confirmaciones
 # solo sirven para agregar un comentario al ticket de quien responde.
 # «Registrate para crear tickets» ya no se envía, pero quedan avisos viejos en
@@ -449,6 +469,9 @@ class Respuesta:
     para: str
     asunto: str
     texto: str
+    # Ticket del que habla: queda en el registro del aviso, así una respuesta
+    # al aviso encuentra el ticket por su hilo.
+    ticket_id: int | None = None
 
 
 def _saludo(nombre: str) -> str:
@@ -472,6 +495,7 @@ def _respuesta_ticket(correo, usuario, ticket, config) -> Respuesta:
             f"el asunto (debe mantener «Ticket #{ticket.id}»).\n\n"
             "Mesa de ayuda"
         ),
+        ticket_id=ticket.id,
     )
 
 
@@ -485,6 +509,7 @@ def _respuesta_comentario(correo, usuario, ticket, config) -> Respuesta:
             f"Agregamos tu mensaje como comentario del ticket #{ticket.id} "
             f"({ticket.title}).\n\nPuedes verlo aquí: {enlace}\n\nMesa de ayuda"
         ),
+        ticket_id=ticket.id,
     )
 
 
@@ -506,6 +531,7 @@ def _respuesta_asignado(asignado, autor, ticket, config) -> Respuesta:
             "su respuesta se agrega como comentario del ticket.\n\n"
             "Mesa de ayuda"
         ),
+        ticket_id=ticket.id,
     )
 
 
@@ -538,6 +564,7 @@ def _aviso_comentario(destinatario, autor, ticket, comentario, config) -> Respue
             "su respuesta se agrega como comentario del ticket.\n\n"
             "Mesa de ayuda"
         ),
+        ticket_id=ticket.id,
     )
 
 
@@ -566,6 +593,48 @@ def _registrar(session, correo, resultado, ticket_id=None) -> None:
         ticket_id=ticket_id,
     ))
     session.commit()
+
+
+def es_aviso_de_la_app(correo: CorreoEntrante) -> bool:
+    """¿Lo escribió una ticketera? Por la cabecera ``X-Ticketera`` (de esta o
+    de otra), por el asunto de sus avisos (también con «RE:») o por sus frases
+    fijas, por si Graph no conservó la cabecera."""
+    if correo.de_la_app:
+        return True
+    base = asunto_base(correo.asunto)
+    if any(p.search(base) for p in AVISOS_APP + CONFIRMACIONES_APP):
+        return True
+    texto = _sin_tildes(correo.cuerpo or "")
+    return any(p.search(texto) for p in FRASES_APP)
+
+
+def _conversacion_conocida(session, correo: CorreoEntrante) -> bool:
+    """¿Ya se procesó (o envió la app) un correo de esta conversación? Si es
+    así, este correo nunca crea un ticket nuevo."""
+    if not correo.conversacion:
+        return False
+    return session.scalar(select(ProcessedEmail.id).where(
+        ProcessedEmail.conversation_id == correo.conversacion,
+        ProcessedEmail.message_id != correo.message_id).limit(1)) is not None
+
+
+def registrar_aviso(session_factory, config: ConfigCorreo, borrador: dict,
+                    ticket_id: int | None = None) -> None:
+    """Anota un correo de la app **antes** de enviarlo (``aviso_app``): su
+    Message-ID y su conversación ya no se procesan como correos nuevos."""
+    message_id = (borrador.get("internetMessageId") or "").strip() or f"<aviso:{borrador.get('id')}>"
+    with session_factory() as session:
+        if session.scalar(select(ProcessedEmail.id).where(
+                ProcessedEmail.message_id == message_id[:500])) is not None:
+            return
+        session.add(ProcessedEmail(
+            message_id=message_id[:500],
+            sender=config.usuario.strip().lower() or None,
+            conversation_id=(borrador.get("conversationId") or "").strip()[:500] or None,
+            result="aviso_app",
+            ticket_id=ticket_id if ticket_id is not None and session.get(Ticket, ticket_id) else None,
+        ))
+        session.commit()
 
 
 def es_de_la_empresa(remitente: str, config: ConfigCorreo) -> bool:
@@ -662,7 +731,8 @@ def es_de_soporte(asunto: str, cuerpo: str, config: ConfigCorreo) -> bool:
     return any(re.search(senal, texto) for senal in SEÑALES_SOPORTE)
 
 
-def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tuple[str, Respuesta | None]:
+def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
+                    puede_crear: bool = True) -> tuple[str, Respuesta | None]:
     """Decide qué hacer con un correo; devuelve (resultado, respuesta a enviar).
 
     El correo queda registrado como procesado; la respuesta (si hay) la envía
@@ -674,13 +744,21 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
     * Un aviso de la app que el buzón se mandó a sí mismo (p. ej. un
       comentario en un ticket asignado al dueño) → ``de_la_app``: no se
       registra ni se mueve, para que el dueño lo vea en su bandeja.
+    * Un correo de una ticketera (cabecera, asunto o frases de sus avisos) o
+      de una conversación ya procesada nunca crea un ticket: comentario si
+      responde en el hilo de un ticket, si no ``ignorado``.
+    * Con ``puede_crear=False`` (freno del ciclo) un correo que crearía un
+      ticket devuelve ``frenado`` sin registrarse: queda para la próxima.
     """
-    if session.scalar(select(ProcessedEmail.id).where(
-            ProcessedEmail.message_id == correo.message_id)) is not None:
-        return "repetido", None
-
+    previo = session.scalar(select(ProcessedEmail.result).where(
+        ProcessedEmail.message_id == correo.message_id))
     propio = correo.remitente == config.usuario.strip().lower()
-    if correo.de_la_app and propio:
+    if previo is not None:
+        # Un aviso que la app se mandó a sí misma queda en la bandeja.
+        return ("de_la_app", None) if previo == "aviso_app" and propio else ("repetido", None)
+
+    aviso_app = es_aviso_de_la_app(correo)
+    if aviso_app and propio:
         return "de_la_app", None
 
     base = asunto_base(correo.asunto)
@@ -740,6 +818,14 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
         _registrar(session, correo, "comentario", hilo.id)
         return "comentario", _respuesta_comentario(correo, usuario, hilo, config)
 
+    if aviso_app or _conversacion_conocida(session, correo):
+        # Un aviso de una ticketera o un correo de una conversación ya
+        # procesada: nunca es una solicitud nueva (evita los ciclos).
+        logger.info("Correo ignorado: «%s» de %s es un aviso de la app o de una conversación "
+                    "ya procesada; no crea un ticket", correo.asunto, correo.remitente)
+        _registrar(session, correo, "ignorado")
+        return "ignorado", None
+
     if es_confirmacion or not (forzado or es_de_soporte(correo.asunto, correo.cuerpo, config)):
         # Responde a una confirmación de un ticket ajeno (o sin texto nuevo), o
         # nombra un ticket sin pedir ayuda: nunca crea un ticket nuevo.
@@ -747,6 +833,9 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
                     correo.asunto, correo.remitente)
         _registrar(session, correo, "ignorado")
         return "ignorado", None
+
+    if not puede_crear:
+        return "frenado", None
 
     # Quien escribe es el solicitante; quien recibe (el dueño del buzón), el
     # asignado.
@@ -768,18 +857,21 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo) -> tu
     return "ticket", _respuesta_ticket(correo, usuario, ticket, config)
 
 
-def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo) -> tuple[str, Respuesta | None]:
+def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
+                     puede_crear: bool = True) -> tuple[str, Respuesta | None]:
     """Un correo de Elementos enviados del dueño del buzón; devuelve
     (resultado, aviso al asignado o ``None``).
 
-    * Lo envió la ticketera (confirmaciones y avisos) → ``ignorado``.
+    * Lo envió la ticketera (registrado como ``aviso_app`` al enviarlo, o
+      reconocido por cabecera, asunto o frases) → ``repetido`` / ``ignorado``.
     * No va a nadie de la empresa (solo externos, o solo al propio buzón) →
       ``ignorado``. CC no cuenta.
     * Responde en el hilo de un ticket (In-Reply-To / References o
       conversationId) o con «Ticket #N» en un ticket del dueño → ``comentario``
       del dueño.
-    * No parece pedir ayuda (el mismo ``CORREO_FILTRO`` que los que llegan)
-      ni el asunto empieza con «Ticket:» → ``otro``.
+    * Su conversación ya se procesó → ``ignorado`` (nunca un ticket nuevo).
+    * El asunto no empieza con «Ticket:» → ``otro`` (lo que el dueño envía
+      solo crea tickets con ese prefijo).
     * Si no, ``ticket``: solicitante = el dueño; asignado = el primer
       destinatario de la empresa en «Para» (se crea si no existe, para que lo
       vea al entrar con Microsoft).
@@ -791,10 +883,12 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo) -> t
             ProcessedEmail.message_id == correo.message_id)) is not None:
         return "repetido", None
 
-    # Lo que envía la app lleva su asunto tal cual (sin «RE:»); una respuesta
-    # del dueño a una confirmación sí cuenta (comentario en el ticket).
+    # Lo que envía la app lleva su asunto tal cual (sin «RE:») y sus frases
+    # fijas; una respuesta del dueño a una confirmación sí cuenta (comentario).
     asunto = correo.asunto.strip()
-    if correo.de_la_app or any(p.search(asunto) for p in AVISOS_APP + CONFIRMACIONES_APP):
+    texto = _sin_tildes(correo.cuerpo or "")
+    if (correo.de_la_app or any(p.search(asunto) for p in AVISOS_APP + CONFIRMACIONES_APP)
+            or any(p.search(texto) for p in FRASES_APP)):
         _registrar(session, correo, "ignorado")
         return "ignorado", None
 
@@ -816,10 +910,18 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo) -> t
         _registrar(session, correo, "ignorado")
         return "ignorado", None
 
-    if not (es_forzado(correo.asunto) or es_de_soporte(correo.asunto, correo.cuerpo, config)):
+    if _conversacion_conocida(session, correo):
+        logger.info("Enviado «%s» ignorado: su conversación ya se procesó", correo.asunto)
+        _registrar(session, correo, "ignorado")
+        return "ignorado", None
+
+    if not es_forzado(correo.asunto):
         # Correo normal a un compañero: se anota para no revisarlo de nuevo.
         _registrar(session, correo, "otro")
         return "otro", None
+
+    if not puede_crear:
+        return "frenado", None
 
     correo_asignado, nombre_asignado = internos[0]
     asignado = _usuario_por_correo(session, correo_asignado) or _crear_usuario(
@@ -953,43 +1055,59 @@ class ClienteGraph:
         self._pedir("PATCH", f"/me/messages/{mensaje_id}", json={"isRead": True})
         self._pedir("POST", f"/me/messages/{mensaje_id}/move", json={"destinationId": carpeta_id})
 
-    def responder(self, mensaje_id: str, respuesta: Respuesta) -> None:
-        """Responde en el mismo hilo del correo recibido."""
-        mensaje = {
+    @staticmethod
+    def _mensaje(respuesta: Respuesta, **extra) -> dict:
+        return {
             "subject": respuesta.asunto,
             "body": {"contentType": "Text", "content": respuesta.texto},
+            **extra,
             # Pide a los servidores no contestar con respuestas automáticas y
-            # marca el correo como de la ticketera (no se procesa en Enviados).
+            # marca el correo como de la ticketera.
             "internetMessageHeaders": [{"name": "X-Auto-Response-Suppress", "value": "All"},
                                        {"name": CABECERA_APP, "value": "1"}],
         }
+
+    def _borrador(self, metodo_url: str, cuerpo: dict, clave: str | None) -> dict:
+        """Crea el borrador; si Graph no acepta las cabeceras, sin ellas (la
+        app igual lo reconoce: queda registrado y por asunto y frases)."""
+        mensaje = cuerpo[clave] if clave else cuerpo
         try:
-            self._pedir("POST", f"/me/messages/{mensaje_id}/reply", json={"message": mensaje})
+            return self._pedir("POST", metodo_url, json=cuerpo)
         except ErrorGraph as error:
             if "→ 400" not in str(error):
                 raise
-            # Si Graph no acepta la cabecera en /reply, se responde sin ella.
-            logger.info("Graph no aceptó las cabeceras en la respuesta; se envía sin ellas")
+            logger.info("Graph no aceptó las cabeceras en el correo; se envía sin ellas")
             del mensaje["internetMessageHeaders"]
-            self._pedir("POST", f"/me/messages/{mensaje_id}/reply", json={"message": mensaje})
+            return self._pedir("POST", metodo_url, json=cuerpo)
 
-
-    def enviar(self, respuesta: Respuesta) -> None:
-        """Correo nuevo (no una respuesta), marcado como de la ticketera."""
-        mensaje = {
-            "subject": respuesta.asunto,
-            "body": {"contentType": "Text", "content": respuesta.texto},
-            "toRecipients": [{"emailAddress": {"address": respuesta.para}}],
-            "internetMessageHeaders": [{"name": "X-Auto-Response-Suppress", "value": "All"},
-                                       {"name": CABECERA_APP, "value": "1"}],
-        }
+    def _enviar_borrador(self, borrador: dict, registrar) -> None:
+        """Registra el borrador (``registrar``) y recién después lo envía. Si
+        no se pudo registrar, no se envía: un aviso sin registro podría
+        volver como correo nuevo."""
         try:
-            self._pedir("POST", "/me/sendMail", json={"message": mensaje, "saveToSentItems": True})
-        except ErrorGraph as error:
-            if "→ 400" not in str(error):
-                raise
-            del mensaje["internetMessageHeaders"]
-            self._pedir("POST", "/me/sendMail", json={"message": mensaje, "saveToSentItems": True})
+            if registrar is not None:
+                registrar(borrador)
+        except Exception:
+            try:
+                self._pedir("DELETE", f"/me/messages/{borrador['id']}")
+            except Exception:  # noqa: BLE001 — queda en Borradores, sin enviarse
+                pass
+            raise
+        self._pedir("POST", f"/me/messages/{borrador['id']}/send")
+
+    def responder(self, mensaje_id: str, respuesta: Respuesta, registrar=None) -> None:
+        """Responde en el mismo hilo del correo recibido (``createReply`` y
+        ``send``: así se conoce el Message-ID antes de enviarlo)."""
+        borrador = self._borrador(f"/me/messages/{mensaje_id}/createReply",
+                                  {"message": self._mensaje(respuesta)}, "message")
+        self._enviar_borrador(borrador, registrar)
+
+    def enviar(self, respuesta: Respuesta, registrar=None) -> None:
+        """Correo nuevo (no una respuesta), marcado como de la ticketera; se
+        guarda en Elementos enviados al enviarse."""
+        mensaje = self._mensaje(respuesta, toRecipients=[{"emailAddress": {"address": respuesta.para}}])
+        borrador = self._borrador("/me/messages", mensaje, None)
+        self._enviar_borrador(borrador, registrar)
 
 
 def crear_cliente(config: ConfigCorreo, session_factory=None) -> ClienteGraph:
@@ -1025,15 +1143,49 @@ def avisar_comentario(session, ticket: Ticket, comentario, autor: User, env=None
         from sqlalchemy.orm import sessionmaker
 
         crear = crear or crear_cliente
+        fabrica = sessionmaker(bind=session.get_bind())
         # Timeout corto (el de cron): la petición del comentario espera el envío.
-        cliente = crear(replace(config, modo="cron"), sessionmaker(bind=session.get_bind()))
+        cliente = crear(replace(config, modo="cron"), fabrica)
         for correo, usuario in destinatarios.items():
-            cliente.enviar(_aviso_comentario(usuario, autor, ticket, comentario, config))
+            aviso = _aviso_comentario(usuario, autor, ticket, comentario, config)
+            cliente.enviar(aviso, registrar=_registrador(fabrica, config, aviso))
             avisados.append(correo)
             logger.info("Aviso del comentario del ticket #%s enviado a %s", ticket.id, correo)
     except Exception:
         logger.exception("No se pudo avisar por correo el comentario del ticket #%s", ticket.id)
     return avisados
+
+
+def _registrador(session_factory, config: ConfigCorreo, respuesta: Respuesta):
+    """Lo que anota el correo de la app antes de enviarlo (ver :func:`registrar_aviso`)."""
+    return lambda borrador: registrar_aviso(session_factory, config, borrador, respuesta.ticket_id)
+
+
+class _Freno:
+    """Cuenta los tickets creados en una revisión; pasado el máximo, los
+    correos que crearían otro quedan para la próxima y se avisa en el log."""
+
+    def __init__(self, maximo: int = MAX_TICKETS_POR_CICLO):
+        self.maximo = maximo
+        self.creados = 0
+        self.frenados = 0
+
+    @property
+    def puede_crear(self) -> bool:
+        return self.creados < self.maximo
+
+    def anotar(self, resultado: str) -> None:
+        if resultado == "ticket":
+            self.creados += 1
+        elif resultado == "frenado":
+            self.frenados += 1
+
+    def alertar(self, buzon: str) -> None:
+        if self.frenados:
+            logger.error("ALERTA: freno de seguridad del correo de %s: en esta revisión ya se "
+                         "crearon %d tickets (el máximo); %d correo(s) que crearían más quedan para "
+                         "la próxima revisión. Revise si hay un ciclo de correos.",
+                         buzon, self.creados, self.frenados)
 
 
 def _sin_tiempo(hasta: float | None) -> bool:
@@ -1058,10 +1210,12 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
     puntual se registran y se sigue con el siguiente.
     """
     conteo: dict[str, int] = {}
+    freno = _Freno()
     # Primero los enviados: si alguien ya respondió a un correo recién
     # enviado, su respuesta encuentra el hilo y no crea otro ticket.
     try:
-        for resultado, cantidad in revisar_enviados(session_factory, config, cliente, hasta).items():
+        for resultado, cantidad in revisar_enviados(session_factory, config, cliente, hasta,
+                                                    freno).items():
             conteo[f"enviado_{resultado}"] = cantidad
     except SinSesionError:
         raise
@@ -1072,6 +1226,7 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
         inicio = fecha_de_inicio(session)
 
     if _sin_tiempo(hasta):
+        freno.alertar(config.usuario)
         return conteo
     mensajes = cliente.no_leidos()
     carpeta_id = None
@@ -1084,14 +1239,17 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
             continue  # Llegó antes de activar la función: no se toca.
         with session_factory() as session:
             try:
-                resultado, respuesta = procesar_correo(session, correo, config)
+                resultado, respuesta = procesar_correo(session, correo, config, freno.puede_crear)
             except Exception:
                 session.rollback()
                 logger.exception("No se pudo procesar el correo %s", correo.message_id)
                 continue
         conteo[resultado] = conteo.get(resultado, 0) + 1
-        if resultado == "de_la_app":
-            continue  # Aviso de la app al propio buzón: queda en la bandeja.
+        freno.anotar(resultado)
+        if resultado in ("de_la_app", "frenado"):
+            # Aviso de la app al propio buzón: queda en la bandeja. Frenado:
+            # sin leer y sin registrar, se procesa en la próxima revisión.
+            continue
         if resultado == "otro":
             # No pide ayuda: queda sin leer y en la bandeja.
             if avisados is None or correo.message_id not in avisados:
@@ -1104,7 +1262,8 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
         # Primero se responde (al mover, Graph le cambia el id al correo).
         if respuesta is not None:
             try:
-                cliente.responder(mensaje["id"], respuesta)
+                cliente.responder(mensaje["id"], respuesta,
+                                  registrar=_registrador(session_factory, config, respuesta))
             except SinSesionError:
                 raise
             except Exception:
@@ -1119,15 +1278,17 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
             # Queda en la bandeja: la próxima vez sale como «repetido» y se
             # vuelve a intentar mover, sin responder otra vez.
             logger.exception("No se pudo mover el correo «%s»", correo.asunto)
+    freno.alertar(config.usuario)
     return conteo
 
 
 def revisar_enviados(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
-                     hasta: float | None = None) -> dict[str, int]:
+                     hasta: float | None = None, freno: _Freno | None = None) -> dict[str, int]:
     """Procesa los Elementos enviados desde que se activó la función. No los
     mueve ni los marca: cada uno queda registrado por su Message-ID (los
     que no se alcanzan antes de ``hasta`` se procesan en la próxima)."""
     conteo: dict[str, int] = {}
+    freno = freno or _Freno()
     with session_factory() as session:
         inicio = fecha_de_inicio(session, MARCA_INICIO_ENVIADOS)
     for mensaje in cliente.enviados(inicio):
@@ -1139,15 +1300,16 @@ def revisar_enviados(session_factory, config: ConfigCorreo, cliente: ClienteGrap
             continue
         with session_factory() as session:
             try:
-                resultado, aviso = procesar_enviado(session, correo, config)
+                resultado, aviso = procesar_enviado(session, correo, config, freno.puede_crear)
             except Exception:
                 session.rollback()
                 logger.exception("No se pudo procesar el enviado %s", correo.message_id)
                 continue
         conteo[resultado] = conteo.get(resultado, 0) + 1
+        freno.anotar(resultado)
         if aviso is not None:
             try:
-                cliente.enviar(aviso)
+                cliente.enviar(aviso, registrar=_registrador(session_factory, config, aviso))
             except SinSesionError:
                 raise
             except Exception:

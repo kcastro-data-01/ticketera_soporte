@@ -100,8 +100,9 @@ test("ayuda: la tabla de permisos explica lo del Solicitante asignado", () => {
   assert.match(ayuda, /<td>Ver tickets<\/td>.*<td>Los suyos y los asignados a él<\/td>/);
 });
 
-test("ayuda: los correos enviados usan la misma regla que los que llegan", () => {
-  assert.match(ayuda, /Los correos que el dueño del buzón envía a alguien de la empresa siguen la misma regla/);
+test("ayuda: los correos enviados solo crean tickets con «Ticket:»", () => {
+  assert.match(ayuda, /Los correos que el dueño del buzón envía a alguien de la empresa crean un ticket solo si el asunto empieza con «Ticket:»/);
+  assert.match(ayuda, /Los avisos que envía la ticketera .* nunca crean tickets/);
   assert.match(ayuda, /Responder en el hilo de un ticket, o con «\[Ticket #N\]» en el asunto, agrega un comentario/);
   assert.match(ayuda, /primero se ingresa a la ticketera con la cuenta de Microsoft de la empresa/);
   assert.match(ayuda, /Nuevo comentario en el ticket #N/);

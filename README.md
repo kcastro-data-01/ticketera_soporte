@@ -869,20 +869,39 @@ que llegan después de activar la función.
 ### Correos enviados
 
 La app también revisa **Elementos enviados** del buzón (mismo permiso
-`Mail.ReadWrite`). Lo que envía el dueño a alguien de la empresa usa el
-**mismo filtro** que lo que llega (`CORREO_FILTRO`): con `auto`, solo crean
-ticket los que parecen pedir ayuda o reportar un problema («No me funciona la
-impresora» sí; «Gracias por el informe» no). Si el asunto empieza con
-**«Ticket:»**, crea siempre (y el título va sin «Ticket:»). Ojo: con
-`CORREO_FILTRO=todos`, **todo** correo enviado a un compañero crea un ticket.
+`Mail.ReadWrite`). Lo que envía el dueño a alguien de la empresa crea un
+ticket **solo si el asunto empieza con «Ticket:»** (el título va sin
+«Ticket:»); `CORREO_FILTRO` solo se aplica a lo que llega.
 
 | Caso | Qué pasa |
 |---|---|
-| Pasa el filtro (o asunto «Ticket: …») y va a alguien de `DOMINIO_EMPRESA` en «Para» | Ticket a nombre del dueño, **asignado al primer destinatario de la empresa en «Para»** (CC no cuenta). Si no tiene cuenta, se crea con el nombre del encabezado y el correo en minúsculas; cuando entre con Microsoft, el login lo encuentra por correo y usa ese mismo usuario y ve el ticket. |
+| Asunto «Ticket: …» y va a alguien de `DOMINIO_EMPRESA` en «Para» | Ticket a nombre del dueño, **asignado al primer destinatario de la empresa en «Para»** (CC no cuenta). Si no tiene cuenta, se crea con el nombre del encabezado y el correo en minúsculas; cuando entre con Microsoft, el login lo encuentra por correo y usa ese mismo usuario y ve el ticket. |
 | Responde en el hilo de un ticket (o con «Ticket #N» en uno donde participa) | Comentario del dueño en ese ticket. Nunca crea otro. |
 | Va solo a externos, solo al propio buzón, o solo en CC a la empresa | Se ignora. |
-| Lo envió la ticketera (confirmaciones y avisos: asunto de la app o cabecera `X-Ticketera`) | Se ignora. |
-| No pasa el filtro ni empieza con «Ticket:» | No crea ticket (queda anotado y no se revisa otra vez). |
+| Lo envió la ticketera (registrado como `aviso_app` al enviarlo, cabecera `X-Ticketera`, asunto o frases fijas de sus avisos) | Se ignora. |
+| Su conversación ya se procesó | Se ignora: nunca crea un ticket nuevo. |
+| El asunto no empieza con «Ticket:» | No crea ticket (queda anotado y no se revisa otra vez). |
+
+### Protección contra ciclos de correos
+
+- Todo correo que envía la app (confirmaciones, «Se le asignó…», «Nuevo
+  comentario…», «Ingrese a la ticketera…») se crea primero como borrador
+  (`createReply` o `POST /me/messages`), se **registra** en
+  `processed_emails` con su Message-ID, su `conversationId` y el ticket del
+  que habla (`result = aviso_app`) y recién después se envía (`/send`). Si no
+  se puede registrar, no se envía. Su copia en Elementos enviados o en la
+  bandeja ya no se procesa como correo nuevo.
+- Si Graph no conserva la cabecera `X-Ticketera`, el aviso se reconoce por el
+  asunto (también con «RE:») y por las frases fijas del texto. Un correo con
+  esa cabecera o esas frases que llega de otra persona (por ejemplo, de la
+  ticketera de un compañero) tampoco crea un ticket.
+- Un correo de una conversación ya procesada nunca crea un ticket nuevo: es
+  un comentario (si responde en el hilo de un ticket) o se ignora. Responder a
+  una confirmación o a un aviso agrega un comentario.
+- **Freno**: en una revisión del buzón (cron o hilo) se crean como máximo 5
+  tickets (`MAX_TICKETS_POR_CICLO`); los demás correos quedan sin leer y sin
+  registrar para la revisión siguiente, y el log muestra «ALERTA: freno de
+  seguridad del correo…».
 
 **Cómo se reconoce el hilo** (en la bandeja y en enviados), en este orden:
 cabeceras In-Reply-To / References, el `conversationId` de Graph (se guarda en

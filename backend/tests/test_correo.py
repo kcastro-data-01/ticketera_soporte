@@ -292,8 +292,15 @@ def test_reply_with_only_the_conversation_id_is_a_comment(session, usuario):
 class FakeGraph:
     """Simula los endpoints de Graph que usa la ticketera."""
 
-    def __init__(self, mensajes, carpetas=None, rechazar_cabecera=False, paginas=1, enviados=None):
+    def __init__(self, mensajes, carpetas=None, rechazar_cabecera=False, paginas=1, enviados=None,
+                 copiar_a_enviados=False, perder_cabeceras=False, buzon="kcastro@data.cr"):
         self.mensajes = {m["id"]: dict(m, isRead=False, carpeta="inbox") for m in mensajes}
+        # Como Graph: lo que la app envía queda en Elementos enviados (con el
+        # mismo Message-ID); con perder_cabeceras, sin X-Ticketera.
+        self.copiar_a_enviados = copiar_a_enviados
+        self.perder_cabeceras = perder_cabeceras
+        self.buzon = buzon
+        self.borradores: dict[str, dict] = {}
         # Elementos enviados: ya leídos, en su carpeta.
         for m in enviados or []:
             self.mensajes[m["id"]] = dict(m, isRead=True, carpeta="sentitems")
@@ -332,9 +339,11 @@ class FakeGraph:
                         if m["carpeta"] == "sentitems" and m["sentDateTime"] >= desde]
             enviados.sort(key=lambda m: m["sentDateTime"], reverse=True)
             return httpx.Response(200, json={"value": enviados})
-        if request.method == "POST" and ruta == "/me/sendMail":
-            self.correos_nuevos.append(cuerpo)
-            return httpx.Response(202)
+        if request.method == "POST" and ruta == "/me/messages":
+            # Borrador de un correo nuevo (luego /send).
+            if self.rechazar_cabecera and "internetMessageHeaders" in cuerpo:
+                return httpx.Response(400, json={"error": {"message": "header no permitido"}})
+            return httpx.Response(201, json=self._nuevo_borrador(cuerpo, None, f"conv-app-{len(self.borradores) + 1}"))
         if request.method == "GET" and ruta == "/me/mailFolders":
             nombre = request.url.params["$filter"].split("'")[1]
             valor = [{"id": self.carpetas[nombre]}] if nombre in self.carpetas else []
@@ -344,6 +353,13 @@ class FakeGraph:
             return httpx.Response(201, json={"id": self.carpetas[cuerpo["displayName"]]})
 
         partes = ruta.split("/")  # ['', 'me', 'messages', id, accion?]
+        if len(partes) > 3 and partes[3] in self.borradores:
+            if request.method == "POST" and partes[4:] == ["send"]:
+                self._enviar(partes[3])
+                return httpx.Response(202)
+            if request.method == "DELETE":
+                self.borradores.pop(partes[3])
+                return httpx.Response(204)
         mensaje = self.mensajes.get(partes[3]) if len(partes) > 3 else None
         if mensaje is None:
             return httpx.Response(404, json={"error": {"message": "no existe"}})
@@ -356,12 +372,44 @@ class FakeGraph:
             nuevo = mensaje["id"] + "-movido"
             self.mensajes[nuevo] = dict(self.mensajes.pop(mensaje["id"]), id=nuevo)
             return httpx.Response(201, json={"id": nuevo})
-        if request.method == "POST" and partes[4] == "reply":
+        if request.method == "POST" and partes[4] == "createReply":
             if self.rechazar_cabecera and "internetMessageHeaders" in cuerpo["message"]:
                 return httpx.Response(400, json={"error": {"message": "header no permitido"}})
-            self.respuestas.append((mensaje["id"], cuerpo))
-            return httpx.Response(202)
+            borrador = self._nuevo_borrador(cuerpo["message"], mensaje["id"], mensaje.get("conversationId", ""))
+            return httpx.Response(201, json=borrador)
         return httpx.Response(400, json={"error": {"message": f"no simulado: {ruta}"}})
+
+    def _nuevo_borrador(self, mensaje, responde_a, conversacion):
+        numero = len(self.borradores) + 1
+        borrador = {"id": f"borrador-{numero}", "internetMessageId": f"<app-{numero}@data.cr>",
+                    "conversationId": conversacion, "mensaje": mensaje, "responde_a": responde_a}
+        self.borradores[borrador["id"]] = borrador
+        return {k: borrador[k] for k in ("id", "internetMessageId", "conversationId")}
+
+    def _enviar(self, borrador_id):
+        borrador = self.borradores.pop(borrador_id)
+        mensaje = borrador["mensaje"]
+        if borrador["responde_a"] is not None:
+            self.respuestas.append((borrador["responde_a"], {"message": mensaje}))
+            original = next((m for m in self.mensajes.values() if m["id"] == borrador["responde_a"]), {})
+            para = [original.get("from")] if original.get("from") else []
+            en_respuesta = original.get("internetMessageId", "")
+        else:
+            self.correos_nuevos.append({"message": mensaje, "saveToSentItems": True})
+            para, en_respuesta = mensaje.get("toRecipients", []), ""
+        if self.copiar_a_enviados:
+            cabeceras = [] if self.perder_cabeceras else list(mensaje.get("internetMessageHeaders", []))
+            if en_respuesta:
+                cabeceras.append({"name": "In-Reply-To", "value": en_respuesta})
+            copia_id = f"enviado-{borrador['id']}"
+            self.mensajes[copia_id] = {
+                "id": copia_id, "internetMessageId": borrador["internetMessageId"],
+                "conversationId": borrador["conversationId"], "subject": mensaje["subject"],
+                "from": {"emailAddress": {"address": self.buzon, "name": "Kristin"}},
+                "toRecipients": para, "body": mensaje["body"],
+                "sentDateTime": "2099-01-01T00:00:00Z", "internetMessageHeaders": cabeceras,
+                "isRead": True, "carpeta": "sentitems",
+            }
 
 
 class FakeToken:
@@ -397,7 +445,7 @@ def test_revisar_buzon_replies_in_thread_marks_read_and_moves(factory, session, 
     assert enviado["internetMessageHeaders"] == [{"name": "X-Auto-Response-Suppress", "value": "All"},
                                                  {"name": "X-Ticketera", "value": "1"}]
     # Se respondió antes de mover (después el id cambia).
-    assert graph.llamadas.index(("POST", f"/me/messages/{nuevo['id']}/reply")) < \
+    assert graph.llamadas.index(("POST", f"/me/messages/{nuevo['id']}/createReply")) < \
         graph.llamadas.index(("POST", f"/me/messages/{nuevo['id']}/move"))
 
     # Procesados: leídos y en la carpeta, que se creó porque no existía.

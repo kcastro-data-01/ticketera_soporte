@@ -136,14 +136,12 @@ def test_same_message_id_never_creates_two_tickets(session, yo):
     assert len(session.scalars(select(Ticket)).all()) == 1
 
 
-def test_sent_mail_uses_the_same_filter_as_incoming_mail(session, yo):
-    """Lo que envío usa el mismo CORREO_FILTRO que lo que llega: un correo
-    que pide ayuda crea el ticket aunque no empiece con «Ticket:»."""
+def test_sent_mail_without_ticket_prefix_never_creates_even_if_it_asks_for_help(session, yo):
+    """Lo que envío solo crea un ticket con «Ticket:» al inicio del asunto
+    (lo que llega sigue con el filtro auto)."""
     pide_ayuda = crear_enviado(asunto="No me funciona la impresora", cuerpo="Pedro, ¿la podés revisar?")
-    assert enviar(session, pide_ayuda, CONFIG_FILTRO) == ("ticket", None)
-    ticket = session.scalars(select(Ticket)).one()
-    assert (ticket.title, ticket.assigned_to_id, ticket.created_by_id) == (
-        "No me funciona la impresora", pedro(session).id, yo.id)
+    assert enviar(session, pide_ayuda, CONFIG_FILTRO) == ("otro", None)
+    assert session.scalars(select(Ticket)).all() == []
 
 
 def test_sent_mail_that_does_not_ask_for_help_creates_nothing(session, yo):
@@ -155,9 +153,10 @@ def test_sent_mail_that_does_not_ask_for_help_creates_nothing(session, yo):
     assert pedro(session) is None, "tampoco se crea el usuario del destinatario"
 
 
-def test_sent_mail_with_filter_todos_always_creates(session, yo):
+def test_sent_mail_with_filter_todos_still_needs_the_prefix(session, yo):
     gracias = crear_enviado(asunto="Gracias por el informe", cuerpo="Pedro, lo reviso mañana.")
-    assert enviar(session, gracias, CONFIG)[0] == "ticket"
+    assert enviar(session, gracias, CONFIG)[0] == "otro"
+    assert session.scalars(select(Ticket)).all() == []
 
 
 @pytest.mark.parametrize("asunto", ["Ticket: Cambiar el tóner", "TICKET: Cambiar el tóner",
