@@ -8,7 +8,7 @@ from backend.models import Ticket, User
 from backend.routers.asistente import get_proveedor
 from backend.routers.auth import ROLES_EQUIPO, role_required
 from backend.schemas import ExplicacionResponse
-from backend.services import explicacion_service
+from backend.services import asistente_service, explicacion_service
 from backend.services.asistente_service import AsistenteNoDisponible
 from backend.services.explicacion_service import ExplicacionInvalida
 
@@ -38,7 +38,8 @@ def ver_explicacion(
 ) -> dict:
     """Last saved explanation (``explicacion: null`` if none) and the
     server-computed clarity. Never calls the AI."""
-    return explicacion_service.obtener(session, _ticket(session, ticket_id))
+    datos = explicacion_service.obtener(session, _ticket(session, ticket_id))
+    return {**datos, "ia_disponible": asistente_service.ia_activa()}
 
 
 @router.post(
@@ -54,7 +55,11 @@ def explicar_ticket(
     proveedor=Depends(get_proveedor),
 ) -> dict:
     """Reuse the saved explanation while the ticket has not changed;
-    otherwise (or with ``regenerar=true``) ask the AI and save it."""
+    otherwise (or with ``regenerar=true``) ask the AI and save it. With the
+    AI turned off (``ASISTENTE_PROVEEDOR=ninguno``, Vercel) → 503."""
+    if not asistente_service.ia_activa():
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="La IA no está disponible en esta versión")
     ticket = _ticket(session, ticket_id)
     try:
         return explicacion_service.explicar(session, proveedor, ticket, current_user, regenerar)

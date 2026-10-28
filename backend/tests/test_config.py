@@ -7,7 +7,7 @@ from backend.constants import (
     USER_ROLES,
 )
 
-CONFIG_KEYS = {"categories", "states", "priorities", "roles"}
+CONFIG_KEYS = {"categories", "states", "priorities", "roles", "ia_disponible"}
 
 
 def test_config_returns_200(client):

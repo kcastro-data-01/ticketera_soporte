@@ -6,6 +6,10 @@ Funciona con dos proveedores, elegidos con ``ASISTENTE_PROVEEDOR``:
   Ollama en la propia infraestructura (``OLLAMA_URL``, ``QWEN_MODELO``).
 - ``claude``: la API de Claude (requiere ``ANTHROPIC_API_KEY``).
 
+``ninguno`` (por defecto en Vercel) apaga la IA: el chat responde solo lo que
+calcula el servidor (conteos, fichas, fecha y hora…) y avisa que el chat libre
+no está disponible.
+
 Responde preguntas sobre el uso de la aplicación y sobre los tickets que el
 usuario puede ver. La restricción por rol NO depende solo del prompt: el
 servidor arma el contexto únicamente con los datos que ese rol ya puede
@@ -30,6 +34,7 @@ import httpx
 from sqlalchemy import func, or_, select
 
 from backend.constants import TICKET_CATEGORIES, TICKET_PRIORITIES, TicketPriority, TicketState, UserRole
+from backend.entorno import en_vercel
 from backend.models import Ticket, User
 from backend.services import metricas_service, ticket_service
 
@@ -45,6 +50,10 @@ if not logger.handlers:
 # Lo único que ve la persona cuando el modelo falla; el detalle va al log.
 MENSAJE_NO_DISPONIBLE = "La IA no está disponible en este momento"
 MENSAJE_IA_OCUPADA = "La IA está ocupada, probá de nuevo en unos segundos."
+# Con la IA apagada (ASISTENTE_PROVEEDOR=ninguno, lo normal en Vercel), en
+# lugar de la IA libre.
+MENSAJE_SIN_IA = ("El chat libre con IA no está disponible en esta versión. Podés preguntarme "
+                  "por conteos de tickets, el estado de un ticket, las reglas o los permisos.")
 
 CLAUDE_MODEL = "claude-opus-5-5"
 # El modelo más liviano (≈0,5 GB): funciona en computadoras sin GPU y con
@@ -1770,7 +1779,10 @@ VERBOS_DE_ESTADO = [
 
 
 def redactar_con_ia_activo() -> bool:
-    """``ASISTENTE_REDACTAR_CON_IA`` (encendido por defecto)."""
+    """``ASISTENTE_REDACTAR_CON_IA`` (encendido por defecto; apagado si la IA
+    está apagada)."""
+    if not ia_activa():
+        return False
     valor = os.environ.get("ASISTENTE_REDACTAR_CON_IA", "true").strip().lower()
     return valor not in ("0", "false", "no", "off")
 
@@ -1923,7 +1935,10 @@ EJEMPLOS_INTERPRETACION = [
 
 
 def interpretar_con_ia_activo() -> bool:
-    """``ASISTENTE_INTERPRETAR_CON_IA`` (encendida por defecto)."""
+    """``ASISTENTE_INTERPRETAR_CON_IA`` (encendida por defecto; apagada si la
+    IA está apagada)."""
+    if not ia_activa():
+        return False
     valor = os.environ.get("ASISTENTE_INTERPRETAR_CON_IA", "true").strip().lower()
     return valor not in ("0", "false", "no", "off")
 
@@ -2326,9 +2341,41 @@ class ProveedorClaude:
         return self.responder(system, messages[1:], timeout=timeout)
 
 
+PROVEEDOR_APAGADO = "ninguno"
+
+
+def nombre_proveedor() -> str:
+    """``ASISTENTE_PROVEEDOR``: «qwen» por defecto; en Vercel, «ninguno»."""
+    nombre = os.environ.get("ASISTENTE_PROVEEDOR", "").strip().lower()
+    return nombre or (PROVEEDOR_APAGADO if en_vercel() else "qwen")
+
+
+def ia_activa() -> bool:
+    """False con ``ASISTENTE_PROVEEDOR=ninguno`` (por defecto en Vercel)."""
+    return nombre_proveedor() != PROVEEDOR_APAGADO
+
+
+class ProveedorApagado:
+    """La IA está apagada: el chat responde solo con lo que calcula el
+    servidor y nunca llama a un modelo (por si acaso, cada método falla)."""
+
+    nombre = PROVEEDOR_APAGADO
+
+    def _no(self, *args, **kwargs):
+        raise AsistenteNoDisponible(MENSAJE_SIN_IA)
+
+    responder = generar_json = _no
+
+    def precargar(self) -> bool:
+        return False
+
+
 def crear_proveedor():
-    """Proveedor elegido con ``ASISTENTE_PROVEEDOR`` (``qwen`` por defecto)."""
-    nombre = os.environ.get("ASISTENTE_PROVEEDOR", "qwen").strip().lower() or "qwen"
+    """Proveedor elegido con ``ASISTENTE_PROVEEDOR`` (``qwen`` por defecto;
+    ``ninguno`` apaga la IA)."""
+    nombre = nombre_proveedor()
+    if nombre == PROVEEDOR_APAGADO:
+        return ProveedorApagado()
     if nombre == "claude":
         if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
             raise AsistenteNoConfigurado(
@@ -2348,7 +2395,7 @@ def crear_proveedor():
             timeout=max(10.0, timeout),
         )
     raise AsistenteNoConfigurado(
-        f"ASISTENTE_PROVEEDOR={nombre!r} no es válido: usa «qwen» o «claude»"
+        f"ASISTENTE_PROVEEDOR={nombre!r} no es válido: usa «qwen», «claude» o «ninguno»"
     )
 
 
@@ -2480,6 +2527,8 @@ def responder_completo(proveedor, session, user: User, messages: list[dict],
     directa, system, pregunta = _preparar(proveedor, session, user, messages, ticket_actual)
     if directa is not None:
         return _texto_directa(proveedor, pregunta, directa)
+    if isinstance(proveedor, ProveedorApagado):
+        return MENSAJE_SIN_IA, "directa"
     try:
         texto = proveedor.responder(system, messages)
     except AsistenteNoDisponible as error:
@@ -2513,6 +2562,10 @@ def responder_stream(proveedor, session, user: User, messages: list[dict],
         texto, fuente = _texto_directa(proveedor, pregunta, directa)
         yield {"t": texto}
         yield {"fin": True, "fuente": fuente}
+        return
+    if isinstance(proveedor, ProveedorApagado):
+        yield {"t": MENSAJE_SIN_IA}
+        yield {"fin": True, "fuente": "directa"}
         return
     stream = getattr(proveedor, "responder_stream", None)
 
@@ -2595,7 +2648,7 @@ def iniciar_precarga() -> threading.Thread | None:
     """Al arrancar, carga Qwen en Ollama en segundo plano y lo precalienta
     (:func:`precalentar`) para que la primera pregunta no espere ~1 minuto.
     Solo actúa con Qwen y ``OLLAMA_URL`` definido (como en docker-compose)."""
-    if os.environ.get("ASISTENTE_PROVEEDOR", "qwen").strip().lower() not in ("", "qwen"):
+    if nombre_proveedor() != "qwen":
         return None
     if not os.environ.get("OLLAMA_URL", "").strip():
         return None
