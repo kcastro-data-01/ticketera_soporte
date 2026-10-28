@@ -37,6 +37,7 @@ from backend.services.asistente_service import (
     AsistenteNoConfigurado,
     AsistenteNoDisponible,
     AsistenteOcupado,
+    IATardo,
     MENSAJE_NO_DISPONIBLE,
     logger,
 )
@@ -404,6 +405,28 @@ class ExplicacionInvalida(Exception):
     """La IA respondió dos veces con un JSON que no sirve."""
 
 
+def motivo_para_usuario(error: Exception) -> str:
+    """Mensaje para la pantalla: «La IA no está disponible…» más la causa en
+    palabras simples (el detalle técnico queda en el registro)."""
+    texto = str(error).lower()
+    if isinstance(error, AsistenteOcupado):
+        motivo = "Está atendiendo otra consulta; inténtelo de nuevo en unos segundos."
+    elif isinstance(error, AsistenteNoConfigurado):
+        motivo = "Falta configurarla (ASISTENTE_PROVEEDOR en el archivo .env)."
+    elif isinstance(error, IATardo):
+        motivo = ("Tardó demasiado en responder; inténtelo de nuevo. Si se repite, la computadora "
+                  "puede necesitar un modelo más pequeño o más tiempo (QWEN_TIMEOUT).")
+    elif "no está descargado" in texto:
+        motivo = "El modelo de IA todavía se está descargando; inténtelo de nuevo en unos minutos."
+    elif "conectar" in texto:
+        motivo = "No se pudo conectar con el servicio de IA (Ollama); verifique que esté en funcionamiento."
+    elif "memoria" in texto:
+        motivo = "No hay memoria suficiente para el modelo de IA."
+    else:
+        return MENSAJE_NO_DISPONIBLE
+    return f"{MENSAJE_NO_DISPONIBLE}. {motivo}"
+
+
 def generar(proveedor, ticket: Ticket, claridad: dict) -> dict:
     """Llama a la IA (con un reintento si el JSON viene mal)."""
     mensajes = armar_mensajes(ticket, claridad)
@@ -414,7 +437,7 @@ def generar(proveedor, ticket: Ticket, claridad: dict) -> dict:
         except (AsistenteNoDisponible, AsistenteNoConfigurado, AsistenteOcupado) as error:
             logger.error("explicar ticket #%s: error con %s (%s)", ticket.id,
                          getattr(proveedor, "modelo", getattr(proveedor, "nombre", "?")), error)
-            raise AsistenteNoDisponible(MENSAJE_NO_DISPONIBLE) from error
+            raise AsistenteNoDisponible(motivo_para_usuario(error)) from error
         try:
             return validar_respuesta(texto, claridad)
         except ValueError as error:

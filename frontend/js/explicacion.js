@@ -11,6 +11,8 @@
 const IA_LIMITE_MS = 200000;
 const IA_NOTA = "Contenido generado automáticamente. Revíselo antes de utilizarlo.";
 const IA_NO_DISPONIBLE_TXT = "La IA no está disponible en este momento";
+const IA_TARDO_TXT =
+  "La IA no está disponible en este momento. Tardó demasiado en responder; inténtelo de nuevo.";
 
 let iaOcupada = false;
 
@@ -161,7 +163,7 @@ async function iaExplicar(regenerar = false) {
   } catch (error) {
     console.error("POST explicacion:", error);
     iaEstado(
-      error && error.name === "AbortError" ? IA_NO_DISPONIBLE_TXT : "Error al comunicarse con la API.",
+      error && error.name === "AbortError" ? IA_TARDO_TXT : "Error al comunicarse con la API.",
       "error"
     );
   } finally {
