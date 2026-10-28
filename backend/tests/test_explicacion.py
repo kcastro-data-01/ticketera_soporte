@@ -309,16 +309,41 @@ def test_json_inside_code_fence_is_accepted():
     assert ex.validar_respuesta(texto)["explicacion"] == BUENA["explicacion"]
 
 
-@pytest.mark.parametrize("error", [httpx.ConnectError("refused"), httpx.ReadTimeout("lento")])
-def test_ollama_down_shows_not_available(client, session, ollama, tecnico, error, caplog, monkeypatch):
+@pytest.mark.parametrize("error, motivo", [
+    (httpx.ConnectError("refused"), "No se pudo conectar con el servicio de IA (Ollama)"),
+    (httpx.ReadTimeout("lento"), "Tardó demasiado en responder"),
+])
+def test_ollama_down_shows_the_reason(client, session, ollama, tecnico, error, motivo, caplog, monkeypatch):
     monkeypatch.setattr(asistente_service.logger, "propagate", True)
     ollama.error = error
     ticket = nuevo_ticket(session)
     with caplog.at_level(logging.ERROR, logger=asistente_service.logger.name):
         resp = client.post(f"/api/tickets/{ticket.id}/explicacion", headers=tecnico)
     assert resp.status_code == 502
-    assert resp.json()["detail"] == "La IA no está disponible en este momento"
+    detalle = resp.json()["detail"]
+    assert detalle.startswith("La IA no está disponible en este momento. ")
+    assert motivo in detalle
     assert f"explicar ticket #{ticket.id}: error con qwen3:0.6b" in caplog.text
+
+
+@pytest.mark.parametrize("error, motivo", [
+    (asistente_service.AsistenteNoDisponible(
+        "El modelo qwen3:0.6b todavía no está descargado en Ollama; espera a que termine"),
+     "El modelo de IA todavía se está descargando"),
+    (asistente_service.AsistenteNoDisponible("No hay memoria suficiente para el modelo qwen3:4b"),
+     "No hay memoria suficiente para el modelo de IA."),
+    (asistente_service.AsistenteOcupado("429"), "Está atendiendo otra consulta"),
+    (asistente_service.AsistenteNoConfigurado("falta la clave"), "Falta configurarla"),
+])
+def test_reason_in_plain_words(error, motivo):
+    texto = ex.motivo_para_usuario(error)
+    assert texto.startswith("La IA no está disponible en este momento. ")
+    assert motivo in texto
+
+
+def test_unknown_error_keeps_the_general_message():
+    error = asistente_service.AsistenteNoDisponible("Ollama respondió con un error (500)")
+    assert ex.motivo_para_usuario(error) == "La IA no está disponible en este momento"
 
 
 # --- Caché ------------------------------------------------------------------------
