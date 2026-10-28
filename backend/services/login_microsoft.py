@@ -7,7 +7,9 @@ el ``id_token`` al backend. Aquí se valida:
 * la firma, con las claves públicas de Microsoft del tenant (``jwks_uri``),
 * la audiencia (= ``CORREO_M365_CLIENT_ID``), el emisor (= el tenant) y el
   vencimiento,
-* que ``tid`` sea el del tenant: solo entran cuentas de la empresa.
+* que ``tid`` sea el del tenant: solo entran cuentas de la empresa,
+* que no sea un invitado (B2B) del tenant: el ``idp`` (si viene) es el mismo
+  tenant y el correo es del dominio ``DOMINIO_EMPRESA`` (p. ej. ``data.cr``).
 
 Con los datos del token se busca o se crea el usuario de la ticketera y el
 router entrega la sesión de la app como siempre (JWT propio). El rol de los
@@ -49,6 +51,11 @@ def tenant() -> str:
 
 def client_id() -> str:
     return (os.environ.get("CORREO_M365_CLIENT_ID") or "").strip()
+
+
+def dominio_empresa() -> str:
+    """``DOMINIO_EMPRESA`` sin «@» (vacío: no se revisa el dominio)."""
+    return (os.environ.get("DOMINIO_EMPRESA") or "").strip().lower().lstrip("@")
 
 
 def admin_inicial() -> str:
@@ -113,6 +120,16 @@ def validar_id_token(token: str) -> dict:
     # tendría otro).
     if f"/{claims['tid']}/" not in config["issuer"]:
         raise TokenInvalido("la cuenta no es del tenant de la empresa")
+    # Un invitado trae el tid de la empresa, pero ``idp`` dice dónde se
+    # autenticó (su propia organización, una cuenta personal…).
+    idp = claims.get("idp")
+    if idp and claims["tid"] not in idp:
+        raise TokenInvalido(f"cuenta invitada (idp {idp})")
+    dominio = dominio_empresa()
+    if dominio:
+        correo, _ = datos_de_microsoft(claims)
+        if not correo.endswith("@" + dominio):
+            raise TokenInvalido(f"el correo {correo} no es del dominio {dominio}")
     return claims
 
 

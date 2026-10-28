@@ -10,10 +10,15 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from backend.database import get_session
+from backend.entorno import en_vercel
 from backend.models import User
 
 # Configuration (can be overridden via environment variables)
-JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "").strip() or "dev-secret-key-change-in-production"
+if en_vercel() and JWT_SECRET_KEY == "dev-secret-key-change-in-production":
+    # Con la clave de desarrollo (pública en el repositorio) cualquiera podría
+    # fabricar una sesión: la versión publicada no arranca sin su propia clave.
+    raise RuntimeError("Falta JWT_SECRET_KEY en las variables de entorno de Vercel")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", "60"))
 
@@ -23,7 +28,10 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 def login_local_activo() -> bool:
     """``LOGIN_LOCAL=true``: solo para desarrollo, se mantiene el inicio de
-    sesión con contraseña (por defecto, solo con Microsoft)."""
+    sesión con contraseña (por defecto, solo con Microsoft). En Vercel
+    (público) nunca: solo se entra con Microsoft."""
+    if en_vercel():
+        return False
     return (os.environ.get("LOGIN_LOCAL") or "").strip().lower() in ("1", "true", "si", "sí", "yes")
 
 
