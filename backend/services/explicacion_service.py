@@ -38,6 +38,7 @@ from backend.services.asistente_service import (
     AsistenteNoDisponible,
     AsistenteOcupado,
     IATardo,
+    MENSAJE_IA_LIMITE,
     MENSAJE_NO_DISPONIBLE,
     logger,
 )
@@ -410,8 +411,8 @@ def motivo_para_usuario(error: Exception) -> str:
     palabras simples (el detalle técnico queda en el registro)."""
     texto = str(error).lower()
     if isinstance(error, AsistenteOcupado):
-        motivo = "Está atendiendo otra consulta; inténtelo de nuevo en unos segundos."
-    elif isinstance(error, AsistenteNoConfigurado):
+        return MENSAJE_IA_LIMITE
+    if isinstance(error, AsistenteNoConfigurado):
         motivo = "Falta configurarla (ASISTENTE_PROVEEDOR en el archivo .env)."
     elif isinstance(error, IATardo):
         motivo = ("Tardó demasiado en responder; inténtelo de nuevo. Si se repite, la computadora "

@@ -332,13 +332,17 @@ def test_ollama_down_shows_the_reason(client, session, ollama, tecnico, error, m
      "El modelo de IA todavía se está descargando"),
     (asistente_service.AsistenteNoDisponible("No hay memoria suficiente para el modelo qwen3:4b"),
      "No hay memoria suficiente para el modelo de IA."),
-    (asistente_service.AsistenteOcupado("429"), "Está atendiendo otra consulta"),
     (asistente_service.AsistenteNoConfigurado("falta la clave"), "Falta configurarla"),
 ])
 def test_reason_in_plain_words(error, motivo):
     texto = ex.motivo_para_usuario(error)
     assert texto.startswith("La IA no está disponible en este momento. ")
     assert motivo in texto
+
+
+def test_usage_limit_has_its_own_message():
+    texto = ex.motivo_para_usuario(asistente_service.AsistenteOcupado("429"))
+    assert texto == "La IA está ocupada, intente de nuevo en un minuto"
 
 
 def test_unknown_error_keeps_the_general_message():
