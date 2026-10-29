@@ -34,8 +34,9 @@ los que llegan después de activar la función.
 
 También se revisan los **Elementos enviados** del buzón (ver
 :func:`procesar_enviado`): un correo que el dueño envía a alguien de la
-empresa crea un ticket **solo si el asunto empieza con «Ticket:»**, a nombre
-del dueño y asignado al primer destinatario de la empresa en «Para» (se crea
+empresa crea un ticket si el asunto empieza con «Ticket:» o, con
+``CORREO_FILTRO=ia``, si la IA ve que pide soporte (mismo filtro que la
+bandeja), a nombre del dueño y asignado al primer destinatario de la empresa en «Para» (se crea
 su usuario si no existe).
 
 Contra los ciclos de correos: todo correo que manda la app se registra
@@ -851,12 +852,20 @@ def descarte_fijo(correo: CorreoEntrante) -> str | None:
     return None
 
 
-def descarte_destinatarios(correo: CorreoEntrante, config: ConfigCorreo) -> str | None:
-    """Reglas para una solicitud nueva: más de :data:`MAX_DESTINATARIOS`
-    destinatarios o un remitente de otro dominio. El motivo, o ``None``."""
+def _demasiados_destinatarios(correo: CorreoEntrante) -> str | None:
+    """Más de :data:`MAX_DESTINATARIOS` (Para + CC): una circular, no una
+    solicitud. El motivo, o ``None``."""
     destinatarios = {c for c, _ in correo.para + correo.cc}
     if len(destinatarios) > MAX_DESTINATARIOS:
         return f"tiene {len(destinatarios)} destinatarios (más de {MAX_DESTINATARIOS})"
+    return None
+
+
+def descarte_destinatarios(correo: CorreoEntrante, config: ConfigCorreo) -> str | None:
+    """Reglas para una solicitud nueva: más de :data:`MAX_DESTINATARIOS`
+    destinatarios o un remitente de otro dominio. El motivo, o ``None``."""
+    if (motivo := _demasiados_destinatarios(correo)):
+        return motivo
     if config.dominio_empresa and not es_de_la_empresa(correo.remitente, config):
         return "remitente de otro dominio"
     return None
@@ -1041,8 +1050,13 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
       conversationId) o con «Ticket #N» en un ticket del dueño → ``comentario``
       del dueño.
     * Su conversación ya se procesó → ``ignorado`` (nunca un ticket nuevo).
-    * El asunto no empieza con «Ticket:» → ``otro`` (lo que el dueño envía
-      solo crea tickets con ese prefijo).
+    * Con ``CORREO_FILTRO=ia``, antes de todo se ignoran los automáticos, los
+      avisos de ticketeras, los boletines y los de más de
+      :data:`MAX_DESTINATARIOS` destinatarios; si el asunto no empieza con
+      «Ticket:», decide la IA (mismo clasificador que la bandeja; si falla, el
+      respaldo estricto): ticket solo si el dueño le reporta un problema
+      técnico a un compañero o le pide soporte, acceso o ayuda. Si no →
+      ``otro``. Con otro filtro, solo «Ticket:» crea.
     * Si no, ``ticket``: solicitante = el dueño; asignado = el primer
       destinatario de la empresa en «Para» (se crea si no existe, para que lo
       vea al entrar con Microsoft).
@@ -1062,7 +1076,7 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
             or any(p.search(texto) for p in FRASES_APP)):
         _registrar(session, correo, "ignorado")
         return "ignorado", None
-    if config.filtro == "ia" and (motivo := descarte_fijo(correo)):
+    if config.filtro == "ia" and (motivo := descarte_fijo(correo) or _demasiados_destinatarios(correo)):
         logger.info("Enviado «%s» ignorado (%s)", correo.asunto, motivo)
         _registrar(session, correo, "ignorado")
         return "ignorado", None
@@ -1091,9 +1105,19 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
         return "ignorado", None
 
     if not es_forzado(correo.asunto):
-        # Correo normal a un compañero: se anota para no revisarlo de nuevo.
-        _registrar(session, correo, "otro")
-        return "otro", None
+        if config.filtro != "ia":
+            # Correo normal a un compañero: se anota para no revisarlo de nuevo.
+            _registrar(session, correo, "otro")
+            return "otro", None
+        decision = correo_filtro.clasificar(correo.asunto, correo.cuerpo)
+        logger.info("Enviado %s (%s: %s): «%s» a %s",
+                    "aceptado" if decision.es_solicitud else "ignorado", decision.fuente,
+                    decision.motivo, correo.asunto, internos[0][0])
+        if not decision.es_solicitud:
+            if decision.fuente != "respaldo":
+                # Con la IA caída no se anota: la próxima revisión lo intenta de nuevo.
+                _registrar(session, correo, "otro")
+            return "otro", None
 
     if not puede_crear:
         return "frenado", None

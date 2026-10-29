@@ -919,10 +919,18 @@ que llegan después de activar la función.
 ### Correos enviados
 
 La app también revisa **Elementos enviados** del buzón (mismo permiso
-`Mail.ReadWrite`). Lo que envía el dueño a alguien de la empresa crea un
-ticket **solo si el asunto empieza con «Ticket:»** (el título va sin
-«Ticket:»); la IA no los clasifica, pero con `CORREO_FILTRO=ia` las reglas
-fijas (automáticos, avisos de ticketeras, boletines) también se aplican.
+`Mail.ReadWrite`). Con `CORREO_FILTRO=auto` o `todos`, lo que envía el dueño a
+alguien de la empresa crea un ticket **solo si el asunto empieza con
+«Ticket:»** (el título va sin «Ticket:»). Con `CORREO_FILTRO=ia` pasan por el mismo filtro que la bandeja:
+primero se ignoran los automáticos, los avisos de cualquier ticketera (también
+los de esta), los boletines, los de más de 3 destinatarios y los que van solo a
+externos; «Ticket:» crea siempre y una respuesta en el hilo de un ticket es
+comentario; el resto lo decide la IA (asunto + 800 caracteres): ticket solo si
+el dueño le reporta a un compañero un problema técnico o le pide soporte,
+acceso o ayuda; no si es coordinación, un saludo, un envío de archivos, una
+reunión, un agradecimiento, un resumen o un informe. Si la IA falla, el filtro
+estricto de respaldo. En el log queda «Enviado aceptado/ignorado (ia: motivo)»
+sin el texto, y cuentan para el freno de 5 tickets por revisión.
 
 | Caso | Qué pasa |
 |---|---|

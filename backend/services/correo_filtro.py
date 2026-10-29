@@ -39,14 +39,14 @@ ESQUEMA = {
 }
 
 SISTEMA = (
-    "Clasificás correos que llegan al buzón de soporte técnico de una empresa. "
-    "Decidí si el correo es una SOLICITUD DE SOPORTE.\n"
+    "Clasificás correos del buzón de soporte técnico de una empresa: los que le llegan y los que "
+    "su dueño le envía a un compañero. Decidí si el correo es una SOLICITUD DE SOPORTE.\n"
     "Es solicitud si la persona reporta un problema técnico (algo no funciona, se dañó, da error, "
     "no puede entrar) o pide ayuda, un acceso, un permiso, una instalación o soporte.\n"
     "NO es solicitud si es un resumen, un informe o un reporte; la presentación de un proyecto "
     "(aunque hable de tickets, ticketeras o soporte); un aviso automático de un sistema; un "
-    "saludo; un agradecimiento; una invitación o reunión; un envío de archivos; publicidad o "
-    "cualquier otra conversación.\n"
+    "saludo; un agradecimiento; una invitación o reunión; coordinación de trabajo o personal; "
+    "un envío de archivos; publicidad o cualquier otra conversación.\n"
     "Si el correo lista tickets o problemas de otras personas para informar, NO es solicitud.\n"
     'Respondé solo JSON: {"es_solicitud": true|false, "motivo": "frase corta en español"}.'
 )
@@ -72,6 +72,14 @@ EJEMPLOS: tuple[tuple[str, str, bool, str], ...] = (
     ("Reunión del viernes", "Les recuerdo la reunión de seguimiento a las 10 am.", False,
      "es una invitación a reunión"),
     ("Archivos del informe", "Adjunto los archivos que me pidieron.", False, "es un envío de archivos"),
+    # Lo que el dueño del buzón le envía a un compañero.
+    ("Impresora", "Hola, no me funciona la impresora del segundo piso, ¿la podés revisar?", True,
+     "le reporta un problema técnico a un compañero"),
+    ("Acceso a la VPN", "¿Me podés dar acceso a la VPN? La necesito para trabajar desde casa.", True,
+     "pide un acceso"),
+    ("¿Almorzamos?", "¿Almorzamos hoy a las 12?", False, "es coordinación personal"),
+    ("Pendientes de la semana", "Te recuerdo que el viernes entregamos el avance del proyecto.", False,
+     "es coordinación de trabajo"),
 )
 
 # Respaldo estricto (minúsculas, sin tildes): solo frases de un problema o de

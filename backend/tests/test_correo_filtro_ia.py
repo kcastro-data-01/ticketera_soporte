@@ -262,25 +262,119 @@ def test_end_to_end_keeps_the_brake_and_leaves_rejected_mail_unread(factory, ses
     assert sum(m[-1]["content"].startswith("Asunto: Gracias") for m in ia.pedidos) == 1
 
 
-# --- Enviados: solo «Ticket:» crea; las reglas fijas también -----------------------
+# --- Enviados: el mismo filtro que la bandeja --------------------------------------
 
 
-def _enviado(asunto, msg_id="<e1@data.cr>", cabeceras=None):
-    return cs.correo_desde_graph(crear_enviado(asunto=asunto, cuerpo="Hola", msg_id=msg_id,
-                                               cabeceras=cabeceras))
+def _enviado(asunto, cuerpo="Hola", msg_id="<e1@data.cr>", cabeceras=None, para=None, cc=()):
+    mensaje = crear_enviado(asunto=asunto, cuerpo=cuerpo, msg_id=msg_id, cabeceras=cabeceras,
+                            **({"para": para} if para else {}))
+    mensaje["ccRecipients"] = [{"emailAddress": {"address": c}} for c in cc]
+    return cs.correo_desde_graph(mensaje)
 
 
-def test_sent_mail_only_creates_with_ticket_prefix(session, ia):
-    assert cs.procesar_enviado(session, _enviado("Se dañó mi computadora"), CONFIG_IA)[0] == "otro"
-    assert cs.procesar_enviado(session, _enviado("Ticket: impresora", msg_id="<e2@x>"),
-                               CONFIG_IA)[0] == "ticket"
-    assert ia.pedidos == []
+@pytest.fixture
+def ia_enviados(ia):
+    ia.solicitudes = {"Impresora"}
+    return ia
 
 
-def test_sent_automatic_mail_is_ignored_even_with_prefix(session, ia):
-    correo = _enviado("Ticket: algo", cabeceras={"Auto-Submitted": "auto-generated"})
-    assert cs.procesar_enviado(session, correo, CONFIG_IA) == ("ignorado", None)
+def test_sent_problem_report_creates_an_assigned_ticket_and_notice(session, ia_enviados):
+    config = cs.ConfigCorreo(**{**CONFIG_IA.__dict__, "avisar_asignado": True})
+    correo = _enviado("Impresora", "No me funciona la impresora, ¿la podés revisar?")
+    resultado, aviso = cs.procesar_enviado(session, correo, config)
+    assert resultado == "ticket"
+    ticket = tickets(session)[0]
+    assert ticket.title == "Impresora"
+    assert ticket.assignee.email == "pedro@data.cr"  # primer destinatario @data.cr en «Para»
+    assert ticket.creator.email == "kcastro@data.cr"
+    assert aviso.para == "pedro@data.cr" and aviso.asunto.startswith(f"[Ticket #{ticket.id}] Se le asign")
+    assert ia_enviados.pedidos[0][-1]["content"] == (
+        "Asunto: Impresora\n\nNo me funciona la impresora, ¿la podés revisar?")
+
+
+@pytest.mark.parametrize("asunto,cuerpo", [
+    ("Informe", "Te paso el archivo del informe"),
+    ("¿Almorzamos?", "¿Almorzamos hoy?"),
+])
+def test_sent_non_requests_create_nothing(session, ia_enviados, asunto, cuerpo):
+    assert cs.procesar_enviado(session, _enviado(asunto, cuerpo), CONFIG_IA) == ("otro", None)
     assert tickets(session) == []
+    # Queda anotado: no se le vuelve a preguntar a la IA.
+    assert cs.procesar_enviado(session, _enviado(asunto, cuerpo), CONFIG_IA) == ("repetido", None)
+    assert len(ia_enviados.pedidos) == 1
+
+
+def test_sent_ticket_prefix_creates_without_asking_the_ai(session, ia_enviados):
+    assert cs.procesar_enviado(session, _enviado("Ticket: algo"), CONFIG_IA)[0] == "ticket"
+    assert tickets(session)[0].title == "algo"
+    assert ia_enviados.pedidos == []
+
+
+@pytest.mark.parametrize("asunto,cuerpo,cabeceras", [
+    ("Ticket #5 creado: Impresora", "Recibimos tu solicitud y creamos el ticket #5.", None),
+    ("[Ticket #5] Se le asignó el ticket #5", "Hola", {"X-Ticketera": "aviso"}),
+    ("Impresora", "No me funciona la impresora", {"Auto-Submitted": "auto-generated"}),
+    ("Impresora", "No me funciona la impresora", {"List-Unsubscribe": "<mailto:baja@x>"}),
+])
+def test_sent_app_notices_and_automatic_mail_are_ignored(session, ia_enviados, asunto, cuerpo, cabeceras):
+    correo = _enviado(asunto, cuerpo, cabeceras=cabeceras)
+    assert cs.procesar_enviado(session, correo, CONFIG_IA) == ("ignorado", None)
+    assert tickets(session) == [] and ia_enviados.pedidos == []
+
+
+def test_sent_to_more_than_three_or_only_outside_is_ignored(session, ia_enviados):
+    muchos = _enviado("Impresora", "No me funciona la impresora", para=[
+        ("pedro@data.cr", "Pedro"), ("b@data.cr", "B")], cc=["c@data.cr", "d@data.cr"])
+    assert cs.procesar_enviado(session, muchos, CONFIG_IA) == ("ignorado", None)
+    externo = _enviado("Impresora", "No me funciona la impresora", msg_id="<e2@x>",
+                       para=[("alguien@gmail.com", "Alguien")])
+    assert cs.procesar_enviado(session, externo, CONFIG_IA) == ("ignorado", None)
+    assert tickets(session) == [] and ia_enviados.pedidos == []
+
+
+def test_sent_reply_in_a_ticket_thread_is_a_comment(session, ia_enviados):
+    cs.procesar_enviado(session, _enviado("Ticket: impresora", msg_id="<orig@x>"), CONFIG_IA)
+    ticket = tickets(session)[0]
+    respuesta = cs.correo_desde_graph(crear_enviado(asunto="RE: Ticket: impresora", cuerpo="¿Ya la viste?",
+                                                    msg_id="<resp@x>", en_respuesta_a="<orig@x>"))
+    assert cs.procesar_enviado(session, respuesta, CONFIG_IA)[0] == "comentario"
+    assert session.scalars(select(Comment)).one().ticket_id == ticket.id
+    assert ia_enviados.pedidos == []
+
+
+def test_sent_with_ai_down_uses_the_strict_fallback(session, ia_enviados, log_correo):
+    ia_enviados.error = AsistenteNoDisponible("No se pudo conectar con Groq")
+    pedido = _enviado("Impresora", "No me funciona la impresora, ¿la podés revisar?")
+    assert cs.procesar_enviado(session, pedido, CONFIG_IA)[0] == "ticket"
+    informe = _enviado("Informe", "Te paso el archivo del informe", msg_id="<e2@x>")
+    assert cs.procesar_enviado(session, informe, CONFIG_IA) == ("otro", None)
+    assert "se usó el filtro de respaldo" in log_correo.text
+    # Lo que descartó el respaldo no se anota: se reintenta con la IA.
+    assert session.scalar(select(ProcessedEmail).where(ProcessedEmail.message_id == "<e2@x>")) is None
+
+
+def test_sent_log_has_the_reason_but_not_the_body(session, ia_enviados, log_correo):
+    cs.procesar_enviado(session, _enviado("Impresora", "secreto-1 no me funciona"), CONFIG_IA)
+    cs.procesar_enviado(session, _enviado("¿Almorzamos?", "secreto-2", msg_id="<e2@x>"), CONFIG_IA)
+    assert "Enviado aceptado (ia: pide ayuda)" in log_correo.text
+    assert "Enviado ignorado (ia: no pide ayuda)" in log_correo.text
+    assert "secreto" not in log_correo.text
+
+
+def test_sent_mail_keeps_the_brake(factory, session, ia_enviados):
+    enviados = [crear_enviado(asunto="Impresora", cuerpo="No me funciona", msg_id=f"<s{n}@x>")
+                for n in range(7)]
+    graph = FakeGraph([], enviados=enviados)
+    conteo = cs.revisar_buzon(factory, CONFIG_IA, graph.cliente)
+    assert conteo == {"enviado_ticket": 5, "enviado_frenado": 2}
+    assert cs.revisar_buzon(factory, CONFIG_IA, graph.cliente) == {"enviado_ticket": 2, "enviado_repetido": 5}
+
+
+def test_sent_mail_with_auto_filter_still_needs_the_prefix(session, ia_enviados):
+    config = cs.ConfigCorreo(**{**CONFIG_IA.__dict__, "filtro": "auto"})
+    correo = _enviado("Impresora", "No me funciona la impresora")
+    assert cs.procesar_enviado(session, correo, config) == ("otro", None)
+    assert ia_enviados.pedidos == []
 
 
 # --- Respaldo estricto y configuración ------------------------------------------------
