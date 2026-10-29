@@ -127,3 +127,8 @@ def init_db(target_engine=None) -> None:
     migrate_remove_support_role(db_engine)
     migrate_remove_supervisor_role(db_engine)
     migrate_add_email_conversation_id(db_engine)
+    if not es_sqlite(db_engine):
+        # Una sola vez, en producción (Neon): #16 → #6 tras los borrados.
+        from backend.migrate_renumber_tickets import migrate_renumber_tickets
+
+        migrate_renumber_tickets(db_engine)

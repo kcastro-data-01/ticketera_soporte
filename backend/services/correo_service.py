@@ -89,7 +89,7 @@ from html import unescape
 from pathlib import Path
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from backend.constants import TicketCategory, TicketPriority
 from backend.entorno import en_vercel
@@ -759,6 +759,21 @@ def _ultimo_ticket(session, *condiciones) -> Ticket | None:
     return session.get(Ticket, ticket_id) if ticket_id is not None else None
 
 
+def _hilo_de_ticket_borrado(session, correo: CorreoEntrante) -> bool:
+    """¿El correo responde en un hilo cuyo ticket se borró? (un correo que
+    creó o comentó un ticket y quedó con ``ticket_id`` en NULL al borrarlo)."""
+    del_hilo = []
+    if correo.en_respuesta_a:
+        del_hilo.append(ProcessedEmail.message_id.in_(correo.en_respuesta_a))
+    if correo.conversacion:
+        del_hilo.append(ProcessedEmail.conversation_id == correo.conversacion)
+    if not del_hilo:
+        return False
+    return session.scalar(select(ProcessedEmail.id).where(
+        or_(*del_hilo), ProcessedEmail.ticket_id.is_(None),
+        ProcessedEmail.result.in_(("ticket", "comentario"))).limit(1)) is not None
+
+
 def _ticket_del_hilo(session, correo: CorreoEntrante) -> tuple[Ticket | None, bool]:
     """El ticket del hilo al que responde el correo y si se encontró por el
     hilo mismo. En este orden: por In-Reply-To / References (un correo ya
@@ -773,6 +788,10 @@ def _ticket_del_hilo(session, correo: CorreoEntrante) -> tuple[Ticket | None, bo
         ticket = _ultimo_ticket(session, ProcessedEmail.conversation_id == correo.conversacion)
         if ticket is not None:
             return ticket, True
+    if _hilo_de_ticket_borrado(session, correo):
+        # El número del asunto era del ticket borrado: un ticket nuevo con
+        # ese mismo número no es este hilo.
+        return None, False
     numero = PATRON_TICKET.search(correo.asunto)
     return (session.get(Ticket, int(numero.group(1))) if numero else None), False
 
