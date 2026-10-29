@@ -63,6 +63,12 @@ Configuración (variables de entorno, ver README): ``CORREO_ACTIVO``,
 ``CORREO_INTERVALO``, ``CORREO_MODO``, ``DOMINIO_EMPRESA``, ``AVISAR_ASIGNADO``,
 ``AVISAR_COMENTARIOS`` y ``APP_URL``.
 
+``CORREO_FILTRO``: ``ia`` (por defecto si hay IA, ver :func:`filtro_desde_entorno`)
+aplica las reglas fijas (:func:`descarte_fijo`, :func:`descarte_destinatarios`)
+y lo que queda en duda lo clasifica la IA (``correo_filtro``; si falla, un
+filtro de palabras estricto); ``auto`` usa solo ``SEÑALES_SOPORTE``; ``todos``
+toma cada correo.
+
 ``CORREO_MODO``: ``hilo`` (Docker, por defecto) revisa el buzón en un hilo
 cada ``CORREO_INTERVALO`` segundos; ``cron`` (por defecto en Vercel, donde no
 hay hilos en segundo plano) no arranca el hilo: cada llamada a
@@ -89,7 +95,7 @@ from backend.constants import TicketCategory, TicketPriority
 from backend.entorno import en_vercel
 from backend.models import ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate
-from backend.services import ticket_service
+from backend.services import correo_filtro, ticket_service
 from backend.services.correo_auth import AlmacenBD, ProveedorToken, SinSesionError, ruta_cache
 from backend.services.login_microsoft import asignar_rol_inicial
 
@@ -194,7 +200,7 @@ MAX_TICKETS_POR_CICLO = 5
 # «Registrate para crear tickets» ya no se envía, pero quedan avisos viejos en
 # los buzones: sus respuestas tampoco son solicitudes.
 AVISOS_APP = (re.compile(r"^registrate para crear tickets$", re.IGNORECASE),
-              re.compile(r"^no pudimos crear tu ticket$", re.IGNORECASE),
+              re.compile(r"^no pudimos crear (tu|su) ticket$", re.IGNORECASE),
               re.compile(r"^ingrese a la ticketera para crear tickets$", re.IGNORECASE))
 CONFIRMACIONES_APP = (re.compile(r"^ticket\s*#\d+ creado:", re.IGNORECASE),
                       re.compile(r"^comentario agregado al ticket\s*#\d+$", re.IGNORECASE),
@@ -202,6 +208,46 @@ CONFIRMACIONES_APP = (re.compile(r"^ticket\s*#\d+ creado:", re.IGNORECASE),
                       re.compile(r"^\[ticket\s*#\d+\]\s*nuevo comentario", re.IGNORECASE))
 REMITENTES_AUTOMATICOS = ("noreply", "no-reply", "no_reply", "donotreply", "mailer-daemon",
                           "postmaster", "bounce")
+# --- Reglas fijas de CORREO_FILTRO=ia (minúsculas y sin tildes) -------------
+# Respuestas automáticas que llegan: fuera de oficina, rebotes...
+ASUNTOS_AUTOMATICOS = tuple(re.compile(p) for p in (
+    r"fuera de (la )?oficina", r"respuesta automatica", r"automatic reply", r"auto(matic)?[- ]?reply",
+    r"out of (the )?office", r"undeliverable", r"no (se pudo|se puede) entregar", r"no entregado",
+    r"delivery status notification", r"mail delivery (failed|subsystem)", r"returned mail",
+    r"delivery has failed", r"error de entrega",
+))
+# Avisos de cualquier ticketera (no solo la nuestra). Las marcas van solo en
+# el remitente y las cabeceras: «no puedo entrar a Jira» sí es una solicitud.
+ASUNTOS_TICKETERA = tuple(re.compile(p) for p in (
+    r"^\[(ticketera|helpdesk|help desk|service ?desk|jira|zendesk|freshdesk|"
+    r"glpi|otrs|osticket)[^\]]*\]",
+    r"\b(resumen|reporte|informe) (del dia|diario|semanal|mensual)\b.*\b(ticketera|tickets|soporte)\b",
+    r"\b(ticket|caso|solicitud|request)\s*#?\s*\d+\s+(ha sido|fue|has been|was)\s+"
+    r"(cread[oa]|actualizad[oa]|cerrad[oa]|resuelt[oa]|asignad[oa]|created|updated|closed|resolved)",
+))
+FRASES_TICKETERA = tuple(re.compile(p) for p in (
+    r"\bagente virtual\b",
+    r"\b(le|les|te) compartimos el (resumen|reporte|informe)\b",
+    r"\b(resumen|reporte|informe) de (la )?(ticketera|mesa de ayuda)\b",
+    r"no esta registrad[oa] como (cliente|usuario) en la ticketera",
+    r"\b(hemos|se ha|se han) (creado|registrado|recibido) (su|tu) (ticket|solicitud|caso)\b",
+    r"\b(su|tu) (ticket|solicitud|caso) (#|n(umero|o\.?|°) ?)\d+ (ha sido|fue)\b",
+    r"\byour (ticket|request) (#\s*\d+|has been)",
+    r"\bno responda (a )?este (correo|mensaje)\b",
+    r"\bplease do not reply\b",
+    r"\beste (es un )?(correo|mensaje) (es )?(automatico|generado automaticamente)\b",
+))
+DOMINIOS_TICKETERA = ("zendesk.com", "freshdesk.com", "atlassian.net", "service-now.com",
+                      "servicenowservices.com", "zohodesk.com", "helpscout.net", "otrs.com",
+                      "osticket.com", "glpi-network.cloud", "spiceworks.com")
+REMITENTES_TICKETERA = ("ticketera", "helpdesk", "servicedesk", "mesadeayuda", "mesa.de.ayuda")
+CABECERAS_TICKETERA = ("x-zendesk", "x-freshdesk", "x-jira", "x-atlassian", "x-servicenow",
+                       "x-otrs", "x-glpi", "x-osticket", "x-helpdesk", "x-zoho-desk", "x-ticketera")
+# Más destinatarios que esto (Para + CC) → es una circular, no una solicitud.
+MAX_DESTINATARIOS = 3
+# Correo que el filtro ia ya descartó: se anota (sin conversación, para no
+# afectar al hilo) y no se vuelve a clasificar mientras siga sin leer.
+NO_SOLICITUD = "no_solicitud"
 
 
 @dataclass
@@ -213,9 +259,10 @@ class ConfigCorreo:
     m365_client_id: str = ""
     cache_path: Path = field(default_factory=ruta_cache)
     carpeta_procesados: str = CARPETA_PROCESADOS
-    # «auto»: solo los correos que parecen una solicitud de ayuda (ver
-    # SEÑALES_SOPORTE); «todos»: cada correo es un ticket (buzón exclusivo
-    # de soporte). Los demás se dejan tal cual, sin guardar ni responder.
+    # «ia»: reglas fijas y la IA (con respaldo estricto); «auto»: solo los
+    # correos que parecen una solicitud de ayuda (ver SEÑALES_SOPORTE);
+    # «todos»: cada correo es un ticket (buzón exclusivo de soporte). Los
+    # demás se dejan tal cual, sin responder.
     filtro: str = "auto"
     intervalo: int = 60
     app_url: str = "http://localhost:8000"
@@ -251,7 +298,7 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         m365_client_id=(env.get("CORREO_M365_CLIENT_ID") or "").strip(),
         cache_path=ruta_cache(env.get("CORREO_M365_CACHE")),
         carpeta_procesados=(env.get("CORREO_CARPETA_PROCESADOS") or CARPETA_PROCESADOS).strip(),
-        filtro="todos" if (env.get("CORREO_FILTRO") or "").strip().lower() == "todos" else "auto",
+        filtro=filtro_desde_entorno(env),
         intervalo=max(15, int(env.get("CORREO_INTERVALO") or 60)),
         app_url=(env.get("APP_URL") or "http://localhost:8000").rstrip("/"),
         dominio_empresa=(env.get("DOMINIO_EMPRESA") or "").strip().lower().lstrip("@"),
@@ -259,6 +306,17 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         modo=modo_desde_entorno(env),
         avisar_comentarios=avisar_comentarios_desde_entorno(env),
     )
+
+
+def filtro_desde_entorno(env=None, ia_disponible=None) -> str:
+    """``CORREO_FILTRO``: «ia», «auto» o «todos»; si no está, «ia» cuando hay
+    IA configurada (``ASISTENTE_PROVEEDOR``) y «auto» si no."""
+    env = os.environ if env is None else env
+    valor = (env.get("CORREO_FILTRO") or "").strip().lower()
+    if valor in ("ia", "auto", "todos"):
+        return valor
+    disponible = correo_filtro.ia_disponible() if ia_disponible is None else ia_disponible
+    return "ia" if disponible else "auto"
 
 
 def avisar_comentarios_desde_entorno(env=None) -> bool:
@@ -301,6 +359,10 @@ class CorreoEntrante:
     de_la_app: bool = False
     # ``conversationId`` de Graph (respaldo para encontrar el hilo).
     conversacion: str = ""
+    # Boletín o lista de correo (List-Unsubscribe, List-Id, Precedence bulk).
+    masivo: bool = False
+    # Trae cabeceras de una ticketera conocida (Zendesk, Jira, X-Ticketera…).
+    cabecera_ticketera: bool = False
 
 
 def _html_a_texto(html: str) -> str:
@@ -359,6 +421,12 @@ def _es_automatico(cabeceras: dict[str, str], remitente: str) -> bool:
         or "x-autorespond" in cabeceras
         or any(p in remitente for p in REMITENTES_AUTOMATICOS)
     )
+
+
+def _es_masivo(cabeceras: dict[str, str]) -> bool:
+    """¿Boletín o lista de correo?"""
+    return ("list-unsubscribe" in cabeceras or "list-id" in cabeceras
+            or cabeceras.get("precedence", "").strip().lower() in ("bulk", "list", "junk"))
 
 
 def _fecha_iso(valor: str | None) -> datetime | None:
@@ -421,6 +489,8 @@ def correo_desde_graph(mensaje: dict) -> CorreoEntrante:
         en_respuesta_a=list(dict.fromkeys(_ids_mensaje(hilo))),
         de_la_app=CABECERA_APP.lower() in cabeceras or bool(propiedades.get(PROPIEDAD_X_TICKETERA.lower())),
         conversacion=(mensaje.get("conversationId") or "").strip()[:500],
+        masivo=_es_masivo(cabeceras),
+        cabecera_ticketera=any(c.startswith(CABECERAS_TICKETERA) for c in cabeceras),
     )
 
 
@@ -731,6 +801,61 @@ def es_de_soporte(asunto: str, cuerpo: str, config: ConfigCorreo) -> bool:
     return any(re.search(senal, texto) for senal in SEÑALES_SOPORTE)
 
 
+def es_de_ticketera(correo: CorreoEntrante) -> bool:
+    """¿Es un aviso de una ticketera (esta u otra)? Por cabeceras, remitente,
+    asunto o frases fijas. Las confirmaciones de esta app («Ticket #N
+    creado:»…) no cuentan: responderlas agrega un comentario."""
+    if correo.de_la_app or correo.cabecera_ticketera:
+        return True
+    usuario, _, dominio = correo.remitente.partition("@")
+    if any(dominio == d or dominio.endswith("." + d) for d in DOMINIOS_TICKETERA):
+        return True
+    if any(r in usuario for r in REMITENTES_TICKETERA):
+        return True
+    asunto = _sin_tildes(asunto_base(correo.asunto).lower())
+    if any(p.search(asunto) for p in ASUNTOS_TICKETERA):
+        return True
+    texto = _sin_tildes((correo.cuerpo or "").lower())
+    return any(p.search(texto) for p in FRASES_TICKETERA + FRASES_APP)
+
+
+def descarte_fijo(correo: CorreoEntrante) -> str | None:
+    """Reglas fijas que valen siempre (también con «Ticket:» o en un hilo):
+    el motivo para ignorar el correo, o ``None``."""
+    asunto = _sin_tildes(asunto_base(correo.asunto).lower())
+    if correo.masivo:
+        return "boletín o lista de correo"
+    if correo.automatico or any(p.search(asunto) for p in ASUNTOS_AUTOMATICOS):
+        return "respuesta automática (fuera de oficina, rebote o Auto-Submitted)"
+    if es_de_ticketera(correo):
+        return "aviso de una ticketera"
+    return None
+
+
+def descarte_destinatarios(correo: CorreoEntrante, config: ConfigCorreo) -> str | None:
+    """Reglas para una solicitud nueva: más de :data:`MAX_DESTINATARIOS`
+    destinatarios o un remitente de otro dominio. El motivo, o ``None``."""
+    destinatarios = {c for c, _ in correo.para + correo.cc}
+    if len(destinatarios) > MAX_DESTINATARIOS:
+        return f"tiene {len(destinatarios)} destinatarios (más de {MAX_DESTINATARIOS})"
+    if config.dominio_empresa and not es_de_la_empresa(correo.remitente, config):
+        return "remitente de otro dominio"
+    return None
+
+
+def _decidir_ia(correo: CorreoEntrante, config: ConfigCorreo) -> correo_filtro.Decision:
+    """¿Pide soporte? Reglas de destinatarios y dominio, y si no, la IA."""
+    motivo = descarte_destinatarios(correo, config)
+    if motivo:
+        return correo_filtro.Decision(False, motivo, "regla")
+    return correo_filtro.clasificar(correo.asunto, correo.cuerpo)
+
+
+def _anotar_no_solicitud(session, correo: CorreoEntrante) -> None:
+    """Recuerda el descarte (sin la conversación: no cuenta como hilo procesado)."""
+    _registrar(session, replace(correo, conversacion=""), NO_SOLICITUD)
+
+
 def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
                     puede_crear: bool = True) -> tuple[str, Respuesta | None]:
     """Decide qué hacer con un correo; devuelve (resultado, respuesta a enviar).
@@ -755,7 +880,10 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
     propio = correo.remitente == config.usuario.strip().lower()
     if previo is not None:
         # Un aviso que la app se mandó a sí misma queda en la bandeja.
-        return ("de_la_app", None) if previo == "aviso_app" and propio else ("repetido", None)
+        if previo == "aviso_app" and propio:
+            return "de_la_app", None
+        # Ya descartado por el filtro ia: sigue sin leer, no se clasifica otra vez.
+        return ("visto", None) if previo == NO_SOLICITUD else ("repetido", None)
 
     aviso_app = es_aviso_de_la_app(correo)
     if aviso_app and propio:
@@ -766,8 +894,32 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
     es_confirmacion = any(p.search(base) for p in CONFIRMACIONES_APP)
     forzado = es_forzado(correo.asunto)
     hilo, por_hilo = _ticket_del_hilo(session, correo)
-    if not (es_aviso or hilo or forzado or es_de_soporte(correo.asunto, correo.cuerpo, config)):
-        # Correo normal de la empresa: no se toca ni se guarda.
+    decision: correo_filtro.Decision | None = None
+
+    def pide_soporte() -> bool:
+        """El filtro de ``CORREO_FILTRO`` (la IA se llama una sola vez)."""
+        nonlocal decision
+        if config.filtro != "ia":
+            return es_de_soporte(correo.asunto, correo.cuerpo, config)
+        if decision is None:
+            decision = _decidir_ia(correo, config)
+            logger.info("Correo %s (%s: %s): «%s» de %s",
+                        "aceptado" if decision.es_solicitud else "ignorado", decision.fuente,
+                        decision.motivo, correo.asunto, correo.remitente)
+        return decision.es_solicitud
+
+    if config.filtro == "ia" and (motivo := descarte_fijo(correo)):
+        # Automático, aviso de una ticketera o boletín: ni con «Ticket:» ni
+        # en el hilo de un ticket. Queda sin leer en la bandeja.
+        logger.info("Correo ignorado (%s): «%s» de %s", motivo, correo.asunto, correo.remitente)
+        _anotar_no_solicitud(session, correo)
+        return "otro", None
+
+    if not (es_aviso or hilo or forzado or pide_soporte()):
+        # Correo normal de la empresa: no se toca. Con la IA caída (respaldo)
+        # no se anota, para volver a probar con la IA.
+        if decision is not None and decision.fuente != "respaldo":
+            _anotar_no_solicitud(session, correo)
         return "otro", None
 
     if correo.automatico or propio or "@" not in correo.remitente:
@@ -826,7 +978,7 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
         _registrar(session, correo, "ignorado")
         return "ignorado", None
 
-    if es_confirmacion or not (forzado or es_de_soporte(correo.asunto, correo.cuerpo, config)):
+    if es_confirmacion or not (forzado or pide_soporte()):
         # Responde a una confirmación de un ticket ajeno (o sin texto nuevo), o
         # nombra un ticket sin pedir ayuda: nunca crea un ticket nuevo.
         logger.info("Correo ignorado: «%s» de %s no es un comentario válido ni una solicitud nueva",
@@ -891,9 +1043,13 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
             or any(p.search(texto) for p in FRASES_APP)):
         _registrar(session, correo, "ignorado")
         return "ignorado", None
+    if config.filtro == "ia" and (motivo := descarte_fijo(correo)):
+        logger.info("Enviado «%s» ignorado (%s)", correo.asunto, motivo)
+        _registrar(session, correo, "ignorado")
+        return "ignorado", None
 
     propio = config.usuario.strip().lower()
-    internos = [(c, n) for c, n in correo.para if c != propio and es_de_la_empresa(c, config)]
+    internos =[(c, n) for c, n in correo.para if c != propio and es_de_la_empresa(c, config)]
     if not internos:
         _registrar(session, correo, "ignorado")
         return "ignorado", None
@@ -1246,13 +1402,15 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
                 continue
         conteo[resultado] = conteo.get(resultado, 0) + 1
         freno.anotar(resultado)
-        if resultado in ("de_la_app", "frenado"):
+        if resultado in ("de_la_app", "frenado", "visto"):
             # Aviso de la app al propio buzón: queda en la bandeja. Frenado:
             # sin leer y sin registrar, se procesa en la próxima revisión.
+            # Visto: el filtro ia ya lo descartó antes.
             continue
         if resultado == "otro":
-            # No pide ayuda: queda sin leer y en la bandeja.
-            if avisados is None or correo.message_id not in avisados:
+            # No pide ayuda: queda sin leer y en la bandeja (con el filtro
+            # ia el motivo ya quedó en el log).
+            if config.filtro != "ia" and (avisados is None or correo.message_id not in avisados):
                 logger.info("Correo ignorado: no parece solicitud de ayuda «%s»", correo.asunto)
                 if avisados is not None:
                     avisados.add(correo.message_id)
@@ -1325,7 +1483,8 @@ _hilo: threading.Thread | None = None
 
 def _bucle(session_factory, config: ConfigCorreo, cliente: ClienteGraph) -> None:
     logger.info("leyendo el buzón %s cada %s s (correos: %s)", config.usuario, config.intervalo,
-                "todos" if config.filtro == "todos" else "solo los que piden ayuda")
+                {"todos": "todos", "ia": "los que la IA clasifica como solicitud"}.get(
+                    config.filtro, "solo los que piden ayuda"))
     conectado = False
     avisados: set = set()
     while not _detener.is_set():

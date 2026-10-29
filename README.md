@@ -842,6 +842,34 @@ respuesta. Si el buzón es solo de soporte, `CORREO_FILTRO=todos` convierte cada
 correo en ticket. Si el asunto empieza con **«Ticket:»** (sin importar
 mayúsculas), el correo siempre crea un ticket y el título va sin «Ticket:».
 
+**Filtro con IA (`CORREO_FILTRO=ia`, por defecto cuando hay IA configurada).**
+En este orden:
+
+1. Se ignoran siempre (también con «Ticket:» o en el hilo de un ticket): las
+   respuestas automáticas que llegan (fuera de oficina, no entregado,
+   `Auto-Submitted`), los avisos de cualquier ticketera (cabeceras o remitente
+   de Zendesk, Jira, Freshdesk…, asunto «[Ticketera] …», frases como «agente
+   virtual» o «le compartimos el resumen») y los boletines (`List-Unsubscribe`,
+   `Precedence: bulk`).
+2. «Ticket:» al inicio del asunto → ticket. Respuesta en el hilo de un ticket
+   o «[Ticket #N]» → comentario.
+3. Más de 3 destinatarios (Para + CC) o remitente de otro dominio → se ignora.
+4. El resto lo decide la IA (`ASISTENTE_PROVEEDOR`, p. ej. Groq) con solo el
+   asunto y los primeros 800 caracteres: es solicitud si reporta un problema
+   técnico o pide ayuda, acceso o soporte; no lo es un resumen, un informe,
+   la presentación de un proyecto (aunque hable de tickets), un saludo, un
+   agradecimiento, una reunión o un envío de archivos.
+5. Si la IA falla o llega a su límite (429), un filtro de palabras estricto
+   (solo frases de un problema real, como «no puedo entrar» o «se dañó»;
+   «ticket», «soporte» o «estado» sueltas no cuentan) y queda en el log
+   «se usó el filtro de respaldo». Tras una falla la IA descansa 60 s.
+
+En el log queda cada decisión («Correo aceptado/ignorado (ia: motivo)»),
+sin el texto del correo. Los que la IA descarta quedan sin leer en la bandeja
+y no se le vuelven a preguntar. El freno de 5 tickets por revisión sigue. El
+aviso de «ingrese primero» a quien no tiene cuenta solo sale si su correo es
+una solicitud.
+
 Regla general: **quien escribe es el solicitante y quien recibe, el asignado**.
 Los correos que llegan al buzón quedan asignados al dueño del buzón
 (`CORREO_USUARIO`), sin reparto automático; los que el dueño envía, al
@@ -893,7 +921,8 @@ que llegan después de activar la función.
 La app también revisa **Elementos enviados** del buzón (mismo permiso
 `Mail.ReadWrite`). Lo que envía el dueño a alguien de la empresa crea un
 ticket **solo si el asunto empieza con «Ticket:»** (el título va sin
-«Ticket:»); `CORREO_FILTRO` solo se aplica a lo que llega.
+«Ticket:»); la IA no los clasifica, pero con `CORREO_FILTRO=ia` las reglas
+fijas (automáticos, avisos de ticketeras, boletines) también se aplican.
 
 | Caso | Qué pasa |
 |---|---|
@@ -982,7 +1011,8 @@ APP_URL=http://IP-O-NOMBRE-DEL-EQUIPO:8000
 ```
 
 Opcionales: `CORREO_CARPETA_PROCESADOS` (por defecto `Tickets-Procesados`),
-`CORREO_FILTRO` (`auto` o `todos`), `CORREO_INTERVALO` (segundos, 60),
+`CORREO_FILTRO` (`ia`, `auto` o `todos`; si no está, `ia` cuando hay IA y si
+no `auto`), `CORREO_INTERVALO` (segundos, 60),
 `AVISAR_ASIGNADO` (`false`; `true` avisa por correo al asignado de un ticket
 creado desde un correo enviado), `AVISAR_COMENTARIOS` (`false` en Docker,
 `true` en Vercel: avisa por correo los comentarios hechos en la app) y
@@ -1065,7 +1095,7 @@ se ve, sin «Volver a explicar»).
    | `DOMINIO_EMPRESA` | `data.cr` |
    | `CORREO_ACTIVO` | `1` |
    | `CORREO_USUARIO` | el buzón de soporte |
-   | `CORREO_FILTRO` | `auto` (o `todos`) |
+   | `CORREO_FILTRO` | `ia` (necesita `ASISTENTE_PROVEEDOR=groq` y `GROQ_API_KEY`; sin IA usa el filtro estricto) |
    | `CORREO_CARPETA_PROCESADOS` | `Tickets-Procesados` |
    | `AVISAR_ASIGNADO` | `true` (ya hay un enlace público) |
    | `AVISAR_COMENTARIOS` | `true` (ya es el valor por defecto en Vercel; queda explícito) |

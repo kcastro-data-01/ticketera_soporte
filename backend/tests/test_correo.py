@@ -261,7 +261,7 @@ def test_config_from_env(tmp_path):
     assert (cfg.m365_tenant, cfg.m365_client_id) == ("t", "c")
     assert cfg.cache_path == tmp_path / "cache.json"
     assert cfg.carpeta_procesados == "Tickets-Procesados"
-    assert cfg.filtro == "auto"
+    assert cfg.filtro == cs.filtro_desde_entorno({})  # «ia» si hay IA, si no «auto»
     assert cfg.dominio_empresa == ""
     base = {"CORREO_ACTIVO": "1", "CORREO_USUARIO": "kcastro@data.cr"}
     assert cs.config_desde_entorno({**base, "DOMINIO_EMPRESA": " @Data.CR "}).dominio_empresa == "data.cr"
