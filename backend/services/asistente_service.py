@@ -424,7 +424,16 @@ def build_context(
     for ticket_id in _tickets_de_la_pregunta(pregunta, ticket_actual):
         lines.extend(_detalle_ticket(session, user, ticket_id))
 
-    # Solo quienes asignan o administran ven el equipo; nunca correos.
+    # Usuarios activos por rol, para que la IA no invente gente: Administrador
+    # y Técnico ven los nombres; el Solicitante, solo la cantidad. Nunca correos.
+    activos = session.scalars(select(User).where(User.is_active.is_(True)).order_by(User.name)).all()
+    lines.append("Usuarios activos por rol (los únicos que existen; no inventes otros):")
+    for rol, (_, plural) in NOMBRES_ROL.items():
+        gente = [u for u in activos if u.role == rol]
+        nombres = f" ({_nombres(gente)})" if gente and not solicitante else ""
+        lines.append(f"- {plural.capitalize()}: {len(gente)}{nombres}")
+
+    # Solo quienes administran ven el equipo completo (también desactivados).
     if user.role == UserRole.ADMIN.value:
         users = session.scalars(select(User).order_by(User.id)).all()
         lines.append("Usuarios del sistema:")
@@ -1046,6 +1055,92 @@ def _conteo_rol(session, user: User, rol: str, plural: str) -> Directa:
             verbo = "no tiene" if len(sin_tickets) == 1 else "no tienen"
             respuesta += f" {_unir([_persona(u) for u in sin_tickets])} {verbo} ninguno."
     return Directa(_con_cierre(respuesta, _cierre(user, len(tickets))))
+
+
+# ---------- Usuarios por rol (sin IA) ----------
+# «¿cuántos administradores hay?», «¿quiénes son los técnicos?»: preguntas
+# sobre USUARIOS, no tickets. Solo usuarios activos. El Solicitante no ve la
+# lista de usuarios: recibe solo la cantidad por rol.
+
+# (singular, plural) de cada rol, en el orden en que se responden.
+NOMBRES_ROL = {
+    UserRole.ADMIN.value: ("administrador", "administradores"),
+    UserRole.TECHNICIAN.value: ("técnico", "técnicos"),
+    UserRole.REQUESTER.value: ("solicitante", "solicitantes"),
+}
+_PALABRAS_USUARIOS = ("usuario", "usuarios")
+_OTRAS_PALABRAS_USUARIOS = frozenset("personas gente miembros integrantes".split())
+_PIDE_USUARIOS = re.compile(
+    rf"\b({_CUANTOS}|{_HAY}|quien\w*|nombres?|lista\w*|listar|dame|dime|cuales|muestra\w*|mostrar|total)\b"
+)
+# «¿cuántos tickets tiene el administrador?» cuenta tickets; «¿qué hace un
+# técnico?» o «¿cómo creo un usuario?» son otras preguntas.
+_NO_ES_DE_USUARIOS = re.compile(
+    rf"\b({_TICKET}|{_ASIGNADO}|carga|como|donde|puede\w*|hace\w*|tienen?|tiene|roles?|permis\w*|"
+    r"crear|creo|agregar|agrego|desactiv\w*|activ[ao]r?|cambi\w*)\b"
+)
+USUARIOS_MAX_NOMBRES = 15
+
+
+def _nombra_usuarios(t: str) -> bool:
+    return any(p in _OTRAS_PALABRAS_USUARIOS or any(_es_rol(p, f) for f in _PALABRAS_USUARIOS)
+               for p in re.findall(r"[a-z]+", t))
+
+
+def pide_usuarios(t: str) -> list[str] | None:
+    """Roles por los que pregunta (todos si dice «usuarios» sin rol), o
+    ``None`` si no es una pregunta sobre usuarios. ``t``: pregunta normalizada."""
+    if not _PIDE_USUARIOS.search(t) or _NO_ES_DE_USUARIOS.search(t):
+        return None
+    roles = roles_nombrados(t)
+    if roles:
+        return roles
+    return list(NOMBRES_ROL) if _nombra_usuarios(t) else None
+
+
+def _nombres(usuarios: list[User]) -> str:
+    nombres = [u.name for u in usuarios[:USUARIOS_MAX_NOMBRES]]
+    if len(usuarios) > USUARIOS_MAX_NOMBRES:
+        nombres.append(f"{len(usuarios) - USUARIOS_MAX_NOMBRES} más")
+    return _unir(nombres)
+
+
+def _cantidad_rol(n: int, rol: str) -> str:
+    singular, plural = NOMBRES_ROL[rol]
+    return f"{_negrita(n)} {singular if n == 1 else plural}"
+
+
+def respuesta_usuarios(session, user: User, t: str) -> Directa | None:
+    """Cantidad (y nombres, salvo para el Solicitante) de los usuarios activos
+    de los roles que nombra la pregunta; ``None`` si no pregunta por usuarios."""
+    roles = pide_usuarios(t)
+    if roles is None:
+        return None
+    ve_nombres = user.role != UserRole.REQUESTER.value
+    activos = session.scalars(
+        select(User).where(User.is_active.is_(True), User.role.in_(roles)).order_by(User.name)
+    ).all()
+    por_rol = {rol: [u for u in activos if u.role == rol] for rol in roles}
+
+    if len(roles) == 1:
+        rol = roles[0]
+        gente = por_rol[rol]
+        if not gente:
+            texto = f"No hay {NOMBRES_ROL[rol][1]} activos en la ticketera."
+        else:
+            texto = f"Hay {_cantidad_rol(len(gente), rol)} {'activo' if len(gente) == 1 else 'activos'}"
+            texto += f": {_nombres(gente)}." if ve_nombres else "."
+    else:
+        total = len(activos)
+        partes = [_cantidad_rol(len(por_rol[r]), r) for r in roles]
+        texto = (f"Hay {_negrita(total)} {'usuario activo' if total == 1 else 'usuarios activos'}: "
+                 f"{_unir(partes)}.")
+        if ve_nombres:
+            texto += "".join(f"\n- {NOMBRES_ROL[r][1].capitalize()}: {_nombres(por_rol[r])}"
+                             for r in roles if por_rol[r])
+    if not ve_nombres and re.search(r"\b(quien\w*|nombres?|lista\w*|listar|cuales)\b", t):
+        texto += " Los nombres no se los puedo dar: su rol no tiene acceso a la lista de usuarios."
+    return Directa(texto)
 
 
 def _palabras_nombre(nombre: str) -> list[str]:
@@ -2102,6 +2197,10 @@ def calcular_directa(session, user: User, pregunta: str,
         regla = respuesta_regla(pregunta)
         if regla is not None:
             return Directa(regla)
+        # Usuarios por rol, antes que los conteos de tickets por rol o persona.
+        usuarios = respuesta_usuarios(session, user, t)
+        if usuarios is not None:
+            return usuarios
         # Antes que la guía: «quiero ver los tickets asignados a técnicos» es
         # un conteo, no «cómo asignar».
         conteo = respuesta_por_persona(session, user, t) or respuesta_por_rol(session, user, t)
