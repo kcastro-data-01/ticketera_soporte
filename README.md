@@ -611,6 +611,28 @@ un modelo que ya no uses: `docker compose exec ollama ollama rm qwen3:4b`.
 Si usas Docker Desktop en Windows, la memoria disponible para Docker se
 ajusta en Settings → Resources.
 
+Para usar Qwen en **Groq** (API gratuita, compatible con OpenAI; es lo que
+usa Vercel), en el `.env`:
+
+```
+ASISTENTE_PROVEEDOR=groq
+GROQ_API_KEY=gsk_...
+```
+
+La clave se crea gratis en <https://console.groq.com/keys>. `GROQ_MODELO`
+elige el modelo (por defecto `qwen/qwen3.8-27b`, el único Qwen de Groq; está
+en *Preview*, así que si Groq lo retira hay que poner otro de
+<https://console.groq.com/docs/models>, por ejemplo `llama-3.3-70b-versatile`).
+Funcionan el chat libre, la interpretación de preguntas mal escritas, la
+redacción de respuestas y «Explicar con IA» (con `response_format` JSON y la
+misma validación y reintento que con Qwen local). Cada petición espera como
+máximo `GROQ_TIMEOUT` segundos (20 por defecto, tope 25), así «Explicar con
+IA» con su reintento no pasa de los 60 s de la función de Vercel. Si se
+acaba el límite del plan gratis (Groq responde `429`), el chat y «Explicar
+con IA» muestran «La IA está ocupada, intente de nuevo en un minuto»; lo que
+calcula el servidor (conteos, fichas, reglas) sigue respondiendo. Sin
+`GROQ_API_KEY` la IA queda apagada (`ia_disponible: false`).
+
 Para usar Claude en lugar de Qwen3, en el mismo `.env`:
 
 ```
@@ -1001,7 +1023,7 @@ valores por defecto (cada uno se puede forzar con su variable):
 | | Docker | Vercel |
 |---|---|---|
 | Base de datos (`DATABASE_URL`) | SQLite en el volumen | Postgres en Neon |
-| IA (`ASISTENTE_PROVEEDOR`) | `qwen` | `ninguno` (apagada) |
+| IA (`ASISTENTE_PROVEEDOR`) | `qwen` | `ninguno` (apagada); `groq` para tenerla gratis |
 | Correo (`CORREO_MODO`) | `hilo`: revisa cada `CORREO_INTERVALO` s | `cron`: lo llama cron-job.org |
 | Caché de tokens del buzón | tabla `msal_cache` | tabla `msal_cache` |
 | `/docs` y `/openapi.json` | visibles | apagados |
@@ -1011,7 +1033,8 @@ Archivos: `vercel.json` (frontend estático desde `frontend/`, `/api/*` y
 `/health` a la función `api/index.py`, encabezado `X-Robots-Tag: noindex`),
 `.vercelignore` y `.python-version`. Docker no los usa.
 
-Con la IA apagada el chat sigue respondiendo lo que calcula el servidor
+Con `ASISTENTE_PROVEEDOR=groq` y `GROQ_API_KEY` la IA funciona en Vercel
+igual que en Docker, con Qwen en Groq (ver «Asistente de IA»). Con la IA apagada el chat sigue respondiendo lo que calcula el servidor
 (conteos, fichas de tickets, fecha y hora…); lo que iría a la IA libre
 contesta que el chat libre no está disponible. En el detalle del ticket no
 aparece el botón «Explicar con IA» (si hay una explicación copiada de Docker,
@@ -1047,6 +1070,9 @@ se ve, sin «Volver a explicar»).
    | `AVISAR_ASIGNADO` | `true` (ya hay un enlace público) |
    | `AVISAR_COMENTARIOS` | `true` (ya es el valor por defecto en Vercel; queda explícito) |
    | `APP_URL` | `https://tickets-americandata.vercel.app` |
+   | `ASISTENTE_PROVEEDOR` | `groq` (sin ella la IA queda apagada) |
+   | `GROQ_API_KEY` | la clave de <https://console.groq.com/keys> (secreta) |
+   | `GROQ_MODELO` | opcional; por defecto `qwen/qwen3.8-27b` |
 
    `DATABASE_URL` ya la puso Neon. Para generar las claves:
    `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`.

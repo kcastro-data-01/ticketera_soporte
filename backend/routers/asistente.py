@@ -52,7 +52,7 @@ def preguntar(
     except AsistenteOcupado:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="El asistente está recibiendo demasiadas consultas; intenta en un momento",
+            detail=asistente_service.MENSAJE_IA_LIMITE,
         )
     except AsistenteNoDisponible as error:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error))

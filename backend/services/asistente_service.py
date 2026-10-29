@@ -1,9 +1,11 @@
 """Asistente de IA de la ticketera.
 
-Funciona con dos proveedores, elegidos con ``ASISTENTE_PROVEEDOR``:
+Funciona con tres proveedores, elegidos con ``ASISTENTE_PROVEEDOR``:
 
 - ``qwen`` (por defecto): Qwen3, modelo abierto y gratuito, servido por
   Ollama en la propia infraestructura (``OLLAMA_URL``, ``QWEN_MODELO``).
+- ``groq``: Qwen en la API de Groq, compatible con OpenAI y con plan
+  gratuito (``GROQ_API_KEY``, ``GROQ_MODELO``). Es la opción para Vercel.
 - ``claude``: la API de Claude (requiere ``ANTHROPIC_API_KEY``).
 
 ``ninguno`` (por defecto en Vercel) apaga la IA: el chat responde solo lo que
@@ -50,6 +52,8 @@ if not logger.handlers:
 # Lo único que ve la persona cuando el modelo falla; el detalle va al log.
 MENSAJE_NO_DISPONIBLE = "La IA no está disponible en este momento"
 MENSAJE_IA_OCUPADA = "La IA está ocupada, probá de nuevo en unos segundos."
+# El proveedor rechazó la consulta por límite de uso (429 del plan gratis de Groq).
+MENSAJE_IA_LIMITE = "La IA está ocupada, intente de nuevo en un minuto"
 # Con la IA apagada (ASISTENTE_PROVEEDOR=ninguno, lo normal en Vercel), en
 # lugar de la IA libre.
 MENSAJE_SIN_IA = ("El chat libre con IA no está disponible en esta versión. Podés preguntarme "
@@ -77,6 +81,16 @@ DETALLE_MAX_COMENTARIO = 400
 MAX_TICKETS_IN_CONTEXT = 15
 # Un modelo local en CPU lee el prompt despacio: se le envían menos tickets.
 QWEN_MAX_TICKETS = 2
+
+# Groq (API compatible con OpenAI). El plan gratis limita los tokens por
+# minuto: se envían tan pocos tickets como a Qwen local.
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODELO_POR_DEFECTO = "qwen/qwen3.8-27b"
+# Segundos por petición (GROQ_TIMEOUT). Con el reintento de «Explicar con IA»
+# son dos peticiones: 2 × 25 s queda por debajo de los 60 s de la función de Vercel.
+GROQ_TIMEOUT_POR_DEFECTO = 20.0
+GROQ_TIMEOUT_MAXIMO = 25.0
+GROQ_TIMEOUT_CONEXION = 5.0
 
 # Roles en el orden de la tabla «Permisos por rol» de ayuda.html.
 ROLES_TABLA = (UserRole.ADMIN.value, UserRole.TECHNICIAN.value, UserRole.REQUESTER.value)
@@ -2410,6 +2424,9 @@ def interpretar(proveedor, pregunta: str) -> dict | None:
     except IATardo:
         logger.info("interpretación cancelada: tardó más de %g s", INTERPRETACION_TIMEOUT)
         raise
+    except AsistenteOcupado:
+        logger.info("interpretación cancelada: la IA llegó a su límite de uso")
+        raise
     except ValueError as error:
         motivo = f"JSON inválido: {error}"
     except Exception as error:  # noqa: BLE001 — cualquier falla sigue con la IA libre
@@ -2757,6 +2774,144 @@ class ProveedorClaude:
         return self.responder(system, messages[1:], timeout=timeout)
 
 
+class ProveedorGroq:
+    """Qwen en Groq (``POST /openai/v1/chat/completions``, formato OpenAI)."""
+
+    nombre = "groq"
+    max_tickets = QWEN_MAX_TICKETS
+
+    def __init__(self, clave: str, modelo: str = GROQ_MODELO_POR_DEFECTO,
+                 http: httpx.Client | None = None, timeout: float = GROQ_TIMEOUT_POR_DEFECTO,
+                 url: str = GROQ_URL):
+        self.url = url
+        self.modelo = modelo
+        self.timeout = timeout
+        self.http = http or httpx.Client(timeout=httpx.Timeout(timeout, connect=GROQ_TIMEOUT_CONEXION))
+        self.headers = {"Authorization": f"Bearer {clave}"}
+
+    def _cuerpo(self, messages: list[dict], **extra) -> dict:
+        cuerpo = {"model": self.modelo, "messages": messages, "temperature": 0.3, **extra}
+        if self.modelo.startswith("qwen/"):
+            # Sin razonamiento: respuestas más rápidas y menos tokens del límite.
+            cuerpo["reasoning_effort"] = "none"
+        return cuerpo
+
+    def _limite(self, timeout: float | None) -> dict:
+        timeout = min(timeout or self.timeout, self.timeout)
+        return {"timeout": httpx.Timeout(timeout, connect=min(GROQ_TIMEOUT_CONEXION, timeout))}
+
+    @staticmethod
+    def _detalle(response: httpx.Response) -> dict:
+        try:
+            error = response.json().get("error")
+        except ValueError:
+            return {}
+        return error if isinstance(error, dict) else {}
+
+    def _error_http(self, response: httpx.Response) -> Exception:
+        if response.status_code == 429:
+            logger.warning("Groq: límite de uso alcanzado (retry-after: %s)",
+                           response.headers.get("retry-after", "?"))
+            return AsistenteOcupado(MENSAJE_IA_LIMITE)
+        if response.status_code == 401:
+            return AsistenteNoConfigurado("La clave GROQ_API_KEY del servidor no es válida")
+        if response.status_code == 404:
+            return AsistenteNoDisponible(f"Groq no tiene el modelo {self.modelo} (revise GROQ_MODELO)")
+        mensaje = self._detalle(response).get("message", "")
+        return AsistenteNoDisponible(
+            f"Groq respondió con un error ({response.status_code})" + (f": {mensaje}" if mensaje else "")
+        )
+
+    @staticmethod
+    def _error_conexion(error: httpx.HTTPError) -> AsistenteNoDisponible:
+        if isinstance(error, httpx.TimeoutException):
+            return IATardo("Groq tardó demasiado en responder (timeout)")
+        return AsistenteNoDisponible("No se pudo conectar con Groq")
+
+    def _post(self, cuerpo: dict, timeout: float | None) -> httpx.Response:
+        try:
+            return self.http.post(self.url, json=cuerpo, headers=self.headers, **self._limite(timeout))
+        except httpx.HTTPError as error:
+            raise self._error_conexion(error)
+
+    @staticmethod
+    def _contenido(response: httpx.Response) -> str:
+        try:
+            texto = response.json()["choices"][0]["message"]["content"]
+        except (ValueError, KeyError, IndexError, TypeError):
+            raise AsistenteNoDisponible("Groq devolvió una respuesta inválida")
+        filtro = _FiltroPensamiento()
+        return (filtro.agregar(texto or "") + filtro.terminar()).strip()
+
+    def responder(self, system: str, messages: list[dict], timeout: float | None = None) -> str:
+        response = self._post(self._cuerpo([{"role": "system", "content": system}, *messages]), timeout)
+        if response.status_code >= 400:
+            raise self._error_http(response)
+        texto = self._contenido(response)
+        if not texto:
+            raise AsistenteNoDisponible("el modelo devolvió una respuesta vacía")
+        return texto
+
+    def responder_stream(self, system: str, messages: list[dict]):
+        """Va entregando el texto a medida que llega (eventos ``data:`` de SSE)."""
+        cuerpo = self._cuerpo([{"role": "system", "content": system}, *messages], stream=True)
+        filtro = _FiltroPensamiento()
+        emitido = False
+        try:
+            with self.http.stream("POST", self.url, json=cuerpo, headers=self.headers,
+                                  **self._limite(None)) as response:
+                if response.status_code >= 400:
+                    response.read()
+                    raise self._error_http(response)
+                for linea in response.iter_lines():
+                    if not linea.startswith("data:"):
+                        continue
+                    dato = linea[5:].strip()
+                    if dato == "[DONE]":
+                        break
+                    try:
+                        delta = json.loads(dato)["choices"][0].get("delta") or {}
+                    except (ValueError, KeyError, IndexError, TypeError):
+                        raise AsistenteNoDisponible("Groq devolvió una respuesta inválida")
+                    parte = filtro.agregar(delta.get("content") or "")
+                    if parte:
+                        emitido = True
+                        yield parte
+        except httpx.HTTPError as error:
+            raise self._error_conexion(error)
+        resto = filtro.terminar()
+        if resto:
+            emitido = True
+            yield resto
+        if not emitido:
+            raise AsistenteNoDisponible("el modelo devolvió una respuesta vacía")
+
+    def generar_json(self, messages: list[dict], esquema: dict, temperature: float = 0.1,
+                     timeout: float | None = None, num_ctx: int | None = None) -> str:
+        """JSON con la forma de ``esquema`` (``response_format`` de tipo
+        ``json_schema``, sin ``strict``: los esquemas usan ``minItems`` y
+        campos opcionales). ``num_ctx`` no aplica. Devuelve el texto tal cual;
+        quien llama lo valida y, si no sirve, reintenta."""
+        cuerpo = self._cuerpo(messages, temperature=temperature, max_tokens=900, response_format={
+            "type": "json_schema",
+            "json_schema": {"name": "respuesta", "schema": esquema, "strict": False},
+        })
+        response = self._post(cuerpo, timeout)
+        if response.status_code == 400:
+            detalle = self._detalle(response)
+            if detalle.get("code") == "json_validate_failed":
+                # El JSON no cumplió el esquema: se devuelve lo generado y la
+                # validación de quien llama decide (y reintenta).
+                return str(detalle.get("failed_generation") or "")
+        if response.status_code >= 400:
+            raise self._error_http(response)
+        return self._contenido(response)
+
+    def precargar(self) -> bool:
+        """En Groq el modelo ya está cargado."""
+        return True
+
+
 PROVEEDOR_APAGADO = "ninguno"
 
 
@@ -2767,8 +2922,12 @@ def nombre_proveedor() -> str:
 
 
 def ia_activa() -> bool:
-    """False con ``ASISTENTE_PROVEEDOR=ninguno`` (por defecto en Vercel)."""
-    return nombre_proveedor() != PROVEEDOR_APAGADO
+    """False con ``ASISTENTE_PROVEEDOR=ninguno`` (por defecto en Vercel) o con
+    ``groq`` sin ``GROQ_API_KEY``."""
+    nombre = nombre_proveedor()
+    if nombre == "groq":
+        return bool(os.environ.get("GROQ_API_KEY", "").strip())
+    return nombre != PROVEEDOR_APAGADO
 
 
 class ProveedorApagado:
@@ -2800,6 +2959,21 @@ def crear_proveedor():
         import anthropic
 
         return ProveedorClaude(anthropic.Anthropic())
+    if nombre == "groq":
+        clave = os.environ.get("GROQ_API_KEY", "").strip()
+        if not clave:
+            raise AsistenteNoConfigurado(
+                "El asistente no está configurado: falta la clave GROQ_API_KEY en el servidor"
+            )
+        try:
+            timeout = float(os.environ.get("GROQ_TIMEOUT") or GROQ_TIMEOUT_POR_DEFECTO)
+        except ValueError:
+            timeout = GROQ_TIMEOUT_POR_DEFECTO
+        return ProveedorGroq(
+            clave,
+            os.environ.get("GROQ_MODELO", "").strip() or GROQ_MODELO_POR_DEFECTO,
+            timeout=min(max(5.0, timeout), GROQ_TIMEOUT_MAXIMO),
+        )
     if nombre == "qwen":
         try:
             timeout = float(os.environ.get("QWEN_TIMEOUT") or QWEN_TIMEOUT_POR_DEFECTO)
@@ -2811,7 +2985,7 @@ def crear_proveedor():
             timeout=max(10.0, timeout),
         )
     raise AsistenteNoConfigurado(
-        f"ASISTENTE_PROVEEDOR={nombre!r} no es válido: usa «qwen», «claude» o «ninguno»"
+        f"ASISTENTE_PROVEEDOR={nombre!r} no es válido: usa «qwen», «groq», «claude» o «ninguno»"
     )
 
 
@@ -2900,6 +3074,9 @@ def _preparar(proveedor, session, user: User, messages: list[dict], ticket_actua
         except IATardo:
             # No se llama a la IA libre detrás: también se pasaría del tiempo.
             return directa or Directa(MENSAJE_IA_OCUPADA), None, pregunta
+        except AsistenteOcupado:
+            # Límite de uso: la IA libre también lo rechazaría.
+            return directa or Directa(MENSAJE_IA_LIMITE), None, pregunta
         interpretada = datos and calcular_desde_interpretacion(session, user, datos, ticket_actual, pregunta)
         if interpretada:
             return interpretada, None, pregunta
@@ -3013,7 +3190,7 @@ def responder_stream(proveedor, session, user: User, messages: list[dict],
                 emitido = True
                 yield {"t": limpia}
     except AsistenteOcupado:
-        yield {"error": "El asistente está recibiendo demasiadas consultas; intenta en un momento"}
+        yield {"error": MENSAJE_IA_LIMITE}
         return
     except (AsistenteNoDisponible, AsistenteNoConfigurado) as error:
         _registrar_falla(proveedor, user, ticket_actual, error)
