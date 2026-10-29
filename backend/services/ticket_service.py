@@ -4,13 +4,38 @@ assignment and comments)."""
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.orm import joinedload
 
 from backend.constants import TicketCategory, TicketPriority, TicketState, UserRole
 from backend.models import Comment, History, ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate, TicketUpdate
 from backend.services.user_service import get_auto_assignable_users
+
+
+# Clave del candado de Postgres (pg_advisory_xact_lock) que ordena la
+# numeración: crear un ticket y renumerar nunca corren a la vez.
+CANDADO_NUMERACION = 742_001
+
+
+def reservar_numero(session) -> None:
+    """El ticket que se inserta en esta transacción recibe el mayor id + 1
+    (aunque antes se hayan creado y borrado otros; los huecos del medio no
+    se rellenan).
+
+    SQLite ya lo hace solo (``INTEGER PRIMARY KEY`` sin AUTOINCREMENT usa el
+    mayor rowid + 1). En Postgres la secuencia nunca retrocede: se toma un
+    candado de la transacción y se pone en ``MAX(id)``; otra creación espera
+    al candado hasta el commit y ve el ticket nuevo, así dos tickets nunca
+    reciben el mismo número.
+    """
+    if session.get_bind().dialect.name != "postgresql":
+        return
+    session.execute(text("SELECT pg_advisory_xact_lock(:clave)"), {"clave": CANDADO_NUMERACION})
+    session.execute(text(
+        "SELECT setval(pg_get_serial_sequence('tickets', 'id'), COALESCE(MAX(id), 0) + 1, false) "
+        "FROM tickets"
+    ))
 
 
 def _like_pattern(term: str) -> str:
@@ -152,6 +177,7 @@ def create_ticket(
     if assignee is not None:
         ticket.assigned_to_id = assignee.id
 
+    reservar_numero(session)
     session.add(ticket)
     session.commit()
     session.refresh(ticket)
@@ -557,7 +583,8 @@ def create_comment(
 
 
 def delete_ticket(session, ticket_id: int, current_user: User) -> None:
-    """Elimina un ticket con sus comentarios y su historial, en una transacción.
+    """Elimina un ticket con sus comentarios, su historial y su explicación de
+    la IA, en una transacción: un ticket nuevo con el mismo número no hereda nada.
 
     El registro del correo que lo creó (si vino por correo) se conserva con
     ``ticket_id`` en ``NULL``: así ese correo nunca vuelve a crear un ticket.

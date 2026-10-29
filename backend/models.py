@@ -308,3 +308,13 @@ class MsalCache(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utc_now)
+
+
+class SchemaMigration(Base):
+    """Migraciones de datos que corren una sola vez (``name``): las de
+    esquema se revisan solas, estas dejan aquí su marca."""
+
+    __tablename__ = "schema_migrations"
+
+    name: Mapped[str] = mapped_column(String(100), primary_key=True)
+    applied_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utc_now)
