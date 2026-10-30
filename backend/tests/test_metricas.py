@@ -117,6 +117,20 @@ def test_first_resolution_is_used(client, session, admin):
     assert m["tarjetas"]["tiempo_promedio_horas"] == 2.0
 
 
+def test_closed_without_resolving_is_not_a_resolved_ticket(client, session, admin):
+    """Nuevo → Cerrado directo (p. ej. «ya no se va a hacer»): cuenta como
+    Cerrado en «por estado», pero no como resuelto ni en el promedio."""
+    ticket(session, cr("2026-10-01", "08:00"), "Resuelto", resuelto=cr("2026-10-01", "12:00"))  # 4 h
+    t = ticket(session, cr("2026-10-01", "08:00"), "Cerrado")
+    session.add(History(ticket_id=t.id, action="Cambio de estado", field="state", old_value="Nuevo",
+                        new_value="Cerrado", created_at=cr("2026-10-03")))
+    session.commit()
+    m = metricas(client, admin, desde="2026-10-01", hasta="2026-10-31")
+    assert m["tarjetas"]["resueltos_periodo"] == 1
+    assert m["tarjetas"]["tiempo_promedio_horas"] == 4.0
+    assert {e["nombre"]: e["total"] for e in m["por_estado"]}["Cerrado"] == 1
+
+
 def test_email_versus_web(client, session, admin):
     por_correo = ticket(session, cr("2026-10-02"))
     ticket(session, cr("2026-10-03"))

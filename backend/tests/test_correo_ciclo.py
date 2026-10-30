@@ -149,6 +149,28 @@ def test_reply_to_the_confirmation_is_a_comment(modo, entorno, factory, session,
     assert comentarios(session, ticket.id) == ["Ya la reinicié y sigue sin funcionar."]
 
 
+@pytest.mark.parametrize("estado", ["Resuelto", "Cerrado"])
+def test_reply_on_a_resolved_or_closed_ticket_is_a_comment_and_keeps_the_state(estado, entorno,
+                                                                              factory, session, gente):
+    """Responder por correo no reabre el ticket (no hay reapertura automática):
+    solo agrega el comentario; reabrir es pasarlo a «En proceso» a mano."""
+    graph = FakeGraph([pedido_de_ana()], copiar_a_enviados=True)
+    revisar(MODOS[0], factory, graph, entorno)
+    [ticket] = tickets(session)
+    ticket.state = estado
+    session.commit()
+
+    agregar(graph, pedido_de_ana(msg_id="<re-cerrado@data.cr>",
+                                 asunto=f"RE: Ticket #{ticket.id} creado: {ticket.title}",
+                                 cuerpo="Volvió a fallar esta mañana.",
+                                 cabeceras={"In-Reply-To": "<app-1@data.cr>"}))
+    revisar(MODOS[0], factory, graph, entorno)
+
+    [ticket] = tickets(session)
+    assert ticket.state == estado
+    assert comentarios(session, ticket.id) == ["Volvió a fallar esta mañana."]
+
+
 @pytest.mark.parametrize("modo", MODOS)
 def test_reply_to_the_confirmation_with_another_subject_is_still_a_comment(modo, entorno, factory,
                                                                           session, gente):

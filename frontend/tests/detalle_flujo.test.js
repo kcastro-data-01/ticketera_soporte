@@ -780,3 +780,66 @@ test("Eliminar: un 404 avisa que el ticket ya no existe", async () => {
 
   assert.equal(harness.node("estado-carga").textContent, "El ticket ya no existe. Regrese al listado.");
 });
+
+/* Cambio de estado con confirmación y motivo opcional (puntos del recorrido
+   y «Cambiar estado»). Sin document.body, confirmarAccion usa window.confirm
+   y devuelve un motivo vacío. */
+test("Cambiar estado: pide confirmación con el número y el destino, y envía solo el estado", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  harness.clearCalls();
+
+  await harness.call("pedirCambioEstado", "Cerrado");
+
+  assert.deepEqual(harness.confirmaciones, ["¿Pasar el ticket #1 a «Cerrado»?"]);
+  const patch = harness.fetchCalls.find((c) => c.options.method === "PATCH");
+  assert.equal(patch.url, "/api/tickets/1/state");
+  assert.deepEqual(JSON.parse(patch.options.body), { state: "Cerrado" });
+});
+
+test("Cambiar estado: si se cancela no se envía nada", async () => {
+  const harness = createHarness(makeFetch(), { confirmar: false });
+  await harness.init();
+  harness.clearCalls();
+
+  await harness.call("pedirCambioEstado", "Cerrado");
+
+  assert.equal(harness.confirmaciones.length, 1);
+  assert.deepEqual(harness.urls(), []);
+});
+
+test("Cambiar estado: el motivo viaja en el cuerpo y se recargan los comentarios", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  harness.clearCalls();
+
+  await harness.call("cambiarEstado", "Cerrado", "  Ya no se va a hacer.  ");
+
+  const patch = harness.fetchCalls.find((c) => c.options.method === "PATCH");
+  assert.deepEqual(JSON.parse(patch.options.body), { state: "Cerrado", motivo: "Ya no se va a hacer." });
+  assert.ok(harness.urls().includes("/api/tickets/1/comments"), "muestra el motivo como comentario");
+});
+
+test("Cambiar estado: el botón usa la misma confirmación con el destino elegido", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  harness.clearCalls();
+
+  harness.node("estado-destino").value = "Resuelto";
+  await harness.node("cambiar-estado").listeners.click[0]();
+
+  assert.deepEqual(harness.confirmaciones, ["¿Pasar el ticket #1 a «Resuelto»?"]);
+  const patch = harness.fetchCalls.find((c) => c.options.method === "PATCH");
+  assert.deepEqual(JSON.parse(patch.options.body), { state: "Resuelto" });
+});
+
+test("Pasar a: ofrece saltos hacia adelante y, desde Cerrado, reabrir", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  const opciones = () => harness.node("estado-destino").children.map((o) => o.value);
+  assert.deepEqual(opciones(), ["En proceso", "Resuelto", "Cerrado"]);
+
+  harness.call("renderEstadoControl", { ...TICKET, state: "Cerrado" });
+  assert.deepEqual(opciones(), ["En proceso"]);
+  assert.equal(harness.node("estado-final").hidden, true);
+});

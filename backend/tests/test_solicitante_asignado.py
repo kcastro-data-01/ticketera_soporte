@@ -59,12 +59,19 @@ def test_assignee_changes_state_only_of_assigned_tickets(client, escenario):
     resp = client.patch(f"/api/tickets/{asignado.id}/state", json={"state": "En proceso"}, headers=cabeceras)
     assert resp.status_code == 200, resp.text
     assert resp.json()["state"] == "En proceso"
-    # El flujo sigue siendo el mismo: no puede saltar estados.
-    assert client.patch(f"/api/tickets/{asignado.id}/state", json={"state": "Cerrado"},
+    # Las mismas reglas que para todos: salta a Cerrado, pero no vuelve a Nuevo.
+    resp = client.patch(f"/api/tickets/{asignado.id}/state",
+                        json={"state": "Cerrado", "motivo": "Ya no hace falta."}, headers=cabeceras)
+    assert resp.status_code == 200, resp.text
+    comentarios = client.get(f"/api/tickets/{asignado.id}/comments", headers=cabeceras).json()
+    assert [(c["author"], c["content"]) for c in comentarios] == [("Pedro Rojas", "Ya no hace falta.")]
+    assert client.patch(f"/api/tickets/{asignado.id}/state", json={"state": "Nuevo"},
                         headers=cabeceras).status_code == 409
-    # El suyo que no tiene asignado: no; el ajeno: no existe para él.
-    assert client.patch(f"/api/tickets/{propio.id}/state", json={"state": "En proceso"},
+    # El suyo que no tiene asignado: no (ni deja el motivo); el ajeno: no existe para él.
+    assert client.patch(f"/api/tickets/{propio.id}/state",
+                        json={"state": "Cerrado", "motivo": "Intento"},
                         headers=cabeceras).status_code == 403
+    assert client.get(f"/api/tickets/{propio.id}/comments", headers=cabeceras).json() == []
     assert client.patch(f"/api/tickets/{ajeno.id}/state", json={"state": "En proceso"},
                         headers=cabeceras).status_code == 404
 

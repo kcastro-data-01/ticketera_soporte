@@ -253,10 +253,25 @@ class TicketStateUpdate(BaseModel):
     """Payload accepted by ``PATCH /api/tickets/{ticket_id}/state`` (RF3).
 
     Reuses the existing ``TicketState`` enum: an unknown value is rejected
-    with the usual FastAPI/Pydantic ``422``.
+    with the usual FastAPI/Pydantic ``422``. ``motivo`` is optional: when it
+    has text it is saved as a comment of the ticket, signed by the user who
+    changes the state; empty or blank means no comment.
     """
 
     state: TicketState
+    motivo: str | None = None
+
+    @field_validator("motivo")
+    @classmethod
+    def motivo_trimmed(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if len(cleaned) > COMMENT_MAX_LENGTH:
+            raise ValueError(
+                f"el motivo debe tener como máximo {COMMENT_MAX_LENGTH} caracteres"
+            )
+        return cleaned or None
 
 
 class CommentCreate(BaseModel):

@@ -105,8 +105,10 @@
                 <span id="ver-priority">—</span>
               </div>
             </div>
-            <!-- Avance del estado: los pasos ya hechos, el actual y los que faltan. -->
-            <ol id="pasos-estado" class="pasos-estado" aria-label="Avance del ticket">
+            <!-- Avance del estado: los pasos ya hechos, el actual y los que faltan.
+                 Quien puede cambiar el estado toca un paso para pasar a él
+                 (detalle.js convierte los destinos permitidos en botones). -->
+            <ol id="pasos-estado" class="pasos-estado" aria-label="Avance del ticket" tabindex="-1">
               <li data-paso="Nuevo"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Nuevo</span></li>
               <li data-paso="En proceso"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">En proceso</span></li>
               <li data-paso="Resuelto"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Resuelto</span></li>
@@ -302,9 +304,12 @@
                 <button type="button" id="cambiar-estado">Cambiar estado</button>
               </div>
             </div>
+            <p class="nota">
+              También puede tocar un estado en el recorrido del ticket. Se puede
+              saltar pasos hacia adelante; para reabrir, páselo a <b>En proceso</b>.
+            </p>
             <p class="nota" id="estado-final" hidden>
-              Este ticket está <b>Cerrado</b>: es un estado final y no admite más
-              cambios de estado.
+              No hay otro estado disponible para este ticket.
             </p>
           </section>
         </aside>

@@ -255,11 +255,13 @@ def change_ticket_state(
     roles (Solicitante), solo los asignados a ellos (``403`` si no). Un
     ticket que no puede ver responde ``404``.
 
-    Only the forward linear moves are accepted: ``Nuevo → En proceso``,
-    ``En proceso → Resuelto`` and ``Resuelto → Cerrado``. Any jump, step
-    back, repeated state or change on a ``Cerrado`` ticket is answered with
-    ``409 Conflict``. The new state comes from the existing ``TicketState``
-    enum, so an unknown value is rejected with ``422``.
+    A ticket moves forward to any later state, even skipping steps
+    (``Nuevo → Cerrado``), and is reopened only to ``En proceso`` from
+    ``Resuelto`` or ``Cerrado``. Going back to ``Nuevo``, ``Cerrado →
+    Resuelto`` or staying in the same state is answered with ``409
+    Conflict``. The new state comes from the existing ``TicketState`` enum,
+    so an unknown value is rejected with ``422``. An optional ``motivo`` is
+    saved as a comment of the ticket in the same transaction.
     """
     visible = ticket_service.get_visible_ticket(session, ticket_id, current_user)
     if visible is None:
@@ -274,7 +276,7 @@ def change_ticket_state(
         )
     try:
         ticket = ticket_service.change_ticket_state(
-            session, ticket_id, payload.state, current_user
+            session, ticket_id, payload.state, current_user, payload.motivo
         )
     except TicketNotFoundError:
         raise HTTPException(

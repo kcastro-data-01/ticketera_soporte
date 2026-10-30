@@ -263,7 +263,8 @@ def _grupos(user: User) -> dict[str, tuple[str, tuple]]:
             "Tickets en estado En proceso",
             (Ticket.state == TicketState.IN_PROGRESS.value,),
         ),
-        # Un ticket Cerrado ya pasó por Resuelto: los dos cuentan como resueltos.
+        # Resuelto y Cerrado cuentan juntos (la etiqueta lo dice), aunque un
+        # ticket se haya cerrado sin pasar por Resuelto.
         "resueltos": (
             "Tickets resueltos (estado Resuelto o Cerrado)",
             (Ticket.state.in_((TicketState.RESOLVED.value, TicketState.CLOSED.value)),),
@@ -1375,9 +1376,11 @@ GUIA_POR_ACCION = [
         r"marc\w* como|pasar a|en proceso)",
         EQUIPO,
         "cambiar el estado de un ticket",
-        "Abre el ticket. En la columna derecha, en «Cambio de estado», elige el "
-        "estado siguiente en «Pasar a» y pulsa «Cambiar estado». El orden es Nuevo → "
-        "En proceso → Resuelto → Cerrado, y un ticket Cerrado ya no cambia.",
+        "Abre el ticket y toca el estado al que quieres pasarlo en el recorrido "
+        "(Nuevo · En proceso · Resuelto · Cerrado), o elígelo en «Pasar a» y pulsa "
+        "«Cambiar estado»; confirmas y, si quieres, escribes un motivo, que queda como "
+        "comentario. Se puede saltar pasos hacia adelante (por ejemplo, cerrar directo "
+        "un ticket que ya no se va a hacer) y, para reabrir, se pasa a En proceso.",
         "al Técnico asignado o a un Administrador",
     ),
     (
@@ -1507,8 +1510,9 @@ REGLA_REPARTO = (
 REGLA_QUIEN_CAMBIA_ESTADO = (
     "El Técnico y el Administrador pueden cambiar el estado de cualquier "
     "ticket; el Solicitante, solo el de los tickets que tiene asignados. El orden es "
-    "Nuevo → En proceso → Resuelto → Cerrado, sin saltar pasos ni volver atrás, y un "
-    "ticket Cerrado ya no cambia."
+    "Nuevo → En proceso → Resuelto → Cerrado: se puede avanzar a cualquier estado "
+    "posterior saltando pasos, y hacia atrás solo se reabre un ticket Resuelto o "
+    "Cerrado pasándolo a En proceso."
 )
 REGLA_SOLICITANTE = (
     "Un Solicitante solo ve los tickets que él mismo creó y los que tiene asignados. "
@@ -1677,9 +1681,10 @@ def _app_estados(user: User) -> str:
         "- **Nuevo**: recién creado, todavía nadie empezó a trabajarlo.\n"
         "- **En proceso**: alguien está trabajando en él.\n"
         "- **Resuelto**: ya se le dio solución.\n"
-        "- **Cerrado**: terminado definitivamente; ya no cambia más.\n"
-        "Los estados solo avanzan (Nuevo → En proceso → Resuelto → Cerrado), sin saltar pasos "
-        "ni volver atrás."
+        "- **Cerrado**: terminado; ya no se trabaja en él.\n"
+        "Se puede avanzar a cualquier estado posterior, aunque se salten pasos (por ejemplo, "
+        "cerrar directo un ticket que ya no se va a hacer). Hacia atrás solo se reabre: un "
+        "ticket Resuelto o Cerrado vuelve a En proceso."
     )
 
 
@@ -1709,9 +1714,13 @@ def _app_eliminar(user: User) -> str:
 
 
 def _app_reabrir(user: User) -> str:
-    return ("No: un ticket Cerrado ya no cambia, y los estados no vuelven atrás. Si el problema "
-            "vuelve a aparecer, cree un ticket nuevo con «Nuevo ticket» y mencione el número "
-            "del anterior en la descripción.")
+    texto = ("Sí: un ticket Resuelto o Cerrado se reabre pasándolo a En proceso. Abra el "
+             "ticket y toque «En proceso» en el recorrido (o elíjalo en «Pasar a»); puede "
+             "escribir el motivo, que queda como comentario.")
+    if user.role == UserRole.REQUESTER.value:
+        return texto + (" Como Solicitante, solo puede hacerlo en los tickets que tiene "
+                        "asignados; si no, pídaselo al Técnico asignado o a un Administrador.")
+    return texto
 
 
 def _app_iniciar_sesion(user: User) -> str:
@@ -1767,8 +1776,8 @@ def _app_cambiar_estado_solicitante(user: User) -> str | None:
     if user.role != UserRole.REQUESTER.value:
         return None  # la guía de siempre
     return ("Como Solicitante, solo puede cambiar el estado de los tickets que tiene asignados: "
-            "abra el ticket y, en «Cambio de estado», elija el estado siguiente y pulse «Cambiar "
-            "estado». Los de los demás los cambia el Técnico asignado o un Administrador.")
+            "abra el ticket y toque el estado en el recorrido, o elíjalo en «Cambio de estado» "
+            "y pulse «Cambiar estado». Los de los demás los cambia el Técnico asignado o un Administrador.")
 
 
 # (cómo se reconoce en la pregunta normalizada, respuesta según el usuario), en orden.

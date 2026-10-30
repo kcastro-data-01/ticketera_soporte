@@ -168,11 +168,15 @@ function pintarPersona(el, nombre) {
    una promesa con true (Aceptar) o false (Cancelar, Escape o clic
    afuera). El foco empieza en «Cancelar», la opción segura. Sin DOM
    disponible usa window.confirm. */
-function confirmarAccion({ titulo, mensaje, aceptar = "Aceptar", cancelar = "Cancelar", peligro = false } = {}) {
+/* Con ``campo: { etiqueta }`` agrega un texto opcional (p. ej. el motivo de
+   un cambio de estado) y resuelve ``{ valor }`` al confirmar o ``false`` al
+   cancelar; sin ``campo`` resuelve ``true``/``false`` como siempre. */
+function confirmarAccion({ titulo, mensaje, aceptar = "Aceptar", cancelar = "Cancelar", peligro = false, campo = null } = {}) {
   const doc = typeof document !== "undefined" ? document : null;
   if (!doc || !doc.body || typeof doc.createElement !== "function") {
     const confirmar = typeof window !== "undefined" && typeof window.confirm === "function" ? window.confirm : null;
-    return Promise.resolve(confirmar ? Boolean(confirmar(mensaje)) : false);
+    const ok = confirmar ? Boolean(confirmar(mensaje)) : false;
+    return Promise.resolve(ok && campo ? { valor: "" } : ok);
   }
   return new Promise((resolver) => {
     const anterior = doc.activeElement;
@@ -198,23 +202,37 @@ function confirmarAccion({ titulo, mensaje, aceptar = "Aceptar", cancelar = "Can
     const si = nodo("button", peligro ? "boton-peligro" : "", aceptar);
     si.type = "button";
     acciones.append(no, si);
-    caja.append(h, p, acciones);
+    let texto = null;
+    if (campo) {
+      const etiqueta = nodo("label", "campo dialogo-campo");
+      texto = nodo("textarea");
+      texto.id = "dialogo-campo";
+      texto.rows = 3;
+      texto.maxLength = 2000;
+      etiqueta.append(nodo("span", "", campo.etiqueta || "Detalle (opcional)"), texto);
+      caja.append(h, p, etiqueta, acciones);
+    } else {
+      caja.append(h, p, acciones);
+    }
     fondo.appendChild(caja);
+    const enfocables = texto ? [texto, no, si] : [no, si];
 
     const cerrar = (valor) => {
       doc.removeEventListener("keydown", teclas, true);
       fondo.remove();
       if (anterior && typeof anterior.focus === "function") anterior.focus();
-      resolver(valor);
+      resolver(valor && texto ? { valor: (texto.value || "").trim() } : valor);
     };
-    /* Escape cancela; Tab queda entre los dos botones. */
+    /* Escape cancela; Tab (y Mayús+Tab) queda dentro de la ventana. */
     const teclas = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
         cerrar(false);
       } else if (event.key === "Tab") {
         event.preventDefault();
-        (doc.activeElement === no ? si : no).focus();
+        const i = enfocables.indexOf(doc.activeElement);
+        const paso = event.shiftKey ? -1 : 1;
+        enfocables[(i + paso + enfocables.length) % enfocables.length].focus();
       }
     };
     no.addEventListener("click", () => cerrar(false));
@@ -224,7 +242,7 @@ function confirmarAccion({ titulo, mensaje, aceptar = "Aceptar", cancelar = "Can
     });
     doc.addEventListener("keydown", teclas, true);
     doc.body.appendChild(fondo);
-    no.focus();
+    (texto || no).focus();
   });
 }
 

@@ -74,7 +74,7 @@
           <h3>Funcionalidades principales</h3>
           <ul>
             <li><strong>Creación de tickets</strong>: Altas de nuevos tickets con título, descripción, categoría y prioridad</li>
-            <li><strong>Gestión de estados</strong>: Flujo de estados <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
+            <li><strong>Gestión de estados</strong>: Flujo de estados <code>Nuevo → En proceso → Resuelto → Cerrado</code>, con saltos hacia adelante y reapertura</li>
             <li><strong>Asignación de tickets</strong>: Asignación a usuarios con roles <code>Administrador</code>, <code>Técnico</code> y <code>Solicitante</code></li>
             <li><strong>Comentarios</strong>: Cada comentario queda firmado con el nombre del usuario que lo escribió</li>
             <li><strong>Búsqueda y filtros</strong>: Búsqueda por título/descripción y filtros por categoría, prioridad y estado</li>
@@ -85,7 +85,7 @@
             <li><strong>Crear un ticket</strong>: Desde el formulario en <code>index.html</code> o <code>crear.html</code></li>
             <li><strong>Asignar un ticket</strong>: Asignar a un usuario mediante la sección de usuarios</li>
             <li><strong>Comentar un ticket</strong>: Agregar comentarios, que quedan firmados con su nombre</li>
-            <li><strong>Cambiar estado</strong>: Flujos <code>Nuevo → En proceso → Resuelto → Cerrado</code></li>
+            <li><strong>Cambiar estado</strong>: En el detalle, toque el estado en el recorrido del ticket (o elíjalo en «Pasar a»), confirme y, si quiere, escriba un motivo</li>
           </ol>
         </div>
       </details>
@@ -94,12 +94,20 @@
         <summary>Seguimiento</summary>
         <div class="ayuda-cuerpo">
           <h3>Estados de los tickets</h3>
-          <p>Los tickets siguen un flujo lineal:</p>
+          <p>Los tickets siguen el orden <code>Nuevo → En proceso → Resuelto → Cerrado</code>:</p>
           <ul>
             <li><code>Nuevo</code>: Ticket recién creado</li>
             <li><code>En proceso</code>: Están trabajando en él</li>
             <li><code>Resuelto</code>: Se ha dado solución</li>
-            <li><code>Cerrado</code>: Ticket cerrado definitivamente</li>
+            <li><code>Cerrado</code>: Ticket terminado; ya no se trabaja en él</li>
+          </ul>
+          <h3>Cambiar el estado</h3>
+          <p>En el detalle del ticket, toque el estado al que quiere pasarlo en el recorrido (también se puede con el teclado: Tab hasta el estado y Enter), o elíjalo en «Pasar a» y pulse «Cambiar estado». Se pide confirmación y un <strong>motivo opcional</strong>: si lo escribe, queda como comentario del ticket.</p>
+          <ul>
+            <li><strong>Hacia adelante</strong> se puede saltar pasos: por ejemplo, un ticket que ya no se va a hacer se pasa de <code>Nuevo</code> a <code>Cerrado</code> directamente.</li>
+            <li><strong>Hacia atrás</strong> solo se reabre: un ticket <code>Resuelto</code> o <code>Cerrado</code> vuelve a <code>En proceso</code>. Nunca vuelve a <code>Nuevo</code>.</li>
+            <li>Lo cambian el Técnico y el Administrador en cualquier ticket, y el Solicitante solo en los que tiene asignados. Quien no puede cambiarlo ve el recorrido, pero no puede tocarlo.</li>
+            <li>En las métricas, «Resueltos» y el tiempo promedio solo cuentan los tickets que pasaron por <code>Resuelto</code>; uno cerrado directo no cuenta como resuelto.</li>
           </ul>
 
           <h3>Cómo leer el historial</h3>
@@ -114,7 +122,7 @@
                 <tr><td>Editó el ticket</td><td>Se cambia el título, la descripción, la categoría o la prioridad (una fila por cada dato).</td><td>Prioridad: «Media» → «Alta»</td></tr>
                 <tr><td>Asignó el ticket</td><td>Se cambia la persona responsable.</td><td>José Solano → Carlos Rojas</td></tr>
                 <tr><td>Quitó la asignación</td><td>El ticket queda sin responsable.</td><td>Carlos Rojas → Sin asignar</td></tr>
-                <tr><td>Cambió el estado</td><td>El ticket avanza en el flujo.</td><td>Nuevo → En proceso</td></tr>
+                <tr><td>Cambió el estado</td><td>El ticket avanza en el flujo, salta pasos o se reabre.</td><td>Nuevo → Cerrado</td></tr>
                 <tr><td>Comentó</td><td>Alguien agrega un comentario.</td><td>«Ya revisé el cable de red»</td></tr>
               </tbody>
             </table>

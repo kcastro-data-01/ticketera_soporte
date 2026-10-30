@@ -9,13 +9,14 @@
 const API_USERS_URL = "/api/users";
 
 /* Transiciones válidas desde cada estado (espejo del backend para ofrecer
-   solo destinos posibles; el backend siempre vuelve a validar). Avances
-   lineales: Nuevo → En proceso → Resuelto → Cerrado (Cerrado es final). */
+   solo destinos posibles; el backend siempre vuelve a validar). Se avanza a
+   cualquier estado posterior, aunque se salten pasos; hacia atrás solo se
+   reabre: Resuelto o Cerrado → En proceso. */
 const TRANSICIONES = {
-  "Nuevo": ["En proceso"],
-  "En proceso": ["Resuelto"],
-  "Resuelto": ["Cerrado"],
-  "Cerrado": [],
+  "Nuevo": ["En proceso", "Resuelto", "Cerrado"],
+  "En proceso": ["Resuelto", "Cerrado"],
+  "Resuelto": ["Cerrado", "En proceso"],
+  "Cerrado": ["En proceso"],
 };
 
 let ticketId = null;
@@ -198,19 +199,49 @@ function terminarImpresion() {
   temaAntesDeImprimir = null;
 }
 
-/* Barra de pasos: marca como hechos los estados anteriores al actual. */
+/* Barra de pasos: marca como hechos los estados anteriores al actual.
+   Para quien puede cambiar el estado, cada destino permitido es un botón
+   (teclado y lector de pantalla); los demás pasos se ven igual pero no se
+   pueden tocar. */
 const PASOS_ESTADO = ["Nuevo", "En proceso", "Resuelto", "Cerrado"];
 
 function pintarPasos(estado) {
   const lista = document.getElementById("pasos-estado");
   if (!lista || typeof lista.querySelectorAll !== "function") return;
   const actual = PASOS_ESTADO.indexOf(estado);
+  const destinos = ticketActual && puedeCambiarEstado(ticketActual)
+    ? TRANSICIONES[estado] || []
+    : [];
   lista.querySelectorAll("li").forEach((paso) => {
     const indice = PASOS_ESTADO.indexOf(paso.dataset.paso);
     paso.className = indice < actual ? "hecho" : indice === actual ? "actual" : "";
     if (indice === actual) paso.setAttribute("aria-current", "step");
     else paso.removeAttribute("aria-current");
+    pintarContenidoPaso(paso, destinos.includes(paso.dataset.paso));
   });
+}
+
+function pintarContenidoPaso(paso, tocable) {
+  if (typeof document.createElement !== "function" || typeof paso.replaceChildren !== "function") return;
+  const nombre = paso.dataset.paso;
+  const marca = document.createElement("span");
+  marca.className = "paso-marca";
+  marca.setAttribute("aria-hidden", "true");
+  const texto = document.createElement("span");
+  texto.className = "paso-nombre";
+  texto.textContent = nombre;
+  if (!tocable) {
+    paso.replaceChildren(marca, texto);
+    return;
+  }
+  const boton = document.createElement("button");
+  boton.type = "button";
+  boton.className = "paso-boton";
+  boton.dataset.destino = nombre;
+  boton.title = `Pasar a «${nombre}»`;
+  boton.setAttribute("aria-label", `Pasar el ticket a «${nombre}»`);
+  boton.append(marca, texto);
+  paso.replaceChildren(boton);
 }
 
 function renderTicket(ticket) {
@@ -244,8 +275,7 @@ function renderTicket(ticket) {
 }
 
 /* Muestra el estado actual y solo ofrece los destinos posibles desde él.
-   Con "Cerrado" no queda ninguna transición: se oculta el selector útil y
-   se explica que el estado es final. */
+   Si no quedara ninguna transición se desactiva el selector y se avisa. */
 function renderEstadoControl(ticket) {
   const elements = getElements();
   const destinos = TRANSICIONES[ticket.state] || [];
@@ -545,11 +575,29 @@ async function guardarAsignacion() {
   }
 }
 
-async function cambiarEstado() {
+/* Punto del recorrido o «Cambiar estado»: pide confirmación con un motivo
+   opcional (queda como comentario del ticket) y cambia el estado. */
+async function pedirCambioEstado(destino, { desdePasos = false } = {}) {
+  if (ocupado || ticketId === null || !destino) return;
+  const respuesta = await confirmarAccion({
+    titulo: "Cambiar estado",
+    mensaje: `¿Pasar el ticket #${ticketId} a «${destino}»?`,
+    aceptar: "Confirmar",
+    cancelar: "Cancelar",
+    campo: { etiqueta: "Motivo (opcional)" },
+  });
+  if (!respuesta) return;
+  await cambiarEstado(destino, respuesta.valor);
+  /* El botón tocado se rehízo al recargar: el foco vuelve al recorrido. */
+  const pasos = desdePasos ? document.getElementById("pasos-estado") : null;
+  if (pasos && typeof pasos.focus === "function") pasos.focus();
+}
+
+async function cambiarEstado(destino = getElements().estadoDestino.value, motivo = "") {
   if (ocupado || ticketId === null) return;
-  const elements = getElements();
-  const destino = elements.estadoDestino.value;
-  if (!destino) return; /* sin transiciones posibles (ticket cerrado) */
+  if (!destino) return; /* sin transiciones posibles */
+  motivo = (motivo || "").trim();
+  let recargarHistorial = false;
 
   ocupado = true;
   bloquearBotones(true);
@@ -557,7 +605,7 @@ async function cambiarEstado() {
     const response = await fetchWithAuth(`/api/tickets/${ticketId}/state`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: destino }),
+      body: JSON.stringify(motivo ? { state: destino, motivo } : { state: destino }),
     });
     if (response.status === 404) {
       avisar(
@@ -593,12 +641,16 @@ async function cambiarEstado() {
     }
     avisar(`Estado actualizado a «${destino}».`, "exito");
     await cargarTicket({ silencioso: true });
+    if (motivo) await cargarComentarios();
+    recargarHistorial = !getElements().tablaHistorial.hidden;
   } catch (error) {
     avisar("Error al comunicarse con la API.", "error");
   } finally {
     ocupado = false;
     bloquearBotones(false);
   }
+  /* El historial ya abierto muestra el cambio (y el motivo) sin pulsar de nuevo. */
+  if (recargarHistorial) await cargarHistorial();
 }
 
 async function agregarComentario() {
@@ -910,7 +962,18 @@ async function init() {
   if (elements.eliminar) elements.eliminar.addEventListener("click", () => eliminarTicket());
   elements.cancelarEdicion.addEventListener("click", () => cancelarEdicion());
   elements.asignar.addEventListener("click", () => guardarAsignacion());
-  elements.cambiarEstado.addEventListener("click", () => cambiarEstado());
+  elements.cambiarEstado.addEventListener("click", () =>
+    pedirCambioEstado(elements.estadoDestino.value)
+  );
+  const pasos = document.getElementById("pasos-estado");
+  if (pasos) {
+    pasos.addEventListener("click", (event) => {
+      const boton = event.target && typeof event.target.closest === "function"
+        ? event.target.closest(".paso-boton")
+        : null;
+      if (boton) pedirCambioEstado(boton.dataset.destino, { desdePasos: true });
+    });
+  }
   elements.formComentario.addEventListener("submit", (event) => {
     event.preventDefault();
     agregarComentario();

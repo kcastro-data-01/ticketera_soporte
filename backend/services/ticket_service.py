@@ -87,13 +87,17 @@ class InvalidTransitionError(Exception):
         super().__init__(f"Transition from {current} to {target} not allowed")
 
 
-# Allowed state transitions (RF3, Task 18): linear forward workflow only —
-# no jumps and no backwards moves. "Cerrado" is terminal.
+# Allowed state transitions (RF3): forward to any later state, skipping the
+# ones in between if needed (e.g. "Nuevo → Cerrado" for a ticket that will not
+# be done). The only move back is reopening: "Resuelto" or "Cerrado" →
+# "En proceso". Nothing goes back to "Nuevo".
 ALLOWED_TRANSITIONS: dict[TicketState, frozenset[TicketState]] = {
-    TicketState.NEW: frozenset({TicketState.IN_PROGRESS}),
-    TicketState.IN_PROGRESS: frozenset({TicketState.RESOLVED}),
-    TicketState.RESOLVED: frozenset({TicketState.CLOSED}),
-    TicketState.CLOSED: frozenset(),
+    TicketState.NEW: frozenset(
+        {TicketState.IN_PROGRESS, TicketState.RESOLVED, TicketState.CLOSED}
+    ),
+    TicketState.IN_PROGRESS: frozenset({TicketState.RESOLVED, TicketState.CLOSED}),
+    TicketState.RESOLVED: frozenset({TicketState.CLOSED, TicketState.IN_PROGRESS}),
+    TicketState.CLOSED: frozenset({TicketState.IN_PROGRESS}),
 }
 
 
@@ -497,19 +501,21 @@ def change_ticket_state(
     ticket_id: int,
     new_state: TicketState,
     current_user: User | None = None,
+    motivo: str | None = None,
 ) -> Ticket:
     """Move a ticket to another state through an allowed transition (RF3).
 
-    The state update and its audit entry are both added to the session and
+    The state update, its audit entry and the optional ``motivo`` (saved as a
+    comment with its own history entry) are added to the session and
     committed in one go, so a failure cannot leave a ticket updated without
-    its history entry nor an orphan history entry. A rejected transition
-    raises before anything is written, so it never reaches the history.
+    its history entry nor an orphan entry. A rejected transition raises
+    before anything is written, so it never reaches the history.
 
     Raises:
         ``TicketNotFoundError``: the ticket does not exist.
-        ``InvalidTransitionError``: the transition is not allowed. Staying in
-            the same state is rejected as well: only the linear forward
-            moves (``Nuevo → En proceso → Resuelto → Cerrado``) are valid.
+        ``InvalidTransitionError``: the transition is not in
+            ``ALLOWED_TRANSITIONS``. Staying in the same state is rejected
+            as well.
     """
     ticket = session.get(Ticket, ticket_id)
     if ticket is None:
@@ -532,6 +538,8 @@ def change_ticket_state(
             author_id=author_id,
         )
     )
+    if motivo and motivo.strip():
+        _add_comment(session, ticket.id, motivo.strip(), current_user)
     session.commit()
     session.refresh(ticket)
     return ticket
@@ -551,20 +559,22 @@ def create_comment(
     if session.get(Ticket, ticket_id) is None:
         raise TicketNotFoundError(ticket_id)
 
-    # El autor es el usuario autenticado que escribe el comentario; el
-    # ``author`` que envíe el cliente se ignora. "Anónimo" solo queda para
-    # llamadas internas sin usuario.
-    author = current_user.name if current_user is not None else "Anónimo"
-
-    comment = Comment(
-        ticket_id=ticket_id,
-        author=author,
-        content=payload.content,
-    )
-    session.add(comment)
+    comment = _add_comment(session, ticket_id, payload.content, current_user)
     session.commit()
     session.refresh(comment)
-    # Registry of comment in history (RF9), signed by the same user.
+    return comment
+
+
+def _add_comment(session, ticket_id: int, content: str, current_user: User | None) -> Comment:
+    """Add a comment and its history entry (RF9) to the session, uncommitted.
+
+    The author is the authenticated user; "Anónimo" only remains for
+    internal calls without a user. Used by ``create_comment`` and by the
+    ``motivo`` of ``change_ticket_state``.
+    """
+    author = current_user.name if current_user is not None else "Anónimo"
+    comment = Comment(ticket_id=ticket_id, author=author, content=content)
+    session.add(comment)
     author_name, author_id = _audit_author(current_user)
     session.add(
         History(
@@ -572,13 +582,11 @@ def create_comment(
             action="commented",
             field="comment",
             old_value=None,
-            new_value=payload.content,
+            new_value=content,
             author=author_name,
             author_id=author_id,
         )
     )
-    session.commit()
-    session.refresh(comment)
     return comment
 
 

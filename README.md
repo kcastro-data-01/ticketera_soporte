@@ -11,7 +11,10 @@ filtrarlos, y consultar su historial de cambios.
 
 - Crear un ticket con título y descripción.
 - Seleccionar categoría y prioridad.
-- Cambiar el estado entre **Nuevo**, **En proceso**, **Resuelto** y **Cerrado**.
+- Cambiar el estado entre **Nuevo**, **En proceso**, **Resuelto** y **Cerrado**:
+  tocando el estado en el recorrido del detalle (o con «Pasar a»), con motivo
+  opcional que queda como comentario. Se puede saltar pasos hacia adelante
+  (p. ej. `Nuevo → Cerrado`) y reabrir `Resuelto`/`Cerrado → En proceso`.
 - Asignar el ticket a una persona.
 - Agregar comentarios al ticket.
 - Ver listado de tickets.

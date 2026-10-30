@@ -95,3 +95,46 @@ test("ya no se usa window.confirm al eliminar ni al desactivar", () => {
     assert.match(codigo, /await confirmarAccion\(\{/, archivo);
   }
 });
+
+test("con campo: muestra el motivo opcional, empieza en él y devuelve su texto", async () => {
+  const { sandbox, doc } = montar();
+  const promesa = sandbox.confirmarAccion({
+    titulo: "Cambiar estado", mensaje: "¿Pasar el ticket #4 a «Cerrado»?",
+    aceptar: "Confirmar", campo: { etiqueta: "Motivo (opcional)" },
+  });
+  const caja = doc.body.children.at(-1).children[0];
+  const [titulo, mensaje, etiqueta, acciones] = caja.children;
+  const [no, si] = acciones.children;
+  const [texto, area] = etiqueta.children;
+  assert.equal(titulo.textContent, "Cambiar estado");
+  assert.equal(mensaje.textContent, "¿Pasar el ticket #4 a «Cerrado»?");
+  assert.equal(etiqueta.tag, "label");
+  assert.equal(texto.textContent, "Motivo (opcional)");
+  assert.equal(area.tag, "textarea");
+  assert.equal(no.textContent, "Cancelar");
+  assert.equal(si.textContent, "Confirmar");
+  assert.equal(doc.activeElement, area);
+
+  /* Tab recorre campo → Cancelar → Confirmar → campo; Mayús+Tab al revés. */
+  doc.teclas[0]({ key: "Tab", preventDefault() {} });
+  assert.equal(doc.activeElement, no);
+  doc.teclas[0]({ key: "Tab", preventDefault() {} });
+  assert.equal(doc.activeElement, si);
+  doc.teclas[0]({ key: "Tab", preventDefault() {} });
+  assert.equal(doc.activeElement, area);
+  doc.teclas[0]({ key: "Tab", shiftKey: true, preventDefault() {} });
+  assert.equal(doc.activeElement, si);
+
+  area.value = "  Ya no se va a hacer.  ";
+  si.listeners.click[0]();
+  assert.deepEqual({ ...(await promesa) }, { valor: "Ya no se va a hacer." });
+});
+
+test("con campo: Cancelar devuelve false aunque haya texto", async () => {
+  const { sandbox, doc } = montar();
+  const promesa = sandbox.confirmarAccion({ mensaje: "x", campo: { etiqueta: "Motivo (opcional)" } });
+  const caja = doc.body.children.at(-1).children[0];
+  caja.children[2].children[1].value = "algo";
+  caja.children[3].children[0].listeners.click[0]();
+  assert.equal(await promesa, false);
+});

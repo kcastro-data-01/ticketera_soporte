@@ -4350,3 +4350,49 @@ summary:focus-visible,
     min-height: 44px;
   }
 }
+
+/* ===== Detalle: pasos del recorrido que se pueden tocar ===== */
+/* Mismo aspecto que el paso sin botón; solo cambia el cursor y, al pasar
+   o con el teclado, el nombre se subraya y la marca toma el color primario. */
+.pasos-estado .paso-boton,
+.pasos-estado .paso-boton:hover,
+.pasos-estado .paso-boton:active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pasos-estado .paso-boton:hover .paso-nombre,
+.pasos-estado .paso-boton:focus-visible .paso-nombre {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.pasos-estado .paso-boton:hover .paso-marca,
+.pasos-estado .paso-boton:focus-visible .paso-marca {
+  border-color: var(--color-primario);
+}
+
+.pasos-estado:focus {
+  outline: none;
+}
+
+/* Campo opcional dentro de la ventana de confirmación (motivo). */
+.dialogo-campo {
+  margin-top: 1rem;
+}
+
+.dialogo-campo textarea {
+  width: 100%;
+  resize: vertical;
+}

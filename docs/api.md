@@ -264,50 +264,63 @@ si el rango pasa de 366 días o si una fecha está mal escrita.
 son la cola de hoy. El resto usa el rango: `por_estado`, `por_categoria`,
 `por_dia` y el origen cuentan los tickets **creados** en el rango;
 `resueltos_periodo`, `resueltos` por persona y `tiempo_promedio_horas` (`null`
-si no hay resueltos) usan el primer paso a «Resuelto» de cada ticket.
+si no hay resueltos) usan el primer paso a «Resuelto» de cada ticket. Un
+ticket cerrado sin pasar por «Resuelto» (p. ej. `Nuevo → Cerrado`) **no**
+cuenta como resuelto ni entra en el tiempo promedio; sí aparece como `Cerrado`
+en `por_estado`. Si un ticket se reabre y se vuelve a resolver, cuenta una sola
+vez, por su primer paso a «Resuelto».
 `por_estado` y `por_categoria` incluyen todos los valores, aunque estén en 0.
 
 ### `PATCH /api/tickets/{ticket_id}/state`
 
-Cambia el estado del ticket a través de la máquina de estados (RF3). Solo se
-aceptan los avances lineales; no hay saltos, retrocesos ni transiciones
-automáticas, y `Cerrado` es un estado final. Cada cambio exitoso registra
+Cambia el estado del ticket a través de la máquina de estados (RF3). Se puede
+avanzar a cualquier estado posterior, aunque se salten pasos, y hacia atrás
+solo se reabre (`Resuelto`/`Cerrado → En proceso`). No hay transiciones
+automáticas: una respuesta por correo en el hilo de un ticket `Resuelto` o
+`Cerrado` solo agrega un comentario, no lo reabre. Cada cambio exitoso registra
 **exactamente una** entrada en `history` (`action` = `"Cambio de estado"`,
 `field` = `"state"`, `old_value`/`new_value` con los estados, `author` =
 nombre del usuario autenticado y `author_id` = su id) en la misma operación
-de base de datos que la actualización del ticket. Una transición rechazada no
+de base de datos que la actualización del ticket, también cuando salta pasos
+(`old_value` = `Nuevo`, `new_value` = `Cerrado`). Una transición rechazada no
 toca el ticket ni el historial.
+
+Lo pueden usar el Administrador y el Técnico en cualquier ticket, y el
+Solicitante solo en los que tiene asignados (`403` si no).
 
 **Transiciones permitidas:**
 
 | Desde | Hasta |
 |-------|-------|
-| `Nuevo` | `En proceso` |
-| `En proceso` | `Resuelto` |
-| `Resuelto` | `Cerrado` |
+| `Nuevo` | `En proceso`, `Resuelto`, `Cerrado` |
+| `En proceso` | `Resuelto`, `Cerrado` |
+| `Resuelto` | `Cerrado`, `En proceso` (reabrir) |
+| `Cerrado` | `En proceso` (reabrir) |
 
-Todo lo demás queda fuera: saltos (`Nuevo → Resuelto`), retrocesos
-(`En proceso → Nuevo`), mantener el mismo estado (`Nuevo → Nuevo`) y
-cualquier cambio sobre `Cerrado`.
+Todo lo demás queda fuera: volver a `Nuevo` (`En proceso → Nuevo`),
+`Cerrado → Resuelto`, `Resuelto → Resuelto` y, en general, mantener el mismo
+estado.
 
 **Body** (JSON, obligatorio):
 
 | Campo | Tipo | Reglas |
 |-------|------|--------|
 | `state` | enum | uno de los valores de `state`; debe ser un destino permitido desde el estado actual |
+| `motivo` | string, opcional | si tiene texto, se guarda como comentario del ticket (firmado por el usuario, con su entrada `commented` en el historial) en la misma operación; vacío o solo espacios no crea comentario; máx. 2000 caracteres (`422` si se pasa) |
 
 **Respuestas:**
 
 - `200` → el ticket con el estado nuevo y `updated_at` actualizado.
 - `404` → `{"detail": "Ticket 999 no encontrado"}` si el ticket no existe.
-- `409` → `{"detail": "Transición de 'Nuevo' a 'Resuelto' no permitida"}`
+- `403` → el Solicitante no está asignado al ticket.
+- `409` → `{"detail": "Transición de 'Resuelto' a 'Nuevo' no permitida"}`
   cuando la transición no está permitida (incluye mantener el mismo estado).
 - `422` → si falta `state` o el valor no pertenece al enum.
 
 ```bash
 curl -X PATCH http://127.0.0.1:8000/api/tickets/1/state \
   -H "Content-Type: application/json" \
-  -d '{"state": "En proceso"}'
+  -d '{"state": "Cerrado", "motivo": "Ya no se va a hacer"}'
 ```
 
 ```json

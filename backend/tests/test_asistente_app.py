@@ -92,7 +92,7 @@ def test_summary_does_not_detail_the_permissions_table(client, session, ia):
     ("Técnico", "que significa cada estado", "**En proceso**: alguien está trabajando en él."),
     ("Técnico", "que significa en proceso", "**En proceso**: alguien está trabajando en él."),
     ("Solicitante", "que es un ticket resuelto", "**Resuelto**: ya se le dio solución."),
-    ("Técnico", "que diferencia hay entre resuelto y cerrado", "**Cerrado**: terminado definitivamente"),
+    ("Técnico", "que diferencia hay entre resuelto y cerrado", "**Cerrado**: terminado; ya no se trabaja en él"),
     ("Técnico", "que es la prioridad", "Baja, Media, Alta o Crítica"),
     ("Técnico", "que significa prioridad critica", "Baja, Media, Alta o Crítica"),
     ("Solicitante", "que prioridades hay", "solo la cambia un Administrador."),
@@ -100,7 +100,7 @@ def test_summary_does_not_detail_the_permissions_table(client, session, ia):
     ("Técnico", "que categorias hay", "Hardware (equipos), Software (programas), Red"),
     ("Técnico", "como elimino un ticket", "Solo el Administrador puede eliminar un ticket"),
     ("Administrador", "como borro un ticket", "Abra el ticket y pulse «Eliminar»"),
-    ("Técnico", "puedo reabrir un ticket cerrado", "No: un ticket Cerrado ya no cambia"),
+    ("Técnico", "puedo reabrir un ticket cerrado", "Sí: un ticket Resuelto o Cerrado se reabre pasándolo a En proceso"),
     ("Técnico", "como creo un ticket por correo", REGLA_CORREO),
     ("Técnico", "como inicio sesion", "«Iniciar sesión con Microsoft»"),
     ("Técnico", "como cierro sesion", "elija «Cerrar sesión»"),
@@ -129,7 +129,7 @@ def test_guide_answers_that_already_existed_are_still_recognized(client, session
         ("como comento un ticket", "Abre el ticket, escribe en «Nuevo comentario»"),
         ("como busco un ticket", "En «Tickets», escribe en «Buscar»"),
         # Un Técnico sigue con la guía de siempre para cambiar el estado.
-        ("como cambio el estado", "Abre el ticket. En la columna derecha, en «Cambio de estado»"),
+        ("como cambio el estado", "Abre el ticket y toca el estado al que quieres pasarlo en el recorrido"),
     ]:
         assert _respuesta(ask(client, headers, pregunta), "directa").startswith(empieza)
     sin_ia(ia)
