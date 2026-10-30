@@ -24,8 +24,6 @@ function esSolicitante() {
 const TEXTOS_SOLICITANTE = {
   "titulo-listado": "Mis solicitudes",
   "subtitulo-listado": "Consulte el estado de sus tickets de soporte",
-  "opt-pendientes": "Abiertas",
-  "opt-resueltos": "Resueltas",
   "th-asignado": "Atendido por",
 };
 
@@ -76,6 +74,14 @@ function getElements() {
   };
 }
 
+/* Estados del filtro «Estado» (además de «Todos»). Un valor viejo como
+   «Pendientes» («Nuevo,En proceso») o «Resuelto,Cerrado» vuelve a «Todos». */
+const ESTADOS_FILTRO = ["Nuevo", "En proceso", "Resuelto", "Cerrado"];
+
+function estadoFiltro(valor) {
+  return ESTADOS_FILTRO.includes(valor) ? valor : "";
+}
+
 /* Solo se envían los parámetros con valor, con los nombres que ya usa la API. */
 function getFilters() {
   const elements = getElements();
@@ -83,7 +89,7 @@ function getFilters() {
     search: elements.search.value.trim(),
     category: elements.category.value,
     priority: elements.priority.value,
-    state: elements.state.value,
+    state: estadoFiltro(elements.state.value),
     mios: soloMios,
   };
 }
@@ -94,10 +100,8 @@ function buildTicketsUrl(filters, pagina = 0) {
   if (filters.search) params.set("search", filters.search);
   if (filters.category) params.set("category", filters.category);
   if (filters.priority) params.set("priority", filters.priority);
-  /* «Resuelto,Cerrado» pide varios estados: ?state=Resuelto&state=Cerrado. */
-  if (filters.state) {
-    filters.state.split(",").forEach((estado) => params.append("state", estado));
-  }
+  const estado = estadoFiltro(filters.state);
+  if (estado) params.set("state", estado);
   if (filters.mios) params.set("mios", "true");
   params.set("limit", String(PAGE_SIZE));
   if (pagina > 0) params.set("offset", String(pagina * PAGE_SIZE));
@@ -618,6 +622,8 @@ function mostrarSoloMios(valor) {
 function init() {
   const elements = getElements();
   vistaSolicitante = aplicarVistaSolicitante();
+  /* El navegador puede restaurar un valor que ya no está en el selector. */
+  elements.state.value = estadoFiltro(elements.state.value);
 
   elements.form.addEventListener("submit", (event) => {
     event.preventDefault();

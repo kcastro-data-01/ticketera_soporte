@@ -185,12 +185,15 @@ test("buildTicketsUrl: mios y offset de la página", () => {
   );
 });
 
-test("buildTicketsUrl: «Resuelto,Cerrado» pide los dos estados", () => {
+test("buildTicketsUrl: un estado pide ese estado; los viejos grupos piden «Todos»", () => {
   const harness = createHarness(async () => jsonResponse(200, []));
   assert.equal(
-    harness.sandbox.buildTicketsUrl({ state: "Resuelto,Cerrado" }),
-    "/api/tickets?state=Resuelto&state=Cerrado&limit=20"
+    harness.sandbox.buildTicketsUrl({ state: "En proceso" }),
+    "/api/tickets?state=En+proceso&limit=20"
   );
+  for (const viejo of ["Nuevo,En proceso", "Resuelto,Cerrado", "Pendientes"]) {
+    assert.equal(harness.sandbox.buildTicketsUrl({ state: viejo }), "/api/tickets?limit=20", viejo);
+  }
 });
 
 test("error HTTP con detail de texto: se muestra el código y el detalle", async () => {

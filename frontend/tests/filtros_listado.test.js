@@ -37,7 +37,10 @@ function nodo(tag) {
 }
 
 async function montar() {
-  const nodos = new Map(IDS.map((id) => [id, nodo(id)]));
+  return montarCon(new Map(IDS.map((id) => [id, nodo(id)])));
+}
+
+async function montarCon(nodos) {
   nodos.get("form-filtros").campos = nodos;
   const store = new Map();
   const pedidos = [];
@@ -97,4 +100,40 @@ test("Buscar (o Enter en el campo) envía el formulario y pide el listado filtra
   await esperar();
   assert.equal(pedidos.length, antes + 1);
   assert.match(pedidos.at(-1), /search=impresora/);
+});
+
+test("index.html: el filtro «Estado» tiene solo Todos y los cuatro estados", () => {
+  const select = indexHtml.slice(indexHtml.indexOf('<select id="state"'), indexHtml.indexOf("</select>", indexHtml.indexOf('<select id="state"')));
+  const opciones = [...select.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(opciones, [
+    ["", "Todos"], ["Nuevo", "Nuevo"], ["En proceso", "En proceso"], ["Resuelto", "Resuelto"], ["Cerrado", "Cerrado"],
+  ]);
+  assert.doesNotMatch(indexHtml, /Pendientes|Resueltos y cerrados|opt-pendientes|opt-resueltos/);
+  assert.doesNotMatch(leer("js/app.js"), /opt-pendientes|opt-resueltos|Abiertas|Resueltas/);
+});
+
+test("un filtro viejo («Pendientes», «Resueltos y cerrados») restaurado vuelve a «Todos» sin error", async () => {
+  for (const viejo of ["Nuevo,En proceso", "Resuelto,Cerrado"]) {
+    const nodos = new Map(IDS.map((id) => [id, nodo(id)]));
+    nodos.get("state").value = viejo;
+    const { pedidos } = await montarCon(nodos);
+    assert.equal(nodos.get("state").value, "", viejo);
+    const listado = pedidos.filter((u) => u.startsWith("/api/tickets"));
+    assert.ok(listado.length > 0);
+    listado.forEach((u) => assert.doesNotMatch(u, /state=/, u));
+  }
+});
+
+test("elegir un estado pide solo ese estado", async () => {
+  const { nodos, pedidos } = await montar();
+  nodos.get("state").value = "Resuelto";
+  enviar(nodos.get("form-filtros"));
+  await esperar();
+  assert.match(pedidos.at(-1), /^\/api\/tickets\?state=Resuelto&limit=20$/);
+});
+
+test("ayuda.html describe el filtro «Estado» sin los grupos viejos", () => {
+  const ayuda = leer("ayuda.html");
+  assert.match(ayuda, /El filtro «Estado» ofrece Todos, Nuevo, En proceso, Resuelto o Cerrado/);
+  assert.doesNotMatch(ayuda, /Resueltos y cerrados|«Pendientes»/);
 });
