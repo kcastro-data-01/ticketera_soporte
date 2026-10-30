@@ -1377,9 +1377,8 @@ GUIA_POR_ACCION = [
         EQUIPO,
         "cambiar el estado de un ticket",
         "Abre el ticket y toca el estado al que quieres pasarlo en el recorrido "
-        "(Nuevo · En proceso · Resuelto · Cerrado), o elígelo en «Pasar a» y pulsa "
-        "«Cambiar estado»; confirmas y, si quieres, escribes un motivo, que queda como "
-        "comentario. Se puede saltar pasos hacia adelante (por ejemplo, cerrar directo "
+        "(Nuevo · En proceso · Resuelto · Cerrado), arriba, debajo del título; confirmas "
+        "y, si quieres, escribes un motivo, que queda como comentario. Se puede saltar pasos hacia adelante (por ejemplo, cerrar directo "
         "un ticket que ya no se va a hacer). Un ticket Resuelto se reabre pasándolo a En "
         "proceso; uno Cerrado ya no cambia.",
         "al Técnico asignado o a un Administrador",
@@ -1716,8 +1715,8 @@ def _app_eliminar(user: User) -> str:
 
 def _app_reabrir(user: User) -> str:
     texto = ("Un ticket Cerrado no se reabre; uno Resuelto vuelve a En proceso. Para "
-             "reabrir uno Resuelto, abra el ticket y toque «En proceso» en el recorrido (o "
-             "elíjalo en «Pasar a»); puede escribir el motivo, que queda como comentario.")
+             "reabrir uno Resuelto, abra el ticket y toque «En proceso» en el recorrido; "
+             "puede escribir el motivo, que queda como comentario.")
     if user.role == UserRole.REQUESTER.value:
         texto += (" Como Solicitante, solo puede hacerlo en los tickets que tiene asignados; "
                   "si no, pídaselo al Técnico asignado o a un Administrador.")
@@ -1778,8 +1777,8 @@ def _app_cambiar_estado_solicitante(user: User) -> str | None:
     if user.role != UserRole.REQUESTER.value:
         return None  # la guía de siempre
     return ("Como Solicitante, solo puede cambiar el estado de los tickets que tiene asignados: "
-            "abra el ticket y toque el estado en el recorrido, o elíjalo en «Cambio de estado» "
-            "y pulse «Cambiar estado». Los de los demás los cambia el Técnico asignado o un Administrador.")
+            "abra el ticket y toque el estado al que quiere pasarlo en el recorrido, arriba, "
+            "debajo del título. Los de los demás los cambia el Técnico asignado o un Administrador.")
 
 
 # (cómo se reconoce en la pregunta normalizada, respuesta según el usuario), en orden.

@@ -78,13 +78,9 @@ const ELEMENT_IDS = [
   "usuario",
   "asignar",
   "usuarios-nota",
-  "estado-actual",
-  "estado-destino",
-  "cambiar-estado",
+  "pasos-estado",
+  "pasos-nota",
   "estado-final",
-  "campo-destino",
-  "acciones-estado",
-  "estado-ayuda",
   "form-comentario",
   "contenido",
   "comentar",
@@ -680,8 +676,7 @@ test("las cuatro escrituras del detalle envían el Bearer token", async () => {
   await harness.call("guardarAsignacion");
 
   /* Cambiar estado */
-  harness.node("estado-destino").value = "En proceso";
-  await harness.call("cambiarEstado");
+  await harness.call("cambiarEstado", "En proceso");
 
   /* Comentar */
   harness.node("contenido").value = "Comentario con token.";
@@ -785,7 +780,7 @@ test("Eliminar: un 404 avisa que el ticket ya no existe", async () => {
 });
 
 /* Cambio de estado con confirmación y motivo opcional (puntos del recorrido
-   y «Cambiar estado»). Sin document.body, confirmarAccion usa window.confirm
+). Sin document.body, confirmarAccion usa window.confirm
    y devuelve un motivo vacío. */
 test("Cambiar estado: al cerrar, la confirmación avisa que no se puede reabrir", async () => {
   const harness = createHarness(makeFetch());
@@ -825,33 +820,43 @@ test("Cambiar estado: el motivo viaja en el cuerpo y se recargan los comentarios
   assert.ok(harness.urls().includes("/api/tickets/1/comments"), "muestra el motivo como comentario");
 });
 
-test("Cambiar estado: el botón usa la misma confirmación con el destino elegido", async () => {
+test("Cambiar estado: tocar un punto del recorrido pide confirmación con ese destino", async () => {
   const harness = createHarness(makeFetch());
   await harness.init();
   harness.clearCalls();
 
-  harness.node("estado-destino").value = "Resuelto";
-  await harness.node("cambiar-estado").listeners.click[0]();
+  const boton = { dataset: { destino: "Resuelto" } };
+  await harness.node("pasos-estado").listeners.click[0]({
+    target: { closest: (sel) => (sel === ".paso-boton" ? boton : null) },
+  });
+  /* El listener no devuelve la promesa: se deja terminar el flujo. */
+  for (let i = 0; i < 10; i += 1) await new Promise((r) => setImmediate(r));
 
   assert.deepEqual(harness.confirmaciones, ["¿Pasar el ticket #1 a «Resuelto»?"],
     "el aviso de no reabrir es solo para Cerrado");
   const patch = harness.fetchCalls.find((c) => c.options.method === "PATCH");
   assert.deepEqual(JSON.parse(patch.options.body), { state: "Resuelto" });
+  assert.equal(harness.node("pasos-estado").focused, true, "el foco vuelve al recorrido");
 });
 
-test("Pasar a: ofrece saltos hacia adelante; en Cerrado no aparece y se muestra la nota final", async () => {
+test("Cambiar estado: un clic fuera de los botones del recorrido no hace nada", async () => {
   const harness = createHarness(makeFetch());
   await harness.init();
-  const opciones = () => harness.node("estado-destino").children.map((o) => o.value);
-  const ocultos = () => ["campo-destino", "acciones-estado", "estado-ayuda", "estado-final"]
-    .map((id) => harness.node(id).hidden);
-  assert.deepEqual(opciones(), ["En proceso", "Resuelto", "Cerrado"]);
-  assert.deepEqual(ocultos(), [false, false, false, true]);
+  harness.clearCalls();
 
-  harness.call("renderEstadoControl", { ...TICKET, state: "Resuelto" });
-  assert.deepEqual(opciones(), ["Cerrado", "En proceso"]);
+  await harness.node("pasos-estado").listeners.click[0]({ target: { closest: () => null } });
 
-  harness.call("renderEstadoControl", { ...TICKET, state: "Cerrado" });
-  assert.deepEqual(opciones(), []);
-  assert.deepEqual(ocultos(), [true, true, true, false]);
+  assert.deepEqual(harness.confirmaciones, []);
+  assert.deepEqual(harness.urls(), []);
+});
+
+test("Recorrido: en un ticket Cerrado se muestra a todos la nota de estado final", async () => {
+  const harness = createHarness(makeFetch({ ticket: jsonResponse(200, { ...TICKET, state: "Cerrado" }) }));
+  await harness.init();
+  assert.equal(harness.node("estado-final").hidden, false);
+  assert.equal(harness.node("pasos-nota").hidden, true);
+
+  const abierto = createHarness(makeFetch());
+  await abierto.init();
+  assert.equal(abierto.node("estado-final").hidden, true);
 });

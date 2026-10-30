@@ -4353,17 +4353,21 @@ summary:focus-visible,
 
 /* ===== Detalle: pasos del recorrido que se pueden tocar ===== */
 /* Mismo aspecto que el paso sin botón; solo cambia el cursor y, al pasar
-   o con el teclado, el nombre se subraya y la marca toma el color primario. */
+   o con el teclado, el nombre se subraya y la marca toma el color primario.
+   El botón ocupa todo el ancho del paso y al menos 44px de alto (área
+   táctil cómoda en celular); la marca queda arriba, alineada con la línea. */
 .pasos-estado .paso-boton,
 .pasos-estado .paso-boton:hover,
 .pasos-estado .paso-boton:active {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
+  align-self: stretch;
   gap: 0.35rem;
-  min-width: 0;
-  min-height: 0;
-  padding: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0 0.25rem;
   border: 0;
   box-shadow: none;
   background: none;
@@ -4385,6 +4389,15 @@ summary:focus-visible,
 
 .pasos-estado:focus {
   outline: none;
+}
+
+/* Línea chica debajo del recorrido: «Toque un estado…» o el aviso de Cerrado. */
+.pasos-nota {
+  margin: 0.5rem 0 0;
+  font-size: var(--texto-sm);
+  line-height: 1.5;
+  color: var(--color-tenue-fuerte);
+  text-align: center;
 }
 
 /* Campo opcional dentro de la ventana de confirmación (motivo). */

@@ -70,11 +70,12 @@ function cargarConDom(usuario) {
     return li;
   });
   const lista = { querySelectorAll: (sel) => (sel === "li" ? pasos : []) };
+  const notas = { "pasos-nota": { hidden: true }, "estado-final": { hidden: true } };
   const guardado = new Map(usuario ? [["user", JSON.stringify(usuario)]] : []);
   const sandbox = {
     console,
     document: {
-      getElementById: (id) => (id === "pasos-estado" ? lista : null),
+      getElementById: (id) => (id === "pasos-estado" ? lista : notas[id] || null),
       createElement: nodo,
       addEventListener() {},
     },
@@ -90,7 +91,8 @@ function cargarConDom(usuario) {
     sandbox.pintarPasos(ticket.state);
   };
   const botones = () => pasos.map((li) => (li.children[0].tag === "button" ? li.children[0] : null));
-  return { pintar, botones, pasos };
+  const visibles = () => Object.keys(notas).filter((id) => !notas[id].hidden);
+  return { pintar, botones, pasos, visibles };
 }
 
 const tecnico = { id: 7, name: "Carlos", role: "Técnico" };
@@ -134,11 +136,37 @@ test("sin permiso los pasos se ven igual pero ninguno es botón", () => {
   assert.deepEqual(botones().map((b) => (b ? b.dataset.destino : null)), [null, null, "Resuelto", "Cerrado"]);
 });
 
-test("detalle.html deja enfocar el recorrido y explica que se puede tocar", () => {
+test("debajo del recorrido: «Toque un estado…» solo para quien puede, y el aviso de Cerrado para todos", () => {
+  const tec = cargarConDom(tecnico);
+  tec.pintar({ id: 4, state: "Nuevo", assigned_to_id: null });
+  assert.deepEqual(tec.visibles(), ["pasos-nota"]);
+  tec.pintar({ id: 4, state: "Cerrado", assigned_to_id: null });
+  assert.deepEqual(tec.visibles(), ["estado-final"]);
+
+  const sol = cargarConDom(solicitante);
+  sol.pintar({ id: 4, state: "En proceso", assigned_to_id: 1 });
+  assert.deepEqual(sol.visibles(), []);
+  sol.pintar({ id: 4, state: "Cerrado", assigned_to_id: 1 });
+  assert.deepEqual(sol.visibles(), ["estado-final"]);
+});
+
+test("detalle.html: notas debajo del recorrido y sin el recuadro «Cambio de estado»", () => {
   const html = leer("detalle.html");
   assert.match(html, /id="pasos-estado"[^>]*tabindex="-1"/);
-  assert.match(html, /También puede tocar un estado en el recorrido/);
-  assert.match(html, /Este ticket está <b>Cerrado<\/b>: es un estado final y no admite más\s+cambios de estado\./);
+  const despues = html.slice(html.indexOf("</ol>", html.indexOf('id="pasos-estado"')));
+  assert.match(despues, /^<\/ol>[\s\S]*?<p id="pasos-nota" class="pasos-nota" hidden>Toque un estado para cambiarlo\.<\/p>/);
+  assert.match(despues, /<p id="estado-final" class="pasos-nota" hidden>\s*Este ticket está <b>Cerrado<\/b>: es un estado final y no admite más\s+cambios de estado\.\s*<\/p>/);
+  for (const viejo of ["seccion-estado", "estado-destino", "cambiar-estado", "Pasar a", "estado-actual"]) {
+    assert.ok(!html.includes(viejo), viejo);
+  }
+});
+
+test("los pasos tocables tienen área táctil de 44px y son botones nativos (Tab llega)", () => {
   const css = leer("css/estilos.css");
-  assert.match(css, /\.pasos-estado \.paso-boton/);
+  const regla = css.slice(css.indexOf(".pasos-estado .paso-boton,"), css.indexOf("}", css.indexOf(".pasos-estado .paso-boton,")));
+  assert.match(regla, /min-height: 44px;/);
+  assert.match(regla, /min-width: 44px;/);
+  assert.match(regla, /align-self: stretch;/, "ocupa todo el ancho del paso");
+  /* Un <button> sin tabindex negativo entra en el orden de Tab. */
+  assert.doesNotMatch(leer("js/detalle.js"), /paso-boton[^\n]*tabindex|boton\.tabIndex\s*=\s*-1/);
 });

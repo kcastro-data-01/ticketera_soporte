@@ -89,7 +89,7 @@ test("detalle: «Detalles» arriba del panel derecho, fijo al bajar y debajo en 
   const inicio = detalleHtml.indexOf('<aside class="detalle-lateral"');
   const lateral = detalleHtml.slice(inicio, detalleHtml.indexOf("</aside>", inicio));
   const secciones = [...lateral.matchAll(/<section[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(secciones, ["Detalles del ticket", "Asignación del ticket", "Cambio de estado del ticket"]);
+  assert.deepEqual(secciones, ["Detalles del ticket", "Asignación del ticket"]);
   const datos = [...lateral.matchAll(/<dt>([^<]+)<\/dt>\s*<dd id="(ver-[a-z]+)">/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(datos, [
     ["Categoría", "ver-category"], ["Asignado a", "ver-assigned"], ["Solicitante", "ver-creator"],

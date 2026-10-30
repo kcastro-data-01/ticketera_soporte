@@ -58,10 +58,6 @@ function getElements() {
     usuario: document.getElementById("usuario"),
     asignar: document.getElementById("asignar"),
     usuariosNota: document.getElementById("usuarios-nota"),
-    estadoActual: document.getElementById("estado-actual"),
-    estadoDestino: document.getElementById("estado-destino"),
-    cambiarEstado: document.getElementById("cambiar-estado"),
-    estadoFinal: document.getElementById("estado-final"),
     formComentario: document.getElementById("form-comentario"),
     contenido: document.getElementById("contenido"),
     comentar: document.getElementById("comentar"),
@@ -111,9 +107,6 @@ function bloquearBotones(bloqueado) {
   elements.comentar.disabled = bloqueado;
   elements.historial.disabled = bloqueado;
   if (elements.eliminar) elements.eliminar.disabled = bloqueado;
-  /* El botón de estado solo se activa si hay alguna transición posible. */
-  elements.cambiarEstado.disabled =
-    bloqueado || elements.estadoDestino.options.length === 0;
 }
 
 function formatFecha(value) {
@@ -202,16 +195,21 @@ function terminarImpresion() {
 /* Barra de pasos: marca como hechos los estados anteriores al actual.
    Para quien puede cambiar el estado, cada destino permitido es un botón
    (teclado y lector de pantalla); los demás pasos se ven igual pero no se
-   pueden tocar. */
+   pueden tocar. Debajo, una nota: «Toque un estado…» para quien puede
+   tocarlos y, en Cerrado, que el estado es final (para todos). */
 const PASOS_ESTADO = ["Nuevo", "En proceso", "Resuelto", "Cerrado"];
 
 function pintarPasos(estado) {
-  const lista = document.getElementById("pasos-estado");
-  if (!lista || typeof lista.querySelectorAll !== "function") return;
-  const actual = PASOS_ESTADO.indexOf(estado);
   const destinos = ticketActual && puedeCambiarEstado(ticketActual)
     ? TRANSICIONES[estado] || []
     : [];
+  const nota = document.getElementById("pasos-nota");
+  if (nota) nota.hidden = destinos.length === 0;
+  const final = document.getElementById("estado-final");
+  if (final) final.hidden = estado !== "Cerrado";
+  const lista = document.getElementById("pasos-estado");
+  if (!lista || typeof lista.querySelectorAll !== "function") return;
+  const actual = PASOS_ESTADO.indexOf(estado);
   lista.querySelectorAll("li").forEach((paso) => {
     const indice = PASOS_ESTADO.indexOf(paso.dataset.paso);
     paso.className = indice < actual ? "hecho" : indice === actual ? "actual" : "";
@@ -267,35 +265,6 @@ function renderTicket(ticket) {
     ticket.assigned_to_id === null || ticket.assigned_to_id === undefined
       ? ""
       : String(ticket.assigned_to_id);
-
-  renderEstadoControl(ticket);
-  /* El asignado cambia el estado de sus tickets aunque su rol no pueda. */
-  const seccionEstado = document.getElementById("seccion-estado");
-  if (seccionEstado) seccionEstado.hidden = !puedeCambiarEstado(ticket);
-}
-
-/* Muestra el estado actual y solo ofrece los destinos posibles desde él.
-   Con "Cerrado" no queda ninguna transición: se ocultan «Pasar a» y el
-   botón, y se explica que el estado es final. */
-function renderEstadoControl(ticket) {
-  const elements = getElements();
-  const destinos = TRANSICIONES[ticket.state] || [];
-  elements.estadoActual.textContent = ticket.state;
-  elements.estadoDestino.replaceChildren();
-  destinos.forEach((estado) => {
-    const option = document.createElement("option");
-    option.value = estado;
-    option.textContent = estado;
-    elements.estadoDestino.appendChild(option);
-  });
-  const sinTransiciones = destinos.length === 0;
-  elements.estadoDestino.disabled = sinTransiciones;
-  elements.cambiarEstado.disabled = sinTransiciones;
-  elements.estadoFinal.hidden = !sinTransiciones;
-  ["campo-destino", "acciones-estado", "estado-ayuda"].forEach((id) => {
-    const nodo = document.getElementById(id);
-    if (nodo) nodo.hidden = sinTransiciones;
-  });
 }
 
 function renderUsuarios(users) {
@@ -580,7 +549,7 @@ async function guardarAsignacion() {
   }
 }
 
-/* Punto del recorrido o «Cambiar estado»: pide confirmación con un motivo
+/* Punto del recorrido: pide confirmación con un motivo
    opcional (queda como comentario del ticket) y cambia el estado. */
 async function pedirCambioEstado(destino, { desdePasos = false } = {}) {
   if (ocupado || ticketId === null || !destino) return;
@@ -600,9 +569,8 @@ async function pedirCambioEstado(destino, { desdePasos = false } = {}) {
   if (pasos && typeof pasos.focus === "function") pasos.focus();
 }
 
-async function cambiarEstado(destino = getElements().estadoDestino.value, motivo = "") {
-  if (ocupado || ticketId === null) return;
-  if (!destino) return; /* sin transiciones posibles */
+async function cambiarEstado(destino, motivo = "") {
+  if (ocupado || ticketId === null || !destino) return;
   motivo = (motivo || "").trim();
   let recargarHistorial = false;
 
@@ -969,9 +937,6 @@ async function init() {
   if (elements.eliminar) elements.eliminar.addEventListener("click", () => eliminarTicket());
   elements.cancelarEdicion.addEventListener("click", () => cancelarEdicion());
   elements.asignar.addEventListener("click", () => guardarAsignacion());
-  elements.cambiarEstado.addEventListener("click", () =>
-    pedirCambioEstado(elements.estadoDestino.value)
-  );
   const pasos = document.getElementById("pasos-estado");
   if (pasos) {
     pasos.addEventListener("click", (event) => {

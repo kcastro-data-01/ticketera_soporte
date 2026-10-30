@@ -71,15 +71,15 @@ test("puedeCambiarEstado: el equipo siempre; los demás, solo en sus asignados",
   for (const permiso of ["editar", "asignar", "eliminar"]) assert.equal(sandbox.puede(permiso), false);
 });
 
-test("detalle: el asignado ve «Cambio de estado» solo en sus tickets asignados", () => {
-  assert.match(html, /id="seccion-estado"[^>]*data-permiso="cambiar_estado"/);
+test("detalle: el asignado ve «Toque un estado…» solo en sus tickets asignados", () => {
+  assert.doesNotMatch(html, /id="seccion-estado"/, "ya no hay recuadro «Cambio de estado»");
   const asignado = montar(PEDRO);
   asignado.sandbox.renderTicket(TICKET);
-  assert.equal(asignado.nodos.get("seccion-estado").hidden, false);
+  assert.equal(asignado.nodos.get("pasos-nota").hidden, false);
 
   const otro = montar(PEDRO);
   otro.sandbox.renderTicket({ ...TICKET, assigned_to_id: 4 });
-  assert.equal(otro.nodos.get("seccion-estado").hidden, true);
+  assert.equal(otro.nodos.get("pasos-nota").hidden, true);
 });
 
 test("historial: el ticket creado desde un correo dice quién lo envió y a quién", () => {

@@ -114,6 +114,13 @@
               <li data-paso="Resuelto"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Resuelto</span></li>
               <li data-paso="Cerrado"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Cerrado</span></li>
             </ol>
+            <!-- detalle.js muestra una u otra: la primera solo a quien puede
+                 cambiar el estado (y no en Cerrado); la segunda, a todos en Cerrado. -->
+            <p id="pasos-nota" class="pasos-nota" hidden>Toque un estado para cambiarlo.</p>
+            <p id="estado-final" class="pasos-nota" hidden>
+              Este ticket está <b>Cerrado</b>: es un estado final y no admite más
+              cambios de estado.
+            </p>
             <h3 class="tarjeta-ticket-subtitulo">Descripción</h3>
             <p id="ver-description" class="tarjeta-ticket-descripcion">—</p>
           </section>
@@ -284,34 +291,6 @@
             <p id="usuarios-nota" class="nota" hidden>
               No hay usuarios disponibles. Puede crear uno desde
               <a href="usuarios.html">Usuarios</a>.
-            </p>
-          </section>
-
-          <!-- Sin el permiso cambiar_estado se oculta; detalle.js la vuelve a
-               mostrar si el ticket está asignado a quien lo ve. -->
-          <section id="seccion-estado" class="seccion" aria-label="Cambio de estado del ticket" data-permiso="cambiar_estado">
-            <h2>Cambio de estado</h2>
-            <div class="filtros formulario">
-              <div class="campo">
-                <span>Estado actual</span>
-                <strong id="estado-actual">—</strong>
-              </div>
-              <label class="campo" id="campo-destino">
-                <span>Pasar a</span>
-                <select id="estado-destino"></select>
-              </label>
-              <div class="acciones" id="acciones-estado">
-                <button type="button" id="cambiar-estado">Cambiar estado</button>
-              </div>
-            </div>
-            <p class="nota" id="estado-ayuda">
-              También puede tocar un estado en el recorrido del ticket. Se puede
-              saltar pasos hacia adelante; un ticket Resuelto se reabre pasándolo a
-              <b>En proceso</b>, y uno Cerrado ya no cambia.
-            </p>
-            <p class="nota" id="estado-final" hidden>
-              Este ticket está <b>Cerrado</b>: es un estado final y no admite más
-              cambios de estado.
             </p>
           </section>
         </aside>
