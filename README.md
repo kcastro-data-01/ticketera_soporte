@@ -14,7 +14,8 @@ filtrarlos, y consultar su historial de cambios.
 - Cambiar el estado entre **Nuevo**, **En proceso**, **Resuelto** y **Cerrado**:
   tocando el estado en el recorrido del detalle (o con «Pasar a»), con motivo
   opcional que queda como comentario. Se puede saltar pasos hacia adelante
-  (p. ej. `Nuevo → Cerrado`) y reabrir `Resuelto`/`Cerrado → En proceso`.
+  (p. ej. `Nuevo → Cerrado`) y reabrir `Resuelto → En proceso`. `Cerrado` es
+  un estado final: no se reabre.
 - Asignar el ticket a una persona.
 - Agregar comentarios al ticket.
 - Ver listado de tickets.

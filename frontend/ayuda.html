@@ -99,13 +99,14 @@
             <li><code>Nuevo</code>: Ticket recién creado</li>
             <li><code>En proceso</code>: Están trabajando en él</li>
             <li><code>Resuelto</code>: Se ha dado solución</li>
-            <li><code>Cerrado</code>: Ticket terminado; ya no se trabaja en él</li>
+            <li><code>Cerrado</code>: Ticket cerrado definitivamente; es un estado final y ya no cambia</li>
           </ul>
           <h3>Cambiar el estado</h3>
-          <p>En el detalle del ticket, toque el estado al que quiere pasarlo en el recorrido (también se puede con el teclado: Tab hasta el estado y Enter), o elíjalo en «Pasar a» y pulse «Cambiar estado». Se pide confirmación y un <strong>motivo opcional</strong>: si lo escribe, queda como comentario del ticket.</p>
+          <p>En el detalle del ticket, toque el estado al que quiere pasarlo en el recorrido (también se puede con el teclado: Tab hasta el estado y Enter), o elíjalo en «Pasar a» y pulse «Cambiar estado». Se pide confirmación y un <strong>motivo opcional</strong>: si lo escribe, queda como comentario del ticket. Antes de cerrar, la confirmación avisa que un ticket Cerrado ya no se puede reabrir.</p>
           <ul>
             <li><strong>Hacia adelante</strong> se puede saltar pasos: por ejemplo, un ticket que ya no se va a hacer se pasa de <code>Nuevo</code> a <code>Cerrado</code> directamente.</li>
-            <li><strong>Hacia atrás</strong> solo se reabre: un ticket <code>Resuelto</code> o <code>Cerrado</code> vuelve a <code>En proceso</code>. Nunca vuelve a <code>Nuevo</code>.</li>
+            <li><strong>Hacia atrás</strong> solo se reabre un ticket <code>Resuelto</code>: vuelve a <code>En proceso</code>. Nunca vuelve a <code>Nuevo</code>.</li>
+            <li><code>Cerrado</code> es un estado <strong>final</strong>: no se reabre ni admite más cambios de estado. Si el problema vuelve a aparecer, cree un ticket nuevo y mencione el número del anterior.</li>
             <li>Lo cambian el Técnico y el Administrador en cualquier ticket, y el Solicitante solo en los que tiene asignados. Quien no puede cambiarlo ve el recorrido, pero no puede tocarlo.</li>
             <li>En las métricas, «Resueltos» y el tiempo promedio solo cuentan los tickets que pasaron por <code>Resuelto</code>; uno cerrado directo no cuenta como resuelto.</li>
           </ul>
@@ -122,7 +123,7 @@
                 <tr><td>Editó el ticket</td><td>Se cambia el título, la descripción, la categoría o la prioridad (una fila por cada dato).</td><td>Prioridad: «Media» → «Alta»</td></tr>
                 <tr><td>Asignó el ticket</td><td>Se cambia la persona responsable.</td><td>José Solano → Carlos Rojas</td></tr>
                 <tr><td>Quitó la asignación</td><td>El ticket queda sin responsable.</td><td>Carlos Rojas → Sin asignar</td></tr>
-                <tr><td>Cambió el estado</td><td>El ticket avanza en el flujo, salta pasos o se reabre.</td><td>Nuevo → Cerrado</td></tr>
+                <tr><td>Cambió el estado</td><td>El ticket avanza en el flujo, salta pasos o se reabre (de Resuelto a En proceso).</td><td>Nuevo → Cerrado</td></tr>
                 <tr><td>Comentó</td><td>Alguien agrega un comentario.</td><td>«Ya revisé el cable de red»</td></tr>
               </tbody>
             </table>

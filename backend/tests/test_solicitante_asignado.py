@@ -59,14 +59,15 @@ def test_assignee_changes_state_only_of_assigned_tickets(client, escenario):
     resp = client.patch(f"/api/tickets/{asignado.id}/state", json={"state": "En proceso"}, headers=cabeceras)
     assert resp.status_code == 200, resp.text
     assert resp.json()["state"] == "En proceso"
-    # Las mismas reglas que para todos: salta a Cerrado, pero no vuelve a Nuevo.
+    # Las mismas reglas que para todos: salta a Cerrado, y Cerrado ya no cambia.
     resp = client.patch(f"/api/tickets/{asignado.id}/state",
                         json={"state": "Cerrado", "motivo": "Ya no hace falta."}, headers=cabeceras)
     assert resp.status_code == 200, resp.text
     comentarios = client.get(f"/api/tickets/{asignado.id}/comments", headers=cabeceras).json()
     assert [(c["author"], c["content"]) for c in comentarios] == [("Pedro Rojas", "Ya no hace falta.")]
-    assert client.patch(f"/api/tickets/{asignado.id}/state", json={"state": "Nuevo"},
-                        headers=cabeceras).status_code == 409
+    for estado in ("Nuevo", "En proceso"):
+        assert client.patch(f"/api/tickets/{asignado.id}/state", json={"state": estado},
+                            headers=cabeceras).status_code == 409
     # El suyo que no tiene asignado: no (ni deja el motivo); el ajeno: no existe para él.
     assert client.patch(f"/api/tickets/{propio.id}/state",
                         json={"state": "Cerrado", "motivo": "Intento"},

@@ -11,12 +11,12 @@ const API_USERS_URL = "/api/users";
 /* Transiciones válidas desde cada estado (espejo del backend para ofrecer
    solo destinos posibles; el backend siempre vuelve a validar). Se avanza a
    cualquier estado posterior, aunque se salten pasos; hacia atrás solo se
-   reabre: Resuelto o Cerrado → En proceso. */
+   reabre Resuelto → En proceso. Cerrado es final: no admite cambios. */
 const TRANSICIONES = {
   "Nuevo": ["En proceso", "Resuelto", "Cerrado"],
   "En proceso": ["Resuelto", "Cerrado"],
   "Resuelto": ["Cerrado", "En proceso"],
-  "Cerrado": ["En proceso"],
+  "Cerrado": [],
 };
 
 let ticketId = null;
@@ -275,7 +275,8 @@ function renderTicket(ticket) {
 }
 
 /* Muestra el estado actual y solo ofrece los destinos posibles desde él.
-   Si no quedara ninguna transición se desactiva el selector y se avisa. */
+   Con "Cerrado" no queda ninguna transición: se ocultan «Pasar a» y el
+   botón, y se explica que el estado es final. */
 function renderEstadoControl(ticket) {
   const elements = getElements();
   const destinos = TRANSICIONES[ticket.state] || [];
@@ -291,6 +292,10 @@ function renderEstadoControl(ticket) {
   elements.estadoDestino.disabled = sinTransiciones;
   elements.cambiarEstado.disabled = sinTransiciones;
   elements.estadoFinal.hidden = !sinTransiciones;
+  ["campo-destino", "acciones-estado", "estado-ayuda"].forEach((id) => {
+    const nodo = document.getElementById(id);
+    if (nodo) nodo.hidden = sinTransiciones;
+  });
 }
 
 function renderUsuarios(users) {
@@ -581,7 +586,9 @@ async function pedirCambioEstado(destino, { desdePasos = false } = {}) {
   if (ocupado || ticketId === null || !destino) return;
   const respuesta = await confirmarAccion({
     titulo: "Cambiar estado",
-    mensaje: `¿Pasar el ticket #${ticketId} a «${destino}»?`,
+    mensaje: destino === "Cerrado"
+      ? `¿Pasar el ticket #${ticketId} a «Cerrado»? Un ticket Cerrado ya no se puede reabrir.`
+      : `¿Pasar el ticket #${ticketId} a «${destino}»?`,
     aceptar: "Confirmar",
     cancelar: "Cancelar",
     campo: { etiqueta: "Motivo (opcional)" },

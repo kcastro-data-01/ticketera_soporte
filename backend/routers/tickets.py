@@ -256,9 +256,9 @@ def change_ticket_state(
     ticket que no puede ver responde ``404``.
 
     A ticket moves forward to any later state, even skipping steps
-    (``Nuevo → Cerrado``), and is reopened only to ``En proceso`` from
-    ``Resuelto`` or ``Cerrado``. Going back to ``Nuevo``, ``Cerrado →
-    Resuelto`` or staying in the same state is answered with ``409
+    (``Nuevo → Cerrado``); a ``Resuelto`` ticket is reopened only to ``En
+    proceso``. ``Cerrado`` is final. Going back to ``Nuevo``, any change on a
+    ``Cerrado`` ticket or staying in the same state is answered with ``409
     Conflict``. The new state comes from the existing ``TicketState`` enum,
     so an unknown value is rejected with ``422``. An optional ``motivo`` is
     saved as a comment of the ticket in the same transaction.

@@ -1380,7 +1380,8 @@ GUIA_POR_ACCION = [
         "(Nuevo · En proceso · Resuelto · Cerrado), o elígelo en «Pasar a» y pulsa "
         "«Cambiar estado»; confirmas y, si quieres, escribes un motivo, que queda como "
         "comentario. Se puede saltar pasos hacia adelante (por ejemplo, cerrar directo "
-        "un ticket que ya no se va a hacer) y, para reabrir, se pasa a En proceso.",
+        "un ticket que ya no se va a hacer). Un ticket Resuelto se reabre pasándolo a En "
+        "proceso; uno Cerrado ya no cambia.",
         "al Técnico asignado o a un Administrador",
     ),
     (
@@ -1511,8 +1512,8 @@ REGLA_QUIEN_CAMBIA_ESTADO = (
     "El Técnico y el Administrador pueden cambiar el estado de cualquier "
     "ticket; el Solicitante, solo el de los tickets que tiene asignados. El orden es "
     "Nuevo → En proceso → Resuelto → Cerrado: se puede avanzar a cualquier estado "
-    "posterior saltando pasos, y hacia atrás solo se reabre un ticket Resuelto o "
-    "Cerrado pasándolo a En proceso."
+    "posterior saltando pasos; hacia atrás solo se reabre un ticket Resuelto "
+    "pasándolo a En proceso, y un ticket Cerrado ya no cambia."
 )
 REGLA_SOLICITANTE = (
     "Un Solicitante solo ve los tickets que él mismo creó y los que tiene asignados. "
@@ -1681,10 +1682,10 @@ def _app_estados(user: User) -> str:
         "- **Nuevo**: recién creado, todavía nadie empezó a trabajarlo.\n"
         "- **En proceso**: alguien está trabajando en él.\n"
         "- **Resuelto**: ya se le dio solución.\n"
-        "- **Cerrado**: terminado; ya no se trabaja en él.\n"
+        "- **Cerrado**: terminado definitivamente; ya no cambia más.\n"
         "Se puede avanzar a cualquier estado posterior, aunque se salten pasos (por ejemplo, "
-        "cerrar directo un ticket que ya no se va a hacer). Hacia atrás solo se reabre: un "
-        "ticket Resuelto o Cerrado vuelve a En proceso."
+        "cerrar directo un ticket que ya no se va a hacer). Hacia atrás solo se reabre un "
+        "ticket Resuelto: vuelve a En proceso. Un ticket Cerrado no se reabre."
     )
 
 
@@ -1714,13 +1715,14 @@ def _app_eliminar(user: User) -> str:
 
 
 def _app_reabrir(user: User) -> str:
-    texto = ("Sí: un ticket Resuelto o Cerrado se reabre pasándolo a En proceso. Abra el "
-             "ticket y toque «En proceso» en el recorrido (o elíjalo en «Pasar a»); puede "
-             "escribir el motivo, que queda como comentario.")
+    texto = ("Un ticket Cerrado no se reabre; uno Resuelto vuelve a En proceso. Para "
+             "reabrir uno Resuelto, abra el ticket y toque «En proceso» en el recorrido (o "
+             "elíjalo en «Pasar a»); puede escribir el motivo, que queda como comentario.")
     if user.role == UserRole.REQUESTER.value:
-        return texto + (" Como Solicitante, solo puede hacerlo en los tickets que tiene "
-                        "asignados; si no, pídaselo al Técnico asignado o a un Administrador.")
-    return texto
+        texto += (" Como Solicitante, solo puede hacerlo en los tickets que tiene asignados; "
+                  "si no, pídaselo al Técnico asignado o a un Administrador.")
+    return texto + (" Si el problema de un ticket Cerrado vuelve a aparecer, cree un ticket "
+                    "nuevo con «Nuevo ticket» y mencione el número del anterior.")
 
 
 def _app_iniciar_sesion(user: User) -> str:

@@ -111,10 +111,11 @@ test("con permiso, los destinos permitidos son botones accesibles", () => {
   }
 });
 
-test("desde Cerrado solo se puede tocar «En proceso» (reabrir)", () => {
-  const { pintar, botones } = cargarConDom(tecnico);
+test("en un ticket Cerrado ningún paso es botón; desde Resuelto se reabre a «En proceso»", () => {
+  const { pintar, botones, pasos } = cargarConDom(tecnico);
   pintar({ id: 4, state: "Cerrado", assigned_to_id: null });
-  assert.deepEqual(botones().map((b) => (b ? b.dataset.destino : null)), [null, "En proceso", null, null]);
+  assert.deepEqual(botones(), [null, null, null, null]);
+  assert.deepEqual(pasos.map((li) => li.className), ["hecho", "hecho", "hecho", "actual"]);
 
   pintar({ id: 4, state: "Resuelto", assigned_to_id: null });
   assert.deepEqual(botones().map((b) => (b ? b.dataset.destino : null)), [null, "En proceso", null, "Cerrado"]);
@@ -137,6 +138,7 @@ test("detalle.html deja enfocar el recorrido y explica que se puede tocar", () =
   const html = leer("detalle.html");
   assert.match(html, /id="pasos-estado"[^>]*tabindex="-1"/);
   assert.match(html, /También puede tocar un estado en el recorrido/);
+  assert.match(html, /Este ticket está <b>Cerrado<\/b>: es un estado final y no admite más\s+cambios de estado\./);
   const css = leer("css/estilos.css");
   assert.match(css, /\.pasos-estado \.paso-boton/);
 });

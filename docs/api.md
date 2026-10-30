@@ -267,7 +267,7 @@ son la cola de hoy. El resto usa el rango: `por_estado`, `por_categoria`,
 si no hay resueltos) usan el primer paso a «Resuelto» de cada ticket. Un
 ticket cerrado sin pasar por «Resuelto» (p. ej. `Nuevo → Cerrado`) **no**
 cuenta como resuelto ni entra en el tiempo promedio; sí aparece como `Cerrado`
-en `por_estado`. Si un ticket se reabre y se vuelve a resolver, cuenta una sola
+en `por_estado`. Si un ticket Resuelto se reabre y se vuelve a resolver, cuenta una sola
 vez, por su primer paso a «Resuelto».
 `por_estado` y `por_categoria` incluyen todos los valores, aunque estén en 0.
 
@@ -275,7 +275,8 @@ vez, por su primer paso a «Resuelto».
 
 Cambia el estado del ticket a través de la máquina de estados (RF3). Se puede
 avanzar a cualquier estado posterior, aunque se salten pasos, y hacia atrás
-solo se reabre (`Resuelto`/`Cerrado → En proceso`). No hay transiciones
+solo se reabre `Resuelto → En proceso`. `Cerrado` es un estado final: no se
+reabre ni admite ningún cambio. No hay transiciones
 automáticas: una respuesta por correo en el hilo de un ticket `Resuelto` o
 `Cerrado` solo agrega un comentario, no lo reabre. Cada cambio exitoso registra
 **exactamente una** entrada en `history` (`action` = `"Cambio de estado"`,
@@ -295,11 +296,11 @@ Solicitante solo en los que tiene asignados (`403` si no).
 | `Nuevo` | `En proceso`, `Resuelto`, `Cerrado` |
 | `En proceso` | `Resuelto`, `Cerrado` |
 | `Resuelto` | `Cerrado`, `En proceso` (reabrir) |
-| `Cerrado` | `En proceso` (reabrir) |
+| `Cerrado` | — (estado final) |
 
 Todo lo demás queda fuera: volver a `Nuevo` (`En proceso → Nuevo`),
-`Cerrado → Resuelto`, `Resuelto → Resuelto` y, en general, mantener el mismo
-estado.
+cualquier cambio sobre `Cerrado` (`Cerrado → En proceso`, `Cerrado → Resuelto`…)
+y mantener el mismo estado (`Resuelto → Resuelto`).
 
 **Body** (JSON, obligatorio):
 

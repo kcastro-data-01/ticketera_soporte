@@ -296,20 +296,22 @@
                 <span>Estado actual</span>
                 <strong id="estado-actual">—</strong>
               </div>
-              <label class="campo">
+              <label class="campo" id="campo-destino">
                 <span>Pasar a</span>
                 <select id="estado-destino"></select>
               </label>
-              <div class="acciones">
+              <div class="acciones" id="acciones-estado">
                 <button type="button" id="cambiar-estado">Cambiar estado</button>
               </div>
             </div>
-            <p class="nota">
+            <p class="nota" id="estado-ayuda">
               También puede tocar un estado en el recorrido del ticket. Se puede
-              saltar pasos hacia adelante; para reabrir, páselo a <b>En proceso</b>.
+              saltar pasos hacia adelante; un ticket Resuelto se reabre pasándolo a
+              <b>En proceso</b>, y uno Cerrado ya no cambia.
             </p>
             <p class="nota" id="estado-final" hidden>
-              No hay otro estado disponible para este ticket.
+              Este ticket está <b>Cerrado</b>: es un estado final y no admite más
+              cambios de estado.
             </p>
           </section>
         </aside>

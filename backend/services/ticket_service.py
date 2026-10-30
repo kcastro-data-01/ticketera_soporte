@@ -89,15 +89,15 @@ class InvalidTransitionError(Exception):
 
 # Allowed state transitions (RF3): forward to any later state, skipping the
 # ones in between if needed (e.g. "Nuevo → Cerrado" for a ticket that will not
-# be done). The only move back is reopening: "Resuelto" or "Cerrado" →
-# "En proceso". Nothing goes back to "Nuevo".
+# be done). The only move back is reopening "Resuelto" → "En proceso".
+# "Cerrado" is final: it cannot be reopened. Nothing goes back to "Nuevo".
 ALLOWED_TRANSITIONS: dict[TicketState, frozenset[TicketState]] = {
     TicketState.NEW: frozenset(
         {TicketState.IN_PROGRESS, TicketState.RESOLVED, TicketState.CLOSED}
     ),
     TicketState.IN_PROGRESS: frozenset({TicketState.RESOLVED, TicketState.CLOSED}),
     TicketState.RESOLVED: frozenset({TicketState.CLOSED, TicketState.IN_PROGRESS}),
-    TicketState.CLOSED: frozenset({TicketState.IN_PROGRESS}),
+    TicketState.CLOSED: frozenset(),
 }
 
 

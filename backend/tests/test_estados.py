@@ -1,7 +1,8 @@
 """Tests for the ticket state machine (Task 18: RF3).
 
 Forward to any later state, even skipping steps (``Nuevo → Cerrado``); the
-only move back is reopening ``Resuelto``/``Cerrado → En proceso``. An optional
+only move back is reopening ``Resuelto → En proceso``; ``Cerrado`` is final.
+An optional
 ``motivo`` is saved as a comment of the ticket.
 """
 
@@ -30,17 +31,18 @@ LINEAR_STEPS = [
     (TicketState.RESOLVED.value, TicketState.CLOSED.value),
 ]
 
-# Every allowed transition: forward (also skipping steps) and reopening.
+# Every allowed transition: forward (also skipping steps) and reopening a
+# Resuelto ticket.
 ALLOWED_TRANSITIONS = LINEAR_STEPS + [
     (TicketState.NEW.value, TicketState.RESOLVED.value),  # jump
     (TicketState.NEW.value, TicketState.CLOSED.value),  # jump
     (TicketState.IN_PROGRESS.value, TicketState.CLOSED.value),  # jump
     (TicketState.RESOLVED.value, TicketState.IN_PROGRESS.value),  # reopen
-    (TicketState.CLOSED.value, TicketState.IN_PROGRESS.value),  # reopen
 ]
 
-# Back to Nuevo, other moves back and repeated states.
+# Back to Nuevo, any change on Cerrado (final) and repeated states.
 REJECTED_TRANSITIONS = [
+    (TicketState.CLOSED.value, TicketState.IN_PROGRESS.value),  # Cerrado is final
     (TicketState.IN_PROGRESS.value, TicketState.NEW.value),
     (TicketState.RESOLVED.value, TicketState.NEW.value),
     (TicketState.CLOSED.value, TicketState.NEW.value),
@@ -147,23 +149,37 @@ def test_rejected_transitions_answer_409_and_change_nothing(auth_client):
         assert len(history_of(auth_client, ticket["id"])) == entries_before
 
 
-def test_cerrado_only_reopens_to_en_proceso(auth_client):
-    ticket = create_ticket(auth_client)
-    advance_to(auth_client, ticket["id"], TicketState.CLOSED.value)
+def test_cerrado_rejects_every_target_state(auth_client):
+    """Cerrado is final, also when it was reached by skipping steps."""
+    for path in (["Resuelto", "Cerrado"], ["Cerrado"]):
+        ticket = create_ticket(auth_client, title=f"Cerrado por {' y '.join(path)}")
+        for target in path:
+            assert change_state(auth_client, ticket["id"], target).status_code == 200
+        entries_before = len(history_of(auth_client, ticket["id"]))
 
-    for target in (TicketState.NEW.value, TicketState.RESOLVED.value, TicketState.CLOSED.value):
-        response = change_state(auth_client, ticket["id"], target)
-        assert response.status_code == 409
-        assert "no permitida" in response.json()["detail"]
+        for target in WORKFLOW:
+            response = change_state(auth_client, ticket["id"], target, "Reabrir")
+            assert response.status_code == 409, target
+            assert "no permitida" in response.json()["detail"]
+
+        assert auth_client.get(f"/api/tickets/{ticket['id']}").json()["state"] == "Cerrado"
+        assert len(history_of(auth_client, ticket["id"])) == entries_before
+        assert auth_client.get(f"/api/tickets/{ticket['id']}/comments").json() == []
+
+
+def test_resuelto_reopens_to_en_proceso(auth_client):
+    ticket = create_ticket(auth_client)
+    advance_to(auth_client, ticket["id"], TicketState.RESOLVED.value)
 
     response = change_state(auth_client, ticket["id"], TicketState.IN_PROGRESS.value)
+
     assert response.status_code == 200
     assert response.json()["state"] == TicketState.IN_PROGRESS.value
 
 
 def test_reopened_ticket_can_be_resolved_and_closed_again(auth_client):
     ticket = create_ticket(auth_client)
-    for target in ("Resuelto", "En proceso", "Cerrado", "En proceso", "Resuelto", "Cerrado"):
+    for target in ("Resuelto", "En proceso", "Resuelto", "En proceso", "Cerrado"):
         assert change_state(auth_client, ticket["id"], target).status_code == 200, target
 
     states = [
@@ -172,8 +188,8 @@ def test_reopened_ticket_can_be_resolved_and_closed_again(auth_client):
         if e["action"] == "Cambio de estado"
     ]
     assert states == [
-        ("Nuevo", "Resuelto"), ("Resuelto", "En proceso"), ("En proceso", "Cerrado"),
-        ("Cerrado", "En proceso"), ("En proceso", "Resuelto"), ("Resuelto", "Cerrado"),
+        ("Nuevo", "Resuelto"), ("Resuelto", "En proceso"), ("En proceso", "Resuelto"),
+        ("Resuelto", "En proceso"), ("En proceso", "Cerrado"),
     ]
 
 

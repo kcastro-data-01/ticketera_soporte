@@ -82,6 +82,9 @@ const ELEMENT_IDS = [
   "estado-destino",
   "cambiar-estado",
   "estado-final",
+  "campo-destino",
+  "acciones-estado",
+  "estado-ayuda",
   "form-comentario",
   "contenido",
   "comentar",
@@ -784,14 +787,16 @@ test("Eliminar: un 404 avisa que el ticket ya no existe", async () => {
 /* Cambio de estado con confirmación y motivo opcional (puntos del recorrido
    y «Cambiar estado»). Sin document.body, confirmarAccion usa window.confirm
    y devuelve un motivo vacío. */
-test("Cambiar estado: pide confirmación con el número y el destino, y envía solo el estado", async () => {
+test("Cambiar estado: al cerrar, la confirmación avisa que no se puede reabrir", async () => {
   const harness = createHarness(makeFetch());
   await harness.init();
   harness.clearCalls();
 
   await harness.call("pedirCambioEstado", "Cerrado");
 
-  assert.deepEqual(harness.confirmaciones, ["¿Pasar el ticket #1 a «Cerrado»?"]);
+  assert.deepEqual(harness.confirmaciones, [
+    "¿Pasar el ticket #1 a «Cerrado»? Un ticket Cerrado ya no se puede reabrir.",
+  ]);
   const patch = harness.fetchCalls.find((c) => c.options.method === "PATCH");
   assert.equal(patch.url, "/api/tickets/1/state");
   assert.deepEqual(JSON.parse(patch.options.body), { state: "Cerrado" });
@@ -828,18 +833,25 @@ test("Cambiar estado: el botón usa la misma confirmación con el destino elegid
   harness.node("estado-destino").value = "Resuelto";
   await harness.node("cambiar-estado").listeners.click[0]();
 
-  assert.deepEqual(harness.confirmaciones, ["¿Pasar el ticket #1 a «Resuelto»?"]);
+  assert.deepEqual(harness.confirmaciones, ["¿Pasar el ticket #1 a «Resuelto»?"],
+    "el aviso de no reabrir es solo para Cerrado");
   const patch = harness.fetchCalls.find((c) => c.options.method === "PATCH");
   assert.deepEqual(JSON.parse(patch.options.body), { state: "Resuelto" });
 });
 
-test("Pasar a: ofrece saltos hacia adelante y, desde Cerrado, reabrir", async () => {
+test("Pasar a: ofrece saltos hacia adelante; en Cerrado no aparece y se muestra la nota final", async () => {
   const harness = createHarness(makeFetch());
   await harness.init();
   const opciones = () => harness.node("estado-destino").children.map((o) => o.value);
+  const ocultos = () => ["campo-destino", "acciones-estado", "estado-ayuda", "estado-final"]
+    .map((id) => harness.node(id).hidden);
   assert.deepEqual(opciones(), ["En proceso", "Resuelto", "Cerrado"]);
+  assert.deepEqual(ocultos(), [false, false, false, true]);
+
+  harness.call("renderEstadoControl", { ...TICKET, state: "Resuelto" });
+  assert.deepEqual(opciones(), ["Cerrado", "En proceso"]);
 
   harness.call("renderEstadoControl", { ...TICKET, state: "Cerrado" });
-  assert.deepEqual(opciones(), ["En proceso"]);
-  assert.equal(harness.node("estado-final").hidden, true);
+  assert.deepEqual(opciones(), []);
+  assert.deepEqual(ocultos(), [true, true, true, false]);
 });
