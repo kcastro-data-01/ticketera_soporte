@@ -241,7 +241,8 @@ class ProcessedEmail(Base):
     """Correo del buzón de soporte que ya se revisó (no se procesa dos veces).
 
     ``message_id`` es la cabecera ``Message-ID`` del correo. ``result`` dice
-    qué se hizo: ``ticket``, ``comentario``, ``inactivo``, ``ignorado`` o
+    qué se hizo: ``ticket``, ``comentario``, ``cerrado`` (respuesta a un ticket
+    Cerrado: no se comentó), ``inactivo``, ``ignorado`` o
     ``inicio`` (marca de cuándo se activó la lectura del buzón: los correos
     anteriores no se procesan). ``registro`` (se le pedía registrarse) solo
     queda en correos viejos.

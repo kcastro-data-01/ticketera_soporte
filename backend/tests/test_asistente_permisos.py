@@ -11,6 +11,7 @@ import pytest
 
 from backend.models import User
 from backend.services.asistente_service import (
+    NOTA_CERRADO,
     PERMISOS_POR_ROL,
     REGLAS_PARA_IA,
     ROLES_TABLA,
@@ -66,11 +67,12 @@ def test_permissions_table_is_the_same_as_the_help_page():
 
 def test_role_texts_follow_the_table():
     tecnico = PERMISOS_POR_ROL["Técnico"]
-    assert "No puede editar tickets, asignar tickets, ver las métricas, eliminar tickets ni administrar usuarios." in tecnico
+    assert "No puede asignar tickets, ver las métricas, eliminar tickets ni administrar usuarios." in tecnico
+    assert "editar tickets (los que creó, mientras están en Nuevo)" in tecnico.split("No puede")[0]
     assert "cambiar el estado" in tecnico.split("No puede")[0]
     solicitante = PERMISOS_POR_ROL["Solicitante"]
     assert "ver tickets (los suyos y los asignados a él)" in solicitante
-    assert "editar tickets" in solicitante.split("No puede")[1]
+    assert "editar tickets (los que creó, mientras están en Nuevo)" in solicitante.split("No puede")[0]
     assert "asignar tickets" in solicitante.split("No puede")[1]
     assert "No puede" not in PERMISOS_POR_ROL["Administrador"]
 
@@ -78,10 +80,11 @@ def test_role_texts_follow_the_table():
 def test_technician_and_requester_one_line_each_without_ai(client, ia, admin):
     respuesta = _respuesta(ask(client, admin, "y que hace el tecnico y el solicitante?"), "directa")
 
-    assert respuesta == f"{linea('Técnico')}\n{linea('Solicitante')}"
-    # Ninguno de los dos edita ni asigna (la IA lo había inventado).
+    assert respuesta == f"{linea('Técnico')}\n{linea('Solicitante')}\n{NOTA_CERRADO}"
+    # Ninguno de los dos asigna (la IA lo había inventado) y solo editan los suyos en Nuevo.
     for rol in ("Técnico", "Solicitante"):
-        assert "editar tickets" in PERMISOS_POR_ROL[rol].split("No puede")[1]
+        assert "asignar tickets" in PERMISOS_POR_ROL[rol].split("No puede")[1]
+        assert "editar tickets (los que creó, mientras están en Nuevo)" in PERMISOS_POR_ROL[rol]
     sin_nombres(respuesta)
     assert ia.interpretaciones == [] and ia.calls == []
 
@@ -100,8 +103,8 @@ def test_technician_and_requester_one_line_each_without_ai(client, ia, admin):
 def test_role_questions_are_answered_by_the_server(client, ia, admin, pregunta, roles):
     respuesta = _respuesta(ask(client, admin, pregunta), "directa")
 
-    lineas = [TRES_ROLES, *map(linea, ROLES_TABLA)] if roles is None else map(linea, roles)
-    assert respuesta == "\n".join(lineas)
+    lineas = [TRES_ROLES, *map(linea, ROLES_TABLA)] if roles is None else list(map(linea, roles))
+    assert respuesta == "\n".join([*lineas, NOTA_CERRADO])
     assert "Supervisor" not in respuesta
     sin_nombres(respuesta)
     assert ia.interpretaciones == [] and ia.calls == []
@@ -109,12 +112,12 @@ def test_role_questions_are_answered_by_the_server(client, ia, admin, pregunta, 
 
 def test_follow_up_with_another_role(client, ia, admin):
     primera = _respuesta(ask(client, admin, "que hace el tecnico"), "directa")
-    assert primera == linea("Técnico")
+    assert primera == f"{linea('Técnico')}\n{NOTA_CERRADO}"
 
     segunda = _respuesta(conversar(client, admin, "que hace el tecnico", primera, "y el solicitante?"),
                          "directa")
 
-    assert segunda == linea("Solicitante")
+    assert segunda == f"{linea('Solicitante')}\n{NOTA_CERRADO}"
     sin_nombres(segunda)
     assert ia.calls == []
 

@@ -155,7 +155,7 @@ test("detalle.html: notas debajo del recorrido y sin el recuadro «Cambio de est
   assert.match(html, /id="pasos-estado"[^>]*tabindex="-1"/);
   const despues = html.slice(html.indexOf("</ol>", html.indexOf('id="pasos-estado"')));
   assert.match(despues, /^<\/ol>[\s\S]*?<p id="pasos-nota" class="pasos-nota" hidden>Toque un estado para cambiarlo\.<\/p>/);
-  assert.match(despues, /<p id="estado-final" class="pasos-nota" hidden>\s*Este ticket está <b>Cerrado<\/b>: es un estado final y no admite más\s+cambios de estado\.\s*<\/p>/);
+  assert.match(despues, /<p id="estado-final" class="pasos-nota" hidden>\s*Este ticket está <b>Cerrado<\/b> y no admite cambios\.\s*<\/p>/);
   for (const viejo of ["seccion-estado", "estado-destino", "cambiar-estado", "Pasar a", "estado-actual"]) {
     assert.ok(!html.includes(viejo), viejo);
   }

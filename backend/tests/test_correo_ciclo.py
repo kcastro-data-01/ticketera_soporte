@@ -153,7 +153,8 @@ def test_reply_to_the_confirmation_is_a_comment(modo, entorno, factory, session,
 def test_reply_on_a_resolved_or_closed_ticket_is_a_comment_and_keeps_the_state(estado, entorno,
                                                                               factory, session, gente):
     """Responder por correo no reabre el ticket (no hay reapertura automática):
-    solo agrega el comentario; reabrir es pasarlo a «En proceso» a mano."""
+    en uno Resuelto solo agrega el comentario (reabrir es pasarlo a «En
+    proceso» a mano); en uno Cerrado ni siquiera comenta (test_integridad.py)."""
     graph = FakeGraph([pedido_de_ana()], copiar_a_enviados=True)
     revisar(MODOS[0], factory, graph, entorno)
     [ticket] = tickets(session)
@@ -168,7 +169,8 @@ def test_reply_on_a_resolved_or_closed_ticket_is_a_comment_and_keeps_the_state(e
 
     [ticket] = tickets(session)
     assert ticket.state == estado
-    assert comentarios(session, ticket.id) == ["Volvió a fallar esta mañana."]
+    esperado = [] if estado == "Cerrado" else ["Volvió a fallar esta mañana."]
+    assert comentarios(session, ticket.id) == esperado
 
 
 @pytest.mark.parametrize("modo", MODOS)

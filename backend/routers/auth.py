@@ -32,7 +32,9 @@ ROLES_ADMIN = {UserRole.ADMIN.value}
 # Todos los roles: ver tickets (el Solicitante solo los suyos), crear y comentar.
 ROLES_TODOS = {role.value for role in UserRole}
 # Todos menos el Solicitante: cambiar estado, historial global y «Explicar con IA».
-# Lo demás (editar, asignar, métricas, eliminar y usuarios) es solo ROLES_ADMIN.
+# Lo demás (asignar, métricas, eliminar y usuarios) es solo ROLES_ADMIN. Editar
+# un ticket: quien lo creó (mientras está «Nuevo») o el Administrador
+# (ticket_service.edit_denied_reason). Un ticket Cerrado no lo cambia nadie.
 ROLES_EQUIPO = ROLES_TODOS - {UserRole.REQUESTER.value}
 
 

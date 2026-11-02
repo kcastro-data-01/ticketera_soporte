@@ -8,12 +8,12 @@ from backend.models import User
 from backend.routers.auth import ROLES_TODOS, role_required
 from backend.schemas import CommentCreate, CommentResponse
 from backend.services import correo_service, ticket_service
-from backend.services.ticket_service import TicketNotFoundError
+from backend.services.ticket_service import TicketClosedError, TicketNotFoundError
 
 router = APIRouter(prefix="/api/tickets", tags=["Comentarios"])
 
 # Cualquier usuario autenticado puede comentar y leer comentarios; el
-# Solicitante solo en los tickets que creó.
+# Solicitante solo en los tickets que creó. Un ticket Cerrado no se comenta.
 COMMENT_ROLES = ROLES_TODOS
 
 
@@ -31,7 +31,8 @@ def create_comment(
 ) -> CommentResponse:
     """Create a comment on an existing ticket (RF5).
 
-    Requires authentication (401 without token).
+    Requires authentication (401 without token). A Cerrado ticket is
+    read-only: ``409`` with «El ticket #N está Cerrado y no admite cambios.».
     """
     if ticket_service.get_visible_ticket(session, ticket_id, current_user) is None:
         raise HTTPException(
@@ -47,6 +48,8 @@ def create_comment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ticket {ticket_id} no encontrado",
         )
+    except TicketClosedError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error))
     # Aviso por correo al solicitante y al asignado (AVISAR_COMENTARIOS). Si
     # falla, el comentario queda guardado igual y el error va al log.
     correo_service.avisar_comentario(

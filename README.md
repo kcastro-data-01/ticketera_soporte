@@ -15,7 +15,7 @@ filtrarlos, y consultar su historial de cambios.
   tocando el estado en el recorrido del detalle, con motivo
   opcional que queda como comentario. Se puede saltar pasos hacia adelante
   (p. ej. `Nuevo → Cerrado`) y reabrir `Resuelto → En proceso`. `Cerrado` es
-  un estado final: no se reabre.
+  un estado final y de solo lectura (ver «Integridad de los tickets»).
 - Asignar el ticket a una persona.
 - Agregar comentarios al ticket.
 - Ver listado de tickets.
@@ -47,8 +47,10 @@ filtrarlos, y consultar su historial de cambios.
   `node:test` (52 pruebas en cuatro ficheros) y documentación en
   [docs/api.md](docs/api.md).
 
-- Tres roles: Administrador, Técnico y Solicitante. Editar, asignar, eliminar,
-  métricas y usuarios son solo del Administrador. Al arrancar, una migración
+- Tres roles: Administrador, Técnico y Solicitante. Asignar, eliminar,
+  métricas y usuarios son solo del Administrador; editar un ticket, quien lo
+  creó (mientras está «Nuevo») o el Administrador (ver «Integridad de los
+  tickets»). Al arrancar, una migración
   pasa a Técnico a quien todavía tenga el rol Supervisor, que ya no existe
   (queda en el log), y la API responde `422` si se intenta usar.
 - Permisos por rol: el servidor aplica la tabla de permisos (ver
@@ -317,8 +319,9 @@ curl -X PATCH http://127.0.0.1:8000/api/tickets/1 \
 
 Actualización **parcial**: envía solo los campos que quieras cambiar entre
 `title`, `description`, `category` y `priority`. Respuestas: `200 OK` con el
-ticket actualizado, `404 Not Found` si el ticket no existe y `422` si algún
-campo es inválido o la petición no contiene campos modificables. Los campos
+ticket actualizado, `403` si quien edita no puede (ver «Integridad de los
+tickets»), `404 Not Found` si el ticket no existe, `409` si está `Cerrado` y
+`422` si algún campo es inválido o la petición no contiene campos modificables. Los campos
 `id`, `state`, `assigned_to_id` y `created_at` no se pueden modificar con este
 endpoint; `updated_at` se actualiza automáticamente.
 
@@ -481,6 +484,39 @@ ejemplos), junto con el mapeo RF1–RF9 y la lista de lo **no implementado**,
 está en [docs/api.md](docs/api.md). La documentación interactiva se sirve en
 `/docs` con la aplicación arrancada.
 
+## Integridad de los tickets
+
+**Editar** un ticket (título, descripción, categoría y prioridad):
+
+| Quién | Cuándo |
+|-------|--------|
+| Quien lo creó (cualquier rol) | Solo mientras está `Nuevo` |
+| Administrador | En cualquier estado salvo `Cerrado` |
+| Nadie más (Técnico o Solicitante que no lo creó) | Nunca |
+
+Cada cambio queda en el historial (quién, qué campo, valor anterior y nuevo, y
+cuándo). En cualquier otro caso la API responde `403` con el motivo, por
+ejemplo «Solo puede editar el ticket mientras está «Nuevo»; ahora está «En
+proceso». Pídale el cambio a un Administrador.» La regla está en
+`ticket_service.edit_denied_reason` y su espejo en `puedeEditarTicket`
+(`frontend/js/auth.js`).
+
+**Un ticket `Cerrado` es de solo lectura para todos**, también para el
+Administrador: no se edita, no se reasigna, no se comenta, no se elimina y no
+cambia de estado. Cada uno de esos endpoints responde `409` con «El ticket #N
+está Cerrado y no admite cambios.»; la regla está en los servicios
+(`TicketClosedError`), así que vale también para el correo y el chat. En el
+detalle de un ticket Cerrado no aparecen «Editar ticket», «Asignación»,
+«Eliminar» ni el cuadro de comentario, y se ve la nota «Este ticket está
+Cerrado y no admite cambios.».
+
+Si llega por correo una respuesta a un ticket Cerrado, no se agrega como
+comentario: se le contesta una sola vez (el correo queda registrado como
+`cerrado`) «El ticket #N está cerrado. Si el problema continúa, envíe un nuevo
+correo para crear otro ticket.» y queda en el log (`Comentario no agregado: el
+ticket #N está Cerrado…`). Si quien contesta es el dueño del buzón (Elementos
+enviados), tampoco se comenta, y no se le envía el aviso a sí mismo.
+
 ## Eliminar tickets
 
 Solo el **Administrador** puede eliminar un ticket: en el detalle del ticket
@@ -489,7 +525,8 @@ aparece el botón **Eliminar** (los demás roles no lo ven, y la API les respond
 ticket #N? Esta acción no se puede deshacer.») y después se vuelve al listado.
 
 - API: `DELETE /api/tickets/{id}` → `204` si se eliminó, `403` si el rol no es
-  Administrador, `404` si el ticket no existe.
+  Administrador, `404` si el ticket no existe, `409` si está `Cerrado` (un
+  ticket Cerrado no se elimina).
 - Se borran el ticket, sus comentarios y su historial en una sola transacción
   (si algo falla, no se borra nada).
 - Si el ticket vino por correo, el registro de ese correo se conserva sin
@@ -903,7 +940,7 @@ Si un correo de soporte real no se detecta, agrega la frase a la lista.
 | Quién escribe (correo que pide ayuda) | Qué pasa |
 |---|---|
 | Usuario activo de la ticketera (mismo correo) | Se crea el ticket a su nombre (asunto = título, cuerpo = descripción, categoría y prioridad por palabras clave) y se le responde con el número y el enlace. |
-| Responde en el hilo de un correo que ya es ticket (In-Reply-To / References / `conversationId`) | Se agrega como **comentario** si es el solicitante, el asignado o **cualquier usuario activo que estuvo en el hilo** (en «Para» o CC). |
+| Responde en el hilo de un correo que ya es ticket (In-Reply-To / References / `conversationId`) | Se agrega como **comentario** si es el solicitante, el asignado o **cualquier usuario activo que estuvo en el hilo** (en «Para» o CC). Si el ticket está `Cerrado`, no se comenta: se le responde una sola vez «El ticket #N está cerrado. Si el problema continúa, envíe un nuevo correo para crear otro ticket.» (registro `cerrado`). |
 | Escribe «[Ticket #N]» (o «Ticket #N») en el asunto, sin responder en el hilo | Comentario solo si es el solicitante o el asignado de ese ticket (así nadie comenta un ticket ajeno con solo escribir el número). |
 | Alguien sin cuenta del dominio de la empresa (`DOMINIO_EMPRESA`, p. ej. `data.cr`) | **No se crea ni el usuario ni el ticket.** Se le responde en el hilo: «Para crear tickets por correo, primero ingrese a la ticketera con su cuenta de Microsoft de la empresa: `APP_URL`. Después vuelva a enviar su solicitud.» (con `X-Auto-Response-Suppress` y `X-Ticketera`). El correo queda registrado (`sin_cuenta`), así no se le responde dos veces. Solo si el correo pasa el filtro: a un correo normal de un compañero sin cuenta no se le responde. |
 | Alguien sin cuenta que responde en el hilo de un ticket | Se ignora (no comenta ni recibe el aviso). En el registro: `Comentario ignorado: <correo> no tiene cuenta en la ticketera (ticket #N)`. |

@@ -166,6 +166,16 @@ async function mensajeDeDetalle(response, mensajePorDefecto) {
   return body && body.detail ? String(body.detail) : mensajePorDefecto;
 }
 
+/* 403 (sin permiso para este ticket) o 409 (ticket Cerrado): muestra el
+   motivo que da el servidor y recarga el ticket, para que los controles
+   queden como dicen las reglas. Devuelve true si la respuesta era una de esas. */
+async function rechazoDeReglas(response, mensajePorDefecto) {
+  if (response.status !== 403 && response.status !== 409) return false;
+  avisar(await mensajeDeDetalle(response, mensajePorDefecto), "error");
+  await cargarTicket({ silencioso: true });
+  return true;
+}
+
 /* «Imprimir»: anota la fecha en el encabezado de la hoja y abre el
    diálogo del navegador (el estilo de impresión está en estilos.css). */
 function imprimirTicket() {
@@ -254,6 +264,7 @@ function renderTicket(ticket) {
   elements.ver.state.textContent = ticket.state;
   elements.ver.state.className = claseBadge(ticket.state);
   pintarPasos(ticket.state);
+  aplicarReglasTicket(ticket);
   pintarPersona(elements.ver.assigned, nombreAsignado(ticket));
   pintarPersona(elements.ver.creator, nombreSolicitante(ticket));
   elements.ver.created.textContent = formatFecha(ticket.created_at);
@@ -265,6 +276,26 @@ function renderTicket(ticket) {
     ticket.assigned_to_id === null || ticket.assigned_to_id === undefined
       ? ""
       : String(ticket.assigned_to_id);
+}
+
+/* Controles según las reglas del ticket (el servidor vuelve a validar):
+   «Editar ticket» solo para quien puede editarlo; «Asignación» y «Eliminar»
+   para el Administrador; el cuadro de comentario para todos. Un ticket
+   Cerrado es de solo lectura: ninguno se muestra. */
+function aplicarReglasTicket(ticket) {
+  const elements = getElements();
+  const cerrado = ticketCerrado(ticket);
+  const editando = elements.seccionEdicion && !elements.seccionEdicion.hidden;
+  if (!puedeEditarTicket(ticket)) {
+    if (elements.seccionEdicion) elements.seccionEdicion.hidden = true;
+    elements.editar.hidden = true;
+  } else if (!editando) {
+    elements.editar.hidden = false;
+  }
+  if (elements.eliminar) elements.eliminar.hidden = cerrado || !puede("eliminar");
+  const asignacion = document.getElementById("seccion-asignacion");
+  if (asignacion) asignacion.hidden = cerrado || !puede("asignar");
+  if (elements.formComentario) elements.formComentario.hidden = cerrado;
 }
 
 function renderUsuarios(users) {
@@ -374,11 +405,11 @@ function rellenarFormularioEdicion(ticket) {
 function salirModoEdicion() {
   const elements = getElements();
   elements.seccionEdicion.hidden = true;
-  elements.editar.hidden = false;
+  elements.editar.hidden = !puedeEditarTicket(ticketActual);
 }
 
 function activarEdicion() {
-  if (ocupado || ticketId === null || !ticketActual) return;
+  if (ocupado || ticketId === null || !ticketActual || !puedeEditarTicket(ticketActual)) return;
   const elements = getElements();
   rellenarFormularioEdicion(ticketActual);
   elements.seccionEdicion.hidden = false;
@@ -395,8 +426,8 @@ function cancelarEdicion() {
   getElements().editar.focus();
 }
 
-/* Solo Administrador (el servidor responde 403 a los demás). Pide
-   confirmación y, si se elimina, vuelve al listado. */
+/* Solo Administrador (el servidor responde 403 a los demás) y nunca en un
+   ticket Cerrado (409). Pide confirmación y, si se elimina, vuelve al listado. */
 async function eliminarTicket() {
   if (ocupado || ticketId === null) return;
   const confirmado = await confirmarAccion({
@@ -419,6 +450,8 @@ async function eliminarTicket() {
     }
     if (response.status === 403) {
       avisar("Solo un Administrador puede eliminar tickets.", "error");
+    } else if (response.status === 409) {
+      await rechazoDeReglas(response, "Un ticket Cerrado no se elimina.");
     } else if (response.status === 404) {
       avisar("El ticket ya no existe. Regrese al listado.", "error");
     } else {
@@ -459,6 +492,7 @@ async function guardarEdicion() {
       avisar(`No se encontró el ticket #${ticketId}.`, "error");
       return;
     }
+    if (await rechazoDeReglas(response, "No tiene permiso para editar este ticket.")) return;
     if (response.status === 422) {
       const body = await response.json().catch(() => null);
       avisar(formatValidation(body), "error");
@@ -512,6 +546,7 @@ async function guardarAsignacion() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ assigned_to_id: assignedToId }),
     });
+    if (await rechazoDeReglas(response, "No tiene permiso para asignar este ticket.")) return;
     if (response.status === 404) {
       avisar(
         await mensajeDeDetalle(
@@ -600,6 +635,8 @@ async function cambiarEstado(destino, motivo = "") {
         ),
         "error"
       );
+      /* Puede que otro lo haya cerrado mientras tanto: el recorrido se actualiza. */
+      await cargarTicket({ silencioso: true });
       return;
     }
     if (response.status === 422) {
@@ -646,6 +683,7 @@ async function agregarComentario() {
       /* El autor lo pone el servidor: el usuario que inició sesión. */
       body: JSON.stringify({ content }),
     });
+    if (await rechazoDeReglas(response, "No se puede comentar este ticket.")) return;
     if (response.status === 404) {
       avisar(
         await mensajeDeDetalle(

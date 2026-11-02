@@ -99,7 +99,7 @@
             <li><code>Nuevo</code>: Ticket recién creado</li>
             <li><code>En proceso</code>: Están trabajando en él</li>
             <li><code>Resuelto</code>: Se ha dado solución</li>
-            <li><code>Cerrado</code>: Ticket cerrado definitivamente; es un estado final y ya no cambia</li>
+            <li><code>Cerrado</code>: Ticket cerrado definitivamente; es un estado final y de solo lectura (no se edita, reasigna, comenta ni elimina)</li>
           </ul>
           <h3>Cambiar el estado</h3>
           <p>En el detalle del ticket, toque el estado al que quiere pasarlo en el recorrido, debajo del título (también se puede con el teclado: Tab hasta el estado y Enter). Si puede cambiarlo, debajo del recorrido verá «Toque un estado para cambiarlo.» Se pide confirmación y un <strong>motivo opcional</strong>: si lo escribe, queda como comentario del ticket. Antes de cerrar, la confirmación avisa que un ticket Cerrado ya no se puede reabrir.</p>
@@ -158,7 +158,7 @@
                 <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Los suyos y los asignados a él</td></tr>
                 <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
                 <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>En los suyos y los asignados a él</td></tr>
-                <tr><td>Editar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
+                <tr><td>Editar ticket</td><td>Todos, salvo los Cerrados</td><td>Los que creó, mientras están en Nuevo</td><td>Los que creó, mientras están en Nuevo</td></tr>
                 <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Solo en los asignados a él</td></tr>
                 <tr><td>Asignar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
                 <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>No</td></tr>
@@ -169,6 +169,8 @@
               </tbody>
             </table>
           </div>
+          <p id="nota-editar">Editar un ticket es cambiar su título, descripción, categoría o prioridad. Lo puede hacer quien lo creó, solo mientras está en <code>Nuevo</code>, y el Administrador, en cualquier estado salvo <code>Cerrado</code>; nadie más. Cada cambio queda en el historial con quién, qué y cuándo.</p>
+          <p id="nota-cerrado"><strong>Un ticket Cerrado es de solo lectura para todos, también para el Administrador</strong>: no se edita, no se reasigna, no se comenta, no se elimina y no cambia de estado. En su detalle se ve la nota «Este ticket está Cerrado y no admite cambios.»</p>
         </div>
       </details>
 
@@ -197,6 +199,7 @@
             <li>Los correos que el dueño del buzón envía a alguien de la empresa pasan por el mismo filtro que los que llegan: crean un ticket si el asunto empieza con «Ticket:» o si le reporta a un compañero un problema técnico o le pide soporte, acceso o ayuda (por ejemplo «No me funciona la impresora, ¿la podés revisar?»). La coordinación, los saludos, los envíos de archivos, las reuniones, los agradecimientos y los informes no crean tickets, ni los que van a más de 3 personas o solo a gente de fuera de la empresa. Queda asignado al primer destinatario de la empresa en «Para» (si no tiene cuenta, se le crea); al iniciar sesión con Microsoft ve ese ticket en su lista. Si el aviso al asignado está activo, recibe un correo «Se le asignó el ticket #N» con el enlace.</li>
             <li>Los avisos que envía la ticketera (confirmaciones, «Se le asignó el ticket #N», «Nuevo comentario…») nunca crean tickets, y un correo de una conversación que ya se procesó tampoco. Por seguridad, en cada revisión del buzón se crean como máximo 5 tickets; el resto espera a la siguiente.</li>
             <li>Responder en el hilo de un ticket, o con «[Ticket #N]» en el asunto, agrega un comentario y nunca crea otro ticket. Pueden comentar así el solicitante, el asignado y cualquier usuario activo que esté en el hilo (en «Para» o en copia). Quien no tiene cuenta no puede comentar por correo.</li>
+            <li>Si el ticket está <code>Cerrado</code>, la respuesta por correo no se agrega como comentario: se contesta una sola vez «El ticket #N está cerrado. Si el problema continúa, envíe un nuevo correo para crear otro ticket.» y queda en el registro de la aplicación.</li>
             <li>Cuando alguien agrega un comentario desde la ticketera, el solicitante y el asignado reciben el correo «Nuevo comentario en el ticket #N» (menos quien lo escribió), si ese aviso está activo. Si responden a ese correo, la respuesta vuelve como comentario. Los comentarios que llegan por correo no generan este aviso.</li>
             <li>La ticketera nunca responde a respuestas automáticas, rebotes ni a sus propios avisos.</li>
           </ul>
@@ -212,7 +215,7 @@
             <dt>¿Puedo cambiar mi contraseña?</dt>
             <dd>Se entra con la cuenta de Microsoft de la empresa, así que la contraseña es la de Microsoft: se cambia allí o con el área de TI. La ticketera no guarda contraseñas.</dd>
             <dt>¿Se puede eliminar un ticket?</dt>
-            <dd>Solo el Administrador puede eliminarlo, y la acción no se puede deshacer.</dd>
+            <dd>Solo el Administrador puede eliminarlo, y la acción no se puede deshacer. Un ticket Cerrado no se elimina.</dd>
             <dt>¿Cómo sé quién atiende mi ticket?</dt>
             <dd>En el listado, la columna «Atendido por» (o «Asignado a») muestra la persona responsable; en el detalle aparece en «Asignado a».</dd>
             <dt>¿Cómo imprimo un ticket?</dt>

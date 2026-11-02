@@ -10,6 +10,7 @@ import pytest
 
 from backend.services.asistente_service import (
     GUIA_APP,
+    NOTA_CERRADO,
     PERMISOS_POR_ROL,
     REGLA_CORREO,
     REGLA_LIMITE,
@@ -95,7 +96,7 @@ def test_summary_does_not_detail_the_permissions_table(client, session, ia):
     ("Técnico", "que diferencia hay entre resuelto y cerrado", "**Cerrado**: terminado definitivamente"),
     ("Técnico", "que es la prioridad", "Baja, Media, Alta o Crítica"),
     ("Técnico", "que significa prioridad critica", "Baja, Media, Alta o Crítica"),
-    ("Solicitante", "que prioridades hay", "solo la cambia un Administrador."),
+    ("Solicitante", "que prioridades hay", "la cambia quien creó el ticket, mientras está «Nuevo», o un Administrador"),
     ("Administrador", "que prioridades hay", "usted puede cambiarla con «Editar ticket»"),
     ("Técnico", "que categorias hay", "Hardware (equipos), Software (programas), Red"),
     ("Técnico", "como elimino un ticket", "Solo el Administrador puede eliminar un ticket"),
@@ -165,7 +166,7 @@ def test_counts_permissions_and_rules_still_work(client, session, ia):
     nuevos = _respuesta(ask(client, headers, "cuantos tickets nuevos hay"), "directa")
     assert negrita(2) in nuevos and "nuevos" in nuevos
     permisos = _respuesta(ask(client, headers, "que hace el tecnico"), "directa")
-    assert permisos == f"**Técnico**: {PERMISOS_POR_ROL['Técnico']}"
+    assert permisos == f"**Técnico**: {PERMISOS_POR_ROL['Técnico']}\n{NOTA_CERRADO}"
     regla = _respuesta(ask(client, headers, "cuantos ticketes se le pueden asignar a una persona?"), "directa")
     assert regla == REGLA_LIMITE
     criticos = _respuesta(ask(client, headers, "que tickets criticos hay"), "directa")

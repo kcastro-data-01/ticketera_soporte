@@ -87,6 +87,33 @@ class InvalidTransitionError(Exception):
         super().__init__(f"Transition from {current} to {target} not allowed")
 
 
+class TicketClosedError(Exception):
+    """Raised on any change to a ``Cerrado`` ticket (answered as HTTP 409).
+
+    A closed ticket is read-only for everyone, the Administrador included:
+    it is not edited, reassigned, commented, deleted nor moved to another
+    state.
+    """
+
+    def __init__(self, ticket_id: int):
+        self.ticket_id = ticket_id
+        super().__init__(mensaje_cerrado(ticket_id))
+
+
+def mensaje_cerrado(ticket_id: int) -> str:
+    """Texto de la respuesta 409 cuando se intenta cambiar un ticket Cerrado."""
+    return f"El ticket #{ticket_id} está Cerrado y no admite cambios."
+
+
+def is_closed(ticket: Ticket) -> bool:
+    return ticket.state == TicketState.CLOSED.value
+
+
+def _ensure_open(ticket: Ticket) -> None:
+    if is_closed(ticket):
+        raise TicketClosedError(ticket.id)
+
+
 # Allowed state transitions (RF3): forward to any later state, skipping the
 # ones in between if needed (e.g. "Nuevo → Cerrado" for a ticket that will not
 # be done). The only move back is reopening "Resuelto" → "En proceso".
@@ -342,6 +369,33 @@ def can_change_state(ticket: Ticket, user: User) -> bool:
     return user.role != UserRole.REQUESTER.value or ticket.assigned_to_id == user.id
 
 
+def edit_denied_reason(ticket: Ticket, user: User) -> str | None:
+    """Por qué ``user`` no puede editar ``ticket`` (título, descripción,
+    categoría, prioridad), o ``None`` si puede.
+
+    * El Administrador edita en cualquier estado salvo Cerrado.
+    * Quien creó el ticket, solo mientras está «Nuevo».
+    * Nadie más. Un ticket Cerrado no lo edita nadie (lo responde
+      :class:`TicketClosedError` antes de llegar aquí).
+    """
+    if is_closed(ticket):
+        return mensaje_cerrado(ticket.id)
+    if user.role == UserRole.ADMIN.value:
+        return None
+    if ticket.created_by_id == user.id:
+        if ticket.state == TicketState.NEW.value:
+            return None
+        return (f"Solo puede editar el ticket mientras está «Nuevo»; ahora está "
+                f"«{ticket.state}». Pídale el cambio a un Administrador.")
+    return ("Solo quien creó el ticket (mientras está «Nuevo») o un Administrador "
+            "pueden editarlo.")
+
+
+def can_edit_ticket(ticket: Ticket, user: User) -> bool:
+    """Whether ``user`` may edit ``ticket`` (see :func:`edit_denied_reason`)."""
+    return edit_denied_reason(ticket, user) is None
+
+
 def get_visible_ticket(session, ticket_id: int, user: User | None) -> Ticket | None:
     """Return the ticket when it exists and ``user`` may see it, else ``None``.
 
@@ -415,14 +469,16 @@ def update_ticket(
 ) -> Ticket | None:
     """Apply a partial update to an existing ticket.
 
-    Returns ``None`` when the ticket does not exist (the router answers 404).
-    Only the fields present in ``TicketUpdate`` are touched; the ORM triggers
+    Returns ``None`` when the ticket does not exist (the router answers 404)
+    and raises ``TicketClosedError`` when it is Cerrado. Who may edit is
+    checked by the caller (:func:`can_edit_ticket`). Only the fields present in ``TicketUpdate`` are touched; the ORM triggers
     ``updated_at`` through the model's ``onupdate=utc_now``.
     A history entry is recorded for each changed field (RF9).
     """
     ticket = session.get(Ticket, ticket_id)
     if ticket is None:
         return None
+    _ensure_open(ticket)
 
     changes = {
         field: value
@@ -464,10 +520,12 @@ def assign_ticket(
     Raises:
         ``TicketNotFoundError``: the ticket does not exist.
         ``UserNotFoundError``: the target user does not exist.
+        ``TicketClosedError``: the ticket is Cerrado.
     """
     ticket = session.get(Ticket, ticket_id)
     if ticket is None:
         raise TicketNotFoundError(ticket_id)
+    _ensure_open(ticket)
 
     if assigned_to_id is not None and session.get(User, assigned_to_id) is None:
         raise UserNotFoundError(assigned_to_id)
@@ -516,10 +574,12 @@ def change_ticket_state(
         ``InvalidTransitionError``: the transition is not in
             ``ALLOWED_TRANSITIONS``. Staying in the same state is rejected
             as well.
+        ``TicketClosedError``: the ticket is Cerrado (final state).
     """
     ticket = session.get(Ticket, ticket_id)
     if ticket is None:
         raise TicketNotFoundError(ticket_id)
+    _ensure_open(ticket)
 
     current_state = TicketState(ticket.state)
     if new_state == current_state or new_state not in ALLOWED_TRANSITIONS[current_state]:
@@ -555,9 +615,12 @@ def create_comment(
 
     Raises:
         ``TicketNotFoundError``: the ticket does not exist.
+        ``TicketClosedError``: the ticket is Cerrado.
     """
-    if session.get(Ticket, ticket_id) is None:
+    ticket = session.get(Ticket, ticket_id)
+    if ticket is None:
         raise TicketNotFoundError(ticket_id)
+    _ensure_open(ticket)
 
     comment = _add_comment(session, ticket_id, payload.content, current_user)
     session.commit()
@@ -601,10 +664,12 @@ def delete_ticket(session, ticket_id: int, current_user: User) -> None:
 
     Raises:
         ``TicketNotFoundError``: el ticket no existe.
+        ``TicketClosedError``: el ticket está Cerrado (no se elimina).
     """
     ticket = session.get(Ticket, ticket_id)
     if ticket is None:
         raise TicketNotFoundError(ticket_id)
+    _ensure_open(ticket)
     titulo = ticket.title
     try:
         session.execute(

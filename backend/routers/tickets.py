@@ -18,6 +18,7 @@ from backend.schemas import (
 from backend.services import ticket_service
 from backend.services.ticket_service import (
     InvalidTransitionError,
+    TicketClosedError,
     TicketNotFoundError,
     UserNotFoundError,
 )
@@ -30,6 +31,11 @@ from backend.routers.auth import (
 
 
 router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
+
+
+def _cerrado(error: TicketClosedError) -> HTTPException:
+    """``409``: un ticket Cerrado es de solo lectura para todos."""
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error))
 
 
 @router.post(
@@ -192,11 +198,31 @@ def update_ticket(
     payload: TicketUpdate,
     session: Session = Depends(get_session),
     current_user: User = Depends(
-        role_required(ROLES_ADMIN)
+        role_required(ROLES_TODOS)
     ),
 ) -> TicketResponse:
-    """Update title, description, category and/or priority of a ticket."""
-    ticket = ticket_service.update_ticket(session, ticket_id, payload, current_user)
+    """Update title, description, category and/or priority of a ticket.
+
+    Quien creó el ticket lo edita solo mientras está «Nuevo»; el
+    Administrador, en cualquier estado salvo «Cerrado». A cualquier otro se
+    le responde ``403`` con el motivo; un ticket Cerrado responde ``409`` y
+    uno que no puede ver, ``404``. Cada campo cambiado queda en el historial.
+    """
+    ticket = ticket_service.get_visible_ticket(session, ticket_id, current_user)
+    if ticket is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticket {ticket_id} no encontrado",
+        )
+    if ticket_service.is_closed(ticket):
+        raise _cerrado(TicketClosedError(ticket_id))
+    motivo = ticket_service.edit_denied_reason(ticket, current_user)
+    if motivo is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=motivo)
+    try:
+        ticket = ticket_service.update_ticket(session, ticket_id, payload, current_user)
+    except TicketClosedError as error:
+        raise _cerrado(error)
     if ticket is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -218,7 +244,9 @@ def assign_ticket(
         role_required(ROLES_ADMIN)
     ),
 ) -> TicketResponse:
-    """Assign a user to a ticket; ``assigned_to_id: null`` unassigns it (RF4)."""
+    """Assign a user to a ticket; ``assigned_to_id: null`` unassigns it (RF4).
+
+    A Cerrado ticket is not reassigned (``409``)."""
     try:
         ticket = ticket_service.assign_ticket(
             session, ticket_id, payload.assigned_to_id, current_user
@@ -233,6 +261,8 @@ def assign_ticket(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Usuario {error.user_id} no encontrado",
         )
+    except TicketClosedError as error:
+        raise _cerrado(error)
     return TicketResponse.model_validate(ticket)
 
 
@@ -258,8 +288,8 @@ def change_ticket_state(
     A ticket moves forward to any later state, even skipping steps
     (``Nuevo → Cerrado``); a ``Resuelto`` ticket is reopened only to ``En
     proceso``. ``Cerrado`` is final. Going back to ``Nuevo``, any change on a
-    ``Cerrado`` ticket or staying in the same state is answered with ``409
-    Conflict``. The new state comes from the existing ``TicketState`` enum,
+    ``Cerrado`` ticket («El ticket #N está Cerrado y no admite cambios.») or
+    staying in the same state is answered with ``409 Conflict``. The new state comes from the existing ``TicketState`` enum,
     so an unknown value is rejected with ``422``. An optional ``motivo`` is
     saved as a comment of the ticket in the same transaction.
     """
@@ -269,6 +299,8 @@ def change_ticket_state(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ticket {ticket_id} no encontrado",
         )
+    if ticket_service.is_closed(visible):
+        raise _cerrado(TicketClosedError(ticket_id))
     if not ticket_service.can_change_state(visible, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -283,6 +315,8 @@ def change_ticket_state(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ticket {ticket_id} no encontrado",
         )
+    except TicketClosedError as error:
+        raise _cerrado(error)
     except InvalidTransitionError as error:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -296,14 +330,16 @@ def change_ticket_state(
 @router.delete(
     "/{ticket_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Eliminar un ticket (solo Administrador)",
+    summary="Eliminar un ticket (solo Administrador, no Cerrado)",
 )
 def delete_ticket(
     ticket_id: int,
     session: Session = Depends(get_session),
     current_user: User = Depends(role_required(ROLES_ADMIN)),
 ) -> Response:
-    """Delete a ticket with its comments and history (Administrador only)."""
+    """Delete a ticket with its comments and history (Administrador only).
+
+    A Cerrado ticket is not deleted (``409``)."""
     try:
         ticket_service.delete_ticket(session, ticket_id, current_user)
     except TicketNotFoundError:
@@ -311,4 +347,6 @@ def delete_ticket(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ticket {ticket_id} no encontrado",
         )
+    except TicketClosedError as error:
+        raise _cerrado(error)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

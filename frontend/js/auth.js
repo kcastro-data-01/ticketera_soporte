@@ -94,12 +94,31 @@ const PERMISOS = {
 
 /* Cambiar el estado de un ticket: los roles de «cambiar_estado» en
    cualquiera y, sea cual sea su rol, quien lo tiene asignado (espejo de
-   ticket_service.can_change_state). Editar, asignar y eliminar no cambian. */
+   ticket_service.can_change_state). Un ticket Cerrado no cambia para nadie. */
 function puedeCambiarEstado(ticket) {
+  if (ticketCerrado(ticket)) return false;
   if (puede("cambiar_estado")) return true;
   const user = getUser();
   return Boolean(user && ticket && user.id !== undefined && user.id !== null
     && ticket.assigned_to_id === user.id);
+}
+
+/* Un ticket Cerrado es de solo lectura para todos, también para el
+   Administrador: no se edita, reasigna, comenta, elimina ni cambia de estado
+   (espejo de ticket_service.is_closed; el servidor responde 409). */
+function ticketCerrado(ticket) {
+  return Boolean(ticket && ticket.state === "Cerrado");
+}
+
+/* Editar un ticket: el Administrador (permiso «editar») en cualquier estado
+   salvo Cerrado; quien lo creó, solo mientras está «Nuevo»; nadie más
+   (espejo de ticket_service.edit_denied_reason). */
+function puedeEditarTicket(ticket) {
+  if (!ticket || ticketCerrado(ticket)) return false;
+  if (puede("editar")) return true;
+  const user = getUser();
+  return Boolean(user && user.id !== undefined && user.id !== null
+    && ticket.created_by_id === user.id && ticket.state === "Nuevo");
 }
 
 /* true si el usuario de la sesión tiene el permiso indicado. */

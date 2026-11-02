@@ -67,8 +67,14 @@ Documentación de los endpoints **realmente implementados** en el código
 una lista de objetos `{loc, msg, type}` propia de FastAPI/Pydantic.
 
 **Códigos habituales:** `200` OK · `201` creado · `404` recurso inexistente ·
-`409` conflicto (email duplicado de usuario o transición de estado no
-permitida) · `422` datos inválidos.
+`403` sin permiso (con el motivo en `detail`) · `409` conflicto (email
+duplicado de usuario, transición de estado no permitida o ticket `Cerrado`:
+`{"detail": "El ticket #N está Cerrado y no admite cambios."}`) · `422` datos
+inválidos.
+
+**Ticket `Cerrado`:** es de solo lectura para todos, también para el
+Administrador. Editar, asignar, comentar, eliminar y cambiar el estado
+responden `409` con `El ticket #N está Cerrado y no admite cambios.`
 
 ---
 
@@ -148,10 +154,19 @@ Edición **parcial** de los datos básicos (RF1, RF2): solo `title`,
 `assigned_to_id` y `created_at` **no** se pueden modificar con este endpoint;
 `updated_at` se actualiza automáticamente.
 
+**Quién puede editar:** quien creó el ticket, solo mientras está `Nuevo`; el
+Administrador, en cualquier estado salvo `Cerrado`; nadie más. Cada campo
+cambiado queda en `history` (`action` = `"updated"`, `field`, `old_value`,
+`new_value`, `author`, `author_id`, `created_at`).
+
 **Body:** al menos uno de los cuatro campos (mismas reglas de validación que
 la creación).
 
-**Respuestas:** `200` con el ticket actualizado · `404` si no existe · `422`
+**Respuestas:** `200` con el ticket actualizado · `403` si quien edita no
+puede, con el motivo (*"Solo puede editar el ticket mientras está «Nuevo»;
+ahora está «En proceso». Pídale el cambio a un Administrador."* o *"Solo quien
+creó el ticket (mientras está «Nuevo») o un Administrador pueden editarlo."*) ·
+`404` si no existe o quien pregunta no lo ve · `409` si está `Cerrado` · `422`
 si un valor es inválido o el body no contiene ningún campo modificable
 (mensaje: *"la petición debe incluir al menos un campo a modificar"*).
 
@@ -171,9 +186,11 @@ Asigna un usuario al ticket o lo desasigna (RF4).
 |-------|------|--------|
 | `assigned_to_id` | integer \| null | obligatorio; `null` desasigna; si no es `null` debe existir el usuario |
 
+Solo el **Administrador** (`403` para los demás).
+
 **Respuestas:** `200` con el ticket actualizado · `404` si no existe el
 ticket (`Ticket N no encontrado`) o el usuario (`Usuario N no encontrado`) ·
-`422` si falta el campo.
+`409` si el ticket está `Cerrado` · `422` si falta el campo.
 
 ```bash
 curl -X PATCH http://127.0.0.1:8000/api/tickets/1/assign \
@@ -195,6 +212,7 @@ de la aplicación (`TICKETS: …`).
 | `401` | Sin sesión |
 | `403` | El rol no es Administrador |
 | `404` | El ticket no existe |
+| `409` | El ticket está `Cerrado` (no se elimina) |
 
 ```bash
 curl -X DELETE http://localhost:8000/api/tickets/6 -H "Authorization: Bearer $TOKEN"
@@ -277,8 +295,9 @@ Cambia el estado del ticket a través de la máquina de estados (RF3). Se puede
 avanzar a cualquier estado posterior, aunque se salten pasos, y hacia atrás
 solo se reabre `Resuelto → En proceso`. `Cerrado` es un estado final: no se
 reabre ni admite ningún cambio. No hay transiciones
-automáticas: una respuesta por correo en el hilo de un ticket `Resuelto` o
-`Cerrado` solo agrega un comentario, no lo reabre. Cada cambio exitoso registra
+automáticas: una respuesta por correo en el hilo de un ticket `Resuelto` solo
+agrega un comentario, no lo reabre; en uno `Cerrado` ni siquiera se comenta
+(se le responde al remitente que envíe un correo nuevo). Cada cambio exitoso registra
 **exactamente una** entrada en `history` (`action` = `"Cambio de estado"`,
 `field` = `"state"`, `old_value`/`new_value` con los estados, `author` =
 nombre del usuario autenticado y `author_id` = su id) en la misma operación
@@ -315,7 +334,9 @@ y mantener el mismo estado (`Resuelto → Resuelto`).
 - `404` → `{"detail": "Ticket 999 no encontrado"}` si el ticket no existe.
 - `403` → el Solicitante no está asignado al ticket.
 - `409` → `{"detail": "Transición de 'Resuelto' a 'Nuevo' no permitida"}`
-  cuando la transición no está permitida (incluye mantener el mismo estado).
+  cuando la transición no está permitida (incluye mantener el mismo estado), y
+  `{"detail": "El ticket #N está Cerrado y no admite cambios."}` sobre un
+  ticket `Cerrado` (para cualquier rol).
 - `422` → si falta `state` o el valor no pertenece al enum.
 
 ```bash
@@ -390,7 +411,8 @@ Agrega un comentario a un ticket existente (RF5).
 | `author` | string | opcional (por defecto `"Anónimo"`), no vacío, máx. 120 |
 
 **Respuestas:** `201` con `{id, ticket_id, author, content, created_at}` ·
-`404` si el ticket no existe · `422` si `content` o `author` son inválidos.
+`404` si el ticket no existe · `409` si está `Cerrado` (*"El ticket #N está
+Cerrado y no admite cambios."*) · `422` si `content` o `author` son inválidos.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/tickets/1/comments \

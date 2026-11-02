@@ -103,11 +103,13 @@ DESCRIPCION_ROL = {
 # La tabla «Permisos por rol» de ayuda.html, tal cual (una prueba la compara):
 # (acción en la tabla, cómo se dice en una oración, valor por rol en ROLES_TABLA).
 _SUYOS = "Los suyos y los asignados a él"
+_TODOS_MENOS_CERRADOS = "Todos, salvo los Cerrados"
+_CREADOS_NUEVOS = "Los que creó, mientras están en Nuevo"
 TABLA_PERMISOS = [
     ("Ver tickets", "ver tickets", ("Todos", "Todos", _SUYOS)),
     ("Crear ticket", "crear tickets", ("Sí", "Sí", "Sí")),
     ("Comentar", "comentar", ("Sí", "Sí", "En los suyos y los asignados a él")),
-    ("Editar ticket", "editar tickets", ("Sí", "No", "No")),
+    ("Editar ticket", "editar tickets", (_TODOS_MENOS_CERRADOS, _CREADOS_NUEVOS, _CREADOS_NUEVOS)),
     ("Cambiar estado", "cambiar el estado", ("Sí", "Sí", "Solo en los asignados a él")),
     ("Asignar ticket", "asignar tickets", ("Sí", "No", "No")),
     ("Historial global", "ver el historial global", ("Sí", "Sí", "No")),
@@ -143,6 +145,9 @@ def permisos_del_rol(rol: str) -> str:
 
 # Qué puede hacer cada rol (la tabla de permisos de ayuda.html).
 PERMISOS_POR_ROL = {rol: permisos_del_rol(rol) for rol in ROLES_TABLA}
+# La nota debajo de la tabla de ayuda.html: vale para todos los roles.
+NOTA_CERRADO = ("Un ticket Cerrado es de solo lectura para todos, también para el Administrador: "
+                "no se edita, no se reasigna, no se comenta, no se elimina y no cambia de estado.")
 
 GUIA_APP = """\
 Guía de la aplicación (Sistema de Tickets de American Data Networks):
@@ -1385,10 +1390,11 @@ GUIA_POR_ACCION = [
     ),
     (
         r"(edit|modific|correg|actualiz)\w*|(cambi\w* (el |la )?(titulo|descripcion|categoria|prioridad))",
-        GESTION,
+        TODOS,
         "editar un ticket",
         "Abre el ticket y pulsa «Editar ticket». Cambia el título, la descripción, "
-        "la categoría o la prioridad y pulsa «Guardar cambios».",
+        "la categoría o la prioridad y pulsa «Guardar cambios». Como Administrador "
+        "puedes editar cualquier ticket salvo los Cerrados.",
         "a un Administrador",
     ),
     (
@@ -1407,7 +1413,7 @@ GUIA_POR_ACCION = [
         TODOS,
         "comentar un ticket",
         "Abre el ticket, escribe en «Nuevo comentario» y pulsa «Agregar comentario». "
-        "El comentario queda firmado con tu nombre.",
+        "El comentario queda firmado con tu nombre. Un ticket Cerrado ya no admite comentarios.",
         "",
     ),
     (
@@ -1430,6 +1436,14 @@ GUIA_POR_ACCION = [
     ),
 ]
 
+# «¿Cómo edito un ticket?» de quien no es Administrador: solo los que creó, en Nuevo.
+GUIA_EDITAR_CREADOR = (
+    "Puedes editar los tickets que creaste mientras están en «Nuevo»: abre el ticket, pulsa "
+    "«Editar ticket», cambia el título, la descripción, la categoría o la prioridad y pulsa "
+    "«Guardar cambios». Cuando el ticket ya pasó de «Nuevo», solo lo edita un Administrador, "
+    "y un ticket Cerrado no lo edita nadie."
+)
+
 # Solo se usa la guía en preguntas de «cómo / dónde / puedo»: así «¿cuántos
 # tickets en proceso hay?» sigue yendo a los conteos.
 _PIDE_COMO = re.compile(
@@ -1445,12 +1459,14 @@ def respuesta_guia(user: User, pregunta: str) -> str | None:
         return None
     if re.search(r"\b(que puedo hacer|mis permisos|permisos|mi rol)\b", t):
         return (
-            f"Tu rol es {user.role}. {PERMISOS_POR_ROL.get(user.role, '')}"
+            f"Tu rol es {user.role}. {PERMISOS_POR_ROL.get(user.role, '')} {NOTA_CERRADO}"
         ).strip()
     for patron, roles, accion, pasos, quien in GUIA_POR_ACCION:
         if not re.search(patron, t):
             continue
         if user.role in roles:
+            if accion == "editar un ticket" and user.role != UserRole.ADMIN.value:
+                return GUIA_EDITAR_CREADOR
             if accion == "comentar un ticket" and user.role == "Solicitante":
                 return pasos + " Como Solicitante, puedes comentar en los tickets que creaste."
             if accion == "ver el historial" and user.role == "Solicitante":
@@ -1514,10 +1530,20 @@ REGLA_QUIEN_CAMBIA_ESTADO = (
     "posterior saltando pasos; hacia atrás solo se reabre un ticket Resuelto "
     "pasándolo a En proceso, y un ticket Cerrado ya no cambia."
 )
+REGLA_QUIEN_EDITA = (
+    "Editar un ticket (título, descripción, categoría y prioridad) lo puede hacer quien lo "
+    "creó, solo mientras está en «Nuevo», y el Administrador, en cualquier estado salvo "
+    "«Cerrado». Nadie más: ni el Técnico ni un Solicitante que no lo creó. Cada cambio queda "
+    "en el historial con quién, qué y cuándo."
+)
+REGLA_CERRADO = NOTA_CERRADO + (
+    " Si llega una respuesta por correo a un ticket Cerrado, no se agrega como comentario: se "
+    "responde una sola vez que envíe un correo nuevo para crear otro ticket."
+)
 REGLA_SOLICITANTE = (
     "Un Solicitante solo ve los tickets que él mismo creó y los que tiene asignados. "
-    "Puede crear tickets, comentar en ellos y cambiar el estado de los que tiene "
-    "asignados. No ve el historial global, las métricas ni la lista de usuarios."
+    "Puede crear tickets, editar los que creó mientras están en «Nuevo», comentar en ellos y "
+    "cambiar el estado de los que tiene asignados. No ve el historial global, las métricas ni la lista de usuarios."
 )
 REGLA_CORREO = (
     "Cuando la función de correo está activa, la ticketera revisa el buzón de soporte cada "
@@ -1534,12 +1560,18 @@ REGLA_CORREO = (
     "que recibe el aviso «Se le asignó el ticket #N». Los avisos que envía la ticketera nunca crean "
     "tickets, y un correo de una conversación ya procesada tampoco. Responder en el hilo de un ticket o con «[Ticket #N]» en "
     "el asunto agrega un comentario; pueden hacerlo el solicitante, el asignado y los "
-    "usuarios activos que estén en el hilo. Un comentario hecho en la ticketera se avisa por "
+    "usuarios activos que estén en el hilo; si el ticket está Cerrado, no se agrega el "
+    "comentario y se responde una sola vez que envíe un correo nuevo para crear otro ticket. "
+    "Un comentario hecho en la ticketera se avisa por "
     "correo al solicitante y al asignado, si ese aviso está activo."
 )
 
 # (cómo se reconoce, en la pregunta normalizada; la regla), en orden.
 REGLAS_APP = [
+    (lambda t: re.search(r"\bcerrados?\b", t)
+     and re.search(r"\b(edit\w*|modific\w*|coment\w*|asign\w*|reasign\w*|elimin\w*|borr\w*|"
+                   r"cambi\w*|reabr\w*|toc\w*)", t), REGLA_CERRADO),
+    (lambda t: re.search(rf"{_QUIEN}.*\b(edit\w*|modific\w*|correg\w*)", t), REGLA_QUIEN_EDITA),
     (lambda t: (re.search(rf"\b{_LIMITE}\b", t) or re.search(rf"\b{_CUANTOS}\b", t))
      and _HABLA_DE_CARGA.search(t) and not re.search(r"\bestados?\b", t), REGLA_LIMITE),
     (lambda t: re.search(rf"{_QUIEN}.*\b{_ASIGNADO}", t), REGLA_QUIEN_ASIGNA),
@@ -1556,6 +1588,7 @@ REGLAS_PARA_IA = (
     + "\n".join(f"- {regla}" for _, regla in REGLAS_APP)
     + "\nPermisos de cada rol (son exactamente estos; no agregues ni quites ninguno):\n"
     + "\n".join(f"- {rol}: {PERMISOS_POR_ROL[rol]}" for rol in ROLES_TABLA)
+    + f"\n- {NOTA_CERRADO}"
     + "\nCuando hables de un rol, habla del rol: no le pongas nombres de personas ni "
     "digas quién tiene ese rol, salvo que la pregunta sea sobre una persona concreta."
 )
@@ -1619,6 +1652,7 @@ def respuesta_permisos(pregunta: str) -> str | None:
     roles = roles_nombrados(t)
     lineas = [] if roles else [TRES_ROLES]
     lineas += [f"{_negrita(rol)}: {PERMISOS_POR_ROL[rol]}" for rol in roles or ROLES_TABLA]
+    lineas.append(NOTA_CERRADO)
     return "\n".join(lineas)
 
 
@@ -1688,12 +1722,16 @@ def _app_estados(user: User) -> str:
     )
 
 
+_DESPUES_LA_CAMBIA = (" Después la cambia quien creó el ticket, mientras está «Nuevo», o un "
+                      "Administrador (salvo en un ticket Cerrado).")
+
+
 def _app_prioridad(user: User) -> str:
     texto = ("La prioridad indica qué tan urgente es un ticket: Baja, Media, Alta o Crítica. "
              "Se elige al crear el ticket.")
     if user.role in _ES_GESTION:
-        return texto + " Después usted puede cambiarla con «Editar ticket»."
-    return texto + " Después solo la cambia un Administrador."
+        return texto + " Después usted puede cambiarla con «Editar ticket», salvo en un ticket Cerrado."
+    return texto + _DESPUES_LA_CAMBIA
 
 
 def _app_categoria(user: User) -> str:
@@ -1701,16 +1739,16 @@ def _app_categoria(user: User) -> str:
              "(programas), Red (internet, wifi, VPN) o Accesos (cuentas y permisos). Se elige al "
              "crear el ticket.")
     if user.role in _ES_GESTION:
-        return texto + " Después usted puede cambiarla con «Editar ticket»."
-    return texto + " Después solo la cambia un Administrador."
+        return texto + " Después usted puede cambiarla con «Editar ticket», salvo en un ticket Cerrado."
+    return texto + _DESPUES_LA_CAMBIA
 
 
 def _app_eliminar(user: User) -> str:
     if user.role == UserRole.ADMIN.value:
         return ("Abra el ticket y pulse «Eliminar». Solo el Administrador puede eliminar "
-                "tickets, y la acción no se puede deshacer.")
+                "tickets, y la acción no se puede deshacer. Un ticket Cerrado no se elimina.")
     return ("Solo el Administrador puede eliminar un ticket, y la acción no se puede deshacer. "
-            "Si hace falta, pídaselo a un Administrador.")
+            "Si hace falta, pídaselo a un Administrador. Un ticket Cerrado no se elimina.")
 
 
 def _app_reabrir(user: User) -> str:

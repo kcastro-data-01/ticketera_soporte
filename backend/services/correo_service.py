@@ -193,6 +193,7 @@ FRASES_APP = tuple(re.compile(f, re.IGNORECASE) for f in (
     r"agrego un comentario en el ticket #\d+",
     r"para crear tickets por correo, primero ingrese a la ticketera",
     r"tu cuenta en la ticketera de soporte esta desactivada",
+    r"el ticket #\d+ esta cerrado\. si el problema continua",
 ))
 # Freno de seguridad: tickets nuevos como máximo en una revisión del buzón.
 MAX_TICKETS_POR_CICLO = 5
@@ -202,7 +203,8 @@ MAX_TICKETS_POR_CICLO = 5
 # los buzones: sus respuestas tampoco son solicitudes.
 AVISOS_APP = (re.compile(r"^registrate para crear tickets$", re.IGNORECASE),
               re.compile(r"^no pudimos crear (tu|su) ticket$", re.IGNORECASE),
-              re.compile(r"^ingrese a la ticketera para crear tickets$", re.IGNORECASE))
+              re.compile(r"^ingrese a la ticketera para crear tickets$", re.IGNORECASE),
+              re.compile(r"^ticket\s*#\d+ cerrado$", re.IGNORECASE))
 CONFIRMACIONES_APP = (re.compile(r"^ticket\s*#\d+ creado:", re.IGNORECASE),
                       re.compile(r"^comentario agregado al ticket\s*#\d+$", re.IGNORECASE),
                       re.compile(r"^\[ticket\s*#\d+\]\s*se le asign", re.IGNORECASE),
@@ -584,6 +586,21 @@ def _respuesta_comentario(correo, usuario, ticket, config) -> Respuesta:
     )
 
 
+def _respuesta_cerrado(correo, usuario, ticket) -> Respuesta:
+    """Respuesta a un correo que contesta un ticket Cerrado: no se agrega como
+    comentario (se envía una sola vez: el correo queda registrado)."""
+    return Respuesta(
+        para=correo.remitente,
+        asunto=f"Ticket #{ticket.id} cerrado",
+        texto=(
+            f"{_saludo(usuario.name)}\n\n"
+            f"El ticket #{ticket.id} está cerrado. Si el problema continúa, envíe un nuevo "
+            "correo para crear otro ticket.\n\nMesa de ayuda"
+        ),
+        ticket_id=ticket.id,
+    )
+
+
 def _respuesta_asignado(asignado, autor, ticket, config) -> Respuesta:
     """Aviso al asignado de un ticket creado desde un correo enviado
     (solo con ``AVISAR_ASIGNADO``)."""
@@ -900,6 +917,9 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
     * Un correo de una ticketera (cabecera, asunto o frases de sus avisos) o
       de una conversación ya procesada nunca crea un ticket: comentario si
       responde en el hilo de un ticket, si no ``ignorado``.
+    * Una respuesta a un ticket Cerrado → ``cerrado``: no se agrega como
+      comentario; se responde una sola vez (el correo queda registrado) que
+      envíe un correo nuevo para crear otro ticket, y queda en el log.
     * Con ``puede_crear=False`` (freno del ciclo) un correo que crearía un
       ticket devuelve ``frenado`` sin registrarse: queda para la próxima.
     """
@@ -990,7 +1010,14 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
 
     # ¿Responde a un ticket suyo (lo creó o lo tiene asignado) o en el hilo de
     # un ticket en el que estaba (Para o CC)? → comentario en vez de ticket nuevo.
+    # Si el ticket está Cerrado, no se comenta: se avisa que abra otro.
     if hilo is not None and _puede_comentar(hilo, usuario, por_hilo) and correo.cuerpo:
+        if ticket_service.is_closed(hilo):
+            logger.info("Comentario no agregado: el ticket #%s está Cerrado (correo «%s» de %s); "
+                        "se le respondió que envíe un correo nuevo", hilo.id, correo.asunto,
+                        correo.remitente)
+            _registrar(session, correo, "cerrado", hilo.id)
+            return "cerrado", _respuesta_cerrado(correo, usuario, hilo)
         ticket_service.create_comment(
             session, hilo.id,
             CommentCreate(content=correo.cuerpo[:MAX_DESCRIPCION]), usuario,
@@ -1048,7 +1075,7 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
       ``ignorado``. CC no cuenta.
     * Responde en el hilo de un ticket (In-Reply-To / References o
       conversationId) o con «Ticket #N» en un ticket del dueño → ``comentario``
-      del dueño.
+      del dueño (``cerrado``, sin comentario ni aviso, si el ticket está Cerrado).
     * Su conversación ya se procesó → ``ignorado`` (nunca un ticket nuevo).
     * Con ``CORREO_FILTRO=ia``, antes de todo se ignoran los automáticos, los
       avisos de ticketeras, los boletines y los de más de
@@ -1090,6 +1117,12 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
     dueno = _dueno(session, config)
     hilo, por_hilo = _ticket_del_hilo(session, correo)
     if hilo is not None:
+        if ticket_service.is_closed(hilo):
+            # El dueño contesta un ticket Cerrado: no se comenta (sin aviso a sí mismo).
+            logger.info("Enviado «%s»: el ticket #%s está Cerrado; no se agrega como comentario",
+                        correo.asunto, hilo.id)
+            _registrar(session, correo, "cerrado", hilo.id)
+            return "cerrado", None
         if _puede_comentar(hilo, dueno, por_hilo) and correo.cuerpo:
             ticket_service.create_comment(
                 session, hilo.id, CommentCreate(content=correo.cuerpo[:MAX_DESCRIPCION]), dueno)

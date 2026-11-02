@@ -84,11 +84,13 @@
         <div class="detalle-principal">
   
           <div class="acciones acciones-principales">
-            <button type="button" id="editar" data-permiso="editar">Editar ticket</button>
+            <!-- Solo para quien puede editar este ticket (detalle.js, puedeEditarTicket):
+                 quien lo creó mientras está «Nuevo» o el Administrador salvo en Cerrado. -->
+            <button type="button" id="editar" hidden>Editar ticket</button>
             <!-- Versión formal en papel o PDF: sin menú ni botones. -->
             <button type="button" id="imprimir" class="secundario">Imprimir</button>
-            <!-- Solo Administrador: borra el ticket con sus comentarios e historial.
-                 Va aparte, a la derecha de la barra. -->
+            <!-- Solo Administrador y nunca en un ticket Cerrado: borra el ticket con
+                 sus comentarios e historial. Va aparte, a la derecha de la barra. -->
             <button type="button" id="eliminar" class="peligro accion-aparte" data-permiso="eliminar">Eliminar</button>
           </div>
   
@@ -115,11 +117,11 @@
               <li data-paso="Cerrado"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Cerrado</span></li>
             </ol>
             <!-- detalle.js muestra una u otra: la primera solo a quien puede
-                 cambiar el estado (y no en Cerrado); la segunda, a todos en Cerrado. -->
+                 cambiar el estado (y no en Cerrado); la segunda, a todos en Cerrado
+                 (solo lectura: sin Editar, Asignación, Eliminar ni comentarios). -->
             <p id="pasos-nota" class="pasos-nota" hidden>Toque un estado para cambiarlo.</p>
             <p id="estado-final" class="pasos-nota" hidden>
-              Este ticket está <b>Cerrado</b>: es un estado final y no admite más
-              cambios de estado.
+              Este ticket está <b>Cerrado</b> y no admite cambios.
             </p>
             <h3 class="tarjeta-ticket-subtitulo">Descripción</h3>
             <p id="ver-description" class="tarjeta-ticket-descripcion">—</p>
@@ -275,7 +277,7 @@
             </dl>
           </section>
 
-          <section class="seccion" aria-label="Asignación del ticket" data-permiso="asignar">
+          <section id="seccion-asignacion" class="seccion" aria-label="Asignación del ticket" data-permiso="asignar">
             <h2>Asignación</h2>
             <div class="filtros formulario">
               <label class="campo">

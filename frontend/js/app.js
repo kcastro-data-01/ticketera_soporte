@@ -454,7 +454,7 @@ function renderTickets(tickets) {
       appendPersonaCell(row, assignedText(ticket));
     }
     appendCell(row, formatFecha(ticket.created_at), "celda-fecha");
-    appendActionCell(row, ticket.id);
+    appendActionCell(row, ticket);
     elements.tbody.appendChild(row);
   });
   if (usaTablero()) renderTablero(ordenarTickets(tickets));
@@ -670,15 +670,16 @@ if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", init);
 }
 
-/* Celda de acción: «Editar» para los roles que pueden editar tickets y
-   «Ver» para el resto; ambos abren el detalle. */
-function appendActionCell(row, ticketId) {
+/* Celda de acción: «Editar» si quien mira puede editar ese ticket
+   (puedeEditarTicket, auth.js) y «Ver» si no; ambos abren el detalle. */
+function appendActionCell(row, ticket) {
+  const ticketId = ticket.id;
   const cell = document.createElement("td");
   cell.className = "celda-accion";
   const button = document.createElement("button");
   button.type = "button";
   button.className = "btn-accion";
-  const puedeEditar = typeof puede === "function" ? puede("editar") : true;
+  const puedeEditar = typeof puedeEditarTicket === "function" ? puedeEditarTicket(ticket) : true;
   button.textContent = puedeEditar ? "Editar" : "Ver";
   button.onclick = (e) => {
     e.preventDefault();

@@ -143,7 +143,11 @@ def test_rejected_transitions_answer_409_and_change_nothing(auth_client):
 
         assert response.status_code == 409, (current, target)
         detail = response.json()["detail"]
-        assert detail == f"Transición de '{current}' a '{target}' no permitida"
+        if current == "Cerrado":
+            # Un ticket Cerrado es de solo lectura: el motivo es ese, no la transición.
+            assert detail == f"El ticket #{ticket['id']} está Cerrado y no admite cambios."
+        else:
+            assert detail == f"Transición de '{current}' a '{target}' no permitida"
         assert auth_client.get(f"/api/tickets/{ticket['id']}").json()["state"] == current
         # A rejected transition never reaches the history table.
         assert len(history_of(auth_client, ticket["id"])) == entries_before
@@ -160,7 +164,7 @@ def test_cerrado_rejects_every_target_state(auth_client):
         for target in WORKFLOW:
             response = change_state(auth_client, ticket["id"], target, "Reabrir")
             assert response.status_code == 409, target
-            assert "no permitida" in response.json()["detail"]
+            assert response.json()["detail"] == f"El ticket #{ticket['id']} está Cerrado y no admite cambios."
 
         assert auth_client.get(f"/api/tickets/{ticket['id']}").json()["state"] == "Cerrado"
         assert len(history_of(auth_client, ticket["id"])) == entries_before

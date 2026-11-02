@@ -134,7 +134,9 @@ def create_ticket(client) -> dict:
 
 
 def test_solicitante_cannot_update_ticket(client, auth_client):
-    """Un Solicitante no puede editar tickets (PATCH /api/tickets/{id})."""
+    """Un Solicitante no edita un ticket que no creó (PATCH /api/tickets/{id}):
+    si no lo ve, para él no existe (404); los casos con 403 están en
+    test_integridad.py."""
     ticket = create_ticket(auth_client)
     token = register_requester(client)
 
@@ -143,7 +145,7 @@ def test_solicitante_cannot_update_ticket(client, auth_client):
         json={"title": "Intento de edición no autorizada"},
         headers=headers(token),
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 404
 
 
 def test_solicitante_cannot_assign_ticket(client, auth_client):

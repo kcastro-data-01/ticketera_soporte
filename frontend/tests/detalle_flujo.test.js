@@ -21,8 +21,9 @@ const appSource = fs.readFileSync(APP_PATH, "utf8");
 const authSource = fs.readFileSync(AUTH_PATH, "utf8");
 
 /* Sesión activa mínima para que fetchWithAuth() (auth.js) adjunte el token. */
-function createLocalStorage() {
+function createLocalStorage(usuario) {
   const store = new Map([["access_token", "token-de-prueba"]]);
+  if (usuario) store.set("user", JSON.stringify(usuario));
   return {
     getItem: (key) => (store.has(key) ? store.get(key) : null),
     setItem: (key, value) => store.set(key, String(value)),
@@ -40,6 +41,8 @@ const TICKET = {
   priority: "Alta",
   state: "Nuevo",
   assigned_to_id: null,
+  /* Lo creó la usuaria de la sesión y está «Nuevo»: puede editarlo. */
+  created_by_id: 3,
   created_at: "2026-10-08T16:00:00Z",
   updated_at: "2026-10-08T16:00:00Z",
 };
@@ -167,7 +170,7 @@ function makeFetch(overrides = {}) {
   };
 }
 
-function createHarness(fetchImpl, { confirmar = true } = {}) {
+function createHarness(fetchImpl, { confirmar = true, usuario = null } = {}) {
   const nodes = new Map(ELEMENT_IDS.map((id) => [id, createNode(id)]));
   const fetchCalls = [];
   const consoleErrors = [];
@@ -190,7 +193,7 @@ function createHarness(fetchImpl, { confirmar = true } = {}) {
         return confirmar;
       },
     },
-    localStorage: createLocalStorage(),
+    localStorage: createLocalStorage(usuario),
     fetch: (url, options) => {
       fetchCalls.push({ url, options });
       return fetchImpl(url, options);
@@ -565,7 +568,7 @@ test("HTML: botón Editar ticket, sección de edición oculta y un solo formular
 });
 
 test("activarEdicion muestra el formulario, rellena datos y enfoca el primer campo", async () => {
-  const harness = createHarness(makeFetch());
+  const harness = createHarness(makeFetch(), { usuario: USER });
   await harness.init();
 
   /* Si quedó texto suelto del intento anterior, al entrar se rellena con
@@ -586,7 +589,7 @@ test("activarEdicion muestra el formulario, rellena datos y enfoca el primer cam
 });
 
 test("cancelarEdicion vuelve al modo consulta y descarta lo escrito", async () => {
-  const harness = createHarness(makeFetch());
+  const harness = createHarness(makeFetch(), { usuario: USER });
   await harness.init();
 
   harness.call("activarEdicion");
@@ -604,7 +607,7 @@ test("cancelarEdicion vuelve al modo consulta y descarta lo escrito", async () =
 });
 
 test("guardarEdicion guarda, recarga el ticket y vuelve al modo consulta", async () => {
-  const harness = createHarness(makeFetch());
+  const harness = createHarness(makeFetch(), { usuario: USER });
   await harness.init();
 
   harness.call("activarEdicion");
@@ -638,7 +641,8 @@ test("guardarEdicion guarda, recarga el ticket y vuelve al modo consulta", async
 
 test("si guardar falla se mantiene el modo edición con el error visible", async () => {
   const harness = createHarness(
-    makeFetch({ edit: jsonResponse(500, { detail: "Fallo interno" }) })
+    makeFetch({ edit: jsonResponse(500, { detail: "Fallo interno" }) }),
+    { usuario: USER }
   );
   await harness.init();
 
