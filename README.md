@@ -1104,6 +1104,64 @@ Si aparece «sesión de Microsoft no iniciada o vencida», vuelve a ejecutar
 sesión o estuvo apagada mucho tiempo). La app no se cae: sigue intentando
 cada minuto.
 
+## Probar correos con Mailpit
+
+Para ver los correos que manda la app **sin usar el buzón real**, la versión
+local puede mandarlos a [Mailpit](https://mailpit.axllent.org/), un buzón
+falso que corre en Docker y los muestra en una página. Nada sale a Internet.
+En Vercel no cambia nada: ahí siempre se usa Microsoft Graph, aunque alguien
+ponga `CORREO_PROVEEDOR=mailpit`.
+
+En el `.env`:
+
+```env
+CORREO_PROVEEDOR=mailpit
+AVISAR_COMENTARIOS=true
+AVISAR_ASIGNADO=true
+# Para cuando existan avisos de cambio de estado (hoy no hay).
+AVISAR_ESTADOS=true
+APP_URL=http://localhost:8000
+```
+
+y se levantan los dos servicios:
+
+```bash
+docker compose up -d --build --no-deps ticketera mailpit
+```
+
+Los correos se ven en <http://localhost:8025>. Para probar: comente un ticket
+que tenga solicitante o asignado distinto de usted; a ellos les llega
+«[Ticket #N] Nuevo comentario en el ticket #N».
+
+Con `CORREO_PROVEEDOR=mailpit`:
+
+- **Todos** los correos de la app (confirmaciones, «Se le asignó», «Nuevo
+  comentario», «ingrese primero», «Ticket #N cerrado» y los que se agreguen)
+  salen por SMTP a `mailpit:1025`, con los mismos destinatarios, asunto,
+  texto y cabeceras que con Graph: `Message-ID` propio, `In-Reply-To` y
+  `References` en las respuestas, `X-Ticketera` y `X-Auto-Response-Suppress`.
+  Cada uno queda registrado como `aviso_app` antes de enviarse, igual que con
+  Graph.
+- La app **nunca** usa Graph ni toca el buzón real: no arranca el lector del
+  buzón (aunque `CORREO_ACTIVO=1`), `POST /api/cron/correo` responde que el
+  correo está apagado y `correo_login` no inicia sesión. Tampoco hace falta
+  `CORREO_ACTIVO`.
+- Todavía **no lee** correos (eso viene en el paso siguiente). Por eso, de
+  momento, el único aviso que se ve es el de los comentarios hechos en la app;
+  los demás salen cuando la app responde a un correo recibido.
+- El remitente es `CORREO_USUARIO` (o `soporte@ticketera.local` si no está).
+  `MAILPIT_HOST` y `MAILPIT_PUERTO` cambian el servidor (por defecto
+  `mailpit` y `1025`).
+- Si Mailpit está apagado, el comentario se guarda igual y el error queda en
+  `docker compose logs ticketera`.
+
+Mailpit solo escucha en esta compu (`127.0.0.1`), no pide contraseña y
+guarda los últimos 500 correos en memoria (se borran al reiniciarlo). La API
+para ver los correos sin la página: `curl http://localhost:8025/api/v1/messages`.
+
+Para volver al buzón real: `CORREO_PROVEEDOR=graph` (o borrar la línea) y
+`docker compose up -d --no-deps ticketera`.
+
 ## Publicar en Vercel
 
 La misma app corre en Docker (SQLite + Ollama, como siempre) y en Vercel
@@ -1116,6 +1174,7 @@ valores por defecto (cada uno se puede forzar con su variable):
 | Base de datos (`DATABASE_URL`) | SQLite en el volumen | Postgres en Neon |
 | IA (`ASISTENTE_PROVEEDOR`) | `qwen` | `ninguno` (apagada); `groq` para tenerla gratis |
 | Correo (`CORREO_MODO`) | `hilo`: revisa cada `CORREO_INTERVALO` s | `cron`: lo llama cron-job.org |
+| Envío de correos (`CORREO_PROVEEDOR`) | `graph`, o `mailpit` para probar | siempre `graph` |
 | Caché de tokens del buzón | tabla `msal_cache` | tabla `msal_cache` |
 | `/docs` y `/openapi.json` | visibles | apagados |
 | Contraseña (`LOGIN_LOCAL`) | según `.env` | siempre apagada |

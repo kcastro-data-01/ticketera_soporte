@@ -74,6 +74,13 @@ toma cada correo.
 cada ``CORREO_INTERVALO`` segundos; ``cron`` (por defecto en Vercel, donde no
 hay hilos en segundo plano) no arranca el hilo: cada llamada a
 ``POST /api/cron/correo`` hace un ciclo con :func:`revisar_una_vez`.
+
+``CORREO_PROVEEDOR``: ``graph`` (por defecto, y siempre en Vercel) o
+``mailpit`` (solo local, para probar): todos los correos de la app salen por
+SMTP a Mailpit (``MAILPIT_HOST``, ``MAILPIT_PUERTO``) con los mismos
+destinatarios, asunto, texto y cabeceras (:class:`ClienteSMTP`), y la app
+nunca usa Graph ni toca el buzón real: no se lee ningún buzón y no hace falta
+``CORREO_ACTIVO``.
 """
 
 from __future__ import annotations
@@ -81,11 +88,14 @@ from __future__ import annotations
 import logging
 import os
 import re
+import smtplib
 import threading
 import time
 import unicodedata
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
+from email.message import EmailMessage
+from email.utils import formatdate, make_msgid
 from html import unescape
 from pathlib import Path
 
@@ -118,6 +128,9 @@ MARCA_INICIO_ENVIADOS = "__inicio_enviados__"
 GRAPH_URL = "https://graph.microsoft.com/v1.0"
 CARPETA_PROCESADOS = "Tickets-Procesados"
 MAX_PAGINAS = 10  # hasta 500 no leídos por revisión (50 por página)
+PROVEEDORES = ("graph", "mailpit")
+# Remitente de los correos por Mailpit si no hay CORREO_USUARIO.
+REMITENTE_MAILPIT = "soporte@ticketera.local"
 
 # Palabras clave → categoría / prioridad (se revisan en minúsculas, en el
 # asunto y el cuerpo). Si nada coincide: Software y Media.
@@ -280,6 +293,10 @@ class ConfigCorreo:
     # Avisar por correo al solicitante y al asignado cuando alguien comenta
     # desde la app (``AVISAR_COMENTARIOS``; por defecto solo en Vercel).
     avisar_comentarios: bool = False
+    # «graph» (Microsoft 365) o «mailpit» (SMTP local, solo para probar).
+    proveedor: str = "graph"
+    smtp_host: str = "mailpit"
+    smtp_puerto: int = 1025
 
 
 def _activo(valor: str | None) -> bool:
@@ -287,11 +304,15 @@ def _activo(valor: str | None) -> bool:
 
 
 def config_desde_entorno(env=None) -> ConfigCorreo | None:
-    """Configuración del buzón, o ``None`` si la función está apagada."""
+    """Configuración del buzón, o ``None`` si la función está apagada. Con
+    ``CORREO_PROVEEDOR=mailpit`` siempre hay configuración (solo para enviar)."""
     env = os.environ if env is None else env
-    if not _activo(env.get("CORREO_ACTIVO")):
+    proveedor = proveedor_desde_entorno(env)
+    if proveedor != "mailpit" and not _activo(env.get("CORREO_ACTIVO")):
         return None
     usuario = (env.get("CORREO_USUARIO") or "").strip()
+    if proveedor == "mailpit":
+        usuario = usuario or REMITENTE_MAILPIT
     if not usuario:
         logger.warning("CORREO_ACTIVO está encendido pero falta CORREO_USUARIO")
         return None
@@ -308,7 +329,25 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         avisar_asignado=_activo(env.get("AVISAR_ASIGNADO")),
         modo=modo_desde_entorno(env),
         avisar_comentarios=avisar_comentarios_desde_entorno(env),
+        proveedor=proveedor,
+        smtp_host=(env.get("MAILPIT_HOST") or "mailpit").strip(),
+        smtp_puerto=int(env.get("MAILPIT_PUERTO") or 1025),
     )
+
+
+def proveedor_desde_entorno(env=None) -> str:
+    """``CORREO_PROVEEDOR``: «graph» (por defecto) o «mailpit». En Vercel
+    siempre «graph», aunque la variable diga otra cosa."""
+    env = os.environ if env is None else env
+    valor = (env.get("CORREO_PROVEEDOR") or "").strip().lower() or "graph"
+    if valor not in PROVEEDORES:
+        logger.warning("CORREO_PROVEEDOR=%s no existe: se usa graph", valor)
+        return "graph"
+    if valor != "graph" and en_vercel(env):
+        logger.warning("CORREO_PROVEEDOR=%s es solo para probar en local: en Vercel se usa graph",
+                       valor)
+        return "graph"
+    return valor
 
 
 def filtro_desde_entorno(env=None, ia_disponible=None) -> str:
@@ -1342,10 +1381,65 @@ class ClienteGraph:
         self._enviar_borrador(borrador, registrar)
 
 
-def crear_cliente(config: ConfigCorreo, session_factory=None) -> ClienteGraph:
+class ClienteSMTP:
+    """Envía por SMTP (Mailpit, solo local) los mismos correos que
+    :class:`ClienteGraph`: mismo destinatario, asunto, texto y cabeceras
+    (``X-Ticketera``, ``X-Auto-Response-Suppress``), con un ``Message-ID``
+    propio que se registra **antes** de enviar, igual que con Graph. No lee
+    ningún buzón."""
+
+    def __init__(self, host: str, puerto: int, remitente: str, timeout: float = 10,
+                 conectar=smtplib.SMTP):
+        self._host = host
+        self._puerto = puerto
+        self._remitente = remitente
+        self._timeout = timeout
+        self._conectar = conectar
+
+    def _mensaje(self, respuesta: Respuesta, en_respuesta_a: str = "",
+                 referencias: tuple[str, ...] = ()) -> EmailMessage:
+        mensaje = EmailMessage()
+        mensaje["From"] = self._remitente
+        mensaje["To"] = respuesta.para
+        mensaje["Subject"] = respuesta.asunto
+        mensaje["Date"] = formatdate(localtime=True)
+        mensaje["Message-ID"] = make_msgid(domain=self._remitente.rsplit("@", 1)[-1] or None)
+        if en_respuesta_a:
+            # Como una respuesta de Graph: In-Reply-To es el correo al que
+            # contesta y References, el hilo hasta él.
+            mensaje["In-Reply-To"] = en_respuesta_a
+            mensaje["References"] = " ".join([*referencias, en_respuesta_a])
+        mensaje["X-Auto-Response-Suppress"] = "All"
+        mensaje[CABECERA_APP] = "1"
+        mensaje.set_content(respuesta.texto)
+        return mensaje
+
+    def _enviar(self, mensaje: EmailMessage, registrar) -> None:
+        """Registra el correo (``registrar``) y recién después lo envía; si
+        no se pudo registrar, no se envía (como :meth:`ClienteGraph._enviar_borrador`)."""
+        message_id = mensaje["Message-ID"]
+        if registrar is not None:
+            registrar({"id": message_id, "internetMessageId": message_id, "conversationId": ""})
+        with self._conectar(self._host, self._puerto, timeout=self._timeout) as smtp:
+            smtp.send_message(mensaje)
+
+    def responder(self, mensaje_id: str, respuesta: Respuesta, registrar=None,
+                  referencias: tuple[str, ...] = ()) -> None:
+        """Responde en el hilo del correo con Message-ID ``mensaje_id``."""
+        self._enviar(self._mensaje(respuesta, mensaje_id, referencias), registrar)
+
+    def enviar(self, respuesta: Respuesta, registrar=None) -> None:
+        """Correo nuevo (no una respuesta), marcado como de la ticketera."""
+        self._enviar(self._mensaje(respuesta), registrar)
+
+
+def crear_cliente(config: ConfigCorreo, session_factory=None) -> ClienteGraph | ClienteSMTP:
     """Cliente de Graph con los tokens de la base (importa el archivo de
     caché de antes si la base todavía no los tiene). En modo cron cada pedido
-    espera menos (la llamada entera tiene que terminar en ~25 s)."""
+    espera menos (la llamada entera tiene que terminar en ~25 s). Con
+    ``CORREO_PROVEEDOR=mailpit``, un :class:`ClienteSMTP` (sin Graph)."""
+    if config.proveedor == "mailpit":
+        return ClienteSMTP(config.smtp_host, config.smtp_puerto, config.usuario)
     almacen = AlmacenBD(session_factory, importar_de=config.cache_path)
     token = ProveedorToken(config.m365_tenant, config.m365_client_id, config.usuario, almacen)
     return ClienteGraph(token, timeout=TIMEOUT_GRAPH_CRON if config.modo == "cron" else 60)
@@ -1356,7 +1450,8 @@ def avisar_comentario(session, ticket: Ticket, comentario, autor: User, env=None
     """Avisa por correo de un comentario hecho **desde la app** al solicitante
     y al asignado del ticket, menos a quien comentó. Solo con el correo
     encendido y ``AVISAR_COMENTARIOS``. Los comentarios que llegan por correo
-    no pasan por aquí (así no hay un ciclo de avisos).
+    no pasan por aquí (así no hay un ciclo de avisos). Con
+    ``CORREO_PROVEEDOR=mailpit`` salen por Mailpit.
 
     Nunca lanza: el comentario ya está guardado; si el envío falla, queda en
     el log. Devuelve los correos a los que se avisó."""
@@ -1586,6 +1681,10 @@ def iniciar_lector(session_factory=None) -> bool:
     if config is None:
         logger.info("lectura del buzón apagada (CORREO_ACTIVO no está en 1)")
         return False
+    if config.proveedor == "mailpit":
+        logger.info("CORREO_PROVEEDOR=mailpit: los correos salen por Mailpit (%s:%s) y no se lee "
+                    "ningún buzón", config.smtp_host, config.smtp_puerto)
+        return False
     if config.modo == "cron":
         logger.info("lectura del buzón por cron (CORREO_MODO=cron): POST /api/cron/correo")
         return False
@@ -1629,6 +1728,8 @@ def revisar_una_vez(session_factory=None, limite: float = LIMITE_CRON,
     config = config_desde_entorno()
     if config is None:
         raise CorreoApagado("la lectura del buzón está apagada (CORREO_ACTIVO)")
+    if config.proveedor == "mailpit":
+        raise CorreoApagado("con CORREO_PROVEEDOR=mailpit no se lee ningún buzón")
     if session_factory is None:
         from backend.database import SessionLocal
 

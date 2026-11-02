@@ -40,6 +40,15 @@ services:
       AVISAR_ASIGNADO: ${AVISAR_ASIGNADO:-false}
       # Dirección con la que los demás abren la app (va en los correos).
       APP_URL: ${APP_URL:-http://localhost:8000}
+      # Avisar por correo los comentarios hechos en la app (en Docker,
+      # apagado si no se pone).
+      AVISAR_COMENTARIOS: ${AVISAR_COMENTARIOS:-}
+      # «graph» (Microsoft 365, por defecto) o «mailpit»: todos los correos
+      # salen al servicio mailpit de abajo y nunca se toca el buzón real.
+      # Ver README → «Probar correos con Mailpit».
+      CORREO_PROVEEDOR: ${CORREO_PROVEEDOR:-graph}
+      MAILPIT_HOST: mailpit
+      MAILPIT_PUERTO: 1025
     volumes:
       - ticketera-data:/data
     depends_on:
@@ -79,6 +88,20 @@ services:
       ollama:
         condition: service_healthy
     restart: "no"
+
+  # Buzón falso para probar los correos en local (CORREO_PROVEEDOR=mailpit):
+  # recibe por SMTP (1025) y los muestra en http://localhost:8025. Nada sale
+  # a Internet. Solo escucha en esta compu (sin contraseña).
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+    environment:
+      # Guarda los últimos 500 correos (en memoria: se borran al reiniciar).
+      MP_MAX_MESSAGES: 500
+    mem_limit: 64m
+    restart: unless-stopped
 
 volumes:
   ticketera-data:

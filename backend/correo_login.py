@@ -22,6 +22,12 @@ from backend.services.correo_auth import SinSesionError, almacen_desde_entorno, 
 
 def main(env=None, imprimir=print, iniciar=iniciar_sesion, session_factory=None) -> int:
     env = os.environ if env is None else env
+    from backend.services.correo_service import proveedor_desde_entorno
+
+    if proveedor_desde_entorno(env) == "mailpit":
+        imprimir("Con CORREO_PROVEEDOR=mailpit la ticketera no usa el buzón de Microsoft: "
+                 "no hace falta iniciar sesión.")
+        return 1
     tenant = (env.get("CORREO_M365_TENANT") or "").strip()
     client_id = (env.get("CORREO_M365_CLIENT_ID") or "").strip()
     usuario = (env.get("CORREO_USUARIO") or "").strip().lower()
