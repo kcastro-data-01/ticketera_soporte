@@ -858,6 +858,12 @@ button.peligro:disabled:hover {
     flex: 1 1 100%;
   }
 
+  /* «Desde» y «Hasta» de a dos en la misma fila. */
+  .campo.campo-fecha {
+    flex: 1 1 calc(50% - 0.3rem);
+    min-width: 0;
+  }
+
   .acciones {
     flex-wrap: wrap;
   }

@@ -2,12 +2,19 @@
 assignment and comments)."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.orm import joinedload
 
-from backend.constants import TicketCategory, TicketPriority, TicketState, UserRole
+from backend.constants import (
+    DATE_FIELD_STATE,
+    TicketCategory,
+    TicketDateField,
+    TicketPriority,
+    TicketState,
+    UserRole,
+)
 from backend.models import Comment, History, ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate, TicketUpdate
 from backend.services.user_service import get_auto_assignable_users
@@ -247,6 +254,11 @@ def list_tickets(
     created_by_id: int | None = None,
     assigned_to_id: int | None = None,
     visible_para: User | None = None,
+    asignado_a: int | None = None,
+    sin_asignar: bool = False,
+    fecha_campo: TicketDateField = TicketDateField.CREATED,
+    desde: date | None = None,
+    hasta: date | None = None,
     limit: int | None = None,
     offset: int = 0,
 ) -> tuple[list[Ticket], int]:
@@ -262,6 +274,13 @@ def list_tickets(
     to that user ("Mis tickets") and ``visible_para`` to the tickets that
     user may see (:func:`filtro_visible`).
 
+    ``asignado_a`` keeps the tickets assigned to that user and
+    ``sin_asignar`` the unassigned ones (filter «Asignado a»). ``desde`` /
+    ``hasta`` are days of Costa Rica, both included, over the date chosen by
+    ``fecha_campo``: the creation or the first time the ticket reached «En
+    proceso», «Resuelto» or «Cerrado» (from its history; a ticket that never
+    reached that state does not match).
+
     Returns ``(page, total)``: ``total`` counts every matching ticket and
     ``page`` holds at most ``limit`` of them starting at ``offset`` (all of
     them when ``limit`` is ``None``).
@@ -276,6 +295,12 @@ def list_tickets(
         statement = statement.where(Ticket.created_by_id == created_by_id)
     if assigned_to_id is not None:
         statement = statement.where(Ticket.assigned_to_id == assigned_to_id)
+    if asignado_a is not None:
+        statement = statement.where(Ticket.assigned_to_id == asignado_a)
+    if sin_asignar:
+        statement = statement.where(Ticket.assigned_to_id.is_(None))
+    if desde is not None or hasta is not None:
+        statement = _filtrar_fechas(statement, fecha_campo, desde, hasta)
 
     if category is not None:
         statement = statement.where(Ticket.category == category.value)
@@ -302,6 +327,29 @@ def list_tickets(
     if limit is not None:
         statement = statement.limit(limit)
     return list(session.scalars(statement).all()), total
+
+
+def _filtrar_fechas(statement, fecha_campo: TicketDateField, desde: date | None,
+                    hasta: date | None):
+    """Restringe ``statement`` a los tickets cuya fecha ``fecha_campo`` cae
+    entre ``desde`` y ``hasta`` (días de Costa Rica, ambos incluidos; uno de
+    los dos puede faltar). Las métricas y el chat usan el mismo cálculo."""
+    # metricas_service importa este módulo: se importa aquí para no hacer un ciclo.
+    from backend.services.metricas_service import limites_utc, primer_paso_a
+
+    if fecha_campo == TicketDateField.CREATED:
+        columna = Ticket.created_at
+    else:
+        paso = primer_paso_a(DATE_FIELD_STATE[fecha_campo])
+        statement = statement.join(paso, paso.c.ticket_id == Ticket.id)
+        columna = paso.c.en
+    if desde is not None:
+        inicio, _ = limites_utc(desde, desde)
+        statement = statement.where(columna >= inicio)
+    if hasta is not None:
+        _, fin = limites_utc(hasta, hasta)
+        statement = statement.where(columna < fin)
+    return statement
 
 
 OPEN_STATES = (TicketState.NEW.value, TicketState.IN_PROGRESS.value)

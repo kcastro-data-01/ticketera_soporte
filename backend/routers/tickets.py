@@ -1,11 +1,13 @@
 """Ticket endpoints (creation, listing with search and filters, retrieval,
 edition, assignment, state changes, history and deletion)."""
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_session
-from backend.constants import TicketCategory, TicketPriority, TicketState
+from backend.constants import TicketCategory, TicketDateField, TicketPriority, TicketState
 from backend.schemas import (
     HistoryResponse,
     TicketAssignment,
@@ -89,6 +91,28 @@ def list_tickets(
         False,
         description="Solo los tickets asignados al usuario que consulta.",
     ),
+    assigned_to: int | None = Query(
+        None,
+        ge=1,
+        description="Solo los tickets asignados a ese usuario (filtro «Asignado a»).",
+    ),
+    sin_asignar: bool = Query(
+        False,
+        description="Solo los tickets sin asignar (no se combina con assigned_to).",
+    ),
+    fecha_campo: TicketDateField = Query(
+        TicketDateField.CREATED,
+        description=(
+            "Fecha que miran desde/hasta: creacion, o la primera vez que el ticket "
+            "pasó a en_proceso, resuelto o cerrado (según su historial)."
+        ),
+    ),
+    desde: date | None = Query(
+        None, description="Desde este día (hora de Costa Rica, incluido)."
+    ),
+    hasta: date | None = Query(
+        None, description="Hasta este día (hora de Costa Rica, incluido)."
+    ),
     limit: int | None = Query(
         None, ge=1, le=100, description="Tamaño de página (sin él, todos)."
     ),
@@ -105,7 +129,28 @@ def list_tickets(
     response is the plain listing. ``mios`` keeps the tickets assigned to the
     caller; ``limit``/``offset`` paginate and the ``X-Total-Count`` header
     carries the number of matching tickets.
+
+    ``assigned_to`` / ``sin_asignar`` filter by assignee and ``desde`` /
+    ``hasta`` by the date chosen in ``fecha_campo``. Answered with ``422``:
+    ``desde`` after ``hasta``, an ``assigned_to`` user that does not exist,
+    or ``assigned_to`` together with ``sin_asignar``. The Solicitante still
+    only gets the tickets they may see.
     """
+    if desde is not None and hasta is not None and desde > hasta:
+        raise HTTPException(
+            status_code=422,
+            detail="La fecha «Desde» no puede ser posterior a «Hasta».",
+        )
+    if assigned_to is not None and sin_asignar:
+        raise HTTPException(
+            status_code=422,
+            detail="Elija un usuario o «Sin asignar», no los dos.",
+        )
+    if assigned_to is not None and session.get(User, assigned_to) is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Usuario {assigned_to} no encontrado",
+        )
     tickets, total = ticket_service.list_tickets(
         session,
         search=search,
@@ -115,6 +160,11 @@ def list_tickets(
         # El Solicitante: los que creó y los asignados a él.
         visible_para=current_user,
         assigned_to_id=current_user.id if mios else None,
+        asignado_a=assigned_to,
+        sin_asignar=sin_asignar,
+        fecha_campo=fecha_campo,
+        desde=desde,
+        hasta=hasta,
         limit=limit,
         offset=offset,
     )

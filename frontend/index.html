@@ -121,6 +121,38 @@
         </select>
       </label>
 
+      <!-- Solo Administrador y Técnico: el Solicitante ya ve solo los suyos.
+           app.js agrega los usuarios activos después de «Sin asignar». -->
+      <label class="campo" data-vista="equipo">
+        <span>Asignado a</span>
+        <select id="assigned" name="assigned">
+          <option value="">Todos</option>
+          <option value="sin">Sin asignar</option>
+        </select>
+      </label>
+
+      <!-- «Desde / Hasta» (hora de Costa Rica, los dos días incluidos) sobre la
+           fecha elegida: la creación o la primera vez que pasó a ese estado. -->
+      <label class="campo">
+        <span>Fecha de</span>
+        <select id="fecha-campo" name="fecha_campo">
+          <option value="creacion">Creación</option>
+          <option value="en_proceso">En proceso</option>
+          <option value="resuelto">Resuelto</option>
+          <option value="cerrado">Cerrado</option>
+        </select>
+      </label>
+
+      <label class="campo campo-fecha">
+        <span>Desde</span>
+        <input type="date" id="desde" name="desde">
+      </label>
+
+      <label class="campo campo-fecha">
+        <span>Hasta</span>
+        <input type="date" id="hasta" name="hasta">
+      </label>
+
       <div class="acciones">
         <button type="submit" id="buscar">Buscar</button>
         <button type="button" id="limpiar" class="secundario">Limpiar filtros</button>

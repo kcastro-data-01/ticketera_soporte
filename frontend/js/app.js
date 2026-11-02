@@ -62,6 +62,10 @@ function getElements() {
     category: document.getElementById("category"),
     priority: document.getElementById("priority"),
     state: document.getElementById("state"),
+    assigned: document.getElementById("assigned"),
+    fechaCampo: document.getElementById("fecha-campo"),
+    desde: document.getElementById("desde"),
+    hasta: document.getElementById("hasta"),
     limpiar: document.getElementById("limpiar"),
     estado: document.getElementById("estado-carga"),
     tbody: document.getElementById("lista-tickets"),
@@ -82,16 +86,61 @@ function estadoFiltro(valor) {
   return ESTADOS_FILTRO.includes(valor) ? valor : "";
 }
 
-/* Solo se envían los parámetros con valor, con los nombres que ya usa la API. */
+/* «Fecha de» del filtro de fechas (el valor que espera la API). */
+const CAMPOS_FECHA = ["creacion", "en_proceso", "resuelto", "cerrado"];
+
+function valorDe(elemento) {
+  return elemento ? String(elemento.value || "").trim() : "";
+}
+
+/* Solo se envían los parámetros con valor, con los nombres que ya usa la API.
+   «Asignado a» no es para el Solicitante (ya ve solo los suyos). */
 function getFilters() {
   const elements = getElements();
+  const fechaCampo = valorDe(elements.fechaCampo);
   return {
     search: elements.search.value.trim(),
     category: elements.category.value,
     priority: elements.priority.value,
     state: estadoFiltro(elements.state.value),
     mios: soloMios,
+    asignado: vistaSolicitante ? "" : valorDe(elements.assigned),
+    fechaCampo: CAMPOS_FECHA.includes(fechaCampo) ? fechaCampo : "creacion",
+    desde: valorDe(elements.desde),
+    hasta: valorDe(elements.hasta),
   };
+}
+
+/* Los días llegan como AAAA-MM-DD: se comparan como texto. */
+function errorDeFechas(filters) {
+  if (filters.desde && filters.hasta && filters.desde > filters.hasta) {
+    return "La fecha «Desde» no puede ser posterior a «Hasta».";
+  }
+  return "";
+}
+
+function hayFiltros(filters) {
+  return Boolean(
+    filters.search || filters.category || filters.priority || filters.state || filters.mios
+      || filters.asignado || filters.desde || filters.hasta
+  );
+}
+
+/* «Asignado a»: Todos, Sin asignar y los usuarios activos por nombre. */
+function renderFiltroAsignado(users) {
+  const select = getElements().assigned;
+  if (!select || typeof document.createElement !== "function") return;
+  const elegido = select.value;
+  [...users]
+    .filter((user) => user.is_active !== false)
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "es"))
+    .forEach((user) => {
+      const option = document.createElement("option");
+      option.value = String(user.id);
+      option.textContent = user.name;
+      select.appendChild(option);
+    });
+  select.value = elegido;
 }
 
 /* La página se pide con limit/offset; el total llega en X-Total-Count. */
@@ -103,6 +152,15 @@ function buildTicketsUrl(filters, pagina = 0) {
   const estado = estadoFiltro(filters.state);
   if (estado) params.set("state", estado);
   if (filters.mios) params.set("mios", "true");
+  if (filters.asignado === "sin") params.set("sin_asignar", "true");
+  else if (/^\d+$/.test(filters.asignado || "")) params.set("assigned_to", filters.asignado);
+  if (filters.desde || filters.hasta) {
+    if (filters.fechaCampo && filters.fechaCampo !== "creacion") {
+      params.set("fecha_campo", filters.fechaCampo);
+    }
+    if (filters.desde) params.set("desde", filters.desde);
+    if (filters.hasta) params.set("hasta", filters.hasta);
+  }
   params.set("limit", String(PAGE_SIZE));
   if (pagina > 0) params.set("offset", String(pagina * PAGE_SIZE));
   const query = params.toString();
@@ -468,6 +526,7 @@ async function loadUsers() {
     const users = await response.json();
     if (!Array.isArray(users)) return;
     usersById = new Map(users.map((user) => [user.id, user.name]));
+    if (!vistaSolicitante) renderFiltroAsignado(users);
   } catch (error) {
     /* Sin usuarios se muestra el identificador como alternativa. */
   }
@@ -514,9 +573,19 @@ async function fetchTickets() {
   clearRows();
   pintarFilasEsqueleto();
 
+  /* «Desde» posterior a «Hasta»: se avisa sin preguntarle a la API. */
+  const filtros = getFilters();
+  const errorFechas = errorDeFechas(filtros);
+  if (errorFechas) {
+    clearRows();
+    renderPaginacion(0);
+    showStatus(errorFechas, "error");
+    return;
+  }
+
   /* 1) La URL se construye una sola vez. 2) Una única petición HTTP por
      ejecución de fetchTickets(). */
-  const url = buildTicketsUrl(getFilters(), paginaActual);
+  const url = buildTicketsUrl(filtros, paginaActual);
 
   let response;
   try {
@@ -565,10 +634,7 @@ async function fetchTickets() {
   renderPaginacion(Number.isFinite(totalCabecera) ? totalCabecera : tickets.length);
 
   if (tickets.length === 0) {
-    const filtros = getFilters();
-    const conFiltros = Boolean(
-      filtros.search || filtros.category || filtros.priority || filtros.state || filtros.mios
-    );
+    const conFiltros = hayFiltros(filtros);
     if (vistaSolicitante && !conFiltros) {
       clearRows();
       mostrarSinSolicitudes(true);

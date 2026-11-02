@@ -133,9 +133,29 @@ responde `200` con `[]`.
 | `category` | `Hardware`, `Software`, `Red`, `Accesos` | filtra por categoría |
 | `priority` | `Baja`, `Media`, `Alta`, `Crítica` | filtra por prioridad |
 | `state` | `Nuevo`, `En proceso`, `Resuelto`, `Cerrado` | filtra por estado |
+| `mios` | `true` | solo los tickets asignados a quien consulta («Mis tickets») |
+| `assigned_to` | id de usuario | solo los asignados a ese usuario (filtro «Asignado a»); si el usuario no existe → `422` |
+| `sin_asignar` | `true` | solo los tickets sin asignar; junto con `assigned_to` → `422` |
+| `fecha_campo` | `creacion` (por defecto), `en_proceso`, `resuelto`, `cerrado` | qué fecha miran `desde`/`hasta`: la creación o la **primera** vez que el ticket pasó a ese estado (según su historial); un ticket que nunca pasó por ese estado no aparece |
+| `desde` | `AAAA-MM-DD` | desde ese día, incluido (hora de Costa Rica, UTC−6) |
+| `hasta` | `AAAA-MM-DD` | hasta ese día, incluido (hora de Costa Rica); `desde` posterior a `hasta` → `422` |
+| `limit` / `offset` | enteros (`limit` de 1 a 100) | paginación; el total de coincidencias llega en la cabecera `X-Total-Count` |
+
+Se puede usar solo `desde`, solo `hasta` o los dos; `fecha_campo` sin días no
+filtra. El Solicitante sigue recibiendo solo los tickets que creó o tiene
+asignados, aunque mande `assigned_to` o `sin_asignar`.
 
 **Respuestas:** `200` con la lista de tickets · `422` si un parámetro de enum
-no es válido. No existe paginación ni ordenamiento configurable.
+o una fecha no es válida, si `desde` es posterior a `hasta` (*"La fecha «Desde»
+no puede ser posterior a «Hasta»."*), si `assigned_to` no existe (*"Usuario N no
+encontrado"*) o si se mandan `assigned_to` y `sin_asignar` juntos. No hay
+ordenamiento configurable.
+
+```bash
+# Resueltos por primera vez en octubre de 2026 y asignados al usuario 4
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8000/api/tickets?assigned_to=4&fecha_campo=resuelto&desde=2026-10-01&hasta=2026-10-31"
+```
 
 ```bash
 curl "http://127.0.0.1:8000/api/tickets?search=correo&priority=Alta&state=Nuevo"

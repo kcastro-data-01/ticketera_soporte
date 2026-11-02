@@ -348,10 +348,20 @@ Parámetros de consulta (todos opcionales y combinables entre sí):
 | `category` | `Hardware`, `Software`, `Red`, `Accesos` | filtra por categoría |
 | `priority` | `Baja`, `Media`, `Alta`, `Crítica` | filtra por prioridad |
 | `state` | `Nuevo`, `En proceso`, `Resuelto`, `Cerrado` | filtra por estado |
+| `mios` | `true` | solo los tickets asignados a quien consulta («Mis tickets») |
+| `assigned_to` | id de usuario | solo los asignados a ese usuario (filtro «Asignado a»); si el usuario no existe → `422` |
+| `sin_asignar` | `true` | solo los tickets sin asignar; junto con `assigned_to` → `422` |
+| `fecha_campo` | `creacion` (por defecto), `en_proceso`, `resuelto`, `cerrado` | qué fecha miran `desde`/`hasta`: la creación o la **primera** vez que el ticket pasó a ese estado (según su historial); un ticket que nunca pasó por ese estado no aparece |
+| `desde` | `AAAA-MM-DD` | desde ese día, incluido (hora de Costa Rica, UTC−6) |
+| `hasta` | `AAAA-MM-DD` | hasta ese día, incluido (hora de Costa Rica); `desde` posterior a `hasta` → `422` |
+| `limit` / `offset` | enteros (`limit` de 1 a 100) | paginación; el total de coincidencias llega en la cabecera `X-Total-Count` |
 
 Sin parámetros el comportamiento es el original (listado completo). Un valor
-fuera de los enums (`category`, `priority`, `state`) responde `422`. No hay
-paginación ni ordenamiento configurable todavía.
+fuera de los enums (`category`, `priority`, `state`, `fecha_campo`), una fecha
+inválida, `desde` posterior a `hasta`, un `assigned_to` inexistente o
+`assigned_to` junto con `sin_asignar` responden `422`. En la pantalla, «Asignado
+a» solo lo ven el Administrador y el Técnico; «Limpiar filtros» borra todos y los
+filtros valen igual en la vista Tabla y en Tablero.
 
 ### Consultar un ticket
 

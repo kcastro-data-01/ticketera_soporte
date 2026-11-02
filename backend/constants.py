@@ -43,6 +43,24 @@ class UserRole(str, Enum):
     REQUESTER = "Solicitante"
 
 
+class TicketDateField(str, Enum):
+    """Which date the listing's «Desde / Hasta» filter looks at: the creation
+    or the first time the ticket reached a state (from its history)."""
+
+    CREATED = "creacion"
+    IN_PROGRESS = "en_proceso"
+    RESOLVED = "resuelto"
+    CLOSED = "cerrado"
+
+
+# Estado del historial que marca cada «Fecha de» (la creación no tiene).
+DATE_FIELD_STATE: dict[TicketDateField, str] = {
+    TicketDateField.IN_PROGRESS: TicketState.IN_PROGRESS.value,
+    TicketDateField.RESOLVED: TicketState.RESOLVED.value,
+    TicketDateField.CLOSED: TicketState.CLOSED.value,
+}
+
+
 # Tuples of plain values, handy for validation and SQL CHECK constraints.
 TICKET_STATES: tuple[str, ...] = tuple(state.value for state in TicketState)
 TICKET_PRIORITIES: tuple[str, ...] = tuple(priority.value for priority in TicketPriority)
