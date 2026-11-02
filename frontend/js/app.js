@@ -63,8 +63,7 @@ function getElements() {
     priority: document.getElementById("priority"),
     state: document.getElementById("state"),
     assigned: document.getElementById("assigned"),
-    desde: document.getElementById("desde"),
-    hasta: document.getElementById("hasta"),
+    fecha: document.getElementById("fecha"),
     limpiar: document.getElementById("limpiar"),
     estado: document.getElementById("estado-carga"),
     tbody: document.getElementById("lista-tickets"),
@@ -90,8 +89,8 @@ function valorDe(elemento) {
 }
 
 /* Solo se envían los parámetros con valor, con los nombres que ya usa la API.
-   «Asignado a» no es para el Solicitante (ya ve solo los suyos). «Desde» y
-   «Hasta» son siempre de la fecha de creación. */
+   «Asignado a» no es para el Solicitante (ya ve solo los suyos). «Fecha de
+   creación» es un día (AAAA-MM-DD). */
 function getFilters() {
   const elements = getElements();
   return {
@@ -101,23 +100,14 @@ function getFilters() {
     state: estadoFiltro(elements.state.value),
     mios: soloMios,
     asignado: vistaSolicitante ? "" : valorDe(elements.assigned),
-    desde: valorDe(elements.desde),
-    hasta: valorDe(elements.hasta),
+    fecha: valorDe(elements.fecha),
   };
-}
-
-/* Los días llegan como AAAA-MM-DD: se comparan como texto. */
-function errorDeFechas(filters) {
-  if (filters.desde && filters.hasta && filters.desde > filters.hasta) {
-    return "La fecha «Desde» no puede ser posterior a «Hasta».";
-  }
-  return "";
 }
 
 function hayFiltros(filters) {
   return Boolean(
     filters.search || filters.category || filters.priority || filters.state || filters.mios
-      || filters.asignado || filters.desde || filters.hasta
+      || filters.asignado || filters.fecha
   );
 }
 
@@ -149,9 +139,12 @@ function buildTicketsUrl(filters, pagina = 0) {
   if (filters.mios) params.set("mios", "true");
   if (filters.asignado === "sin") params.set("sin_asignar", "true");
   else if (/^\d+$/.test(filters.asignado || "")) params.set("assigned_to", filters.asignado);
-  /* Sin fecha_campo la API filtra por la creación del ticket. */
-  if (filters.desde) params.set("desde", filters.desde);
-  if (filters.hasta) params.set("hasta", filters.hasta);
+  /* Los tickets creados ese día (hora de Costa Rica, de 00:00 a 23:59): desde
+     y hasta el mismo día; sin fecha_campo la API mira la creación. */
+  if (filters.fecha) {
+    params.set("desde", filters.fecha);
+    params.set("hasta", filters.fecha);
+  }
   params.set("limit", String(PAGE_SIZE));
   if (pagina > 0) params.set("offset", String(pagina * PAGE_SIZE));
   const query = params.toString();
@@ -564,15 +557,7 @@ async function fetchTickets() {
   clearRows();
   pintarFilasEsqueleto();
 
-  /* «Desde» posterior a «Hasta»: se avisa sin preguntarle a la API. */
   const filtros = getFilters();
-  const errorFechas = errorDeFechas(filtros);
-  if (errorFechas) {
-    clearRows();
-    renderPaginacion(0);
-    showStatus(errorFechas, "error");
-    return;
-  }
 
   /* 1) La URL se construye una sola vez. 2) Una única petición HTTP por
      ejecución de fetchTickets(). */

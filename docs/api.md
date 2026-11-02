@@ -142,9 +142,9 @@ responde `200` con `[]`.
 | `limit` / `offset` | enteros (`limit` de 1 a 100) | paginación; el total de coincidencias llega en la cabecera `X-Total-Count` |
 
 Se puede usar solo `desde`, solo `hasta` o los dos; `fecha_campo` sin días no
-filtra. La pantalla del listado solo filtra por la fecha de creación (grupo
-«Fecha de creación»: no manda `fecha_campo`); los demás valores de
-`fecha_campo` quedan disponibles en la API. El Solicitante sigue recibiendo solo los tickets que creó o tiene
+filtra. La pantalla del listado filtra por un solo día de creación («Fecha de
+creación»): manda `desde` y `hasta` con el mismo día y no manda `fecha_campo`.
+Los demás valores de `fecha_campo` y los rangos quedan disponibles en la API. El Solicitante sigue recibiendo solo los tickets que creó o tiene
 asignados, aunque mande `assigned_to` o `sin_asignar`.
 
 **Respuestas:** `200` con la lista de tickets · `422` si un parámetro de enum

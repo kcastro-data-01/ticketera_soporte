@@ -131,21 +131,11 @@
         </select>
       </label>
 
-      <!-- Fecha de creación del ticket (hora de Costa Rica, los dos días
-           incluidos); se puede usar solo «Desde», solo «Hasta» o los dos. -->
-      <fieldset class="campo campo-fechas">
-        <legend>Fecha de creación</legend>
-        <div class="campo-fechas-fila">
-          <label class="campo campo-fecha">
-            <span>Desde</span>
-            <input type="date" id="desde" name="desde">
-          </label>
-          <label class="campo campo-fecha">
-            <span>Hasta</span>
-            <input type="date" id="hasta" name="hasta">
-          </label>
-        </div>
-      </fieldset>
+      <!-- Los tickets creados ese día (hora de Costa Rica). Vacío: sin filtro. -->
+      <label class="campo">
+        <span>Fecha de creación</span>
+        <input type="date" id="fecha" name="fecha">
+      </label>
 
       <div class="acciones">
         <button type="submit" id="buscar">Buscar</button>

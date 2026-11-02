@@ -1,4 +1,4 @@
-/* Filtros «Asignado a» y «Fecha de creación» (Desde / Hasta) del listado
+/* Filtros «Asignado a» y «Fecha de creación» (un solo día) del listado
    (app.js + index.html):
    cada uno solo, combinados con los que ya existen, «Limpiar filtros», la
    vista Tablero y el Solicitante sin «Asignado a».
@@ -15,7 +15,7 @@ const vm = require("node:vm");
 const leer = (archivo) => fs.readFileSync(path.join(__dirname, "..", archivo), "utf8");
 const indexHtml = leer("index.html");
 
-const CAMPOS = ["search", "category", "priority", "state", "assigned", "desde", "hasta"];
+const CAMPOS = ["search", "category", "priority", "state", "assigned", "fecha"];
 const INICIAL = {};
 const IDS = [
   "form-filtros", ...CAMPOS, "limpiar", "estado-carga", "lista-tickets", "paginacion",
@@ -100,28 +100,18 @@ async function filtrar(h, valores) {
 
 /* ---------------- HTML ---------------- */
 
-test("index.html: «Asignado a» (solo equipo) y el grupo «Fecha de creación» antes de los botones", () => {
+test("index.html: «Fecha de creación» es un solo campo, al lado de «Asignado a» y antes de los botones", () => {
   const form = indexHtml.slice(indexHtml.indexOf('id="form-filtros"'), indexHtml.indexOf("</form>"));
   assert.match(form, /<label class="campo" data-vista="equipo">\s*<span>Asignado a<\/span>\s*<select id="assigned" name="assigned">\s*<option value="">Todos<\/option>\s*<option value="sin">Sin asignar<\/option>/);
-  assert.match(form, /<fieldset class="campo campo-fechas">\s*<legend>Fecha de creación<\/legend>\s*<div class="campo-fechas-fila">\s*<label class="campo campo-fecha">\s*<span>Desde<\/span>\s*<input type="date" id="desde" name="desde">\s*<\/label>\s*<label class="campo campo-fecha">\s*<span>Hasta<\/span>\s*<input type="date" id="hasta" name="hasta">\s*<\/label>\s*<\/div>\s*<\/fieldset>/);
-  assert.ok(form.indexOf('id="hasta"') < form.indexOf('id="limpiar"'), "los botones quedan al final");
+  assert.match(form, /<\/select>\s*<\/label>\s*(<!--[^>]*-->\s*)?<label class="campo">\s*<span>Fecha de creación<\/span>\s*<input type="date" id="fecha" name="fecha">\s*<\/label>\s*<div class="acciones">\s*<button type="submit" id="buscar">Buscar<\/button>\s*<button type="button" id="limpiar"/);
+  /* Mismo campo que los demás: en celular pasa a otra fila con la regla de .campo. */
+  assert.equal((form.match(/type="date"/g) || []).length, 1);
 });
 
-test("index.html y app.js: ya no hay selector «Fecha de» / «Tipo de fecha»", () => {
-  assert.doesNotMatch(indexHtml, /fecha-campo|fecha_campo|Tipo de fecha|<span>Fecha de<\/span>/);
-  assert.doesNotMatch(leer("js/app.js"), /fecha-campo|params\.set\("fecha_campo"/);
-});
-
-test("estilos: «Desde» y «Hasta» en la misma fila (también en celular), sin colores nuevos", () => {
-  const css = leer("css/estilos.css");
-  assert.match(css, /\.campo-fechas-fila \{\s*display: flex;\s*gap: var\(--espaciado-md\);\s*\}/);
-  assert.match(css, /\.campo-fechas \{\s*margin: 0;\s*padding: 0;\s*border: 0;\s*min-width: 0;\s*\}/);
-  const movil = css.slice(css.indexOf("@media (max-width: 768px)"));
-  assert.match(movil, /\.campo-fechas-fila \.campo-fecha \{\s*flex: 1 1 0;\s*min-width: 0;\s*\}/);
-  for (const selector of [".campo-fechas {", ".campo-fechas legend {", ".campo-fechas-fila {"]) {
-    const regla = css.slice(css.indexOf(selector), css.indexOf("}", css.indexOf(selector)));
-    assert.doesNotMatch(regla, /#|rgb|color/, selector);
-  }
+test("index.html y app.js: sin «Desde», «Hasta» ni selector «Fecha de»", () => {
+  assert.doesNotMatch(indexHtml, /id="desde"|id="hasta"|<span>Desde<|<span>Hasta<|fecha-campo|campo-fechas/);
+  assert.doesNotMatch(leer("js/app.js"), /fecha-campo|params\.set\("fecha_campo"|getElementById\("(desde|hasta)"\)/);
+  assert.doesNotMatch(leer("css/estilos.css"), /campo-fechas|campo-fecha\b/, "sin estilos propios: usa los de .campo");
 });
 
 /* ---------------- «Asignado a» ---------------- */
@@ -156,33 +146,25 @@ test("Solicitante: no ve «Asignado a» ni lo envía, y no se cargan opciones", 
 
 /* ---------------- Fechas ---------------- */
 
-test("Fechas: solo «Desde», solo «Hasta» o los dos, siempre por la creación (sin fecha_campo)", async () => {
+test("Fecha de creación: manda desde = hasta = ese día y nada de fecha_campo", async () => {
   const h = await montar();
-  let q = await filtrar(h, { desde: "2026-10-01" });
-  assert.deepEqual([q.get("desde"), q.has("hasta"), q.has("fecha_campo")], ["2026-10-01", false, false]);
-
-  q = await filtrar(h, { desde: "", hasta: "2026-10-31" });
-  assert.deepEqual([q.has("desde"), q.get("hasta"), q.has("fecha_campo")], [false, "2026-10-31", false]);
-
-  q = await filtrar(h, { desde: "2026-10-01", hasta: "2026-10-31" });
-  assert.deepEqual([q.get("desde"), q.get("hasta"), q.has("fecha_campo")], ["2026-10-01", "2026-10-31", false]);
+  const q = await filtrar(h, { fecha: "2026-10-15" });
+  assert.deepEqual([q.get("desde"), q.get("hasta"), q.has("fecha_campo")], ["2026-10-15", "2026-10-15", false]);
 });
 
-test("Fechas: el mismo día en «Desde» y «Hasta» es válido (los dos extremos incluidos)", async () => {
+test("Fecha de creación vacía: sin filtro de fecha", async () => {
   const h = await montar();
-  const q = await filtrar(h, { desde: "2026-10-15", hasta: "2026-10-15" });
-  assert.deepEqual([q.get("desde"), q.get("hasta")], ["2026-10-15", "2026-10-15"]);
+  await filtrar(h, { fecha: "2026-10-15" });
+  const q = await filtrar(h, { fecha: "" });
+  assert.equal(q.has("desde") || q.has("hasta") || q.has("fecha_campo"), false);
 });
 
-test("Fechas: «Desde» posterior a «Hasta» avisa sin pedirle nada a la API", async () => {
+test("Fecha de creación: el primer y el último día del mes se mandan tal cual (sin correr por zona horaria)", async () => {
   const h = await montar();
-  const antes = h.pedidos.length;
-  h.nodos.get("desde").value = "2026-10-31";
-  h.nodos.get("hasta").value = "2026-10-01";
-  await enviar(h.nodos.get("form-filtros"));
-  assert.equal(h.pedidos.length, antes);
-  assert.equal(h.nodos.get("estado-carga").textContent, "La fecha «Desde» no puede ser posterior a «Hasta».");
-  assert.equal(h.nodos.get("estado-carga").className, "estado error");
+  for (const dia of ["2026-10-01", "2026-10-31", "2026-12-31"]) {
+    const q = await filtrar(h, { fecha: dia });
+    assert.deepEqual([q.get("desde"), q.get("hasta")], [dia, dia]);
+  }
 });
 
 /* ---------------- Combinados, Limpiar y Tablero ---------------- */
@@ -192,26 +174,26 @@ test("Combinados con búsqueda, categoría, prioridad, estado y Mis tickets", as
   await clic(h.nodos.get("vista-mios"));
   const q = await filtrar(h, {
     search: "vpn", category: "Red", priority: "Alta", state: "Cerrado",
-    assigned: "4", desde: "2026-10-01", hasta: "2026-10-31",
+    assigned: "4", fecha: "2026-10-15",
   });
   assert.deepEqual(Object.fromEntries([...q].filter(([k]) => !["limit", "offset"].includes(k))), {
     search: "vpn", category: "Red", priority: "Alta", state: "Cerrado", mios: "true",
-    assigned_to: "4", desde: "2026-10-01", hasta: "2026-10-31",
+    assigned_to: "4", desde: "2026-10-15", hasta: "2026-10-15",
   });
 });
 
-test("«Limpiar filtros» borra también «Asignado a» y las fechas", async () => {
+test("«Limpiar filtros» borra también «Asignado a» y la fecha", async () => {
   const h = await montar();
-  await filtrar(h, { state: "Resuelto", assigned: "sin", desde: "2026-10-01", hasta: "2026-10-31" });
+  await filtrar(h, { state: "Resuelto", assigned: "sin", fecha: "2026-10-15" });
   await clic(h.nodos.get("limpiar"));
-  assert.deepEqual(CAMPOS.map((id) => h.nodos.get(id).value), ["", "", "", "", "", "", ""]);
+  assert.deepEqual(CAMPOS.map((id) => h.nodos.get(id).value), ["", "", "", "", "", ""]);
   assert.deepEqual([...h.ultimo().keys()], ["limit"]);
 });
 
 test("Tablero: usa la misma consulta con los filtros nuevos", async () => {
   const h = await montar("Administrador", { vista: "tablero" });
-  const q = await filtrar(h, { assigned: "4", desde: "2026-10-01" });
-  assert.deepEqual([q.get("assigned_to"), q.get("desde")], ["4", "2026-10-01"]);
+  const q = await filtrar(h, { assigned: "4", fecha: "2026-10-15" });
+  assert.deepEqual([q.get("assigned_to"), q.get("desde"), q.get("hasta")], ["4", "2026-10-15", "2026-10-15"]);
   assert.ok(h.nodos.get("tablero").children.length > 0, "el tablero se dibuja con lo que llegó");
 });
 
@@ -219,6 +201,6 @@ test("Sin resultados con los filtros nuevos: «No hay tickets que coincidan con 
   const h = await montar();
   const filtros = h.sandbox.getFilters();
   assert.equal(h.sandbox.hayFiltros({ ...filtros, asignado: "sin" }), true);
-  assert.equal(h.sandbox.hayFiltros({ ...filtros, hasta: "2026-10-31" }), true);
+  assert.equal(h.sandbox.hayFiltros({ ...filtros, fecha: "2026-10-15" }), true);
   assert.equal(h.sandbox.hayFiltros(filtros), false);
 });
