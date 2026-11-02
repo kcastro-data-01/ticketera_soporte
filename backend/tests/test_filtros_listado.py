@@ -287,7 +287,8 @@ def test_chat_still_answers_by_person_and_by_month(client, session, equipo, ia):
 
 def test_help_and_api_docs_explain_the_filters():
     ayuda = (RAIZ / "frontend" / "ayuda.html").read_text(encoding="utf-8")
-    assert "«Asignado a»" in ayuda and "«Fecha de»" in ayuda and "hora de Costa Rica" in ayuda
+    assert "«Asignado a»" in ayuda and "«Fecha de creación»" in ayuda and "hora de Costa Rica" in ayuda
+    assert "«Fecha de»:" not in ayuda
     api = (RAIZ / "docs" / "api.md").read_text(encoding="utf-8")
     for parametro in ("`assigned_to`", "`sin_asignar`", "`fecha_campo`", "`desde`", "`hasta`"):
         assert parametro in api, parametro

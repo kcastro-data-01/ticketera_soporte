@@ -360,7 +360,8 @@ Sin parámetros el comportamiento es el original (listado completo). Un valor
 fuera de los enums (`category`, `priority`, `state`, `fecha_campo`), una fecha
 inválida, `desde` posterior a `hasta`, un `assigned_to` inexistente o
 `assigned_to` junto con `sin_asignar` responden `422`. En la pantalla, «Asignado
-a» solo lo ven el Administrador y el Técnico; «Limpiar filtros» borra todos y los
+a» solo lo ven el Administrador y el Técnico; el grupo «Fecha de creación»
+(«Desde» / «Hasta») filtra solo por la creación (no manda `fecha_campo`); «Limpiar filtros» borra todos y los
 filtros valen igual en la vista Tabla y en Tablero.
 
 ### Consultar un ticket

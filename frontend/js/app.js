@@ -63,7 +63,6 @@ function getElements() {
     priority: document.getElementById("priority"),
     state: document.getElementById("state"),
     assigned: document.getElementById("assigned"),
-    fechaCampo: document.getElementById("fecha-campo"),
     desde: document.getElementById("desde"),
     hasta: document.getElementById("hasta"),
     limpiar: document.getElementById("limpiar"),
@@ -86,18 +85,15 @@ function estadoFiltro(valor) {
   return ESTADOS_FILTRO.includes(valor) ? valor : "";
 }
 
-/* «Fecha de» del filtro de fechas (el valor que espera la API). */
-const CAMPOS_FECHA = ["creacion", "en_proceso", "resuelto", "cerrado"];
-
 function valorDe(elemento) {
   return elemento ? String(elemento.value || "").trim() : "";
 }
 
 /* Solo se envían los parámetros con valor, con los nombres que ya usa la API.
-   «Asignado a» no es para el Solicitante (ya ve solo los suyos). */
+   «Asignado a» no es para el Solicitante (ya ve solo los suyos). «Desde» y
+   «Hasta» son siempre de la fecha de creación. */
 function getFilters() {
   const elements = getElements();
-  const fechaCampo = valorDe(elements.fechaCampo);
   return {
     search: elements.search.value.trim(),
     category: elements.category.value,
@@ -105,7 +101,6 @@ function getFilters() {
     state: estadoFiltro(elements.state.value),
     mios: soloMios,
     asignado: vistaSolicitante ? "" : valorDe(elements.assigned),
-    fechaCampo: CAMPOS_FECHA.includes(fechaCampo) ? fechaCampo : "creacion",
     desde: valorDe(elements.desde),
     hasta: valorDe(elements.hasta),
   };
@@ -154,13 +149,9 @@ function buildTicketsUrl(filters, pagina = 0) {
   if (filters.mios) params.set("mios", "true");
   if (filters.asignado === "sin") params.set("sin_asignar", "true");
   else if (/^\d+$/.test(filters.asignado || "")) params.set("assigned_to", filters.asignado);
-  if (filters.desde || filters.hasta) {
-    if (filters.fechaCampo && filters.fechaCampo !== "creacion") {
-      params.set("fecha_campo", filters.fechaCampo);
-    }
-    if (filters.desde) params.set("desde", filters.desde);
-    if (filters.hasta) params.set("hasta", filters.hasta);
-  }
+  /* Sin fecha_campo la API filtra por la creación del ticket. */
+  if (filters.desde) params.set("desde", filters.desde);
+  if (filters.hasta) params.set("hasta", filters.hasta);
   params.set("limit", String(PAGE_SIZE));
   if (pagina > 0) params.set("offset", String(pagina * PAGE_SIZE));
   const query = params.toString();

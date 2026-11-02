@@ -384,6 +384,29 @@ h3 {
   flex: 1 1 220px;
 }
 
+/* «Fecha de creación» del listado: un título y «Desde» / «Hasta» en una fila. */
+.campo-fechas {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.campo-fechas legend {
+  margin-bottom: var(--espaciado-xs);
+  padding: 0;
+  font-weight: 600;
+}
+
+.campo-fechas-fila {
+  display: flex;
+  gap: var(--espaciado-md);
+}
+
+.campo-fechas-fila .campo-fecha {
+  flex: 1 1 150px;
+}
+
 .campo input,
 .campo textarea,
 .campo select {
@@ -858,9 +881,9 @@ button.peligro:disabled:hover {
     flex: 1 1 100%;
   }
 
-  /* «Desde» y «Hasta» de a dos en la misma fila. */
-  .campo.campo-fecha {
-    flex: 1 1 calc(50% - 0.3rem);
+  /* «Desde» y «Hasta» siguen de a dos en la misma fila. */
+  .campo-fechas-fila .campo-fecha {
+    flex: 1 1 0;
     min-width: 0;
   }
 

@@ -1,4 +1,5 @@
-/* Filtros «Asignado a» y «Desde / Hasta» del listado (app.js + index.html):
+/* Filtros «Asignado a» y «Fecha de creación» (Desde / Hasta) del listado
+   (app.js + index.html):
    cada uno solo, combinados con los que ya existen, «Limpiar filtros», la
    vista Tablero y el Solicitante sin «Asignado a».
    Ejecutar con: node --test frontend/tests/filtros_asignado_fechas.test.js */
@@ -14,8 +15,8 @@ const vm = require("node:vm");
 const leer = (archivo) => fs.readFileSync(path.join(__dirname, "..", archivo), "utf8");
 const indexHtml = leer("index.html");
 
-const CAMPOS = ["search", "category", "priority", "state", "assigned", "fecha-campo", "desde", "hasta"];
-const INICIAL = { "fecha-campo": "creacion" };
+const CAMPOS = ["search", "category", "priority", "state", "assigned", "desde", "hasta"];
+const INICIAL = {};
 const IDS = [
   "form-filtros", ...CAMPOS, "limpiar", "estado-carga", "lista-tickets", "paginacion",
   "pagina-anterior", "pagina-siguiente", "pagina-info", "tabla-tickets", "tablero",
@@ -82,7 +83,6 @@ async function montar(rol = "Técnico", { vista = "tabla" } = {}) {
   vm.createContext(sandbox);
   vm.runInContext(leer("js/auth.js"), sandbox);
   vm.runInContext(leer("js/app.js"), sandbox);
-  /* La vista que se recuerda se lee con su clave real. */
   sandbox.init();
   await esperar();
   return { nodos, pedidos, sandbox, ultimo: () => new URL(pedidos[pedidos.length - 1], "http://x").searchParams };
@@ -100,21 +100,28 @@ async function filtrar(h, valores) {
 
 /* ---------------- HTML ---------------- */
 
-test("index.html: «Asignado a» (solo equipo), «Fecha de», «Desde» y «Hasta» antes de los botones", () => {
+test("index.html: «Asignado a» (solo equipo) y el grupo «Fecha de creación» antes de los botones", () => {
   const form = indexHtml.slice(indexHtml.indexOf('id="form-filtros"'), indexHtml.indexOf("</form>"));
   assert.match(form, /<label class="campo" data-vista="equipo">\s*<span>Asignado a<\/span>\s*<select id="assigned" name="assigned">\s*<option value="">Todos<\/option>\s*<option value="sin">Sin asignar<\/option>/);
-  assert.match(form, /<select id="fecha-campo" name="fecha_campo">\s*<option value="creacion">Creación<\/option>\s*<option value="en_proceso">En proceso<\/option>\s*<option value="resuelto">Resuelto<\/option>\s*<option value="cerrado">Cerrado<\/option>/);
-  assert.match(form, /<label class="campo campo-fecha">\s*<span>Desde<\/span>\s*<input type="date" id="desde"/);
-  assert.match(form, /<label class="campo campo-fecha">\s*<span>Hasta<\/span>\s*<input type="date" id="hasta"/);
+  assert.match(form, /<fieldset class="campo campo-fechas">\s*<legend>Fecha de creación<\/legend>\s*<div class="campo-fechas-fila">\s*<label class="campo campo-fecha">\s*<span>Desde<\/span>\s*<input type="date" id="desde" name="desde">\s*<\/label>\s*<label class="campo campo-fecha">\s*<span>Hasta<\/span>\s*<input type="date" id="hasta" name="hasta">\s*<\/label>\s*<\/div>\s*<\/fieldset>/);
   assert.ok(form.indexOf('id="hasta"') < form.indexOf('id="limpiar"'), "los botones quedan al final");
 });
 
-test("estilos: en celular «Desde» y «Hasta» van de a dos, sin colores nuevos", () => {
+test("index.html y app.js: ya no hay selector «Fecha de» / «Tipo de fecha»", () => {
+  assert.doesNotMatch(indexHtml, /fecha-campo|fecha_campo|Tipo de fecha|<span>Fecha de<\/span>/);
+  assert.doesNotMatch(leer("js/app.js"), /fecha-campo|params\.set\("fecha_campo"/);
+});
+
+test("estilos: «Desde» y «Hasta» en la misma fila (también en celular), sin colores nuevos", () => {
   const css = leer("css/estilos.css");
+  assert.match(css, /\.campo-fechas-fila \{\s*display: flex;\s*gap: var\(--espaciado-md\);\s*\}/);
+  assert.match(css, /\.campo-fechas \{\s*margin: 0;\s*padding: 0;\s*border: 0;\s*min-width: 0;\s*\}/);
   const movil = css.slice(css.indexOf("@media (max-width: 768px)"));
-  assert.match(movil, /\.campo\.campo-fecha \{\s*flex: 1 1 calc\(50% - 0\.3rem\);\s*min-width: 0;\s*\}/);
-  const regla = movil.slice(movil.indexOf(".campo.campo-fecha"), movil.indexOf("}", movil.indexOf(".campo.campo-fecha")));
-  assert.doesNotMatch(regla, /#|rgb|color/);
+  assert.match(movil, /\.campo-fechas-fila \.campo-fecha \{\s*flex: 1 1 0;\s*min-width: 0;\s*\}/);
+  for (const selector of [".campo-fechas {", ".campo-fechas legend {", ".campo-fechas-fila {"]) {
+    const regla = css.slice(css.indexOf(selector), css.indexOf("}", css.indexOf(selector)));
+    assert.doesNotMatch(regla, /#|rgb|color/, selector);
+  }
 });
 
 /* ---------------- «Asignado a» ---------------- */
@@ -149,28 +156,22 @@ test("Solicitante: no ve «Asignado a» ni lo envía, y no se cargan opciones", 
 
 /* ---------------- Fechas ---------------- */
 
-test("Fechas: solo «Desde», solo «Hasta» o los dos; con Creación no se manda fecha_campo", async () => {
+test("Fechas: solo «Desde», solo «Hasta» o los dos, siempre por la creación (sin fecha_campo)", async () => {
   const h = await montar();
   let q = await filtrar(h, { desde: "2026-10-01" });
   assert.deepEqual([q.get("desde"), q.has("hasta"), q.has("fecha_campo")], ["2026-10-01", false, false]);
 
   q = await filtrar(h, { desde: "", hasta: "2026-10-31" });
-  assert.deepEqual([q.has("desde"), q.get("hasta")], [false, "2026-10-31"]);
+  assert.deepEqual([q.has("desde"), q.get("hasta"), q.has("fecha_campo")], [false, "2026-10-31", false]);
 
-  q = await filtrar(h, { desde: "2026-10-01", hasta: "2026-10-31", "fecha-campo": "cerrado" });
-  assert.deepEqual([q.get("desde"), q.get("hasta"), q.get("fecha_campo")], ["2026-10-01", "2026-10-31", "cerrado"]);
+  q = await filtrar(h, { desde: "2026-10-01", hasta: "2026-10-31" });
+  assert.deepEqual([q.get("desde"), q.get("hasta"), q.has("fecha_campo")], ["2026-10-01", "2026-10-31", false]);
 });
 
 test("Fechas: el mismo día en «Desde» y «Hasta» es válido (los dos extremos incluidos)", async () => {
   const h = await montar();
   const q = await filtrar(h, { desde: "2026-10-15", hasta: "2026-10-15" });
   assert.deepEqual([q.get("desde"), q.get("hasta")], ["2026-10-15", "2026-10-15"]);
-});
-
-test("Fechas: «Fecha de» sin días no filtra", async () => {
-  const h = await montar();
-  const q = await filtrar(h, { "fecha-campo": "resuelto" });
-  assert.equal(q.has("fecha_campo") || q.has("desde") || q.has("hasta"), false);
 });
 
 test("Fechas: «Desde» posterior a «Hasta» avisa sin pedirle nada a la API", async () => {
@@ -191,19 +192,19 @@ test("Combinados con búsqueda, categoría, prioridad, estado y Mis tickets", as
   await clic(h.nodos.get("vista-mios"));
   const q = await filtrar(h, {
     search: "vpn", category: "Red", priority: "Alta", state: "Cerrado",
-    assigned: "4", "fecha-campo": "en_proceso", desde: "2026-10-01", hasta: "2026-10-31",
+    assigned: "4", desde: "2026-10-01", hasta: "2026-10-31",
   });
   assert.deepEqual(Object.fromEntries([...q].filter(([k]) => !["limit", "offset"].includes(k))), {
     search: "vpn", category: "Red", priority: "Alta", state: "Cerrado", mios: "true",
-    assigned_to: "4", fecha_campo: "en_proceso", desde: "2026-10-01", hasta: "2026-10-31",
+    assigned_to: "4", desde: "2026-10-01", hasta: "2026-10-31",
   });
 });
 
-test("«Limpiar filtros» borra también «Asignado a», «Fecha de» y las fechas", async () => {
+test("«Limpiar filtros» borra también «Asignado a» y las fechas", async () => {
   const h = await montar();
-  await filtrar(h, { assigned: "sin", "fecha-campo": "cerrado", desde: "2026-10-01", hasta: "2026-10-31" });
+  await filtrar(h, { state: "Resuelto", assigned: "sin", desde: "2026-10-01", hasta: "2026-10-31" });
   await clic(h.nodos.get("limpiar"));
-  assert.deepEqual(CAMPOS.map((id) => h.nodos.get(id).value), ["", "", "", "", "", "creacion", "", ""]);
+  assert.deepEqual(CAMPOS.map((id) => h.nodos.get(id).value), ["", "", "", "", "", "", ""]);
   assert.deepEqual([...h.ultimo().keys()], ["limit"]);
 });
 
