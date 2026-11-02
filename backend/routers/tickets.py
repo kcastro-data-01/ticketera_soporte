@@ -17,7 +17,7 @@ from backend.schemas import (
     TicketSummary,
     TicketUpdate,
 )
-from backend.services import ticket_service
+from backend.services import correo_service, ticket_service
 from backend.services.ticket_service import (
     InvalidTransitionError,
     TicketClosedError,
@@ -296,7 +296,10 @@ def assign_ticket(
 ) -> TicketResponse:
     """Assign a user to a ticket; ``assigned_to_id: null`` unassigns it (RF4).
 
-    A Cerrado ticket is not reassigned (``409``)."""
+    A Cerrado ticket is not reassigned (``409``). With ``AVISAR_ASIGNADO``
+    the new assignee and the requester get an email (not on unassign)."""
+    anterior = ticket_service.get_ticket(session, ticket_id)
+    anterior_id = anterior.assigned_to_id if anterior is not None else None
     try:
         ticket = ticket_service.assign_ticket(
             session, ticket_id, payload.assigned_to_id, current_user
@@ -313,6 +316,8 @@ def assign_ticket(
         )
     except TicketClosedError as error:
         raise _cerrado(error)
+    # Si el correo falla, la asignación queda guardada igual (error al log).
+    correo_service.avisar_asignacion(session, ticket, anterior_id, current_user)
     return TicketResponse.model_validate(ticket)
 
 
@@ -356,6 +361,7 @@ def change_ticket_state(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tiene permisos para acceder a este recurso",
         )
+    anterior = visible.state
     try:
         ticket = ticket_service.change_ticket_state(
             session, ticket_id, payload.state, current_user, payload.motivo
@@ -374,6 +380,9 @@ def change_ticket_state(
                 f"Transición de '{error.current}' a '{error.target}' no permitida"
             ),
         )
+    # Un solo correo con el motivo (AVISAR_ESTADOS); si falla, el cambio
+    # queda guardado igual y el error va al log.
+    correo_service.avisar_estado(session, ticket, anterior, current_user, payload.motivo)
     return TicketResponse.model_validate(ticket)
 
 

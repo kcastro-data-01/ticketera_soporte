@@ -54,6 +54,10 @@ encendida se le avisa al asignado por correo («[Ticket #N] Se le asignó…»).
 Con ``AVISAR_COMENTARIOS`` (por defecto solo en Vercel), un comentario hecho
 desde la app se avisa por correo al solicitante y al asignado, menos a quien
 lo escribió (:func:`avisar_comentario`); los que llegan por correo no avisan.
+Igual, con ``AVISAR_ESTADOS``, un cambio de estado hecho desde la app
+(:func:`avisar_estado`, con el motivo en el mismo correo) y, con
+``AVISAR_ASIGNADO``, una asignación o reasignación (:func:`avisar_asignacion`:
+«Se le asignó» al nuevo asignado y «fue asignado a» al solicitante).
 
 El inicio de sesión (msal, device code) está en ``correo_auth``; la primera
 vez se ejecuta ``python -m backend.correo_login``.
@@ -62,7 +66,7 @@ Configuración (variables de entorno, ver README): ``CORREO_ACTIVO``,
 ``CORREO_USUARIO``, ``CORREO_M365_TENANT``, ``CORREO_M365_CLIENT_ID``,
 ``CORREO_M365_CACHE``, ``CORREO_CARPETA_PROCESADOS``, ``CORREO_FILTRO``,
 ``CORREO_INTERVALO``, ``CORREO_MODO``, ``DOMINIO_EMPRESA``, ``AVISAR_ASIGNADO``,
-``AVISAR_COMENTARIOS`` y ``APP_URL``.
+``AVISAR_COMENTARIOS``, ``AVISAR_ESTADOS`` y ``APP_URL``.
 
 ``CORREO_FILTRO``: ``ia`` (por defecto si hay IA, ver :func:`filtro_desde_entorno`)
 aplica las reglas fijas (:func:`descarte_fijo`, :func:`descarte_destinatarios`)
@@ -102,7 +106,7 @@ from pathlib import Path
 import httpx
 from sqlalchemy import func, or_, select
 
-from backend.constants import TicketCategory, TicketPriority
+from backend.constants import TicketCategory, TicketPriority, TicketState
 from backend.entorno import en_vercel
 from backend.models import ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate
@@ -207,6 +211,9 @@ FRASES_APP = tuple(re.compile(f, re.IGNORECASE) for f in (
     r"para crear tickets por correo, primero ingrese a la ticketera",
     r"tu cuenta en la ticketera de soporte esta desactivada",
     r"el ticket #\d+ esta cerrado\. si el problema continua",
+    r"cambio el estado del ticket #\d+",
+    r"le asigno el ticket #\d+",
+    r"asigno su ticket #\d+ a ",
 ))
 # Freno de seguridad: tickets nuevos como máximo en una revisión del buzón.
 MAX_TICKETS_POR_CICLO = 5
@@ -221,7 +228,10 @@ AVISOS_APP = (re.compile(r"^registrate para crear tickets$", re.IGNORECASE),
 CONFIRMACIONES_APP = (re.compile(r"^ticket\s*#\d+ creado:", re.IGNORECASE),
                       re.compile(r"^comentario agregado al ticket\s*#\d+$", re.IGNORECASE),
                       re.compile(r"^\[ticket\s*#\d+\]\s*se le asign", re.IGNORECASE),
-                      re.compile(r"^\[ticket\s*#\d+\]\s*nuevo comentario", re.IGNORECASE))
+                      re.compile(r"^\[ticket\s*#\d+\]\s*nuevo comentario", re.IGNORECASE),
+                      re.compile(r"^\[ticket\s*#\d+\]\s*el ticket\s*#\d+ pas[oó] a ", re.IGNORECASE),
+                      re.compile(r"^\[ticket\s*#\d+\]\s*el ticket\s*#\d+ fue asignado a ",
+                                 re.IGNORECASE))
 REMITENTES_AUTOMATICOS = ("noreply", "no-reply", "no_reply", "donotreply", "mailer-daemon",
                           "postmaster", "bounce")
 # --- Reglas fijas de CORREO_FILTRO=ia (minúsculas y sin tildes) -------------
@@ -293,6 +303,9 @@ class ConfigCorreo:
     # Avisar por correo al solicitante y al asignado cuando alguien comenta
     # desde la app (``AVISAR_COMENTARIOS``; por defecto solo en Vercel).
     avisar_comentarios: bool = False
+    # Avisar al solicitante y al asignado los cambios de estado hechos desde
+    # la app (``AVISAR_ESTADOS``).
+    avisar_estados: bool = False
     # «graph» (Microsoft 365) o «mailpit» (SMTP local, solo para probar).
     proveedor: str = "graph"
     smtp_host: str = "mailpit"
@@ -329,6 +342,7 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         avisar_asignado=_activo(env.get("AVISAR_ASIGNADO")),
         modo=modo_desde_entorno(env),
         avisar_comentarios=avisar_comentarios_desde_entorno(env),
+        avisar_estados=_activo(env.get("AVISAR_ESTADOS")),
         proveedor=proveedor,
         smtp_host=(env.get("MAILPIT_HOST") or "mailpit").strip(),
         smtp_puerto=int(env.get("MAILPIT_PUERTO") or 1025),
@@ -686,6 +700,74 @@ def _aviso_comentario(destinatario, autor, ticket, comentario, config) -> Respue
             f"{_saludo(destinatario.name)}\n\n"
             f"{autor.name} agregó un comentario en el ticket #{ticket.id} ({ticket.title}):\n\n"
             f"{comentario.content}\n\n"
+            f"Puede verlo aquí: {enlace}\n\n"
+            f"Si responde a este correo sin cambiar el asunto (debe mantener «[Ticket #{ticket.id}]»), "
+            "su respuesta se agrega como comentario del ticket.\n\n"
+            "Mesa de ayuda"
+        ),
+        ticket_id=ticket.id,
+    )
+
+
+def _aviso_estado(destinatario, autor, ticket, anterior, nuevo, motivo, config) -> Respuesta:
+    """Aviso de un cambio de estado hecho desde la app (``AVISAR_ESTADOS``),
+    con el motivo si lo escribió. Si pasó a Cerrado, avisa que ya no admite
+    cambios (una respuesta no se agrega como comentario)."""
+    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    cerrado = nuevo == TicketState.CLOSED.value
+    partes = [
+        _saludo(destinatario.name),
+        f"{autor.name} cambió el estado del ticket #{ticket.id}.",
+        f"Título: {ticket.title}\nEstado: {anterior} → {nuevo}",
+    ]
+    if motivo:
+        partes.append(f"Motivo: {motivo}")
+    if cerrado:
+        partes.append("Este ticket quedó cerrado y ya no admite cambios.")
+    partes.append(f"Puede verlo aquí: {enlace}")
+    if not cerrado:
+        partes.append(f"Si responde a este correo sin cambiar el asunto (debe mantener «[Ticket #{ticket.id}]»), "
+                      "su respuesta se agrega como comentario del ticket.")
+    partes.append("Mesa de ayuda")
+    return Respuesta(
+        para=destinatario.email,
+        asunto=f"[Ticket #{ticket.id}] El ticket #{ticket.id} pasó a «{nuevo}»",
+        texto="\n\n".join(partes),
+        ticket_id=ticket.id,
+    )
+
+
+def _aviso_asignado(asignado, autor, ticket, config) -> Respuesta:
+    """Al nuevo asignado de un ticket asignado desde la app (``AVISAR_ASIGNADO``)."""
+    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    return Respuesta(
+        para=asignado.email,
+        asunto=f"[Ticket #{ticket.id}] Se le asignó el ticket #{ticket.id}",
+        texto=(
+            f"{_saludo(asignado.name)}\n\n"
+            f"{autor.name} le asignó el ticket #{ticket.id}.\n\n"
+            f"Título: {ticket.title}\n"
+            f"Prioridad: {ticket.priority}\n\n"
+            f"Puede verlo aquí: {enlace}\n\n"
+            f"Si responde a este correo sin cambiar el asunto (debe mantener «[Ticket #{ticket.id}]»), "
+            "su respuesta se agrega como comentario del ticket.\n\n"
+            "Mesa de ayuda"
+        ),
+        ticket_id=ticket.id,
+    )
+
+
+def _aviso_asignado_al_solicitante(solicitante, asignado, autor, ticket, config) -> Respuesta:
+    """Al solicitante: a quién se asignó su ticket (``AVISAR_ASIGNADO``)."""
+    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    return Respuesta(
+        para=solicitante.email,
+        asunto=f"[Ticket #{ticket.id}] El ticket #{ticket.id} fue asignado a {asignado.name}",
+        texto=(
+            f"{_saludo(solicitante.name)}\n\n"
+            f"{autor.name} asignó su ticket #{ticket.id} a {asignado.name}.\n\n"
+            f"Título: {ticket.title}\n"
+            f"Prioridad: {ticket.priority}\n\n"
             f"Puede verlo aquí: {enlace}\n\n"
             f"Si responde a este correo sin cambiar el asunto (debe mantener «[Ticket #{ticket.id}]»), "
             "su respuesta se agrega como comentario del ticket.\n\n"
@@ -1445,6 +1527,41 @@ def crear_cliente(config: ConfigCorreo, session_factory=None) -> ClienteGraph | 
     return ClienteGraph(token, timeout=TIMEOUT_GRAPH_CRON if config.modo == "cron" else 60)
 
 
+def _a_quienes_avisar(autor: User, *usuarios) -> dict[str, User]:
+    """Los usuarios activos con correo, sin repetir (por correo) y menos
+    quien hizo el cambio."""
+    destinatarios: dict[str, User] = {}
+    for usuario in usuarios:
+        if usuario is None or usuario.id == autor.id or not usuario.is_active or not usuario.email:
+            continue
+        destinatarios.setdefault(usuario.email.strip().lower(), usuario)
+    return destinatarios
+
+
+def _enviar_avisos(session, config: ConfigCorreo, avisos: list[Respuesta], que: str,
+                   ticket_id: int, crear=None) -> list[str]:
+    """Envía los avisos de la app (cada uno registrado como ``aviso_app``
+    antes de salir). Nunca lanza: el cambio ya está guardado; si el envío
+    falla, queda en el log. Devuelve los correos a los que se avisó."""
+    avisados = []
+    if not avisos:
+        return avisados
+    try:
+        from sqlalchemy.orm import sessionmaker
+
+        crear = crear or crear_cliente
+        fabrica = sessionmaker(bind=session.get_bind())
+        # Timeout corto (el de cron): la petición espera el envío.
+        cliente = crear(replace(config, modo="cron"), fabrica)
+        for aviso in avisos:
+            cliente.enviar(aviso, registrar=_registrador(fabrica, config, aviso))
+            avisados.append(aviso.para.strip().lower())
+            logger.info("Se avisó por correo %s del ticket #%s a %s", que, ticket_id, aviso.para)
+    except Exception:
+        logger.exception("No se pudo avisar por correo %s del ticket #%s", que, ticket_id)
+    return avisados
+
+
 def avisar_comentario(session, ticket: Ticket, comentario, autor: User, env=None,
                       crear=None) -> list[str]:
     """Avisa por correo de un comentario hecho **desde la app** al solicitante
@@ -1458,29 +1575,43 @@ def avisar_comentario(session, ticket: Ticket, comentario, autor: User, env=None
     config = config_desde_entorno(env)
     if config is None or not config.avisar_comentarios:
         return []
-    destinatarios: dict[str, User] = {}
-    for usuario in (ticket.creator, ticket.assignee):
-        if usuario is None or usuario.id == autor.id or not usuario.is_active or not usuario.email:
-            continue
-        destinatarios.setdefault(usuario.email.strip().lower(), usuario)
-    if not destinatarios:
-        return []
-    avisados = []
-    try:
-        from sqlalchemy.orm import sessionmaker
+    avisos = [_aviso_comentario(usuario, autor, ticket, comentario, config)
+              for usuario in _a_quienes_avisar(autor, ticket.creator, ticket.assignee).values()]
+    return _enviar_avisos(session, config, avisos, "el comentario", ticket.id, crear)
 
-        crear = crear or crear_cliente
-        fabrica = sessionmaker(bind=session.get_bind())
-        # Timeout corto (el de cron): la petición del comentario espera el envío.
-        cliente = crear(replace(config, modo="cron"), fabrica)
-        for correo, usuario in destinatarios.items():
-            aviso = _aviso_comentario(usuario, autor, ticket, comentario, config)
-            cliente.enviar(aviso, registrar=_registrador(fabrica, config, aviso))
-            avisados.append(correo)
-            logger.info("Aviso del comentario del ticket #%s enviado a %s", ticket.id, correo)
-    except Exception:
-        logger.exception("No se pudo avisar por correo el comentario del ticket #%s", ticket.id)
-    return avisados
+
+def avisar_estado(session, ticket: Ticket, anterior: str, autor: User, motivo: str | None = None,
+                  env=None, crear=None) -> list[str]:
+    """Avisa un cambio de estado hecho **desde la app** al solicitante y al
+    asignado, menos a quien lo cambió (``AVISAR_ESTADOS``). El motivo va en
+    el mismo correo (no sale además el aviso de comentario). Nunca lanza."""
+    config = config_desde_entorno(env)
+    if config is None or not config.avisar_estados or anterior == ticket.state:
+        return []
+    motivo = (motivo or "").strip() or None
+    avisos = [_aviso_estado(usuario, autor, ticket, anterior, ticket.state, motivo, config)
+              for usuario in _a_quienes_avisar(autor, ticket.creator, ticket.assignee).values()]
+    return _enviar_avisos(session, config, avisos, "el cambio de estado", ticket.id, crear)
+
+
+def avisar_asignacion(session, ticket: Ticket, anterior_id: int | None, autor: User, env=None,
+                      crear=None) -> list[str]:
+    """Avisa una asignación o reasignación hecha **desde la app**
+    (``AVISAR_ASIGNADO``): «Se le asignó» al nuevo asignado y «fue asignado
+    a» al solicitante, menos a quien hizo el cambio. Si el solicitante es el
+    nuevo asignado, recibe solo «Se le asignó». Quitar la asignación, dejar
+    el mismo asignado o un ticket Cerrado no avisan. Nunca lanza."""
+    config = config_desde_entorno(env)
+    asignado = ticket.assignee
+    if (config is None or not config.avisar_asignado or asignado is None
+            or ticket.assigned_to_id == anterior_id or ticket.state == TicketState.CLOSED.value):
+        return []
+    avisos = [_aviso_asignado(u, autor, ticket, config)
+              for u in _a_quienes_avisar(autor, asignado).values()]
+    ya = {a.para.strip().lower() for a in avisos} | {(asignado.email or "").strip().lower()}
+    avisos += [_aviso_asignado_al_solicitante(u, asignado, autor, ticket, config)
+               for correo, u in _a_quienes_avisar(autor, ticket.creator).items() if correo not in ya]
+    return _enviar_avisos(session, config, avisos, "la asignación", ticket.id, crear)
 
 
 def _registrador(session_factory, config: ConfigCorreo, respuesta: Respuesta):

@@ -1563,7 +1563,13 @@ REGLA_CORREO = (
     "usuarios activos que estén en el hilo; si el ticket está Cerrado, no se agrega el "
     "comentario y se responde una sola vez que envíe un correo nuevo para crear otro ticket. "
     "Un comentario hecho en la ticketera se avisa por "
-    "correo al solicitante y al asignado, si ese aviso está activo."
+    "correo al solicitante y al asignado, si ese aviso está activo. También, si esos avisos "
+    "están activos: un cambio de estado hecho en la ticketera llega al solicitante y al "
+    "asignado como «El ticket #N pasó a «Estado»», con el estado anterior y el nuevo, quién lo "
+    "cambió y el motivo en el mismo correo (si pasó a Cerrado, avisa que ya no admite cambios); "
+    "al asignar o reasignar un ticket, el nuevo asignado recibe «Se le asignó el ticket #N» y el "
+    "solicitante, «El ticket #N fue asignado a» esa persona. Quitar la asignación no avisa, y "
+    "quien hace el cambio nunca recibe el aviso."
 )
 
 # (cómo se reconoce, en la pregunta normalizada; la regla), en orden.

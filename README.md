@@ -1045,6 +1045,30 @@ falla, el comentario se guarda igual y el error queda en el registro
 encendido en Vercel y apagado en Docker. Funciona igual en modo `hilo` y
 `cron`: el aviso sale en la misma petición del comentario.
 
+### Avisos de cambio de estado y de asignación
+
+Igual que los de comentarios (registrados como `aviso_app` antes de
+enviarse, con «[Ticket #N]» en el asunto para que una respuesta vuelva como
+comentario), menos a quien hizo el cambio y sin repetir si el solicitante y
+el asignado son la misma persona:
+
+- **`AVISAR_ESTADOS=true`:** cada cambio de estado hecho en la app llega al
+  solicitante y al asignado: «[Ticket #N] El ticket #N pasó a «En proceso»»,
+  con el título, el estado anterior → el nuevo, quién lo cambió, el motivo si
+  lo escribió (en el mismo correo: no sale además el aviso de comentario) y el
+  enlace. Si pasó a **Cerrado**, dice «Este ticket quedó cerrado y ya no
+  admite cambios.»; una respuesta a ese correo no se agrega como comentario y
+  recibe «Ticket #N cerrado».
+- **`AVISAR_ASIGNADO=true`:** al asignar o reasignar desde la app, el nuevo
+  asignado recibe «[Ticket #N] Se le asignó el ticket #N» (título, prioridad,
+  quién lo asignó y enlace) y el solicitante, «[Ticket #N] El ticket #N fue
+  asignado a <nombre>». Quitar la asignación («Sin asignar») o dejar el mismo
+  asignado no envía nada; un ticket Cerrado no se reasigna.
+
+Si el envío falla, el cambio queda guardado igual y el error va al registro
+(`No se pudo avisar por correo el cambio de estado del ticket #N` o
+`… la asignación del ticket #N`).
+
 El asignado ve el ticket en su lista aunque sea **Solicitante**, lo comenta y
 le cambia el estado (solo en los tickets asignados a él); no lo edita,
 reasigna ni borra.
@@ -1074,8 +1098,10 @@ APP_URL=http://IP-O-NOMBRE-DEL-EQUIPO:8000
 Opcionales: `CORREO_CARPETA_PROCESADOS` (por defecto `Tickets-Procesados`),
 `CORREO_FILTRO` (`ia`, `auto` o `todos`; si no está, `ia` cuando hay IA y si
 no `auto`), `CORREO_INTERVALO` (segundos, 60),
-`AVISAR_ASIGNADO` (`false`; `true` avisa por correo al asignado de un ticket
-creado desde un correo enviado), `AVISAR_COMENTARIOS` (`false` en Docker,
+`AVISAR_ASIGNADO` (`false`; `true` avisa por correo las asignaciones y
+reasignaciones hechas en la app y al asignado de un ticket creado desde un
+correo enviado), `AVISAR_ESTADOS` (`false`; `true` avisa los cambios de
+estado hechos en la app), `AVISAR_COMENTARIOS` (`false` en Docker,
 `true` en Vercel: avisa por correo los comentarios hechos en la app) y
 `CORREO_M365_CACHE` (archivo de la caché de tokens de antes; en Docker es
 `/data/msal_cache.json`). Los tokens ahora se guardan en la base de datos
@@ -1118,7 +1144,6 @@ En el `.env`:
 CORREO_PROVEEDOR=mailpit
 AVISAR_COMENTARIOS=true
 AVISAR_ASIGNADO=true
-# Para cuando existan avisos de cambio de estado (hoy no hay).
 AVISAR_ESTADOS=true
 APP_URL=http://localhost:8000
 ```
@@ -1146,9 +1171,9 @@ Con `CORREO_PROVEEDOR=mailpit`:
   buzón (aunque `CORREO_ACTIVO=1`), `POST /api/cron/correo` responde que el
   correo está apagado y `correo_login` no inicia sesión. Tampoco hace falta
   `CORREO_ACTIVO`.
-- Todavía **no lee** correos (eso viene en el paso siguiente). Por eso, de
-  momento, el único aviso que se ve es el de los comentarios hechos en la app;
-  los demás salen cuando la app responde a un correo recibido.
+- Todavía **no lee** correos. Por eso los avisos que se ven son los de lo que
+  se hace en la app: comentarios, cambios de estado y asignaciones; los demás
+  salen cuando la app responde a un correo recibido.
 - El remitente es `CORREO_USUARIO` (o `soporte@ticketera.local` si no está).
   `MAILPIT_HOST` y `MAILPIT_PUERTO` cambian el servidor (por defecto
   `mailpit` y `1025`).
@@ -1217,8 +1242,9 @@ se ve, sin «Volver a explicar»).
    | `CORREO_USUARIO` | el buzón de soporte |
    | `CORREO_FILTRO` | `ia` (necesita `ASISTENTE_PROVEEDOR=groq` y `GROQ_API_KEY`; sin IA usa el filtro estricto) |
    | `CORREO_CARPETA_PROCESADOS` | `Tickets-Procesados` |
-   | `AVISAR_ASIGNADO` | `true` (ya hay un enlace público) |
+   | `AVISAR_ASIGNADO` | `true` (avisa las asignaciones y reasignaciones; ya hay un enlace público) |
    | `AVISAR_COMENTARIOS` | `true` (ya es el valor por defecto en Vercel; queda explícito) |
+   | `AVISAR_ESTADOS` | `true` (avisa los cambios de estado) |
    | `APP_URL` | `https://tickets-americandata.vercel.app` |
    | `ASISTENTE_PROVEEDOR` | `groq` (sin ella la IA queda apagada) |
    | `GROQ_API_KEY` | la clave de <https://console.groq.com/keys> (secreta) |

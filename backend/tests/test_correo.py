@@ -301,6 +301,7 @@ class FakeGraph:
         self.perder_cabeceras = perder_cabeceras
         self.buzon = buzon
         self.borradores: dict[str, dict] = {}
+        self._numero = 0  # como en Graph, cada borrador con su propio Message-ID
         # Elementos enviados: ya leídos, en su carpeta.
         for m in enviados or []:
             self.mensajes[m["id"]] = dict(m, isRead=True, carpeta="sentitems")
@@ -343,7 +344,7 @@ class FakeGraph:
             # Borrador de un correo nuevo (luego /send).
             if self.rechazar_cabecera and "internetMessageHeaders" in cuerpo:
                 return httpx.Response(400, json={"error": {"message": "header no permitido"}})
-            return httpx.Response(201, json=self._nuevo_borrador(cuerpo, None, f"conv-app-{len(self.borradores) + 1}"))
+            return httpx.Response(201, json=self._nuevo_borrador(cuerpo, None, f"conv-app-{self._numero + 1}"))
         if request.method == "GET" and ruta == "/me/mailFolders":
             nombre = request.url.params["$filter"].split("'")[1]
             valor = [{"id": self.carpetas[nombre]}] if nombre in self.carpetas else []
@@ -380,7 +381,8 @@ class FakeGraph:
         return httpx.Response(400, json={"error": {"message": f"no simulado: {ruta}"}})
 
     def _nuevo_borrador(self, mensaje, responde_a, conversacion):
-        numero = len(self.borradores) + 1
+        self._numero += 1
+        numero = self._numero
         borrador = {"id": f"borrador-{numero}", "internetMessageId": f"<app-{numero}@data.cr>",
                     "conversationId": conversacion, "mensaje": mensaje, "responde_a": responde_a}
         self.borradores[borrador["id"]] = borrador
