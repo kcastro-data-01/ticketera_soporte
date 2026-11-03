@@ -537,3 +537,29 @@ class MetricasResponse(BaseModel):
     por_persona: list[MetricaPersona]
     sin_asignar_abiertos: int
     por_dia: list[MetricaDia]
+
+
+class AttachmentResponse(BaseModel):
+    """Un adjunto en ``GET /api/tickets/{id}/adjuntos``. No lleva la ruta ni
+    la URL del almacén: se descarga solo por la API, con sesión."""
+
+    id: int
+    ticket_id: int
+    nombre: str
+    tipo: str
+    tamano: int
+    es_imagen: bool
+    subido_por: str | None = None
+    subido_por_id: int | None = None
+    creado: datetime
+    puede_eliminar: bool
+
+
+class AttachmentList(BaseModel):
+    """Adjuntos de un ticket y lo que el usuario puede hacer con ellos."""
+
+    adjuntos: list[AttachmentResponse]
+    puede_subir: bool
+    cerrado: bool
+    max_archivos: int
+    max_bytes: int

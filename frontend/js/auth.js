@@ -461,6 +461,10 @@ function describirHistorial(entry) {
       return { accion: "Cambió el estado", detalle: `${antes ?? "—"} → ${despues ?? "—"}` };
     case "commented":
       return { accion: "Comentó", detalle: despues ? `«${recortar(despues)}»` : "—" };
+    case "attachment_added":
+      return { accion: "Adjuntó un archivo", detalle: despues ? `«${recortar(despues)}»` : "—" };
+    case "attachment_deleted":
+      return { accion: "Eliminó un adjunto", detalle: antes ? `«${recortar(antes)}»` : "—" };
     default: {
       const hayValores = (antes ?? null) !== null || (despues ?? null) !== null;
       return {

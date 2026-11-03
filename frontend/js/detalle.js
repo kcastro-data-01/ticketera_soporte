@@ -265,6 +265,8 @@ function renderTicket(ticket) {
   elements.ver.state.className = claseBadge(ticket.state);
   pintarPasos(ticket.state);
   aplicarReglasTicket(ticket);
+  /* Adjuntos (js/adjuntos.js): si cambió el estado, vuelve a pedir sus permisos. */
+  if (typeof adjuntosTicketActualizado === "function") adjuntosTicketActualizado(ticket);
   pintarPersona(elements.ver.assigned, nombreAsignado(ticket));
   pintarPersona(elements.ver.creator, nombreSolicitante(ticket));
   elements.ver.created.textContent = formatFecha(ticket.created_at);

@@ -719,6 +719,9 @@ def delete_ticket(session, ticket_id: int, current_user: User) -> None:
         raise TicketNotFoundError(ticket_id)
     _ensure_open(ticket)
     titulo = ticket.title
+    # Las filas de los adjuntos se van con el ticket (cascade); los archivos
+    # se borran del almacén después de confirmar.
+    archivos = [(a.storage, a.storage_key) for a in ticket.attachments]
     try:
         session.execute(
             update(ProcessedEmail)
@@ -730,6 +733,10 @@ def delete_ticket(session, ticket_id: int, current_user: User) -> None:
     except Exception:
         session.rollback()
         raise
+    if archivos:
+        from backend.services import adjuntos_service
+
+        adjuntos_service.borrar_archivos(archivos)
     momento = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     logger.info(
         "%s (%s, id %s) eliminó el ticket #%s «%s» el %s",

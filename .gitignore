@@ -37,3 +37,6 @@ Thumbs.db
 
 # Vercel CLI
 .vercel
+
+# Adjuntos guardados en local (fuera de Docker)
+/adjuntos/

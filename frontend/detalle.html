@@ -127,6 +127,23 @@
             <p id="ver-description" class="tarjeta-ticket-descripcion">—</p>
           </section>
   
+          <!-- Adjuntos (js/adjuntos.js): quien ve el ticket los ve y sube;
+               borra quien lo subió o el Administrador. En Cerrado, solo lectura.
+               «Sacar foto» solo aparece en pantallas táctiles. -->
+          <section id="seccion-adjuntos" class="seccion adjuntos" aria-labelledby="adjuntos-titulo">
+            <h2 id="adjuntos-titulo">Adjuntos</h2>
+            <div id="adj-acciones" class="acciones" hidden>
+              <button type="button" id="adj-subir">Adjuntar archivos</button>
+              <button type="button" id="adj-foto" class="secundario" hidden>Sacar foto</button>
+              <input type="file" id="adj-archivos" multiple hidden
+                     accept=".jpg,.jpeg,.png,.pdf,.docx,.xlsx,.txt,image/jpeg,image/png,application/pdf,text/plain">
+              <input type="file" id="adj-camara" accept="image/*" capture="environment" hidden>
+            </div>
+            <p id="adj-nota" class="nota"></p>
+            <p id="adj-estado" class="estado" role="status" aria-live="polite" hidden></p>
+            <ul id="adj-lista" class="adjuntos-lista" hidden></ul>
+          </section>
+
           <section id="seccion-edicion" class="seccion" aria-label="Edición del ticket" hidden>
             <h2>Editar ticket</h2>
             <p class="nota" id="modo-edicion">
@@ -305,6 +322,7 @@
   <script src="js/auth.js" defer></script>
   <script src="js/asistente.js" defer></script>
   <script src="js/detalle.js" defer></script>
+  <script src="js/adjuntos.js" defer></script>
   <script src="js/explicacion.js" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {

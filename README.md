@@ -548,6 +548,38 @@ ticket #N? Esta acción no se puede deshacer.») y después se vuelve al listado
   (por ejemplo, `TICKETS: Laura Méndez (laura.mendez@adn.local, id 1) eliminó el
   ticket #6 «…» el 2026-10-19 15:30 UTC`).
 
+## Adjuntos
+
+En el detalle de un ticket ya creado, la sección **Adjuntos** muestra los
+archivos (nombre, tamaño, quién y cuándo; miniatura en las imágenes) con
+**Descargar** y **Eliminar**. **Adjuntar archivos** elige uno o varios y, en
+el celular, **Sacar foto** abre la cámara. Las fotos de más de 2000 px de lado
+se achican en el navegador antes de subirlas (y una foto HEIC pasa a JPG).
+
+- Tipos: jpg, png, pdf, docx, xlsx y txt. El servidor mira el **contenido**
+  (firma del archivo; en docx y xlsx, que sea un documento de Office sin
+  macros), no solo la extensión. Hasta **4 MB** por archivo y **10** por ticket.
+- Permisos: los de ver el ticket (el Solicitante, solo en los suyos). Elimina
+  quien lo subió o el Administrador. En un ticket **Cerrado** no se sube ni se
+  elimina; sí se descarga.
+- No hay enlaces públicos: la descarga pasa por la API con sesión y siempre
+  como archivo (`Content-Disposition: attachment`, `nosniff`, `no-store`).
+- Subir y eliminar quedan en el historial («Adjuntó un archivo», «Eliminó un
+  adjunto»). Al eliminar el ticket se borran también sus archivos.
+- Dónde se guardan: en Docker, en `/data/adjuntos` dentro del volumen
+  (`ADJUNTOS_DIR`); fuera de Docker, en `adjuntos/` en la raíz (ignorada por
+  Git). En Vercel, en un store **privado** de Vercel Blob cuando existe
+  `BLOB_READ_WRITE_TOKEN`; sin él, la subida responde `503`. Los adjuntos que
+  se copien de Docker a Neon con `copiar_a_postgres` no llevan el archivo: en
+  Vercel responden «El archivo ya no está disponible».
+- API: `GET /api/tickets/{id}/adjuntos`; `POST /api/tickets/{id}/adjuntos?nombre=…`
+  con el archivo tal cual en el cuerpo (`application/octet-stream`, uno por
+  llamada: así queda por debajo del límite de 4,5 MB de Vercel);
+  `GET …/adjuntos/{adjunto}/archivo`; `DELETE …/adjuntos/{adjunto}`. Errores:
+  `413` más de 4 MB, `422` tipo o contenido inválido, `409` Cerrado o ya hay 10,
+  `403` borrar uno ajeno sin ser Administrador, `404` ticket que no se ve.
+- La tabla `adjuntos` se crea sola al arrancar (`migrate_add_attachments`).
+
 ## Limpiar los datos de prueba
 
 Antes de empezar a usar la ticketera en la empresa se pueden borrar los datos
@@ -1249,6 +1281,7 @@ se ve, sin «Volver a explicar»).
    | `ASISTENTE_PROVEEDOR` | `groq` (sin ella la IA queda apagada) |
    | `GROQ_API_KEY` | la clave de <https://console.groq.com/keys> (secreta) |
    | `GROQ_MODELO` | opcional; por defecto `qwen/qwen3.8-27b` |
+   | `BLOB_READ_WRITE_TOKEN` | la pone sola Vercel al conectar el store **privado** de Blob (ver «Adjuntos») |
 
    `DATABASE_URL` ya la puso Neon. Para generar las claves:
    `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`.

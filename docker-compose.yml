@@ -52,6 +52,9 @@ services:
       CORREO_PROVEEDOR: ${CORREO_PROVEEDOR:-graph}
       MAILPIT_HOST: mailpit
       MAILPIT_PUERTO: 1025
+      # Adjuntos de los tickets: carpeta dentro del volumen (en Vercel van a
+      # Vercel Blob privado con BLOB_READ_WRITE_TOKEN).
+      ADJUNTOS_DIR: /data/adjuntos
     volumes:
       - ticketera-data:/data
     depends_on:

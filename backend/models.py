@@ -7,7 +7,7 @@ defined in ``backend.constants`` because they are shown in the UI.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, Text, TypeDecorator
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.constants import (
@@ -146,6 +146,13 @@ class Ticket(Base):
         cascade="all, delete-orphan",
         order_by="History.created_at",
     )
+    # Archivos adjuntos (la fila se borra con el ticket; el archivo lo borra
+    # ticket_service.delete_ticket del almacén).
+    attachments: Mapped[list["Attachment"]] = relationship(
+        back_populates="ticket",
+        cascade="all, delete-orphan",
+        order_by="Attachment.created_at",
+    )
     # Última explicación de la IA (se borra con el ticket).
     explanation: Mapped["TicketExplanation | None"] = relationship(
         back_populates="ticket",
@@ -235,6 +242,41 @@ class History(Base):
     def ticket_title(self) -> str | None:
         """Title of the audited ticket, so history lists read on their own."""
         return self.ticket.title if self.ticket is not None else None
+
+
+class Attachment(Base):
+    """Archivo adjunto a un ticket (tabla ``adjuntos``).
+
+    El archivo vive en el almacén (carpeta local o Vercel Blob privado):
+    ``storage`` dice cuál y ``storage_key`` dónde (ruta relativa en la carpeta
+    o URL privada del blob). Nunca se arma con el nombre que mandó el usuario.
+    ``filename`` es el nombre que se muestra y con el que se descarga;
+    ``content_type`` es el tipo detectado por el contenido, no el declarado.
+    ``uploaded_by`` guarda el nombre al subirlo (como ``History.author``).
+    """
+
+    __tablename__ = "adjuntos"
+    __table_args__ = (
+        CheckConstraint("size >= 0", name="ck_adjuntos_size"),
+        CheckConstraint("storage IN ('local', 'blob')", name="ck_adjuntos_storage"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(
+        ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)
+    storage: Mapped[str] = mapped_column(String(10), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    uploaded_by: Mapped[str | None] = mapped_column(String(120))
+    uploaded_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utc_now)
+
+    ticket: Mapped[Ticket] = relationship(back_populates="attachments")
 
 
 class ProcessedEmail(Base):

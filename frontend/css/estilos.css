@@ -4409,3 +4409,87 @@ summary:focus-visible,
   width: 100%;
   resize: vertical;
 }
+
+/* ---------- Adjuntos del ticket (detalle.html, js/adjuntos.js) ---------- */
+.adjuntos-lista {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.adjunto {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--color-superficie-alta);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-medio);
+  min-width: 0;
+}
+
+.adjunto-miniatura,
+.adjunto-icono {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: var(--color-fondo-neutro);
+}
+
+.adjunto-miniatura {
+  object-fit: cover;
+}
+
+.adjunto-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-tenue-fuerte);
+}
+
+.adjunto-datos {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.adjunto-nombre {
+  font-weight: 600;
+  color: var(--color-texto);
+  overflow-wrap: anywhere;
+}
+
+.adjunto-meta {
+  font-size: 0.8rem;
+  color: var(--color-tenue);
+}
+
+.adjunto-acciones {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 480px) {
+  .adjunto {
+    flex-wrap: wrap;
+  }
+  .adjunto-acciones {
+    width: 100%;
+  }
+}
+
+@media print {
+  #adj-acciones,
+  .adjunto-acciones,
+  .adjunto-miniatura {
+    display: none !important;
+  }
+}

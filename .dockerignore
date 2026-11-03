@@ -47,3 +47,6 @@ vercel.json
 .python-version
 .vercel
 .env.*
+
+# Adjuntos guardados en local
+adjuntos
