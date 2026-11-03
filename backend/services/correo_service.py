@@ -1755,7 +1755,7 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
         # Adjuntos del correo que creó el ticket o el comentario: antes de
         # responder, para avisar en la respuesta los que no se guardaron.
         if (resultado in ("ticket", "comentario") and respuesta is not None
-                and respuesta.ticket_id is not None and mensaje.get("hasAttachments")):
+                and respuesta.ticket_id is not None and _puede_traer_adjuntos(mensaje)):
             respuesta = _guardar_adjuntos(session_factory, config, cliente, mensaje["id"],
                                           correo, respuesta, hasta)
         # Primero se responde (al mover, Graph le cambia el id al correo).
@@ -1779,6 +1779,21 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
             logger.exception("No se pudo mover el correo «%s»", correo.asunto)
     freno.alertar(config.usuario)
     return conteo
+
+
+def _puede_traer_adjuntos(mensaje: dict) -> bool:
+    """¿Hay que pedirle a Graph la lista de adjuntos?
+
+    ``hasAttachments`` no cuenta las imágenes en línea: un correo que solo
+    trae una captura pegada llega con ``false``. Por eso también se miran las
+    marcas ``[cid:…]`` (o ``<img src="cid:…">``) del texto."""
+    if mensaje.get("hasAttachments"):
+        return True
+    if _tiene_imagen_en_linea(mensaje.get("uniqueBody")) or _tiene_imagen_en_linea(mensaje.get("body")):
+        logger.info("Correo «%s»: hasAttachments=false pero trae imágenes en línea; "
+                    "se piden los adjuntos", mensaje.get("subject") or "")
+        return True
+    return False
 
 
 def _guardar_adjuntos(session_factory, config: ConfigCorreo, cliente: ClienteGraph,

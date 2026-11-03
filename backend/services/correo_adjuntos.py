@@ -50,7 +50,10 @@ from backend.services.adjuntos_service import (
 )
 from backend.services.ticket_service import TicketClosedError
 
-logger = logging.getLogger(__name__)
+# Hijo del logger de correo_service: hereda su salida («CORREO: …») y su
+# nivel INFO. Con ``__name__`` los INFO se perdían (Python solo muestra
+# WARNING para arriba) y en Vercel no quedaba nada de los adjuntos.
+logger = logging.getLogger("backend.services.correo_service.adjuntos")
 
 MAX_ARCHIVOS_CORREO = 5
 MAX_BYTES_CORREO = 10 * 1024 * 1024
@@ -128,7 +131,22 @@ def _nombre(adjunto: dict, en_linea: bool) -> str:
     return nombre
 
 
-def elegir(adjuntos: list[dict], libres: int) -> Eleccion:
+def _datos(adjunto: dict) -> str:
+    """Lo que Graph dijo del adjunto, para el log."""
+    return (f"tamaño={adjunto.get('size')} isInline={bool(adjunto.get('isInline'))} "
+            f"contentId={adjunto.get('contentId') or '-'} tipo={adjunto.get('contentType') or '-'}")
+
+
+def _avisar(ticket_id, adjunto: dict, nombre: str, motivo: str, lista: list | None = None) -> None:
+    """Anota el adjunto descartado (o que falló) en ``lista`` y en el log, con
+    los datos para entender por qué (se ve en los registros de Vercel)."""
+    if lista is not None:
+        lista.append((nombre, motivo))
+    logger.warning("Ticket #%s: adjunto del correo descartado «%s» (%s) motivo: %s",
+                   ticket_id if ticket_id is not None else "?", nombre, _datos(adjunto), motivo)
+
+
+def elegir(adjuntos: list[dict], libres: int, ticket_id: int | None = None) -> Eleccion:
     """Decide, solo con la lista de Graph, qué adjuntos se descargan.
 
     ``libres`` es cuántos adjuntos más admite el ticket. Se respetan el orden
@@ -151,25 +169,27 @@ def elegir(adjuntos: list[dict], libres: int) -> Eleccion:
         if not _es_archivo(adjunto):
             por_que = ("enlace a OneDrive/SharePoint"
                        if "reference" in (adjunto.get("@odata.type") or "") else "otro correo")
-            eleccion.ignorados.append((nombre, por_que))
+            _avisar(ticket_id, adjunto, nombre, por_que, eleccion.ignorados)
         elif en_linea and tamano < MIN_BYTES_IMAGEN:
-            eleccion.ignorados.append((nombre, "imagen en línea de menos de 15 KB (firma)"))
+            _avisar(ticket_id, adjunto, nombre, "imagen en línea de menos de 15 KB (firma)",
+                    eleccion.ignorados)
         elif en_linea and repetidas[(tamano, tipo)] > 1:
-            eleccion.ignorados.append((nombre, POR_QUE_LOGO))
+            _avisar(ticket_id, adjunto, nombre, POR_QUE_LOGO, eleccion.ignorados)
         elif en_linea and ext not in adjuntos_service.TIPOS:
-            eleccion.ignorados.append((nombre, "imagen en línea de un tipo que no se guarda"))
+            _avisar(ticket_id, adjunto, nombre, "imagen en línea de un tipo que no se guarda",
+                    eleccion.ignorados)
         elif _es_imagen(nombre, tipo) and tamano < MIN_BYTES_IMAGEN:
-            eleccion.ignorados.append((nombre, "imagen de menos de 15 KB"))
+            _avisar(ticket_id, adjunto, nombre, "imagen de menos de 15 KB", eleccion.ignorados)
         elif ext not in adjuntos_service.TIPOS:
-            eleccion.omitidos.append((nombre, MOTIVO_TIPO))
+            _avisar(ticket_id, adjunto, nombre, MOTIVO_TIPO, eleccion.omitidos)
         elif tamano > adjuntos_service.MAX_BYTES + HOLGURA_GRAPH:
-            eleccion.omitidos.append((nombre, MOTIVO_GRANDE))
+            _avisar(ticket_id, adjunto, nombre, MOTIVO_GRANDE, eleccion.omitidos)
         elif len(eleccion.elegidos) >= libres:
-            eleccion.omitidos.append((nombre, MOTIVO_LLENO))
+            _avisar(ticket_id, adjunto, nombre, MOTIVO_LLENO, eleccion.omitidos)
         elif len(eleccion.elegidos) >= MAX_ARCHIVOS_CORREO:
-            eleccion.omitidos.append((nombre, MOTIVO_CANTIDAD))
+            _avisar(ticket_id, adjunto, nombre, MOTIVO_CANTIDAD, eleccion.omitidos)
         elif total + tamano > MAX_BYTES_CORREO:
-            eleccion.omitidos.append((nombre, MOTIVO_TOTAL))
+            _avisar(ticket_id, adjunto, nombre, MOTIVO_TOTAL, eleccion.omitidos)
         else:
             total += tamano
             eleccion.elegidos.append({**adjunto, "name": nombre, "en_linea": en_linea})
@@ -213,36 +233,51 @@ def guardar(session_factory, cliente, mensaje_id: str, ticket_id: int, remitente
         usuario = session.scalar(select(User).where(func.lower(User.email) == remitente.lower()))
         libres = adjuntos_service.MAX_POR_TICKET - adjuntos_service.contar(session, ticket_id)
 
-        eleccion = elegir(cliente.adjuntos(mensaje_id), libres)
+        lista = cliente.adjuntos(mensaje_id)
+        logger.info("Ticket #%s: el correo trae %d adjunto(s): %s", ticket_id, len(lista),
+                    "; ".join(f"«{a.get('name')}» ({_datos(a)})" for a in lista) or "ninguno")
+        eleccion = elegir(lista, libres, ticket_id)
         resultado = Resultado(omitidos=list(eleccion.omitidos), ignorados=eleccion.ignorados)
         for posicion, adjunto in enumerate(eleccion.elegidos):
             nombre = adjunto["name"]
             if limite is not None and time.monotonic() >= limite:
-                resultado.omitidos += [(a["name"], MOTIVO_TIEMPO)
-                                       for a in eleccion.elegidos[posicion:]]
+                for pendiente in eleccion.elegidos[posicion:]:
+                    _avisar(ticket_id, pendiente, pendiente["name"], MOTIVO_TIEMPO,
+                            resultado.omitidos)
                 break
             try:
                 contenido = cliente.descargar_adjunto(mensaje_id, adjunto["id"])
-            except Exception:  # noqa: BLE001 — se avisa como omitido
-                logger.exception("No se pudo descargar el adjunto «%s» del correo", nombre)
+            except Exception as error:  # noqa: BLE001 — se avisa como omitido
+                _avisar(ticket_id, adjunto, nombre, f"{MOTIVO_ERROR}: {error!r}", None)
+                logger.warning("Detalle del error al descargar «%s»", nombre, exc_info=True)
                 resultado.omitidos.append((nombre, MOTIVO_ERROR))
                 continue
             if adjunto.get("en_linea") and _es_logo_conocido(session, ticket, usuario, contenido):
+                _avisar(ticket_id, adjunto, nombre, f"{POR_QUE_LOGO}, ya llegó antes")
                 resultado.ignorados.append((nombre, POR_QUE_LOGO))
                 continue
             try:
                 adjuntos_service.subir(session, ticket, usuario, nombre, contenido,
                                        origen=adjuntos_service.ORIGEN_CORREO)
-            except AdjuntoInvalidoError:
-                resultado.omitidos.append((nombre, _motivo_invalido(contenido)))
+            except AdjuntoInvalidoError as error:
+                motivo = _motivo_invalido(contenido)
+                _avisar(ticket_id, adjunto, nombre,
+                        f"{motivo} ({error}; {len(contenido)} bytes descargados)", None)
+                resultado.omitidos.append((nombre, motivo))
             except LimiteAdjuntosError:
-                resultado.omitidos.append((nombre, MOTIVO_LLENO))
+                _avisar(ticket_id, adjunto, nombre, MOTIVO_LLENO, resultado.omitidos)
             except AlmacenNoConfiguradoError:
-                logger.error("Adjunto «%s» del correo no guardado: falta BLOB_READ_WRITE_TOKEN",
-                             nombre)
+                _avisar(ticket_id, adjunto, nombre,
+                        f"{MOTIVO_ALMACEN} (falta BLOB_READ_WRITE_TOKEN)", None)
                 resultado.omitidos.append((nombre, MOTIVO_ALMACEN))
             except TicketClosedError:
+                _avisar(ticket_id, adjunto, nombre, "el ticket se cerró mientras se guardaba")
                 break
+            except Exception as error:  # noqa: BLE001 — Blob caído, etc.: se avisa como omitido
+                _avisar(ticket_id, adjunto, nombre, f"no se pudo guardar: {error!r}", None)
+                logger.warning("Detalle del error al guardar «%s»", nombre, exc_info=True)
+                session.rollback()
+                resultado.omitidos.append((nombre, MOTIVO_ERROR))
             else:
                 resultado.guardados.append(nombre)
 

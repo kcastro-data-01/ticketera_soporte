@@ -629,6 +629,13 @@ mismas validaciones, marcados «por correo» (`backend/services/correo_adjuntos.
   «más de 5 por correo», la nota lo nombra).
 - En un ticket **Cerrado** no se guardan (la respuesta a un ticket Cerrado
   tampoco se agrega como comentario).
+- Graph pone `hasAttachments: false` cuando el correo solo trae imágenes en
+  línea: por eso la lista también se pide si el texto tiene marcas `[cid:…]`.
+- **Log** (en Vercel, buscar «adjunto»): una línea `CORREO: Ticket #N: el correo
+  trae N adjunto(s): …` con lo que listó Graph, y un **WARNING** por cada
+  adjunto descartado o que falló (`adjunto del correo descartado «nombre»
+  (tamaño=… isInline=… contentId=… tipo=…) motivo: …`), con el error si falló
+  la descarga o el almacén.
 - Solo con Graph: con `CORREO_PROVEEDOR=mailpit` no se lee ningún buzón.
 - Usa el permiso `Mail.ReadWrite` que la app ya tiene; no hace falta otro.
 

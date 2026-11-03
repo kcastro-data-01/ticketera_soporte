@@ -84,7 +84,15 @@ class GraphConAdjuntos(FakeGraph):
             for i, adjunto in enumerate(lista):
                 adjunto.setdefault("id", f"{mensaje['id']}-adj{i}")
             self.adjuntos[mensaje["id"]] = lista
-            mensaje["hasAttachments"] = bool(lista)
+            # Como en Graph: ``hasAttachments`` no cuenta las imágenes en
+            # línea, y Outlook deja una marca [cid:…] por cada una en el texto.
+            mensaje["hasAttachments"] = any(not a.get("isInline") for a in lista)
+            cuerpo = mensaje["body"]
+            sin_cid = mensaje.pop("_sin_cid", False)
+            for adjunto in lista:
+                if (adjunto.get("isInline") and adjunto.get("contentId") and not sin_cid
+                        and adjunto["contentId"] not in cuerpo["content"]):
+                    cuerpo["content"] += f" [cid:{adjunto['contentId']}]"
         self.descargas = []
         self.fallar_lista = False
         super().__init__(mensajes, **kwargs)
@@ -540,3 +548,79 @@ def test_migracion_agrega_sha256(tmp_path):
     assert "ix_adjuntos_sha256" in {i["name"] for i in inspect(engine).get_indexes("adjuntos")}
     assert migrate_add_attachment_hash(engine) is False
     engine.dispose()
+
+
+# --- hasAttachments=false con imágenes en línea y registro en el log ---------
+
+
+def test_solo_una_captura_pegada_se_guarda_aunque_hasattachments_sea_false(factory, session, usuario, log):
+    """Graph manda ``hasAttachments: false`` si el correo solo trae imágenes
+    en línea: igual se pide la lista por la marca [cid:…] del texto."""
+    mensaje = con_adjuntos(en_linea("image001.png", png(60)), cuerpo=f"Sale este error:\r\n{CID}")
+    graph = GraphConAdjuntos([mensaje])
+    assert mensaje["hasAttachments"] is False
+    assert revisar(factory, graph) == {"ticket": 1}
+    assert [a.filename for a in adjuntos_en_bd(session)] == ["image001.png"]
+    assert "hasAttachments=false pero trae imágenes en línea" in log.text
+    assert "el correo trae 1 adjunto(s): «image001.png» (tamaño=" in log.text
+
+
+def test_sin_marca_cid_ni_hasattachments_no_se_pide_la_lista(factory, usuario):
+    mensaje = con_adjuntos(en_linea("image001.png", png(60)))
+    mensaje["_sin_cid"] = True
+    graph = GraphConAdjuntos([mensaje])
+    assert revisar(factory, graph) == {"ticket": 1}
+    assert not any("attachments" in ruta for _, ruta in graph.llamadas)
+
+
+def test_cada_descartado_queda_como_warning_con_sus_datos(factory, session, usuario, log):
+    graph = GraphConAdjuntos([con_adjuntos(
+        firma(),
+        archivo("virus.exe", b"MZ" + b"0" * 30_000, "application/octet-stream"),
+        archivo("falsa.pdf", b"no es un pdf" * 3000, "application/pdf"),
+    )])
+    revisar(factory, graph)
+    avisos = [r.getMessage() for r in log.records if r.levelname == "WARNING"]
+    firma_ = next(a for a in avisos if "«image001.png»" in a)
+    assert "isInline=True" in firma_ and "contentId=image001.png@01DB2C3A.5F1E9B20" in firma_
+    assert f"tamaño={len(PNG_CHICA) + 200}" in firma_
+    assert "motivo: imagen en línea de menos de 15 KB (firma)" in firma_
+    exe = next(a for a in avisos if "«virus.exe»" in a)
+    assert "isInline=False" in exe and "contentId=-" in exe and "motivo: tipo no permitido" in exe
+    # Se descargó y el contenido no coincide: también dice cuántos bytes llegaron.
+    pdf = next(a for a in avisos if "«falsa.pdf»" in a)
+    assert "motivo: tipo no permitido (" in pdf and "bytes descargados" in pdf
+
+
+def test_si_falla_la_descarga_queda_warning_con_el_error(factory, session, usuario, log, monkeypatch):
+    graph = GraphConAdjuntos([con_adjuntos(en_linea("image001.png", png(60)), cuerpo=f"Mire {CID}")])
+
+    def falla(*args, **kwargs):
+        raise RuntimeError("Graph devolvió 503")
+
+    monkeypatch.setattr(graph.cliente, "descargar_adjunto", falla)
+    assert revisar(factory, graph) == {"ticket": 1}
+    assert adjuntos_en_bd(session) == []
+    aviso = next(r.getMessage() for r in log.records
+                 if r.levelname == "WARNING" and "«image001.png»" in r.getMessage())
+    assert "isInline=True" in aviso and "contentId=image001.png@01DB2C3A.5F1E9B20" in aviso
+    assert "motivo: no se pudo descargar: RuntimeError('Graph devolvió 503')" in aviso
+    assert "No se guard" in texto_respuesta(graph)
+
+
+def test_si_falla_el_almacen_queda_warning_y_sigue_con_los_demas(factory, session, usuario, log, monkeypatch):
+    graph = GraphConAdjuntos([con_adjuntos(archivo("a.png", PNG, "image/png"),
+                                           archivo("b.pdf", PDF, "application/pdf"))])
+    original = adjuntos_service.subir
+
+    def subir(session_, ticket, user, nombre, contenido, origen="app"):
+        if nombre == "a.png":
+            raise OSError("Blob no responde")
+        return original(session_, ticket, user, nombre, contenido, origen=origen)
+
+    monkeypatch.setattr(adjuntos_service, "subir", subir)
+    revisar(factory, graph)
+    assert [a.filename for a in adjuntos_en_bd(session)] == ["b.pdf"]
+    assert any(r.levelname == "WARNING" and "«a.png»" in r.getMessage()
+               and "no se pudo guardar: OSError('Blob no responde')" in r.getMessage()
+               for r in log.records)
