@@ -19,6 +19,7 @@ import re
 import unicodedata
 import uuid
 import zipfile
+import zlib
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -55,6 +56,11 @@ ORIGEN_CORREO = "correo"
 
 class AdjuntoInvalidoError(Exception):
     """El archivo no se acepta (tipo, contenido, tamaño o vacío): ``422``."""
+
+
+class ImagenDanadaError(AdjuntoInvalidoError):
+    """Empieza como JPEG o PNG pero no es una imagen entera (cortada, dañada o
+    solo la cabecera): guardarla daría un archivo que no se puede abrir."""
 
 
 class LimiteAdjuntosError(Exception):
@@ -121,11 +127,83 @@ def _es_texto(contenido: bytes) -> bool:
     return all(c in "\t\n\r\f" or unicodedata.category(c) != "Cc" for c in texto)
 
 
+_FIRMA_PNG = b"\x89PNG\r\n\x1a\n"
+# SOF0…SOF15 (menos DHT, JPG y DAC): el marco con el tamaño de la imagen.
+_MARCOS_JPEG = set(range(0xC0, 0xD0)) - {0xC4, 0xC8, 0xCC}
+
+
+def _jpeg_completo(contenido: bytes) -> bool:
+    """¿Tiene la estructura de una imagen JPEG que se puede abrir? Recorre los
+    segmentos hasta el inicio de los datos (SOS) y exige antes el marco (SOF).
+    Un archivo con solo la cabecera (``FF D8 FF E0 … JFIF``) y comentarios no
+    es una imagen, aunque empiece igual. No exige el ``FF D9`` final: algunos
+    celulares agregan datos después."""
+    largo_total = len(contenido)
+    if not contenido.startswith(b"\xff\xd8"):
+        return False
+    i, marco = 2, False
+    while i < largo_total:
+        if contenido[i] != 0xFF:
+            return False
+        while i < largo_total and contenido[i] == 0xFF:  # bytes de relleno
+            i += 1
+        if i >= largo_total:
+            return False
+        marcador = contenido[i]
+        i += 1
+        if marcador in (0x00, 0xD8, 0xD9):
+            return False  # termina (o se reinicia) sin datos de imagen
+        if 0xD0 <= marcador <= 0xD7 or marcador == 0x01:
+            continue  # marcadores sin largo
+        if i + 2 > largo_total:
+            return False
+        largo = int.from_bytes(contenido[i:i + 2], "big")
+        if largo < 2 or i + largo > largo_total:
+            return False  # segmento cortado: archivo incompleto
+        if marcador == 0xDA:
+            return marco and i + largo < largo_total
+        marco = marco or marcador in _MARCOS_JPEG
+        i += largo
+    return False
+
+
+def _png_completo(contenido: bytes) -> bool:
+    """¿Es un PNG entero? IHDR primero, al menos un IDAT, IEND al final y el
+    CRC de cada bloque correcto (un archivo cortado o dañado no pasa)."""
+    if not contenido.startswith(_FIRMA_PNG):
+        return False
+    i, primero, datos = len(_FIRMA_PNG), True, False
+    while i + 12 <= len(contenido):
+        largo = int.from_bytes(contenido[i:i + 4], "big")
+        tipo = contenido[i + 4:i + 8]
+        fin = i + 8 + largo
+        if fin + 4 > len(contenido):
+            return False
+        if zlib.crc32(contenido[i + 4:fin]) != int.from_bytes(contenido[fin:fin + 4], "big"):
+            return False
+        if primero and (tipo != b"IHDR" or largo != 13):
+            return False
+        primero = False
+        datos = datos or tipo == b"IDAT"
+        if tipo == b"IEND":
+            return datos
+        i = fin + 4
+    return False
+
+
+def _imagen_completa(ext: str, contenido: bytes) -> bool:
+    if ext in (".jpg", ".jpeg"):
+        return _jpeg_completo(contenido)
+    if ext == ".png":
+        return _png_completo(contenido)
+    return True
+
+
 def _contenido_coincide(ext: str, contenido: bytes) -> bool:
     if ext in (".jpg", ".jpeg"):
         return contenido.startswith(b"\xff\xd8\xff")
     if ext == ".png":
-        return contenido.startswith(b"\x89PNG\r\n\x1a\n")
+        return contenido.startswith(_FIRMA_PNG)
     if ext == ".pdf":
         return contenido.startswith(b"%PDF-")
     if ext == ".docx":
@@ -154,6 +232,9 @@ def validar(nombre: str | None, contenido: bytes) -> tuple[str, str]:
     if not _contenido_coincide(ext, contenido):
         raise AdjuntoInvalidoError(
             f"«{limpio}»: el contenido no corresponde a un archivo {ext[1:].upper()} válido.")
+    if not _imagen_completa(ext, contenido):
+        raise ImagenDanadaError(
+            f"«{limpio}»: la imagen está dañada o incompleta y no se puede abrir.")
     return limpio, TIPOS[ext]
 
 

@@ -24,10 +24,11 @@ from backend.services import adjuntos_service
 from backend.services import correo_adjuntos as ca
 from backend.services import correo_service as cs
 from backend.tests.test_correo import CONFIG, FakeGraph, crear_correo, factory, usuario  # noqa: F401
+from backend.tests import imagenes
 
 MB = 1024 * 1024
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * (20 * 1024)  # 20 KB: no es «imagen chica»
-PNG_CHICA = b"\x89PNG\r\n\x1a\n" + b"\x00" * 2000
+PNG = imagenes.png(20)  # 20 KB: no es «imagen chica»
+PNG_CHICA = imagenes.png(2)
 PDF = b"%PDF-1.7\n" + b"0" * 1000 + b"\n%%EOF\n"
 
 
@@ -61,7 +62,7 @@ def en_linea(nombre, contenido, tipo="image/png"):
 
 
 def png(kb: int, relleno: bytes = b"\x00") -> bytes:
-    return b"\x89PNG\r\n\x1a\n" + relleno * (kb * 1024)
+    return imagenes.png(kb, relleno)
 
 
 def correo_otro():
@@ -210,7 +211,7 @@ def test_foto_del_celular_en_linea_sin_cid_y_sin_hasattachments_se_guarda(factor
     """Como manda la foto el celular: en línea (``isInline``), sin
     ``contentId`` y sin marca [cid:…] en el texto; Graph dice
     ``hasAttachments: false``. Antes ni se pedía la lista."""
-    foto = archivo("IMG_0001.jpeg", b"\xff\xd8\xff\xe0" + b"\x00" * (300 * 1024), "image/jpeg", inline=True)
+    foto = archivo("IMG_0001.jpeg", imagenes.jpeg(300), "image/jpeg", inline=True)
     del foto["contentId"]
     mensaje = con_adjuntos(foto, cuerpo="Se me cayó el celular.\r\n\r\nEnviado desde mi iPhone")
     mensaje["_sin_cid"] = True
@@ -471,7 +472,7 @@ def test_la_captura_pegada_se_guarda_por_correo_y_sin_cid_en_la_descripcion(fact
 
 
 def test_imagen_en_linea_sin_extension_toma_la_de_su_tipo(factory, session, usuario):
-    jpg = b"\xff\xd8\xff\xe0" + b"\x00" * (30 * 1024)
+    jpg = imagenes.jpeg(30)
     graph = GraphConAdjuntos([con_adjuntos(en_linea("Pasted image", jpg, "image/jpeg"),
                                            cuerpo=f"Mire la foto {CID}")])
     revisar(factory, graph)
@@ -535,6 +536,32 @@ def test_la_misma_imagen_en_el_mismo_ticket_no_se_duplica(factory, session, usua
     assert revisar(factory, graph) == {"comentario": 1}
     assert len(adjuntos_en_bd(session)) == 1
     assert "motivo: la misma imagen ya está en el ticket" in log.text
+
+
+def test_la_foto_pegada_se_descarga_igual_byte_por_byte(factory, session, usuario, auth_client):
+    """Con Graph (``$value`` trae los bytes tal cual): lo que se descarga de la
+    ticketera es exactamente la imagen del correo, con su Content-Type."""
+    foto = imagenes.jpeg(300, b"G")
+    revisar(factory, GraphConAdjuntos([con_adjuntos(en_linea("image001.jpg", foto, "image/jpeg"),
+                                                    cuerpo=f"Mire {CID}")]))
+    [adjunto] = adjuntos_en_bd(session)
+    resp = auth_client.get(f"/api/tickets/{adjunto.ticket_id}/adjuntos/{adjunto.id}/archivo")
+    assert resp.status_code == 200
+    assert resp.content == foto and resp.headers["content-type"] == "image/jpeg"
+
+
+def test_foto_danada_no_se_guarda_y_se_avisa(factory, session, usuario, log):
+    """Solo la cabecera JPEG (o una descarga cortada): antes se guardaba y
+    al abrirla «no es compatible»."""
+    falsa = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"\xff\xfe\x50\x02" + b"x" * 20_480
+    cortada = imagenes.jpeg(40)[:30_000]
+    graph = GraphConAdjuntos([con_adjuntos(en_linea("image001.jpg", falsa, "image/jpeg"),
+                                           archivo("foto.jpg", cortada, "image/jpeg"),
+                                           cuerpo=f"Mire {CID}")])
+    revisar(factory, graph)
+    assert adjuntos_en_bd(session) == []
+    assert "No se guardaron 2 adjuntos (imagen dañada o incompleta)" in texto_respuesta(graph)
+    assert "motivo: imagen dañada o incompleta (" in log.text
 
 
 def test_un_adjunto_comun_repetido_si_se_guarda(factory, session, usuario):

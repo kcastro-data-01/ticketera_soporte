@@ -23,10 +23,11 @@ from backend.models import Attachment, Comment, ProcessedEmail, Ticket, User
 from backend.services import correo_service as cs
 from backend.tests.test_correo import factory  # noqa: F401
 from backend.tests.test_correo_mailpit import smtp  # noqa: F401
+from backend.tests import imagenes
 
 YO = "kcastro@data.cr"
 DANIEL = "dsaenz@data.cr"
-JPG = b"\xff\xd8\xff\xe0" + b"\x00\x10JFIF" + b"\x01" * (300 * 1024) + b"\xff\xd9"
+JPG = imagenes.jpeg(300, b"N")
 PDF = b"%PDF-1.7\n" + b"0" * 2000 + b"\n%%EOF\n"
 
 _ruta_script = Path(__file__).resolve().parents[2] / "scripts" / "enviar_correo_prueba.py"
@@ -253,6 +254,29 @@ def test_ticket_con_foto_pegada(factory, session, daniel, smtp, mailpit, cliente
     # La siguiente revisión no lo vuelve a tomar y la respuesta de la app
     # (en «enviados») ya estaba registrada.
     assert revisar(factory, config, cliente) == {"enviado_repetido": 1}
+
+
+def test_la_foto_que_llega_por_mailpit_queda_igual_byte_por_byte(factory, session, daniel, smtp, mailpit, cliente, config, archivos, auth_client):  # noqa: F811
+    """La foto va en base64 en el correo; Mailpit la decodifica (``/part``) y
+    la ticketera guarda y devuelve exactamente los mismos bytes."""
+    enviar(smtp, "--de", DANIEL, "--asunto", "Daño Nokia", "--texto", "Se me cayó",
+           "--imagen-en-linea", str(archivos / "foto.jpg"))
+    id_ = mailpit.id_de("Daño Nokia")
+    parte = next(p for p in mailpit._correos()[id_].walk() if p.get_content_type() == "image/jpeg")
+    assert parte["Content-Transfer-Encoding"] == "base64"
+    revisar(factory, config, cliente)
+    [adjunto] = adjuntos(session, session.scalars(select(Ticket)).one().id)
+    assert (adjunto.filename, adjunto.content_type, adjunto.size) == ("foto.jpg", "image/jpeg", len(JPG))
+    resp = auth_client.get(f"/api/tickets/{adjunto.ticket_id}/adjuntos/{adjunto.id}/archivo")
+    assert resp.content == JPG and resp.headers["content-type"] == "image/jpeg"
+
+
+def test_imagen_de_prueba_del_script_es_un_png_real(factory, session, daniel, smtp, mailpit, cliente, config):  # noqa: F811
+    enviar(smtp, "--de", DANIEL, "--asunto", "Daño Nokia", "--texto", "Se me cayó", "--imagen-de-prueba")
+    revisar(factory, config, cliente)
+    [adjunto] = adjuntos(session, session.scalars(select(Ticket)).one().id)
+    assert adjunto.filename.startswith("imagen_de_prueba") and adjunto.content_type == "image/png"
+    assert adjunto.size >= 15 * 1024
 
 
 def test_ticket_con_pdf_adjunto(factory, session, daniel, smtp, mailpit, cliente, config, archivos):  # noqa: F811

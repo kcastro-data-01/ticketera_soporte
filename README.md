@@ -566,7 +566,12 @@ ticket queda creado igual: la página dice cuál falló y por qué, con el enlac
 
 - Tipos: jpg, png, pdf, docx, xlsx y txt. El servidor mira el **contenido**
   (firma del archivo; en docx y xlsx, que sea un documento de Office sin
-  macros), no solo la extensión. Hasta **4 MB** por archivo y **10** por ticket.
+  macros), no solo la extensión. En jpg y png revisa además que la imagen
+  esté **entera** (JPEG con marco y datos de imagen; PNG con IHDR, IDAT, IEND
+  y sus CRC): una imagen cortada, dañada o con solo la cabecera se rechaza
+  («la imagen está dañada o incompleta»; por correo, motivo «imagen dañada o
+  incompleta» en la respuesta) en vez de guardarse y no poder abrirse.
+  Hasta **4 MB** por archivo y **10** por ticket.
 - Permisos: los de ver el ticket (el Solicitante, solo en los suyos). Elimina
   quien lo subió o el Administrador. En un ticket **Cerrado** no se sube ni se
   elimina; sí se descarga.
@@ -1304,6 +1309,8 @@ Opciones: `--de`, `--para` y `--cc` (se pueden repetir), `--asunto`,
 `--texto`, `--adjunto ARCHIVO` y `--imagen-en-linea IMAGEN` (pegada en el
 texto como Outlook: HTML con `<img src="cid:…">`, la imagen en línea con
 `Content-ID` y `[cid:…]` en el texto; las dos se pueden repetir),
+`--imagen-de-prueba` (pega una imagen PNG real generada al momento, distinta
+cada vez, para no necesitar un archivo),
 `--responder` (contesta en el hilo del último correo que `--para` le mandó a
 `--de`, o sea la respuesta de la ticketera) y `--en-respuesta-a <Message-ID>`.
 `--para` tiene que ser `CORREO_USUARIO`, y el remitente necesita una cuenta

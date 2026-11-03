@@ -16,9 +16,10 @@ from backend.migrate_add_attachments import migrate_add_attachments
 from backend.models import Attachment, History, User
 from backend.services import adjuntos_service
 from backend.tests.conftest import AuthenticatedClient
+from backend.tests import imagenes
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + b"\x00" * 20
-JPG = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"\x00" * 20
+PNG = imagenes.png(1)
+JPG = imagenes.jpeg(1)
 PDF = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
 TXT = "Error al imprimir: «sin papel»\r\nLínea 2\n".encode("utf-8")
 
@@ -164,6 +165,51 @@ def test_rechaza_tipo_o_contenido_invalido(auth_client, carpeta, nombre, conteni
     assert resp.status_code == 422, resp.text
     assert "detail" in resp.json()
     assert not carpeta.exists() or not any(p.is_file() for p in carpeta.rglob("*"))
+
+
+# --- Imágenes que empiezan bien pero no se pueden abrir -----------------------------
+
+# Solo la cabecera JPEG («FF D8 FF E0 … JFIF») y comentarios, sin imagen: así era
+# la foto de prueba que se guardó y «no es compatible» al abrirla.
+SOLO_CABECERA_JPEG = (b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+                      + b"\xff\xfe\x10\x02" + b"x" * 4096 + b"\xff\xd9")
+_PNG_GRANDE = imagenes.png(5)
+_PNG_CRC_MALO = _PNG_GRANDE[:40] + bytes([_PNG_GRANDE[40] ^ 0xFF]) + _PNG_GRANDE[41:]
+
+
+@pytest.mark.parametrize("nombre, contenido", [
+    ("foto.jpg", SOLO_CABECERA_JPEG),
+    ("foto.jpg", imagenes.JPEG_16[:200]),            # cortada antes de los datos
+    ("foto.jpeg", b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"\x00" * 20),
+    ("captura.png", _PNG_GRANDE[:-20]),             # sin IEND
+    ("captura.png", _PNG_CRC_MALO),                 # un byte dañado
+    ("captura.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 2000),
+])
+def test_rechaza_imagen_danada_o_incompleta(auth_client, carpeta, nombre, contenido):
+    ticket_id = _ticket(auth_client)
+    resp = _subir(auth_client, ticket_id, nombre, contenido)
+    assert resp.status_code == 422, resp.text
+    assert "dañada o incompleta" in resp.json()["detail"]
+    assert not carpeta.exists() or not any(p.is_file() for p in carpeta.rglob("*"))
+
+
+def test_acepta_jpeg_con_datos_despues_del_final(auth_client):
+    """Algunos celulares agregan datos después de FF D9: igual se abre."""
+    ticket_id = _ticket(auth_client)
+    assert _subir(auth_client, ticket_id, "IMG_1.jpg", imagenes.jpeg(20) + b"MOTION" * 100).status_code == 201
+
+
+@pytest.mark.parametrize("nombre, contenido, tipo", [
+    ("foto.jpg", imagenes.jpeg(300, b"Q"), "image/jpeg"),
+    ("captura.png", imagenes.png(300, b"Q"), "image/png"),
+])
+def test_la_imagen_se_descarga_igual_byte_por_byte(auth_client, nombre, contenido, tipo):
+    ticket_id = _ticket(auth_client)
+    adjunto = _subir(auth_client, ticket_id, nombre, contenido).json()
+    resp = auth_client.get(f"/api/tickets/{ticket_id}/adjuntos/{adjunto['id']}/archivo")
+    assert resp.status_code == 200
+    assert resp.content == contenido
+    assert resp.headers["content-type"] == tipo
 
 
 def test_rechaza_mas_de_4_mb(auth_client, carpeta):

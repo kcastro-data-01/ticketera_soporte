@@ -26,13 +26,32 @@ import argparse
 import html
 import json
 import mimetypes
+import os
 import smtplib
+import struct
 import sys
+import tempfile
+import time
+import zlib
 import urllib.parse
 import urllib.request
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 from pathlib import Path
+
+
+def imagen_de_prueba(carpeta: Path, lado: int = 160) -> Path:
+    """Un PNG **real** (se puede abrir) con ruido al azar: distinto cada vez,
+    así no cuenta como logo repetido, y de unos 75 KB (más de 15 KB)."""
+    def bloque(tipo: bytes, datos: bytes) -> bytes:
+        return struct.pack(">I", len(datos)) + tipo + datos + struct.pack(">I", zlib.crc32(tipo + datos))
+
+    filas = b"".join(b"\x00" + os.urandom(lado * 3) for _ in range(lado))
+    contenido = (b"\x89PNG\r\n\x1a\n" + bloque(b"IHDR", struct.pack(">IIBBBBB", lado, lado, 8, 2, 0, 0, 0))
+                 + bloque(b"IDAT", zlib.compress(filas)) + bloque(b"IEND", b""))
+    ruta = carpeta / f"imagen_de_prueba_{time.strftime('%H%M%S')}.png"
+    ruta.write_bytes(contenido)
+    return ruta
 
 
 def _tipo(ruta: Path) -> tuple[str, str]:
@@ -79,6 +98,9 @@ def armar(args) -> EmailMessage:
     correo["Message-ID"] = make_msgid(domain=args.de.rsplit("@", 1)[-1])
 
     imagenes = []
+    if args.imagen_de_prueba:
+        args.imagen_en_linea = [*args.imagen_en_linea,
+                                str(imagen_de_prueba(Path(tempfile.mkdtemp(prefix="correo_prueba_"))))]
     for indice, nombre in enumerate(args.imagen_en_linea, start=1):
         ruta = Path(nombre)
         cid = make_msgid(idstring=f"image{indice:03d}", domain="prueba.local")[1:-1]
@@ -121,6 +143,8 @@ def main(argv=None) -> None:
                         help="archivo adjunto; se puede repetir")
     parser.add_argument("--imagen-en-linea", action="append", default=[], metavar="IMAGEN",
                         help="imagen pegada en el texto (en línea, con cid); se puede repetir")
+    parser.add_argument("--imagen-de-prueba", action="store_true",
+                        help="pegar en el texto una imagen PNG real generada al momento (sin archivo)")
     parser.add_argument("--responder", action="store_true",
                         help="responder en el hilo del último correo que --para le mandó a --de")
     parser.add_argument("--en-respuesta-a", default="", metavar="MESSAGE_ID",

@@ -47,6 +47,7 @@ from backend.services import adjuntos_service, ticket_service
 from backend.services.adjuntos_service import (
     AdjuntoInvalidoError,
     AlmacenNoConfiguradoError,
+    ImagenDanadaError,
     LimiteAdjuntosError,
 )
 from backend.services.ticket_service import TicketClosedError
@@ -89,7 +90,8 @@ MOTIVO_LLENO = f"el ticket ya tiene {adjuntos_service.MAX_POR_TICKET} adjuntos"
 MOTIVO_TIEMPO = "no hubo tiempo de descargarlo"
 MOTIVO_ALMACEN = "los adjuntos no están configurados en el servidor"
 MOTIVO_ERROR = "no se pudo descargar"
-ORDEN_MOTIVOS = (MOTIVO_TIPO, MOTIVO_GRANDE, MOTIVO_CANTIDAD, MOTIVO_TOTAL, MOTIVO_LLENO,
+MOTIVO_DANADA = "imagen dañada o incompleta"
+ORDEN_MOTIVOS = (MOTIVO_TIPO, MOTIVO_DANADA, MOTIVO_GRANDE, MOTIVO_CANTIDAD, MOTIVO_TOTAL, MOTIVO_LLENO,
                  MOTIVO_TIEMPO, MOTIVO_ALMACEN, MOTIVO_ERROR)
 
 
@@ -223,8 +225,10 @@ def _repetida(session, ticket: Ticket, usuario: User | None, contenido: bytes) -
     return POR_QUE_LOGO if previa is not None else None
 
 
-def _motivo_invalido(contenido: bytes) -> str:
-    return MOTIVO_GRANDE if len(contenido) > adjuntos_service.MAX_BYTES else MOTIVO_TIPO
+def _motivo_invalido(contenido: bytes, error: Exception | None = None) -> str:
+    if len(contenido) > adjuntos_service.MAX_BYTES:
+        return MOTIVO_GRANDE
+    return MOTIVO_DANADA if isinstance(error, ImagenDanadaError) else MOTIVO_TIPO
 
 
 def guardar(session_factory, cliente, mensaje_id: str, ticket_id: int, remitente: str,
@@ -275,7 +279,7 @@ def guardar(session_factory, cliente, mensaje_id: str, ticket_id: int, remitente
                 adjuntos_service.subir(session, ticket, usuario, nombre, contenido,
                                        origen=adjuntos_service.ORIGEN_CORREO)
             except AdjuntoInvalidoError as error:
-                motivo = _motivo_invalido(contenido)
+                motivo = _motivo_invalido(contenido, error)
                 _avisar(ticket_id, adjunto, nombre,
                         f"{motivo} ({error}; {len(contenido)} bytes descargados)", None)
                 resultado.omitidos.append((nombre, motivo))
