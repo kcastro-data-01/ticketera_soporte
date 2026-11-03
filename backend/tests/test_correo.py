@@ -364,6 +364,9 @@ class FakeGraph:
         mensaje = self.mensajes.get(partes[3]) if len(partes) > 3 else None
         if mensaje is None:
             return httpx.Response(404, json={"error": {"message": "no existe"}})
+        if request.method == "GET" and partes[4:] == ["attachments"]:
+            # Como Graph con un correo sin adjuntos (la app siempre pide la lista).
+            return httpx.Response(200, json={"value": []})
         if request.method == "PATCH" and len(partes) == 4:
             mensaje["isRead"] = cuerpo["isRead"]
             return httpx.Response(200, json={})

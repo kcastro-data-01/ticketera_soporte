@@ -197,10 +197,28 @@ def test_guarda_los_archivos_e_ignora_firma_imagen_chica_correo_y_onedrive(facto
     assert "Planilla.xlsx (enlace a OneDrive/SharePoint)" in log.text
 
 
-def test_sin_adjuntos_no_se_pide_la_lista(factory, usuario):
+def test_sin_adjuntos_se_pide_la_lista_una_vez_y_no_se_baja_nada(factory, session, usuario, log):
     graph = GraphConAdjuntos([crear_correo()])
     assert revisar(factory, graph) == {"ticket": 1}
-    assert not any("attachments" in ruta for _, ruta in graph.llamadas)
+    assert len([r for _, r in graph.llamadas if r.endswith("/attachments")]) == 1
+    assert graph.descargas == [] and adjuntos_en_bd(session) == []
+    assert "el correo trae 0 adjunto(s): ninguno" in log.text
+    assert "No se guard" not in texto_respuesta(graph)
+
+
+def test_foto_del_celular_en_linea_sin_cid_y_sin_hasattachments_se_guarda(factory, session, usuario, log):
+    """Como manda la foto el celular: en línea (``isInline``), sin
+    ``contentId`` y sin marca [cid:…] en el texto; Graph dice
+    ``hasAttachments: false``. Antes ni se pedía la lista."""
+    foto = archivo("IMG_0001.jpeg", b"\xff\xd8\xff\xe0" + b"\x00" * (300 * 1024), "image/jpeg", inline=True)
+    del foto["contentId"]
+    mensaje = con_adjuntos(foto, cuerpo="Se me cayó el celular.\r\n\r\nEnviado desde mi iPhone")
+    mensaje["_sin_cid"] = True
+    graph = GraphConAdjuntos([mensaje])
+    assert mensaje["hasAttachments"] is False
+    revisar(factory, graph)
+    assert [a.filename for a in adjuntos_en_bd(session)] == ["IMG_0001.jpeg"]
+    assert "hasAttachments=false y sin [cid:…]; igual se piden los adjuntos" in log.text
 
 
 def test_solo_firma_no_agrega_nota(factory, session, usuario):
@@ -494,6 +512,31 @@ def test_el_logo_que_ya_llego_en_otro_correo_del_mismo_remitente_no_se_vuelve_a_
     assert f"Ticket #{nuevo.id}: adjuntos del correo ignorados: image001.png (imagen en línea repetida (logo))" in log.text
 
 
+def test_la_misma_foto_grande_en_otro_ticket_si_se_guarda(factory, session, usuario, log):
+    """Una foto (o una captura) que la persona vuelve a mandar no es un logo:
+    solo las imágenes de menos de 100 KB cuentan como logo conocido."""
+    foto = png(300, b"F")
+    for numero, asunto in enumerate(("Daño Nokia", "Sigue el daño del Nokia")):
+        revisar(factory, GraphConAdjuntos([con_adjuntos(en_linea("image001.png", foto), cuerpo=f"Mire {CID}",
+                                                        msg_id=f"<foto{numero}@data.cr>", asunto=asunto)]))
+    assert [a.filename for a in adjuntos_en_bd(session)] == ["image001.png", "image001.png"]
+    assert len({a.ticket_id for a in adjuntos_en_bd(session)}) == 2
+    assert "(logo)" not in log.text
+
+
+def test_la_misma_imagen_en_el_mismo_ticket_no_se_duplica(factory, session, usuario, log):
+    foto = png(300, b"F")
+    revisar(factory, GraphConAdjuntos([con_adjuntos(en_linea("image001.png", foto), cuerpo=f"Mire {CID}",
+                                                    msg_id="<uno@data.cr>")]))
+    ticket = session.scalars(select(Ticket)).one()
+    graph = GraphConAdjuntos([con_adjuntos(en_linea("image001.png", foto), msg_id="<dos@data.cr>",
+                                           asunto=f"RE: Ticket #{ticket.id} creado",
+                                           cuerpo=f"Sigue igual {CID}")])
+    assert revisar(factory, graph) == {"comentario": 1}
+    assert len(adjuntos_en_bd(session)) == 1
+    assert "motivo: la misma imagen ya está en el ticket" in log.text
+
+
 def test_un_adjunto_comun_repetido_si_se_guarda(factory, session, usuario):
     """La regla del logo es solo para imágenes en línea."""
     foto = png(30)
@@ -563,14 +606,6 @@ def test_solo_una_captura_pegada_se_guarda_aunque_hasattachments_sea_false(facto
     assert [a.filename for a in adjuntos_en_bd(session)] == ["image001.png"]
     assert "hasAttachments=false pero trae imágenes en línea" in log.text
     assert "el correo trae 1 adjunto(s): «image001.png» (tamaño=" in log.text
-
-
-def test_sin_marca_cid_ni_hasattachments_no_se_pide_la_lista(factory, usuario):
-    mensaje = con_adjuntos(en_linea("image001.png", png(60)))
-    mensaje["_sin_cid"] = True
-    graph = GraphConAdjuntos([mensaje])
-    assert revisar(factory, graph) == {"ticket": 1}
-    assert not any("attachments" in ruta for _, ruta in graph.llamadas)
 
 
 def test_cada_descartado_queda_como_warning_con_sus_datos(factory, session, usuario, log):

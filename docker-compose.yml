@@ -106,7 +106,9 @@ services:
     environment:
       # Guarda los últimos 500 correos (en memoria: se borran al reiniciar).
       MP_MAX_MESSAGES: 500
-    mem_limit: 64m
+    # Con 64 MB se caía al leer un correo con una foto de varios MB (y al
+    # reiniciarse se borran los correos, que están en memoria).
+    mem_limit: 256m
     restart: unless-stopped
 
 volumes:

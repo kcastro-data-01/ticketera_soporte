@@ -614,12 +614,15 @@ mismas validaciones, marcados «por correo» (`backend/services/correo_adjuntos.
   imagen, el texto queda «(Imagen pegada en el correo.)».
 - Se **ignoran** sin avisar (quedan en el log): imágenes de menos de 15 KB;
   imágenes en línea que se repiten como logo (dos o más con el mismo tamaño y
-  tipo en el mismo correo, sin descargarlas, o la misma imagen —misma huella
-  SHA-256, columna `adjuntos.sha256`— que ya está en el ticket o que ya llegó
-  en un correo anterior del mismo remitente); imágenes en línea de un tipo que
-  no se guarda (gif, bmp…); adjuntos que son otro correo y enlaces a OneDrive
-  o SharePoint. Un logo de 15 KB o más se guarda la primera vez que llega
-  (todavía no se sabe que se repite); desde el segundo correo, no.
+  tipo en el mismo correo, sin descargarlas, o una imagen de menos de 100 KB
+  igual —misma huella SHA-256, columna `adjuntos.sha256`— a una que ya llegó
+  en un correo anterior del mismo remitente); imágenes en línea que ya están
+  en el ticket (misma huella); imágenes en línea de un tipo que no se guarda
+  (gif, bmp…); adjuntos que son otro correo y enlaces a OneDrive o
+  SharePoint. Un logo de 15 KB o más se guarda la primera vez que llega
+  (todavía no se sabe que se repite); desde el segundo correo, no. Una foto o
+  captura de 100 KB o más que se vuelve a mandar para otro ticket **sí** se
+  guarda.
 - Se **omiten** los de tipo no permitido, más de 4 MB, los que pasan de 5 o de
   10 MB en el correo y los que no entran porque el ticket ya tiene 10. El
   ticket o el comentario se crea igual; queda una fila «Adjuntos no guardados»
@@ -629,8 +632,11 @@ mismas validaciones, marcados «por correo» (`backend/services/correo_adjuntos.
   «más de 5 por correo», la nota lo nombra).
 - En un ticket **Cerrado** no se guardan (la respuesta a un ticket Cerrado
   tampoco se agrega como comentario).
-- Graph pone `hasAttachments: false` cuando el correo solo trae imágenes en
-  línea: por eso la lista también se pide si el texto tiene marcas `[cid:…]`.
+- La lista de adjuntos se pide **siempre** para los correos que crean un
+  ticket o un comentario. Graph pone `hasAttachments: false` cuando el correo
+  solo trae imágenes en línea, y una foto mandada desde el celular puede venir
+  en línea sin marca `[cid:…]` en el texto: con esas dos señales en falso
+  antes no se guardaba.
 - **Log** (en Vercel, buscar «adjunto»): una línea `CORREO: Ticket #N: el correo
   trae N adjunto(s): …` con lo que listó Graph, y un **WARNING** por cada
   adjunto descartado o que falló (`adjunto del correo descartado «nombre»
@@ -1258,13 +1264,21 @@ Con `CORREO_PROVEEDOR=mailpit`:
   `References` en las respuestas, `X-Ticketera` y `X-Auto-Response-Suppress`.
   Cada uno queda registrado como `aviso_app` antes de enviarse, igual que con
   Graph.
-- La app **nunca** usa Graph ni toca el buzón real: no arranca el lector del
-  buzón (aunque `CORREO_ACTIVO=1`), `POST /api/cron/correo` responde que el
-  correo está apagado y `correo_login` no inicia sesión. Tampoco hace falta
+- La app **nunca** usa Graph ni toca el buzón real (aunque
+  `CORREO_ACTIVO=1`), y `correo_login` no inicia sesión. Tampoco hace falta
   `CORREO_ACTIVO`.
-- Todavía **no lee** correos. Por eso los avisos que se ven son los de lo que
-  se hace en la app: comentarios, cambios de estado y asignaciones; los demás
-  salen cuando la app responde a un correo recibido.
+- **Lee los correos que llegan a Mailpit** para `CORREO_USUARIO` (en Para, CC
+  o CCO) cada 30 s, con la API de Mailpit (`MAILPIT_API`, por defecto
+  `http://mailpit:8025`). Los convierte al formato de Graph y pasan por lo
+  mismo: filtro, tickets, comentarios, respuestas y adjuntos. Como Graph, las
+  imágenes pegadas van con `isInline` y `contentId`, `hasAttachments` es
+  `false` si solo trae imágenes en línea y el texto lleva `[cid:…]` donde
+  iba cada una. «Mover a Tickets-Procesados» es marcarlo como leído y
+  ponerle esa etiqueta; los que no piden ayuda quedan sin leer. Los correos
+  que manda `CORREO_USUARIO` cuentan como sus Elementos enviados.
+  `POST /api/cron/correo` también hace una revisión.
+- Los correos que llegaron **antes** de que la app empezara a leer el buzón
+  por primera vez no se tocan (igual que con Graph).
 - El remitente es `CORREO_USUARIO` (o `soporte@ticketera.local` si no está).
   `MAILPIT_HOST` y `MAILPIT_PUERTO` cambian el servidor (por defecto
   `mailpit` y `1025`).
@@ -1272,8 +1286,28 @@ Con `CORREO_PROVEEDOR=mailpit`:
   `docker compose logs ticketera`.
 
 Mailpit solo escucha en esta compu (`127.0.0.1`), no pide contraseña y
-guarda los últimos 500 correos en memoria (se borran al reiniciarlo). La API
+guarda los últimos 500 correos en memoria (se borran al reiniciarlo; tiene
+256 MB para que una foto de varios MB no lo tire). La API
 para ver los correos sin la página: `curl http://localhost:8025/api/v1/messages`.
+
+### Mandar correos de prueba
+
+`scripts/enviar_correo_prueba.py` (solo Python, sin instalar nada) manda un
+correo a Mailpit por SMTP (`localhost:1025`):
+
+```bash
+python3 scripts/enviar_correo_prueba.py --de dsaenz@data.cr --para kcastro@data.cr \
+    --asunto "Daño Nokia" --texto "Se me cayó" --imagen-en-linea foto.jpg
+```
+
+Opciones: `--de`, `--para` y `--cc` (se pueden repetir), `--asunto`,
+`--texto`, `--adjunto ARCHIVO` y `--imagen-en-linea IMAGEN` (pegada en el
+texto como Outlook: HTML con `<img src="cid:…">`, la imagen en línea con
+`Content-ID` y `[cid:…]` en el texto; las dos se pueden repetir),
+`--responder` (contesta en el hilo del último correo que `--para` le mandó a
+`--de`, o sea la respuesta de la ticketera) y `--en-respuesta-a <Message-ID>`.
+`--para` tiene que ser `CORREO_USUARIO`, y el remitente necesita una cuenta
+activa en la ticketera local.
 
 Para volver al buzón real: `CORREO_PROVEEDOR=graph` (o borrar la línea) y
 `docker compose up -d --no-deps ticketera`.

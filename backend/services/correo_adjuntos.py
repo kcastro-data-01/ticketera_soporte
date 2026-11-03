@@ -17,9 +17,10 @@ Se ignoran sin avisar (no son archivos que la persona quiso mandar):
 
 * las imágenes de menos de :data:`MIN_BYTES_IMAGEN` (íconos y logos chicos);
 * las imágenes en línea que **se repiten como logo**: dos o más con el mismo
-  tamaño y tipo en el mismo correo (no se descargan), o la misma imagen
-  (misma huella SHA-256) que ya llegó en un correo anterior del mismo
-  remitente o que ya está en el ticket;
+  tamaño y tipo en el mismo correo (no se descargan), o una imagen chica
+  (menos de :data:`MAX_BYTES_LOGO`) igual (misma huella SHA-256) a una que
+  ya llegó en un correo anterior del mismo remitente;
+* las imágenes en línea que ya están en el ticket (misma huella);
 * las imágenes en línea de un tipo que no se guarda (gif, bmp…);
 * los adjuntos que son otro correo (``itemAttachment``) o un enlace a
   OneDrive o SharePoint (``referenceAttachment``).
@@ -39,7 +40,7 @@ from dataclasses import dataclass, field, replace
 
 from collections import Counter
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import func, select
 
 from backend.models import Attachment, Ticket, User
 from backend.services import adjuntos_service, ticket_service
@@ -74,6 +75,11 @@ EXTENSIONES_IMAGEN = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", 
 EXTENSION_POR_TIPO = {"image/jpeg": ".jpg", "image/jpg": ".jpg", "image/pjpeg": ".jpg",
                       "image/png": ".png"}
 POR_QUE_LOGO = "imagen en línea repetida (logo)"
+POR_QUE_YA_ESTA = "la misma imagen ya está en el ticket"
+# Una imagen en línea que ya llegó en otro correo del mismo remitente es el
+# logo de su firma solo si es chica: una foto o una captura que se vuelve a
+# mandar (otro ticket, una prueba) se guarda.
+MAX_BYTES_LOGO = 100 * 1024
 
 MOTIVO_TIPO = "tipo no permitido"
 MOTIVO_GRANDE = "más de 4 MB"
@@ -196,18 +202,25 @@ def elegir(adjuntos: list[dict], libres: int, ticket_id: int | None = None) -> E
     return eleccion
 
 
-def _es_logo_conocido(session, ticket: Ticket, usuario: User | None, contenido: bytes) -> bool:
-    """La misma imagen ya está en el ticket o ya llegó en un correo anterior
-    del mismo remitente (el logo de su firma)."""
-    condiciones = [Attachment.ticket_id == ticket.id]
-    if usuario is not None:
-        condiciones.append(and_(Attachment.source == adjuntos_service.ORIGEN_CORREO,
-                                Attachment.uploaded_by_id == usuario.id))
-    return session.scalar(
+def _repetida(session, ticket: Ticket, usuario: User | None, contenido: bytes) -> str | None:
+    """Por qué no se guarda una imagen en línea ya vista, o ``None``.
+
+    * La misma imagen ya está en el ticket (una respuesta que la vuelve a
+      traer): no se duplica.
+    * Es chica (menos de :data:`MAX_BYTES_LOGO`) y ya llegó en un correo
+      anterior del mismo remitente: el logo de su firma."""
+    huella = adjuntos_service.huella(contenido)
+    if session.scalar(select(Attachment.id).where(Attachment.sha256 == huella,
+                                                  Attachment.ticket_id == ticket.id).limit(1)):
+        return POR_QUE_YA_ESTA
+    if usuario is None or len(contenido) >= MAX_BYTES_LOGO:
+        return None
+    previa = session.scalar(
         select(Attachment.id)
-        .where(Attachment.sha256 == adjuntos_service.huella(contenido), or_(*condiciones))
-        .limit(1)
-    ) is not None
+        .where(Attachment.sha256 == huella, Attachment.source == adjuntos_service.ORIGEN_CORREO,
+               Attachment.uploaded_by_id == usuario.id)
+        .limit(1))
+    return POR_QUE_LOGO if previa is not None else None
 
 
 def _motivo_invalido(contenido: bytes) -> str:
@@ -252,9 +265,11 @@ def guardar(session_factory, cliente, mensaje_id: str, ticket_id: int, remitente
                 logger.warning("Detalle del error al descargar «%s»", nombre, exc_info=True)
                 resultado.omitidos.append((nombre, MOTIVO_ERROR))
                 continue
-            if adjunto.get("en_linea") and _es_logo_conocido(session, ticket, usuario, contenido):
-                _avisar(ticket_id, adjunto, nombre, f"{POR_QUE_LOGO}, ya llegó antes")
-                resultado.ignorados.append((nombre, POR_QUE_LOGO))
+            por_que = adjunto.get("en_linea") and _repetida(session, ticket, usuario, contenido)
+            if por_que:
+                _avisar(ticket_id, adjunto, nombre,
+                        f"{por_que}, ya llegó antes" if por_que == POR_QUE_LOGO else por_que)
+                resultado.ignorados.append((nombre, por_que))
                 continue
             try:
                 adjuntos_service.subir(session, ticket, usuario, nombre, contenido,

@@ -6,8 +6,9 @@ recibe lo que envía la app, como lo haría Mailpit:
 * Los avisos salen por SMTP con los mismos destinatarios, asunto, texto y
   cabeceras que con Graph, y quedan registrados como ``aviso_app`` antes de
   enviarse.
-* Con «mailpit» nunca se usa Graph: no se crea su cliente, no arranca el
-  lector del buzón, el cron no lee y ``correo_login`` no inicia sesión.
+* Con «mailpit» nunca se usa Graph: no se crea su cliente, el lector y el
+  cron leen Mailpit (ver :mod:`test_correo_mailpit_entrada`) y
+  ``correo_login`` no inicia sesión.
 * En Vercel siempre es «graph», diga lo que diga la variable."""
 
 import socketserver
@@ -227,16 +228,35 @@ def test_mailpit_apagado_el_comentario_se_guarda_igual(client, session, entorno_
 # --- Con Mailpit nunca se toca el buzón real ---------------------------------------------
 
 
-def test_mailpit_no_arranca_el_lector_del_buzon(entorno_mailpit, factory):  # noqa: F811
+def test_mailpit_el_lector_lee_mailpit_y_no_graph(entorno_mailpit, factory):  # noqa: F811
     entorno_mailpit.setenv("CORREO_ACTIVO", "1")  # aunque el .env lo tenga encendido
-    assert cs.iniciar_lector(factory) is False
-    assert cs._hilo is None or not cs._hilo.is_alive()
+    arrancado = []
+    entorno_mailpit.setattr(cs, "_bucle", lambda fabrica, config, cliente: arrancado.append(cliente))
+    entorno_mailpit.setattr(cs, "_hilo", None)
+    assert cs.iniciar_lector(factory) is True
+    cs._hilo.join(2)
+    assert [type(c) for c in arrancado] == [cs.ClienteMailpit]
 
 
-def test_mailpit_el_cron_no_lee_el_buzon(entorno_mailpit, factory):  # noqa: F811
+def test_mailpit_el_cron_lee_mailpit(entorno_mailpit, factory):  # noqa: F811
     entorno_mailpit.setenv("CORREO_ACTIVO", "1")
-    with pytest.raises(cs.CorreoApagado):
-        cs.revisar_una_vez(factory, crear=lambda *_: pytest.fail("no debe crear cliente"))
+    leidos = []
+
+    class Vacio:
+        def enviados(self, desde):
+            leidos.append("enviados")
+            return []
+
+        def no_leidos(self):
+            leidos.append("bandeja")
+            return []
+
+    def crear(config, fabrica):
+        assert config.proveedor == "mailpit"
+        return Vacio()
+
+    assert cs.revisar_una_vez(factory, crear=crear) == {}
+    assert leidos == ["enviados", "bandeja"]
 
 
 def test_mailpit_correo_login_no_inicia_sesion_en_microsoft(entorno_mailpit):

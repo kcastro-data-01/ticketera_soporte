@@ -82,9 +82,12 @@ hay hilos en segundo plano) no arranca el hilo: cada llamada a
 ``CORREO_PROVEEDOR``: ``graph`` (por defecto, y siempre en Vercel) o
 ``mailpit`` (solo local, para probar): todos los correos de la app salen por
 SMTP a Mailpit (``MAILPIT_HOST``, ``MAILPIT_PUERTO``) con los mismos
-destinatarios, asunto, texto y cabeceras (:class:`ClienteSMTP`), y la app
-nunca usa Graph ni toca el buzón real: no se lee ningún buzón y no hace falta
-``CORREO_ACTIVO``.
+destinatarios, asunto, texto y cabeceras, y la app nunca usa Graph ni toca el
+buzón real (no hace falta ``CORREO_ACTIVO``). Los correos que llegan a
+Mailpit para ``CORREO_USUARIO`` se leen cada :data:`INTERVALO_MAILPIT`
+segundos con su API (``MAILPIT_API``) y se convierten al formato de Graph
+(:class:`ClienteMailpit`): pasan por el mismo filtro, tickets, comentarios y
+adjuntos.
 """
 
 from __future__ import annotations
@@ -135,6 +138,8 @@ MAX_PAGINAS = 10  # hasta 500 no leídos por revisión (50 por página)
 PROVEEDORES = ("graph", "mailpit")
 # Remitente de los correos por Mailpit si no hay CORREO_USUARIO.
 REMITENTE_MAILPIT = "soporte@ticketera.local"
+# Con Mailpit (solo local) el buzón se revisa cada 30 s.
+INTERVALO_MAILPIT = 30
 
 # Palabras clave → categoría / prioridad (se revisan en minúsculas, en el
 # asunto y el cuerpo). Si nada coincide: Software y Media.
@@ -310,6 +315,8 @@ class ConfigCorreo:
     proveedor: str = "graph"
     smtp_host: str = "mailpit"
     smtp_puerto: int = 1025
+    # API de Mailpit para leer los correos que llegan (solo local).
+    mailpit_api: str = "http://mailpit:8025"
 
 
 def _activo(valor: str | None) -> bool:
@@ -336,7 +343,8 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         cache_path=ruta_cache(env.get("CORREO_M365_CACHE")),
         carpeta_procesados=(env.get("CORREO_CARPETA_PROCESADOS") or CARPETA_PROCESADOS).strip(),
         filtro=filtro_desde_entorno(env),
-        intervalo=max(15, int(env.get("CORREO_INTERVALO") or 60)),
+        intervalo=(INTERVALO_MAILPIT if proveedor == "mailpit"
+                   else max(15, int(env.get("CORREO_INTERVALO") or 60))),
         app_url=(env.get("APP_URL") or "http://localhost:8000").rstrip("/"),
         dominio_empresa=(env.get("DOMINIO_EMPRESA") or "").strip().lower().lstrip("@"),
         avisar_asignado=_activo(env.get("AVISAR_ASIGNADO")),
@@ -346,6 +354,8 @@ def config_desde_entorno(env=None) -> ConfigCorreo | None:
         proveedor=proveedor,
         smtp_host=(env.get("MAILPIT_HOST") or "mailpit").strip(),
         smtp_puerto=int(env.get("MAILPIT_PUERTO") or 1025),
+        mailpit_api=(env.get("MAILPIT_API")
+                     or f"http://{(env.get('MAILPIT_HOST') or 'mailpit').strip()}:8025").rstrip("/"),
     )
 
 
@@ -1548,13 +1558,176 @@ class ClienteSMTP:
         self._enviar(self._mensaje(respuesta), registrar)
 
 
+_IMG_CID = re.compile(r"""(?is)<img\b[^>]*?\bsrc\s*=\s*["']?cid:([^"'\s>]+)[^>]*>""")
+
+
+def _direcciones(lista) -> list[dict]:
+    return [{"emailAddress": {"name": d.get("Name") or "", "address": d.get("Address") or ""}}
+            for d in lista or []]
+
+
+def mensaje_desde_mailpit(datos: dict, cabeceras: dict[str, list[str]]) -> dict:
+    """Un correo de la API de Mailpit (``/api/v1/message/{ID}`` y sus
+    ``/headers``) con la forma de un mensaje de Graph (``_SELECT_MENSAJE``).
+
+    Como Graph con ``Prefer: outlook.body-content-type="text"``: si hay HTML,
+    el texto sale de él y cada ``<img src="cid:…">`` queda como ``[cid:…]``.
+    Como Graph, ``hasAttachments`` no cuenta las imágenes en línea."""
+    html = datos.get("HTML") or ""
+    if html:
+        texto = _html_a_texto(_IMG_CID.sub(lambda m: f" [cid:{m.group(1)}] ", html))
+    else:
+        texto = datos.get("Text") or ""
+    message_id = (datos.get("MessageID") or "").strip()
+    return {
+        "id": datos["ID"],
+        "internetMessageId": f"<{message_id}>" if message_id else "",
+        "conversationId": "",
+        "subject": datos.get("Subject") or "",
+        "from": (_direcciones([datos["From"]]) or [{}])[0] if datos.get("From") else {},
+        "toRecipients": _direcciones(datos.get("To")),
+        "ccRecipients": _direcciones(datos.get("Cc")),
+        "body": {"contentType": "text", "content": texto},
+        "sentDateTime": datos.get("Date") or datos.get("Created"),
+        "receivedDateTime": datos.get("Created") or datos.get("Date"),
+        "internetMessageHeaders": [{"name": nombre, "value": valor}
+                                   for nombre, valores in cabeceras.items() for valor in valores],
+        "hasAttachments": bool(datos.get("Attachments")),
+    }
+
+
+def adjuntos_desde_mailpit(datos: dict) -> list[dict]:
+    """Los adjuntos de un correo de Mailpit como la lista de Graph
+    (``/attachments`` con ``$select``): ``isInline`` y ``contentId`` para las
+    imágenes en línea; un correo adjunto es ``itemAttachment``."""
+    lista = []
+    for en_linea, partes in ((False, datos.get("Attachments")), (True, datos.get("Inline"))):
+        for parte in partes or []:
+            tipo = parte.get("ContentType") or "application/octet-stream"
+            lista.append({
+                "@odata.type": ("#microsoft.graph.itemAttachment" if tipo.lower() == "message/rfc822"
+                                else "#microsoft.graph.fileAttachment"),
+                "id": parte["PartID"],
+                "name": parte.get("FileName") or "",
+                "contentType": tipo,
+                "size": int(parte.get("Size") or 0),
+                "isInline": en_linea,
+                "contentId": parte.get("ContentID") or None,
+            })
+    return lista
+
+
+class ClienteMailpit(ClienteSMTP):
+    """Mailpit como si fuera el buzón (solo local, para probar): envía por
+    SMTP como :class:`ClienteSMTP` y **lee** con la API de Mailpit los
+    correos que llegan, en el formato de Graph.
+
+    * Bandeja de entrada: los no leídos que van para el buzón (``usuario`` en
+      Para, CC o CCO) y que no mandó el propio buzón.
+    * Elementos enviados: los que mandó el buzón (incluye las respuestas de la
+      app, que ya quedaron registradas al enviarlas).
+    * «Mover a la carpeta» = marcar como leído y ponerle la etiqueta de la
+      carpeta (en Mailpit no hay carpetas)."""
+
+    POR_PAGINA = 200
+
+    def __init__(self, host: str, puerto: int, remitente: str, api: str, timeout: float = 10,
+                 conectar=smtplib.SMTP, http: httpx.Client | None = None):
+        super().__init__(host, puerto, remitente, timeout, conectar)
+        self._api = api.rstrip("/")
+        self._http = http or httpx.Client(timeout=timeout)
+        self._buzon = remitente.strip().lower()
+        self._leidos: dict[str, dict] = {}
+
+    def _pedir(self, metodo: str, ruta: str, crudo: bool = False, **kwargs):
+        resp = self._http.request(metodo, self._api + ruta, **kwargs)
+        if resp.status_code >= 400:
+            raise ErrorGraph(f"Mailpit {metodo} {ruta} → {resp.status_code}: {resp.text[:200]}")
+        if crudo:
+            return resp.content
+        # Los PUT de Mailpit contestan «ok» en texto, no en JSON.
+        es_json = "json" in resp.headers.get("content-type", "")
+        return resp.json() if resp.content and es_json else {}
+
+    def _resumenes(self, consulta: str) -> list[dict]:
+        resumenes: list[dict] = []
+        for pagina in range(MAX_PAGINAS):
+            datos = self._pedir("GET", "/api/v1/search", params={
+                "query": consulta, "start": pagina * self.POR_PAGINA, "limit": self.POR_PAGINA})
+            lote = datos.get("messages") or []
+            resumenes.extend(lote)
+            if len(lote) < self.POR_PAGINA:
+                break
+        return resumenes
+
+    def _completo(self, mensaje_id: str) -> dict:
+        datos = self._pedir("GET", f"/api/v1/message/{mensaje_id}")
+        cabeceras = self._pedir("GET", f"/api/v1/message/{mensaje_id}/headers")
+        self._leidos[mensaje_id] = datos
+        return mensaje_desde_mailpit(datos, cabeceras)
+
+    def _es_del_buzon(self, resumen: dict) -> bool:
+        return ((resumen.get("From") or {}).get("Address") or "").strip().lower() == self._buzon
+
+    def _va_al_buzon(self, resumen: dict) -> bool:
+        return any((d.get("Address") or "").strip().lower() == self._buzon
+                   for campo in ("To", "Cc", "Bcc") for d in resumen.get(campo) or [])
+
+    def no_leidos(self) -> list[dict]:
+        """No leídos para el buzón, del más nuevo al más viejo (como Graph)."""
+        return [self._completo(r["ID"]) for r in self._resumenes("is:unread")
+                if self._va_al_buzon(r) and not self._es_del_buzon(r)]
+
+    def enviados(self, desde: datetime) -> list[dict]:
+        """Los que mandó el buzón desde ``desde``, del más viejo al más nuevo."""
+        mensajes = []
+        for resumen in self._resumenes(f'from:"{self._buzon}"'):
+            fecha = _fecha_iso(resumen.get("Created"))
+            if fecha is None or fecha >= desde:
+                mensajes.append(self._completo(resumen["ID"]))
+        return list(reversed(mensajes))
+
+    def adjuntos(self, mensaje_id: str) -> list[dict]:
+        datos = self._leidos.get(mensaje_id) or self._pedir("GET", f"/api/v1/message/{mensaje_id}")
+        return adjuntos_desde_mailpit(datos)
+
+    def descargar_adjunto(self, mensaje_id: str, adjunto_id: str) -> bytes:
+        return self._pedir("GET", f"/api/v1/message/{mensaje_id}/part/{adjunto_id}", crudo=True)
+
+    def id_carpeta(self, nombre: str) -> str:
+        return nombre
+
+    def marcar_y_mover(self, mensaje_id: str, carpeta_id: str) -> None:
+        self._pedir("PUT", "/api/v1/messages", json={"IDs": [mensaje_id], "Read": True})
+        try:
+            self._pedir("PUT", "/api/v1/tags", json={"IDs": [mensaje_id], "Tags": [carpeta_id]})
+        except Exception:  # noqa: BLE001 — la etiqueta es solo para verlo en Mailpit
+            logger.info("Mailpit no aceptó la etiqueta «%s»", carpeta_id)
+        self._leidos.pop(mensaje_id, None)
+
+    def responder(self, mensaje_id: str, respuesta: Respuesta, registrar=None,
+                  referencias: tuple[str, ...] = ()) -> None:
+        """Responde en el hilo: ``mensaje_id`` es el ID de Mailpit (como el
+        id de Graph); se busca su Message-ID y sus References."""
+        datos = self._leidos.get(mensaje_id) or self._pedir("GET", f"/api/v1/message/{mensaje_id}")
+        message_id = f"<{datos.get('MessageID')}>" if datos.get("MessageID") else mensaje_id
+        if not referencias:
+            try:
+                cabeceras = self._pedir("GET", f"/api/v1/message/{mensaje_id}/headers")
+            except Exception:  # noqa: BLE001 — sin References igual queda en el hilo
+                cabeceras = {}
+            referencias = tuple(_ids_mensaje(" ".join(
+                {k.lower(): v for k, v in cabeceras.items()}.get("references") or [])))
+        super().responder(message_id, respuesta, registrar, referencias)
+
+
 def crear_cliente(config: ConfigCorreo, session_factory=None) -> ClienteGraph | ClienteSMTP:
     """Cliente de Graph con los tokens de la base (importa el archivo de
     caché de antes si la base todavía no los tiene). En modo cron cada pedido
     espera menos (la llamada entera tiene que terminar en ~25 s). Con
-    ``CORREO_PROVEEDOR=mailpit``, un :class:`ClienteSMTP` (sin Graph)."""
+    ``CORREO_PROVEEDOR=mailpit``, un :class:`ClienteMailpit` (sin Graph)."""
     if config.proveedor == "mailpit":
-        return ClienteSMTP(config.smtp_host, config.smtp_puerto, config.usuario)
+        return ClienteMailpit(config.smtp_host, config.smtp_puerto, config.usuario, config.mailpit_api)
     almacen = AlmacenBD(session_factory, importar_de=config.cache_path)
     token = ProveedorToken(config.m365_tenant, config.m365_client_id, config.usuario, almacen)
     return ClienteGraph(token, timeout=TIMEOUT_GRAPH_CRON if config.modo == "cron" else 60)
@@ -1754,8 +1927,12 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
             logger.info("%s «%s» → %s", correo.remitente, correo.asunto, resultado)
         # Adjuntos del correo que creó el ticket o el comentario: antes de
         # responder, para avisar en la respuesta los que no se guardaron.
+        # La lista se pide siempre: ``hasAttachments`` no cuenta las imágenes
+        # en línea y una foto del celular puede venir en línea sin [cid:…]
+        # en el texto (ver :func:`_puede_traer_adjuntos`).
         if (resultado in ("ticket", "comentario") and respuesta is not None
-                and respuesta.ticket_id is not None and _puede_traer_adjuntos(mensaje)):
+                and respuesta.ticket_id is not None):
+            _puede_traer_adjuntos(mensaje)
             respuesta = _guardar_adjuntos(session_factory, config, cliente, mensaje["id"],
                                           correo, respuesta, hasta)
         # Primero se responde (al mover, Graph le cambia el id al correo).
@@ -1782,17 +1959,19 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
 
 
 def _puede_traer_adjuntos(mensaje: dict) -> bool:
-    """¿Hay que pedirle a Graph la lista de adjuntos?
-
-    ``hasAttachments`` no cuenta las imágenes en línea: un correo que solo
-    trae una captura pegada llega con ``false``. Por eso también se miran las
-    marcas ``[cid:…]`` (o ``<img src="cid:…">``) del texto."""
+    """¿Graph o el texto dicen que hay adjuntos? Solo para el log: la lista
+    se pide igual, porque ``hasAttachments`` no cuenta las imágenes en línea
+    y una foto mandada desde el celular puede venir en línea **sin** marca
+    ``[cid:…]`` en el texto (``Content-Disposition: inline``, sin
+    ``Content-ID``): con las dos señales en falso, antes no se guardaba."""
     if mensaje.get("hasAttachments"):
         return True
     if _tiene_imagen_en_linea(mensaje.get("uniqueBody")) or _tiene_imagen_en_linea(mensaje.get("body")):
-        logger.info("Correo «%s»: hasAttachments=false pero trae imágenes en línea; "
-                    "se piden los adjuntos", mensaje.get("subject") or "")
+        logger.info("Correo «%s»: hasAttachments=false pero trae imágenes en línea",
+                    mensaje.get("subject") or "")
         return True
+    logger.info("Correo «%s»: hasAttachments=false y sin [cid:…]; igual se piden los adjuntos",
+                mensaje.get("subject") or "")
     return False
 
 
@@ -1887,15 +2066,15 @@ def iniciar_lector(session_factory=None) -> bool:
         logger.info("lectura del buzón apagada (CORREO_ACTIVO no está en 1)")
         return False
     if config.proveedor == "mailpit":
-        logger.info("CORREO_PROVEEDOR=mailpit: los correos salen por Mailpit (%s:%s) y no se lee "
-                    "ningún buzón", config.smtp_host, config.smtp_puerto)
-        return False
-    if config.modo == "cron":
+        logger.info("CORREO_PROVEEDOR=mailpit: los correos salen por Mailpit (%s:%s) y se leen los "
+                    "que llegan a %s (%s) cada %s s", config.smtp_host, config.smtp_puerto,
+                    config.usuario, config.mailpit_api, config.intervalo)
+    elif config.modo == "cron":
         logger.info("lectura del buzón por cron (CORREO_MODO=cron): POST /api/cron/correo")
         return False
     if _hilo is not None and _hilo.is_alive():
         return False
-    if not (config.m365_tenant and config.m365_client_id):
+    if config.proveedor != "mailpit" and not (config.m365_tenant and config.m365_client_id):
         logger.warning("faltan CORREO_M365_TENANT o CORREO_M365_CLIENT_ID: no se puede entrar al buzón")
     if session_factory is None:
         from backend.database import SessionLocal
@@ -1933,8 +2112,6 @@ def revisar_una_vez(session_factory=None, limite: float = LIMITE_CRON,
     config = config_desde_entorno()
     if config is None:
         raise CorreoApagado("la lectura del buzón está apagada (CORREO_ACTIVO)")
-    if config.proveedor == "mailpit":
-        raise CorreoApagado("con CORREO_PROVEEDOR=mailpit no se lee ningún buzón")
     if session_factory is None:
         from backend.database import SessionLocal
 
