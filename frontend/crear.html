@@ -113,10 +113,39 @@
           </fieldset>
         </div>
 
+        <!-- Adjuntos (opcional): se suben uno por uno después de crear el
+             ticket (js/crear.js con las funciones de js/adjuntos.js).
+             «Sacar foto» solo aparece en pantallas táctiles. -->
+        <div class="campo campo-adjuntos" role="group" aria-labelledby="crear-adj-titulo">
+          <span id="crear-adj-titulo">Adjuntos (opcional)</span>
+          <div class="acciones">
+            <button type="button" id="crear-adj-subir" class="secundario" aria-describedby="ayuda-adjuntos">Adjuntar archivos</button>
+            <button type="button" id="crear-adj-foto" class="secundario" hidden>Sacar foto</button>
+            <input type="file" id="crear-adj-archivos" multiple hidden
+                   accept=".jpg,.jpeg,.png,.pdf,.docx,.xlsx,.txt,image/jpeg,image/png,application/pdf,text/plain">
+            <input type="file" id="crear-adj-camara" accept="image/*" capture="environment" hidden>
+          </div>
+          <small id="ayuda-adjuntos" class="ayuda-campo">jpg, png, pdf, docx, xlsx o txt; hasta 4 MB cada uno y 10 por ticket. Las fotos grandes se achican solas.</small>
+          <p id="crear-adj-estado" class="estado" role="status" aria-live="polite" hidden></p>
+          <ul id="crear-adj-lista" class="adjuntos-lista adjuntos-elegidos" aria-label="Archivos elegidos" hidden></ul>
+        </div>
+
         <div class="acciones">
           <button type="submit" id="guardar">Crear ticket</button>
         </div>
       </form>
+
+      <!-- Si algún adjunto no se pudo subir: el ticket ya está creado; se
+           dice cuál falló y por qué, y se ofrece reintentarlo desde el detalle. -->
+      <section id="crear-resultado" class="seccion crear-resultado" aria-labelledby="crear-resultado-titulo" hidden>
+        <h2 id="crear-resultado-titulo" tabindex="-1"></h2>
+        <p id="crear-resultado-texto"></p>
+        <ul id="crear-resultado-fallas" class="crear-resultado-fallas"></ul>
+        <div class="acciones">
+          <a id="crear-resultado-detalle" href="index.html" class="enlace-boton">Ir al ticket y reintentar</a>
+          <a href="index.html" class="enlace-boton secundario">Volver al listado</a>
+        </div>
+      </section>
   
       <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
     </main>
@@ -126,6 +155,7 @@
 
   <script src="js/auth.js" defer></script>
   <script src="js/asistente.js" defer></script>
+  <script src="js/adjuntos.js" defer></script>
   <script src="js/crear.js" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {

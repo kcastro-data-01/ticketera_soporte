@@ -58,6 +58,7 @@ def _respuesta(adjunto: Attachment, ticket: Ticket, user: User) -> AttachmentRes
         subido_por_id=adjunto.uploaded_by_id,
         creado=adjunto.created_at,
         puede_eliminar=adjuntos_service.puede_eliminar(adjunto, ticket, user),
+        por_correo=adjunto.source == adjuntos_service.ORIGEN_CORREO,
     )
 
 

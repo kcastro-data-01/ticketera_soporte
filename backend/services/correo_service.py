@@ -110,7 +110,7 @@ from backend.constants import TicketCategory, TicketPriority, TicketState
 from backend.entorno import en_vercel
 from backend.models import ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate
-from backend.services import correo_filtro, ticket_service
+from backend.services import correo_adjuntos, correo_filtro, ticket_service
 from backend.services.correo_auth import AlmacenBD, ProveedorToken, SinSesionError, ruta_cache
 from backend.services.login_microsoft import asignar_rol_inicial
 
@@ -196,7 +196,7 @@ PROPIEDAD_X_TICKETERA = "String {00020386-0000-0000-C000-000000000046} Name x-ti
 _EXPANDIR_PROPIEDADES = "singleValueExtendedProperties($filter=" + " or ".join(
     f"id eq '{p}'" for p in (PROPIEDAD_IN_REPLY_TO, PROPIEDAD_REFERENCES, PROPIEDAD_X_TICKETERA)) + ")"
 _SELECT_MENSAJE = ("id,internetMessageId,conversationId,subject,from,toRecipients,ccRecipients,body,uniqueBody,"
-                   "receivedDateTime,sentDateTime,internetMessageHeaders")
+                   "receivedDateTime,sentDateTime,internetMessageHeaders,hasAttachments")
 # «RE:», «RV:», «FW:», «Fwd:», «RE[2]:»… (también repetidos) al inicio del asunto.
 PREFIJOS_RESPUESTA = re.compile(r"^\s*((re|rv|fw|fwd|aw|tr|reenviar)\s*(\[\d+\])?\s*:\s*)+", re.IGNORECASE)
 ASUNTO_INACTIVO = "No pudimos crear tu ticket"
@@ -1332,7 +1332,8 @@ class ClienteGraph:
         self._http = http or httpx.Client(timeout=timeout)
         self._carpetas: dict[str, str] = {}
 
-    def _pedir(self, metodo: str, url: str, **kwargs) -> dict:
+    def _pedir(self, metodo: str, url: str, crudo: bool = False, **kwargs):
+        """JSON de la respuesta (o los bytes tal cual, con ``crudo``)."""
         if not url.startswith("http"):
             url = GRAPH_URL + url
         cabeceras = kwargs.pop("headers", {})
@@ -1346,7 +1347,21 @@ class ClienteGraph:
             except ValueError:
                 detalle = resp.text
             raise ErrorGraph(f"{metodo} {url} → {resp.status_code}: {detalle}")
+        if crudo:
+            return resp.content
         return resp.json() if resp.content else {}
+
+    def adjuntos(self, mensaje_id: str) -> list[dict]:
+        """Lista de adjuntos de un correo: nombre, tipo, tamaño y si va en
+        línea, **sin** el contenido (``contentBytes``)."""
+        datos = self._pedir("GET", f"/me/messages/{mensaje_id}/attachments",
+                            params={"$select": "id,name,contentType,size,isInline"})
+        return datos.get("value", [])
+
+    def descargar_adjunto(self, mensaje_id: str, adjunto_id: str) -> bytes:
+        """El contenido de un adjunto de archivo, tal cual (``$value``)."""
+        return self._pedir("GET", f"/me/messages/{mensaje_id}/attachments/{adjunto_id}/$value",
+                           crudo=True)
 
     def no_leidos(self) -> list[dict]:
         """Correos no leídos de la bandeja de entrada (todas las páginas)."""
@@ -1719,6 +1734,12 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
             continue
         if resultado != "repetido":
             logger.info("%s «%s» → %s", correo.remitente, correo.asunto, resultado)
+        # Adjuntos del correo que creó el ticket o el comentario: antes de
+        # responder, para avisar en la respuesta los que no se guardaron.
+        if (resultado in ("ticket", "comentario") and respuesta is not None
+                and respuesta.ticket_id is not None and mensaje.get("hasAttachments")):
+            respuesta = _guardar_adjuntos(session_factory, config, cliente, mensaje["id"],
+                                          correo, respuesta, hasta)
         # Primero se responde (al mover, Graph le cambia el id al correo).
         if respuesta is not None:
             try:
@@ -1740,6 +1761,26 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
             logger.exception("No se pudo mover el correo «%s»", correo.asunto)
     freno.alertar(config.usuario)
     return conteo
+
+
+def _guardar_adjuntos(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
+                      mensaje_id: str, correo: CorreoEntrante, respuesta: Respuesta,
+                      hasta: float | None) -> Respuesta:
+    """Guarda los adjuntos (ver :mod:`correo_adjuntos`) y devuelve la
+    respuesta con la nota de los que no se guardaron. Si algo falla, el
+    ticket o el comentario ya están creados: se responde igual."""
+    try:
+        resultado = correo_adjuntos.guardar(session_factory, cliente, mensaje_id,
+                                            respuesta.ticket_id, correo.remitente, hasta)
+    except SinSesionError:
+        raise
+    except Exception:
+        logger.exception("No se pudieron guardar los adjuntos del correo %s", correo.message_id)
+        return respuesta
+    if resultado is None or not resultado.omitidos:
+        return respuesta
+    enlace = f"{config.app_url}/detalle.html?id={respuesta.ticket_id}"
+    return correo_adjuntos.agregar_nota(respuesta, resultado.omitidos, enlace)
 
 
 def revisar_enviados(session_factory, config: ConfigCorreo, cliente: ClienteGraph,

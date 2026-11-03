@@ -77,6 +77,7 @@
             <li><strong>Gestión de estados</strong>: Flujo de estados <code>Nuevo → En proceso → Resuelto → Cerrado</code>, con saltos hacia adelante y reapertura</li>
             <li><strong>Asignación de tickets</strong>: Asignación a usuarios con roles <code>Administrador</code>, <code>Técnico</code> y <code>Solicitante</code></li>
             <li><strong>Comentarios</strong>: Cada comentario queda firmado con el nombre del usuario que lo escribió</li>
+            <li><strong>Adjuntos</strong>: Archivos y fotos en cada ticket, al crearlo o después desde el detalle</li>
             <li><strong>Búsqueda y filtros</strong>: Búsqueda por título/descripción y filtros por categoría, prioridad y estado. El filtro «Estado» ofrece Todos, Nuevo, En proceso, Resuelto o Cerrado (un estado por vez)</li>
             <li><strong>Filtro «Asignado a»</strong>: Todos, Sin asignar o una persona activa. Solo lo ven el Administrador y el Técnico (el Solicitante ya ve solo sus tickets)</li>
             <li><strong>Filtro «Fecha de creación»</strong>: elija un día y se muestran los tickets creados ese día, de 00:00 a 23:59 en hora de Costa Rica. Vacío, no filtra por fecha</li>
@@ -90,6 +91,18 @@
             <li><strong>Comentar un ticket</strong>: Agregar comentarios, que quedan firmados con su nombre</li>
             <li><strong>Cambiar estado</strong>: En el detalle, toque el estado en el recorrido del ticket (debajo del título), confirme y, si quiere, escriba un motivo</li>
           </ol>
+
+          <h3 id="adjuntos">Adjuntar archivos</h3>
+          <p>Un ticket puede llevar archivos: una captura del error, una foto del equipo, un PDF o una planilla.</p>
+          <ul>
+            <li><strong>Al crear el ticket</strong>: en «Nuevo ticket», pulse «Adjuntar archivos» (en el celular también aparece «Sacar foto», que abre la cámara). Lo elegido se lista con su tamaño; con ✕ se quita. Al pulsar «Crear ticket» primero se crea el ticket y después se suben los archivos, uno por uno.</li>
+            <li>Si algún archivo no se puede subir, <strong>el ticket queda creado igual</strong>: se indica cuál falló y por qué, con el enlace «Ir al ticket y reintentar».</li>
+            <li><strong>En un ticket ya creado</strong>: en su detalle, la sección «Adjuntos» tiene «Adjuntar archivos» (y «Sacar foto» en el celular) y la lista de archivos con su nombre, tamaño, quién lo subió y cuándo. Las imágenes muestran una miniatura: tóquela para verla en grande. Cada archivo tiene «Descargar» y, para quien puede, «Eliminar».</li>
+            <li><strong>Tipos y límites</strong>: jpg, png, pdf, docx, xlsx y txt, hasta 4 MB cada uno y 10 por ticket. Se revisa el contenido del archivo, no solo su nombre. Las fotos de más de 2000 px se achican solas antes de subirse.</li>
+            <li><strong>Por correo</strong>: los archivos de un correo que crea un ticket o agrega un comentario también se guardan; en la lista dicen «por correo» (ver «Tickets por correo»).</li>
+            <li><strong>Quién</strong>: adjunta y descarga quien puede ver el ticket. Elimina quien subió el archivo o un Administrador. En un ticket <code>Cerrado</code> no se agregan ni se eliminan adjuntos, pero se pueden descargar.</li>
+            <li>Los archivos no tienen enlaces públicos: solo se abren con la sesión iniciada. Subir y eliminar quedan en el historial.</li>
+          </ul>
         </div>
       </details>
 
@@ -128,6 +141,9 @@
                 <tr><td>Quitó la asignación</td><td>El ticket queda sin responsable.</td><td>Carlos Rojas → Sin asignar</td></tr>
                 <tr><td>Cambió el estado</td><td>El ticket avanza en el flujo, salta pasos o se reabre (de Resuelto a En proceso).</td><td>Nuevo → Cerrado</td></tr>
                 <tr><td>Comentó</td><td>Alguien agrega un comentario.</td><td>«Ya revisé el cable de red»</td></tr>
+                <tr><td>Adjuntó un archivo</td><td>Alguien sube un archivo (o llegó adjunto en un correo).</td><td>«captura.png» (por correo)</td></tr>
+                <tr><td>Eliminó un adjunto</td><td>Quien lo subió o un Administrador borra un archivo.</td><td>«factura.pdf»</td></tr>
+                <tr><td>Adjuntos no guardados</td><td>Un correo traía archivos que no se guardaron (tipo no permitido, más de 4 MB o demasiados).</td><td>No se guardó 1 adjunto del correo: programa.exe (tipo no permitido)</td></tr>
               </tbody>
             </table>
           </div>
@@ -161,6 +177,8 @@
                 <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Los suyos y los asignados a él</td></tr>
                 <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
                 <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>En los suyos y los asignados a él</td></tr>
+                <tr><td>Adjuntar archivos</td><td>Sí</td><td>Sí</td><td>En los suyos y los asignados a él</td></tr>
+                <tr><td>Eliminar adjuntos</td><td>Todos</td><td>Los que subió</td><td>Los que subió</td></tr>
                 <tr><td>Editar ticket</td><td>Todos, salvo los Cerrados</td><td>Los que creó, mientras están en Nuevo</td><td>Los que creó, mientras están en Nuevo</td></tr>
                 <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Solo en los asignados a él</td></tr>
                 <tr><td>Asignar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
@@ -173,7 +191,7 @@
             </table>
           </div>
           <p id="nota-editar">Editar un ticket es cambiar su título, descripción, categoría o prioridad. Lo puede hacer quien lo creó, solo mientras está en <code>Nuevo</code>, y el Administrador, en cualquier estado salvo <code>Cerrado</code>; nadie más. Cada cambio queda en el historial con quién, qué y cuándo.</p>
-          <p id="nota-cerrado"><strong>Un ticket Cerrado es de solo lectura para todos, también para el Administrador</strong>: no se edita, no se reasigna, no se comenta, no se elimina y no cambia de estado. En su detalle se ve la nota «Este ticket está Cerrado y no admite cambios.»</p>
+          <p id="nota-cerrado"><strong>Un ticket Cerrado es de solo lectura para todos, también para el Administrador</strong>: no se edita, no se reasigna, no se comenta, no se elimina, no cambia de estado y no se le agregan ni quitan adjuntos (sí se descargan). En su detalle se ve la nota «Este ticket está Cerrado y no admite cambios.»</p>
         </div>
       </details>
 
@@ -202,6 +220,7 @@
             <li>Los correos que el dueño del buzón envía a alguien de la empresa pasan por el mismo filtro que los que llegan: crean un ticket si el asunto empieza con «Ticket:» o si le reporta a un compañero un problema técnico o le pide soporte, acceso o ayuda (por ejemplo «No me funciona la impresora, ¿la podés revisar?»). La coordinación, los saludos, los envíos de archivos, las reuniones, los agradecimientos y los informes no crean tickets, ni los que van a más de 3 personas o solo a gente de fuera de la empresa. Queda asignado al primer destinatario de la empresa en «Para» (si no tiene cuenta, se le crea); al iniciar sesión con Microsoft ve ese ticket en su lista. Si el aviso al asignado está activo, recibe un correo «Se le asignó el ticket #N» con el enlace.</li>
             <li>Los avisos que envía la ticketera (confirmaciones, «Se le asignó el ticket #N», «Nuevo comentario…», «El ticket #N pasó a…», «El ticket #N fue asignado a…») nunca crean tickets, y un correo de una conversación que ya se procesó tampoco. Por seguridad, en cada revisión del buzón se crean como máximo 5 tickets; el resto espera a la siguiente.</li>
             <li>Responder en el hilo de un ticket, o con «[Ticket #N]» en el asunto, agrega un comentario y nunca crea otro ticket. Pueden comentar así el solicitante, el asignado y cualquier usuario activo que esté en el hilo (en «Para» o en copia). Quien no tiene cuenta no puede comentar por correo.</li>
+            <li><strong>Adjuntos del correo</strong>: los archivos de un correo que crea un ticket o agrega un comentario se guardan en el ticket, con los mismos tipos y límites que en la ticketera (jpg, png, pdf, docx, xlsx o txt, hasta 4 MB cada uno), y como máximo 5 archivos y 10 MB por correo. No se guardan las imágenes de la firma (en línea o de menos de 15 KB), los correos adjuntos ni los enlaces a OneDrive. Si alguno no se guarda, el ticket o el comentario se crea igual, queda en el historial y la respuesta automática dice «No se guardaron N adjuntos (tipo no permitido o más de 4 MB). Puede subirlos desde la ticketera:» con el enlace. En un ticket <code>Cerrado</code> no se guardan.</li>
             <li>Si el ticket está <code>Cerrado</code>, la respuesta por correo no se agrega como comentario: se contesta una sola vez «El ticket #N está cerrado. Si el problema continúa, envíe un nuevo correo para crear otro ticket.» y queda en el registro de la aplicación.</li>
             <li>Cuando alguien agrega un comentario desde la ticketera, el solicitante y el asignado reciben el correo «Nuevo comentario en el ticket #N» (menos quien lo escribió), si ese aviso está activo. Si responden a ese correo, la respuesta vuelve como comentario. Los comentarios que llegan por correo no generan este aviso.</li>
             <li>Cuando alguien cambia el estado de un ticket desde la ticketera, el solicitante y el asignado reciben el correo «El ticket #N pasó a «Estado»» (menos quien hizo el cambio), con el título, el estado anterior y el nuevo, quién lo cambió y el motivo, si lo escribió, en el mismo correo. Si pasó a Cerrado, el correo avisa que ya no admite cambios y una respuesta no se agrega como comentario.</li>
@@ -223,6 +242,8 @@
             <dd>Solo el Administrador puede eliminarlo, y la acción no se puede deshacer. Un ticket Cerrado no se elimina.</dd>
             <dt>¿Cómo sé quién atiende mi ticket?</dt>
             <dd>En el listado, la columna «Atendido por» (o «Asignado a») muestra la persona responsable; en el detalle aparece en «Asignado a».</dd>
+            <dt>¿Qué archivos puedo adjuntar?</dt>
+            <dd>jpg, png, pdf, docx, xlsx y txt, hasta 4 MB cada uno y 10 por ticket. Se adjuntan al crear el ticket o desde la sección «Adjuntos» del detalle (ver «Adjuntar archivos» en «Crear un ticket»).</dd>
             <dt>¿Cómo imprimo un ticket?</dt>
             <dd>En el detalle del ticket, use el botón «Imprimir»: la hoja sale sin menú ni botones.</dd>
           </dl>

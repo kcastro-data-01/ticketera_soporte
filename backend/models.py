@@ -253,12 +253,15 @@ class Attachment(Base):
     ``filename`` es el nombre que se muestra y con el que se descarga;
     ``content_type`` es el tipo detectado por el contenido, no el declarado.
     ``uploaded_by`` guarda el nombre al subirlo (como ``History.author``).
+    ``source`` dice de dónde vino: ``app`` (subido en la ticketera) o
+    ``correo`` (adjunto de un correo que creó el ticket o un comentario).
     """
 
     __tablename__ = "adjuntos"
     __table_args__ = (
         CheckConstraint("size >= 0", name="ck_adjuntos_size"),
         CheckConstraint("storage IN ('local', 'blob')", name="ck_adjuntos_storage"),
+        CheckConstraint("source IN ('app', 'correo')", name="ck_adjuntos_source"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -270,6 +273,8 @@ class Attachment(Base):
     size: Mapped[int] = mapped_column(Integer, nullable=False)
     storage: Mapped[str] = mapped_column(String(10), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    source: Mapped[str] = mapped_column(String(10), nullable=False, default="app",
+                                        server_default="app")
     uploaded_by: Mapped[str | None] = mapped_column(String(120))
     uploaded_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True

@@ -46,6 +46,10 @@ EXTENSIONES_TEXTO = "jpg, png, pdf, docx, xlsx o txt"
 
 ACCION_SUBIDO = "attachment_added"
 ACCION_BORRADO = "attachment_deleted"
+# Adjuntos de un correo que no se guardaron (tipo, tamaño, cantidad…).
+ACCION_OMITIDOS = "attachments_skipped"
+ORIGEN_APP = "app"
+ORIGEN_CORREO = "correo"
 
 
 class AdjuntoInvalidoError(Exception):
@@ -260,8 +264,11 @@ def puede_eliminar(adjunto: Attachment, ticket: Ticket, user: User) -> bool:
     return user.role == UserRole.ADMIN.value or adjunto.uploaded_by_id == user.id
 
 
-def subir(session, ticket: Ticket, user: User, nombre: str | None, contenido: bytes) -> Attachment:
+def subir(session, ticket: Ticket, user: User, nombre: str | None, contenido: bytes,
+          origen: str = ORIGEN_APP) -> Attachment:
     """Valida, guarda el archivo y registra la fila y el historial.
+
+    ``origen`` es ``app`` o ``correo`` (queda en la fila y en el historial).
 
     Raises: ``TicketClosedError``, :class:`LimiteAdjuntosError`,
     :class:`AdjuntoInvalidoError`, :class:`AlmacenNoConfiguradoError`.
@@ -279,12 +286,13 @@ def subir(session, ticket: Ticket, user: User, nombre: str | None, contenido: by
     autor, autor_id = _audit_author(user)
     adjunto = Attachment(
         ticket_id=ticket.id, filename=limpio, content_type=content_type,
-        size=len(contenido), storage=almacen.nombre, storage_key=ref,
+        size=len(contenido), storage=almacen.nombre, storage_key=ref, source=origen,
         uploaded_by=autor, uploaded_by_id=autor_id,
     )
     session.add(adjunto)
     session.add(History(
-        ticket_id=ticket.id, action=ACCION_SUBIDO, field="adjunto",
+        ticket_id=ticket.id, action=ACCION_SUBIDO,
+        field="correo" if origen == ORIGEN_CORREO else "adjunto",
         old_value=None, new_value=limpio, author=autor, author_id=autor_id,
     ))
     try:
@@ -295,6 +303,24 @@ def subir(session, ticket: Ticket, user: User, nombre: str | None, contenido: by
         raise
     session.refresh(adjunto)
     return adjunto
+
+
+def registrar_omitidos(session, ticket: Ticket, user: User | None,
+                       omitidos: list[tuple[str, str]]) -> None:
+    """Una entrada de historial con los adjuntos de un correo que no se
+    guardaron: ``[(nombre, motivo), …]``."""
+    if not omitidos:
+        return
+    cantidad = len(omitidos)
+    detalle = "; ".join(f"{nombre} ({motivo})" for nombre, motivo in omitidos)
+    texto = (f"No se guardó 1 adjunto del correo: {detalle}" if cantidad == 1
+             else f"No se guardaron {cantidad} adjuntos del correo: {detalle}")
+    autor, autor_id = _audit_author(user)
+    session.add(History(
+        ticket_id=ticket.id, action=ACCION_OMITIDOS, field="correo",
+        old_value=None, new_value=texto, author=autor, author_id=autor_id,
+    ))
+    session.commit()
 
 
 def eliminar(session, ticket: Ticket, adjunto: Attachment, user: User) -> None:

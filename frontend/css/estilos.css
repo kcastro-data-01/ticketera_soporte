@@ -4546,6 +4546,51 @@ summary:focus-visible,
   }
 }
 
+/* Nuevo ticket: archivos elegidos antes de crear (✕ para quitar). */
+.campo-adjuntos .acciones {
+  margin-top: 0.25rem;
+}
+
+.adjunto.adjunto-elegido {
+  flex-wrap: nowrap;
+  padding: 0.4rem 0.4rem 0.4rem 0.75rem;
+}
+
+.adjunto button.adjunto-quitar {
+  flex: 0 0 auto;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radio-suave);
+  background: none;
+  color: var(--color-tenue);
+  font-size: 1rem;
+}
+
+.adjunto button.adjunto-quitar:hover,
+.adjunto button.adjunto-quitar:active {
+  background: var(--color-fondo-neutro);
+  color: var(--color-error);
+}
+
+@media (pointer: coarse) {
+  .adjunto button.adjunto-quitar {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+.crear-resultado-fallas {
+  margin: 0 0 var(--espaciado-lg);
+  padding-left: 1.2rem;
+  color: var(--color-texto);
+}
+
+.crear-resultado-fallas li + li {
+  margin-top: 0.25rem;
+}
+
 /* Vista previa de una imagen adjunta (abrirVistaPrevia). */
 .adj-visor-fondo {
   position: fixed;

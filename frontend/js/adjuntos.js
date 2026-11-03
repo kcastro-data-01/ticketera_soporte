@@ -273,7 +273,8 @@ function renderAdjuntos(datos) {
     }
     datosFila.appendChild(adjNodo(
       "span", "adjunto-meta",
-      `${formatoTamano(adjunto.tamano)} · ${adjunto.subido_por || "Sistema"} · ${adjFecha(adjunto.creado)}`,
+      `${formatoTamano(adjunto.tamano)} · ${adjunto.subido_por || "Sistema"} · ${adjFecha(adjunto.creado)}`
+        + (adjunto.por_correo ? " · por correo" : ""),
     ));
     fila.appendChild(datosFila);
 
@@ -373,6 +374,22 @@ function adjProblema(archivo) {
   return null;
 }
 
+/* Sube un archivo ya preparado (achicado si era una foto) al ticket ``id``.
+   Devuelve ``null`` si quedó guardado o el motivo para mostrar. También lo
+   usa el formulario de Nuevo ticket (crear.js). */
+async function adjSubirUno(id, archivo) {
+  try {
+    const response = await fetchWithAuth(
+      `/api/tickets/${id}/adjuntos?nombre=${encodeURIComponent(archivo.name)}`,
+      { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: archivo.blob || archivo },
+    );
+    if (response.status === 201) return null;
+    return await adjMensaje(response, `No se pudo subir «${archivo.name}».`);
+  } catch (error) {
+    return `No se pudo subir «${archivo.name}».`;
+  }
+}
+
 async function subirArchivos(lista) {
   const id = adjTicketId();
   const archivos = Array.from(lista || []);
@@ -397,16 +414,9 @@ async function subirArchivos(lista) {
         errores.push(problema);
         continue;
       }
-      try {
-        const response = await fetchWithAuth(
-          `/api/tickets/${id}/adjuntos?nombre=${encodeURIComponent(archivo.name)}`,
-          { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: archivo.blob || archivo },
-        );
-        if (response.status === 201) subidos += 1;
-        else errores.push(await adjMensaje(response, `No se pudo subir «${archivo.name}».`));
-      } catch (error) {
-        errores.push(`No se pudo subir «${archivo.name}».`);
-      }
+      const error = await adjSubirUno(id, archivo);
+      if (error) errores.push(error);
+      else subidos += 1;
     }
   } finally {
     adjOcupado = false;

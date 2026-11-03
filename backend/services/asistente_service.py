@@ -109,6 +109,8 @@ TABLA_PERMISOS = [
     ("Ver tickets", "ver tickets", ("Todos", "Todos", _SUYOS)),
     ("Crear ticket", "crear tickets", ("Sí", "Sí", "Sí")),
     ("Comentar", "comentar", ("Sí", "Sí", "En los suyos y los asignados a él")),
+    ("Adjuntar archivos", "adjuntar archivos", ("Sí", "Sí", "En los suyos y los asignados a él")),
+    ("Eliminar adjuntos", "eliminar adjuntos", ("Todos", "Los que subió", "Los que subió")),
     ("Editar ticket", "editar tickets", (_TODOS_MENOS_CERRADOS, _CREADOS_NUEVOS, _CREADOS_NUEVOS)),
     ("Cambiar estado", "cambiar el estado", ("Sí", "Sí", "Solo en los asignados a él")),
     ("Asignar ticket", "asignar tickets", ("Sí", "No", "No")),
@@ -147,7 +149,8 @@ def permisos_del_rol(rol: str) -> str:
 PERMISOS_POR_ROL = {rol: permisos_del_rol(rol) for rol in ROLES_TABLA}
 # La nota debajo de la tabla de ayuda.html: vale para todos los roles.
 NOTA_CERRADO = ("Un ticket Cerrado es de solo lectura para todos, también para el Administrador: "
-                "no se edita, no se reasigna, no se comenta, no se elimina y no cambia de estado.")
+                "no se edita, no se reasigna, no se comenta, no se elimina, no cambia de estado "
+                "y no se le agregan ni quitan adjuntos (sí se descargan).")
 
 GUIA_APP = """\
 Guía de la aplicación (Sistema de Tickets de American Data Networks):
@@ -169,6 +172,12 @@ páginas de 20 tickets.
 - Detalle de un ticket: datos, comentarios (firmados con el nombre de quien los \
 escribe) e historial de cambios; a la derecha, asignación y cambio de estado \
 según el rol.
+- Adjuntos: al crear el ticket («Nuevo ticket») o después, en la sección \
+«Adjuntos» del detalle, con «Adjuntar archivos» (y «Sacar foto» en el celular). \
+Se aceptan jpg, png, pdf, docx, xlsx y txt, hasta 4 MB cada uno y 10 por ticket; \
+las fotos grandes se achican solas. Los archivos de un correo al buzón de soporte \
+también se guardan (hasta 5 y 10 MB por correo). Elimina un adjunto quien lo \
+subió o el Administrador. En un ticket Cerrado no se agregan ni se eliminan.
 - Inicio de sesión: solo con la cuenta de Microsoft de la empresa (botón \
 «Iniciar sesión con Microsoft»); no hay registro ni contraseña propia de la \
 ticketera. La primera vez la cuenta se crea sola como Solicitante.
@@ -1569,7 +1578,10 @@ REGLA_CORREO = (
     "cambió y el motivo en el mismo correo (si pasó a Cerrado, avisa que ya no admite cambios); "
     "al asignar o reasignar un ticket, el nuevo asignado recibe «Se le asignó el ticket #N» y el "
     "solicitante, «El ticket #N fue asignado a» esa persona. Quitar la asignación no avisa, y "
-    "quien hace el cambio nunca recibe el aviso."
+    "quien hace el cambio nunca recibe el aviso. Los archivos adjuntos de un correo que crea un "
+    "ticket o agrega un comentario se guardan en el ticket (jpg, png, pdf, docx, xlsx o txt, "
+    "hasta 4 MB cada uno, 5 archivos y 10 MB por correo); los logos de la firma no. Si alguno "
+    "no se guarda, la respuesta automática lo dice y se puede subir desde la ticketera."
 )
 
 # (cómo se reconoce, en la pregunta normalizada; la regla), en orden.
@@ -1817,6 +1829,32 @@ def _app_correo(user: User) -> str:
     return REGLA_CORREO
 
 
+def _app_adjuntos(user: User) -> str:
+    """Cómo adjuntar un archivo y qué tipos se aceptan."""
+    lineas = [
+        "Puede adjuntar archivos de dos formas:",
+        "- **Al crear el ticket**: en «Nuevo ticket», pulse «Adjuntar archivos» (en el celular "
+        "también aparece «Sacar foto»). Se suben al crear el ticket.",
+        "- **En un ticket ya creado**: ábralo y, en la sección «Adjuntos», pulse «Adjuntar archivos».",
+        "Se aceptan **jpg, png, pdf, docx, xlsx y txt**, hasta **4 MB** cada uno y **10 por ticket**. "
+        "Las fotos grandes se achican solas antes de subirse.",
+        "Si escribe al buzón de soporte, los archivos del correo también se guardan en el ticket "
+        "(hasta 5 y 10 MB por correo); los que no entran se pueden subir después desde la ticketera.",
+    ]
+    if user.role == UserRole.ADMIN.value:
+        lineas.append("Usted puede eliminar cualquier adjunto. En un ticket Cerrado no se agregan "
+                      "ni se eliminan adjuntos.")
+    else:
+        extra = (" Como Solicitante, adjunta en sus tickets y en los asignados a usted."
+                 if user.role == UserRole.REQUESTER.value else "")
+        lineas.append(f"Puede eliminar los adjuntos que subió usted; los demás, un Administrador."
+                      f"{extra} En un ticket Cerrado no se agregan ni se eliminan adjuntos.")
+    return "\n".join(lineas)
+
+
+_ARCHIVO = r"(archivos?|adjuntos?|fotos?|fotografias?|imagen(es)?|capturas?|pantallazos?|pdfs?|documentos?)"
+
+
 def _app_cambiar_estado_solicitante(user: User) -> str | None:
     if user.role != UserRole.REQUESTER.value:
         return None  # la guía de siempre
@@ -1832,6 +1870,12 @@ PREGUNTAS_APP = [
      _app_cerrar_sesion),
     (lambda t: re.search(r"\b(inici\w*|abr\w*|empez\w*) (la |mi )?sesion\b|\b(login|loguear\w*)\b"
                          r"|\bcomo (entro|ingreso|accedo|me conecto)\b", t), _app_iniciar_sesion),
+    (lambda t: re.search(r"\badjunt\w*", t)
+     or re.search(rf"\b(sub\w*|mand\w*|envi\w*|agreg\w*|anex\w*|carg\w*|pon\w*|meto|meter|incluir|incluyo)\b"
+                  rf".*\b{_ARCHIVO}\b", t)
+     or re.search(rf"\b(que|cuales)\b.*\b(tipos?|formatos?|extensiones)\b.*\b{_ARCHIVO}\b", t)
+     or re.search(rf"\b(tamano|peso|pesa|pesar|limite|maximo)\b.*\b{_ARCHIVO}\b", t),
+     _app_adjuntos),
     (lambda t: re.search(rf"\b(correo|correos|mail|email|e-mail)\b", t)
      and re.search(r"\b(crea\w*|creo|mand\w*|envi\w*|abr\w*|hac\w*|hago|llega\w*|funciona\w*)\b", t),
      _app_correo),
@@ -1867,8 +1911,13 @@ def respuesta_app(user: User, pregunta: str) -> str | None:
     t = _normalizar(pregunta)
     # «¿cuántos tickets llegaron por correo?» cuenta; «¿cuánto tarda…?», no.
     cuenta = re.search(rf"\b{_CUANTOS}\b", t)
+    # «¿cuánto puede pesar un archivo?» o «¿cuántos archivos puedo adjuntar?»
+    # tampoco cuentan tickets.
+    limite_adjuntos = re.search(r"\b(pesa\w*|peso|tamano|mb|megas?)\b"
+                                r"|\b(puedo|se pueden|puede) (adjuntar|subir|mandar|enviar)\b", t)
     for coincide, responder_a in PREGUNTAS_APP:
-        if cuenta and responder_a is not _app_tiempo:
+        if cuenta and responder_a is not _app_tiempo and not (
+                limite_adjuntos and responder_a is _app_adjuntos):
             continue
         if coincide(t):
             texto = responder_a(user)

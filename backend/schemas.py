@@ -553,6 +553,8 @@ class AttachmentResponse(BaseModel):
     subido_por_id: int | None = None
     creado: datetime
     puede_eliminar: bool
+    # Vino adjunto en un correo (al crear el ticket o en un comentario).
+    por_correo: bool = False
 
 
 class AttachmentList(BaseModel):

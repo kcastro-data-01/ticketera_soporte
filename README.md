@@ -551,10 +551,18 @@ ticket #N? Esta acción no se puede deshacer.») y después se vuelve al listado
 ## Adjuntos
 
 En el detalle de un ticket ya creado, la sección **Adjuntos** muestra los
-archivos (nombre, tamaño, quién y cuándo; miniatura en las imágenes) con
+archivos (nombre, tamaño, quién y cuándo, «por correo» si llegaron en un
+correo; miniatura en las imágenes, que se abre en grande al tocarla) con
 **Descargar** y **Eliminar**. **Adjuntar archivos** elige uno o varios y, en
 el celular, **Sacar foto** abre la cámara. Las fotos de más de 2000 px de lado
 se achican en el navegador antes de subirlas (y una foto HEIC pasa a JPG).
+
+**Al crear el ticket** (`crear.html`) están los mismos botones: lo elegido se
+lista con su tamaño y ✕ para quitarlo, con los mismos tipos y límites. Al
+pulsar «Crear ticket» primero se crea el ticket y después se suben los
+archivos uno por uno con el mismo `POST …/adjuntos`. Si alguno falla, el
+ticket queda creado igual: la página dice cuál falló y por qué, con el enlace
+«Ir al ticket y reintentar» (al detalle).
 
 - Tipos: jpg, png, pdf, docx, xlsx y txt. El servidor mira el **contenido**
   (firma del archivo; en docx y xlsx, que sea un documento de Office sin
@@ -578,7 +586,38 @@ se achican en el navegador antes de subirlas (y una foto HEIC pasa a JPG).
   `GET …/adjuntos/{adjunto}/archivo`; `DELETE …/adjuntos/{adjunto}`. Errores:
   `413` más de 4 MB, `422` tipo o contenido inválido, `409` Cerrado o ya hay 10,
   `403` borrar uno ajeno sin ser Administrador, `404` ticket que no se ve.
-- La tabla `adjuntos` se crea sola al arrancar (`migrate_add_attachments`).
+- La tabla `adjuntos` se crea sola al arrancar (`migrate_add_attachments`), y
+  la columna `source` (`app` o `correo`) se agrega sola a la de la parte 1
+  (`migrate_add_attachment_source`).
+
+### Adjuntos que llegan por correo
+
+Cuando un correo crea un ticket o agrega un comentario (ver «Tickets por
+correo»), sus adjuntos se guardan en el ticket con el mismo almacén y las
+mismas validaciones, marcados «por correo» (`backend/services/correo_adjuntos.py`):
+
+1. Primero se pide a Graph **solo la lista** (`/me/messages/{id}/attachments`
+   con `$select=id,name,contentType,size,isInline`, sin el contenido).
+2. Se eligen los que entran y se descargan **solo esos**, uno por uno
+   (`…/attachments/{adjunto}/$value`): como máximo **5 archivos y 10 MB por
+   correo**, para no pasarse del tiempo de la función de Vercel (en modo
+   cron, la descarga del correo en curso tiene 15 s más que el límite de 25 s
+   de la revisión).
+
+- Se **ignoran** sin avisar: imágenes en línea (logos de la firma), imágenes de
+  menos de 15 KB, adjuntos que son otro correo y enlaces a OneDrive o
+  SharePoint. Quedan en el log.
+- Se **omiten** los de tipo no permitido, más de 4 MB, los que pasan de 5 o de
+  10 MB en el correo y los que no entran porque el ticket ya tiene 10. El
+  ticket o el comentario se crea igual; queda una fila «Adjuntos no guardados»
+  en el historial, una línea en el log y la respuesta automática agrega
+  «No se guardaron N adjuntos (tipo no permitido o más de 4 MB). Puede
+  subirlos desde la ticketera: <enlace>» (si el motivo es otro, por ejemplo
+  «más de 5 por correo», la nota lo nombra).
+- En un ticket **Cerrado** no se guardan (la respuesta a un ticket Cerrado
+  tampoco se agrega como comentario).
+- Solo con Graph: con `CORREO_PROVEEDOR=mailpit` no se lee ningún buzón.
+- Usa el permiso `Mail.ReadWrite` que la app ya tiene; no hace falta otro.
 
 ## Limpiar los datos de prueba
 

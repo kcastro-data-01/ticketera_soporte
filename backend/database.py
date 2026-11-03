@@ -116,7 +116,10 @@ def init_db(target_engine=None) -> None:
     from backend.migrate_remove_support_role import migrate_remove_support_role
     from backend.migrate_remove_supervisor_role import migrate_remove_supervisor_role
     from backend.migrate_add_email_conversation_id import migrate_add_email_conversation_id
-    from backend.migrate_add_attachments import migrate_add_attachments
+    from backend.migrate_add_attachments import (
+        migrate_add_attachment_source,
+        migrate_add_attachments,
+    )
 
     migrate_add_password_hash(db_engine)
     migrate_add_history_author_id(db_engine)
@@ -129,6 +132,7 @@ def init_db(target_engine=None) -> None:
     migrate_remove_supervisor_role(db_engine)
     migrate_add_email_conversation_id(db_engine)
     migrate_add_attachments(db_engine)
+    migrate_add_attachment_source(db_engine)
     if not es_sqlite(db_engine):
         # Una sola vez, en producción (Neon): #16 → #6 tras los borrados.
         from backend.migrate_renumber_tickets import migrate_renumber_tickets

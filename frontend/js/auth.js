@@ -461,8 +461,13 @@ function describirHistorial(entry) {
       return { accion: "Cambió el estado", detalle: `${antes ?? "—"} → ${despues ?? "—"}` };
     case "commented":
       return { accion: "Comentó", detalle: despues ? `«${recortar(despues)}»` : "—" };
-    case "attachment_added":
-      return { accion: "Adjuntó un archivo", detalle: despues ? `«${recortar(despues)}»` : "—" };
+    case "attachment_added": {
+      /* field «correo»: vino adjunto en un correo. */
+      const porCorreo = entry.field === "correo" ? " (por correo)" : "";
+      return { accion: "Adjuntó un archivo", detalle: despues ? `«${recortar(despues)}»${porCorreo}` : "—" };
+    }
+    case "attachments_skipped":
+      return { accion: "Adjuntos no guardados", detalle: despues ? recortar(despues, 240) : "—" };
     case "attachment_deleted":
       return { accion: "Eliminó un adjunto", detalle: antes ? `«${recortar(antes)}»` : "—" };
     default: {
