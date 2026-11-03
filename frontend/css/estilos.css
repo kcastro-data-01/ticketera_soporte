@@ -4470,11 +4470,153 @@ summary:focus-visible,
   color: var(--color-tenue);
 }
 
+/* «Descargar · Eliminar»: acciones de texto, sin borde ni fondo. */
 .adjunto-acciones {
   display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
   justify-content: flex-end;
+}
+
+.adjunto-acciones button.adjunto-accion {
+  min-height: 0;
+  padding: 0.2rem 0.3rem;
+  border: 0;
+  background: none;
+  color: var(--color-enlace);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.adjunto-acciones button.adjunto-accion:hover,
+.adjunto-acciones button.adjunto-accion:active {
+  background: none;
+  border-color: transparent;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.adjunto-acciones button.adjunto-accion-peligro {
+  color: var(--color-error);
+}
+
+.adjunto-separador {
+  color: var(--color-texto-suave);
+  font-size: 0.85rem;
+}
+
+/* Miniatura y nombre de una imagen: abren la vista previa. */
+.adjunto button.adjunto-ver {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: zoom-in;
+}
+
+.adjunto button.adjunto-nombre-boton {
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  text-align: left;
+  cursor: zoom-in;
+}
+
+.adjunto button.adjunto-nombre-boton:hover,
+.adjunto button.adjunto-nombre-boton:active {
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Pantallas táctiles: cada acción ocupa al menos 44 × 44 px. */
+@media (pointer: coarse) {
+  .adjunto-acciones button.adjunto-accion {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 0.5rem;
+  }
+}
+
+/* Vista previa de una imagen adjunta (abrirVistaPrevia). */
+.adj-visor-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(11, 24, 77, 0.85);
+}
+
+.adj-visor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.adj-visor-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  color: var(--color-texto-inverso);
+}
+
+.adj-visor-titulo {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.adj-visor button.adj-visor-cerrar {
+  flex: 0 0 44px;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  color: var(--color-texto-inverso);
+  font-size: 1.2rem;
+}
+
+.adj-visor button.adj-visor-cerrar:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.adj-visor button.adj-visor-cerrar:focus-visible {
+  outline: 2px solid var(--color-texto-inverso);
+  outline-offset: 2px;
+}
+
+.adj-visor-estado {
+  margin: 0;
+  color: var(--color-texto-inverso);
+}
+
+.adj-visor-imagen {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 6rem);
+  max-height: calc(100dvh - 6rem);
+  object-fit: contain;
+  border-radius: 4px;
+  background: var(--color-superficie);
 }
 
 @media (max-width: 480px) {
@@ -4489,7 +4631,8 @@ summary:focus-visible,
 @media print {
   #adj-acciones,
   .adjunto-acciones,
-  .adjunto-miniatura {
+  .adjunto-ver,
+  .adj-visor-fondo {
     display: none !important;
   }
 }

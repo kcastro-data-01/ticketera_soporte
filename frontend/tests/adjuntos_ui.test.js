@@ -15,6 +15,8 @@ const adjSource = fs.readFileSync(path.join(raiz, "js", "adjuntos.js"), "utf8");
 const detalleHtml = fs.readFileSync(path.join(raiz, "detalle.html"), "utf8");
 const detalleJs = fs.readFileSync(path.join(raiz, "js", "detalle.js"), "utf8");
 
+let enfocado = null;
+
 function nodo(tag) {
   return {
     tag, id: "", type: "", className: "", textContent: "", value: "", hidden: false,
@@ -26,6 +28,7 @@ function nodo(tag) {
     setAttribute(k, v) { this.attrs[k] = v; },
     click() { this.clicked += 1; (this.listeners.click || []).forEach((fn) => fn()); },
     remove() { this.removed = true; },
+    focus() { enfocado = this; },
   };
 }
 
@@ -76,9 +79,15 @@ function crear({ fetchImpl, tactil = false, imagen = null }) {
   const creados = [];
   const lienzos = [];
   const body = nodo("body");
+  const teclado = [];
   const sandbox = {
     document: {
-      getElementById: (id) => ids[id] || null,
+      getElementById: (id) => ids[id]
+        || buscarTodos(body, (n) => n.id === id && !n.removed)[0] || null,
+      removeEventListener(tipo, fn) {
+        const i = teclado.indexOf(fn);
+        if (i >= 0) teclado.splice(i, 1);
+      },
       createElement: (tag) => {
         const n = nodo(tag);
         if (tag === "canvas") {
@@ -89,7 +98,7 @@ function crear({ fetchImpl, tactil = false, imagen = null }) {
         creados.push(n);
         return n;
       },
-      addEventListener() {},
+      addEventListener(tipo, fn) { if (tipo === "keydown") teclado.push(fn); },
     },
     window: {
       location: { search: "?id=7", href: "" },
@@ -110,11 +119,11 @@ function crear({ fetchImpl, tactil = false, imagen = null }) {
   vm.createContext(sandbox);
   vm.runInContext(authSource, sandbox);
   vm.runInContext(adjSource, sandbox);
-  sandbox.document.body = body;
   sandbox.mostrarAviso = (mensaje, tipo) => avisos.push({ mensaje, tipo });
-  // Sin DOM real, confirmarAccion usa window.confirm.
+  // Sin body, confirmarAccion usa window.confirm; la vista previa lo pone.
   sandbox.document.body = undefined;
-  return { sandbox, ids, llamadas, avisos, creados, lienzos };
+  const conBody = () => { sandbox.document.body = body; };
+  return { sandbox, ids, llamadas, avisos, creados, lienzos, body, teclado, conBody };
 }
 
 const esperar = () => new Promise((r) => setImmediate(r));
@@ -324,4 +333,146 @@ test("el historial nombra las subidas y los borrados", () => {
     { ...sandbox.describirHistorial({ action: "attachment_deleted", old_value: "factura.pdf" }) },
     { accion: "Eliminó un adjunto", detalle: "«factura.pdf»" },
   );
+});
+
+// --- Acciones de texto y vista previa -----------------------------------------
+
+test("«Descargar · Eliminar» son acciones de texto chicas, Eliminar en color de peligro", async () => {
+  const a = crear({ fetchImpl: async () => respuesta(200, lista([adjunto({ es_imagen: false, nombre: "a.pdf" }), adjunto({ id: 2, es_imagen: false, nombre: "b.pdf", puede_eliminar: false })])) });
+  await a.sandbox.iniciarAdjuntos();
+  const [conBorrar, sinBorrar] = a.ids["adj-lista"].children;
+  const acciones = buscarTodos(conBorrar, (n) => n.className === "adjunto-acciones")[0];
+  assert.deepEqual(acciones.children.map((n) => n.textContent), ["Descargar", "·", "Eliminar"]);
+  assert.deepEqual(acciones.children.map((n) => n.className),
+    ["adjunto-accion", "adjunto-separador", "adjunto-accion adjunto-accion-peligro"]);
+  assert.equal(acciones.children[1].attrs["aria-hidden"], "true");
+  assert.equal(acciones.children[0].attrs["aria-label"], "Descargar a.pdf");
+  assert.equal(acciones.children[2].attrs["aria-label"], "Eliminar a.pdf");
+  assert.equal(acciones, conBorrar.children.at(-1), "a la derecha de la fila");
+  const soloDescargar = buscarTodos(sinBorrar, (n) => n.className === "adjunto-acciones")[0];
+  assert.deepEqual(soloDescargar.children.map((n) => n.textContent), ["Descargar"], "sin separador suelto");
+  assert.equal(buscarTodos(a.ids["adj-lista"], (n) => String(n.className).split(" ").some((c) => c === "secundario" || c === "peligro")).length, 0,
+    "ya no son botones grandes");
+});
+
+test("estilos de las acciones: sin borde ni fondo, subrayado al pasar, 44 px en táctil, sin colores nuevos", () => {
+  const css = fs.readFileSync(path.join(raiz, "css", "estilos.css"), "utf8");
+  const bloque = css.slice(css.indexOf("/* ---------- Adjuntos del ticket"));
+  assert.match(bloque, /button\.adjunto-accion \{[^}]*border: 0;[^}]*background: none;[^}]*color: var\(--color-enlace\)/);
+  assert.match(bloque, /button\.adjunto-accion:hover,[^{]*\{[^}]*text-decoration: underline/);
+  assert.match(bloque, /button\.adjunto-accion-peligro \{\s*color: var\(--color-error\);/);
+  assert.match(bloque, /@media \(pointer: coarse\) \{\s*\.adjunto-acciones button\.adjunto-accion \{[^}]*min-height: 44px;[^}]*min-width: 44px;/);
+  assert.match(bloque, /\.adj-visor-imagen \{[^}]*max-width: calc\(100vw - 2rem\);[^}]*object-fit: contain;/);
+  assert.match(bloque, /\.adj-visor-fondo \{[^}]*position: fixed;[^}]*background: rgba\(11, 24, 77, 0\.85\)/);
+  // Los colores del bloque salen de los tokens de la app (el azul marino del fondo ya se usa en los diálogos).
+  assert.deepEqual([...new Set(bloque.match(/#[0-9a-f]{3,8}\b/gi) || [])], []);
+});
+
+test("la miniatura es un botón «Ver imagen …» y el nombre de la imagen también abre la vista previa", async () => {
+  const a = crear({ fetchImpl: async () => respuesta(200, lista([adjunto()])) });
+  await a.sandbox.iniciarAdjuntos();
+  const fila = a.ids["adj-lista"].children[0];
+  const ver = fila.children[0];
+  assert.equal(ver.tag, "button");
+  assert.equal(ver.className, "adjunto-ver");
+  assert.equal(ver.attrs["aria-label"], "Ver imagen captura.png");
+  assert.equal(ver.children[0].tag, "img");
+  const nombre = buscarTodos(fila, (n) => /adjunto-nombre-boton/.test(n.className))[0];
+  assert.equal(nombre.tag, "button");
+  assert.equal(nombre.textContent, "captura.png");
+  assert.equal(nombre.attrs["aria-label"], "Ver imagen captura.png");
+});
+
+test("un PDF no tiene vista previa", async () => {
+  const a = crear({ fetchImpl: async () => respuesta(200, lista([adjunto({ es_imagen: false, nombre: "a.pdf" })])) });
+  await a.sandbox.iniciarAdjuntos();
+  assert.equal(buscarTodos(a.ids["adj-lista"], (n) => /adjunto-ver|adjunto-nombre-boton/.test(n.className)).length, 0);
+});
+
+async function abrirVisor(opciones = {}) {
+  const a = crear({ fetchImpl: opciones.fetchImpl || (async () => respuesta(200, lista([adjunto()]))) });
+  await a.sandbox.iniciarAdjuntos();
+  await esperar();
+  a.conBody();
+  const ver = a.ids["adj-lista"].children[0].children[0];
+  ver.listeners.click[0]();
+  await esperar();
+  const visor = a.body.children.find((n) => n.id === "adj-visor");
+  return { a, ver, visor };
+}
+
+test("la vista previa muestra la imagen grande con su nombre y el foco en ✕", async () => {
+  const { a, visor } = await abrirVisor();
+  assert.ok(visor && !visor.removed);
+  assert.equal(visor.className, "adj-visor-fondo");
+  assert.equal(visor.attrs.role, "dialog");
+  assert.equal(visor.attrs["aria-modal"], "true");
+  assert.equal(visor.attrs["aria-labelledby"], "adj-visor-titulo");
+  const titulo = buscarTodos(visor, (n) => n.id === "adj-visor-titulo")[0];
+  assert.equal(titulo.textContent, "captura.png");
+  const cerrar = buscarTodos(visor, (n) => n.className === "adj-visor-cerrar")[0];
+  assert.equal(cerrar.textContent, "✕");
+  assert.equal(cerrar.attrs["aria-label"], "Cerrar vista previa");
+  assert.equal(enfocado, cerrar);
+  const img = buscarTodos(visor, (n) => n.className === "adj-visor-imagen")[0];
+  assert.equal(img.src, "blob:local/1");
+  assert.equal(img.alt, "captura.png");
+  assert.equal(img.hidden, false);
+  // La imagen se pidió una sola vez, con la sesión (la reusa de la miniatura).
+  const pedidas = a.llamadas.filter((l) => l.url === "/api/tickets/7/adjuntos/1/archivo");
+  assert.equal(pedidas.length, 1);
+  assert.equal(pedidas[0].headers.Authorization, "Bearer tok");
+});
+
+test("✕ cierra la vista previa y el foco vuelve a la miniatura", async () => {
+  const { a, ver, visor } = await abrirVisor();
+  buscarTodos(visor, (n) => n.className === "adj-visor-cerrar")[0].listeners.click[0]();
+  assert.equal(visor.removed, true);
+  assert.equal(enfocado, ver);
+  assert.equal(a.teclado.length, 0, "suelta la escucha del teclado");
+});
+
+test("Esc cierra; Tab no sale de la ventana", async () => {
+  const { a, ver, visor } = await abrirVisor();
+  const cerrar = buscarTodos(visor, (n) => n.className === "adj-visor-cerrar")[0];
+  let evitado = 0;
+  enfocado = null;
+  a.teclado[0]({ key: "Tab", preventDefault() { evitado += 1; } });
+  assert.equal(enfocado, cerrar);
+  assert.equal(visor.removed, false);
+  a.teclado[0]({ key: "Escape", preventDefault() { evitado += 1; } });
+  assert.equal(visor.removed, true);
+  assert.equal(evitado, 2);
+  assert.equal(enfocado, ver);
+});
+
+test("tocar afuera de la imagen cierra; tocar la imagen no", async () => {
+  const { ver, visor } = await abrirVisor();
+  const img = buscarTodos(visor, (n) => n.className === "adj-visor-imagen")[0];
+  visor.listeners.click[0]({ target: img });
+  assert.equal(visor.removed, false);
+  visor.listeners.click[0]({ target: visor });
+  assert.equal(visor.removed, true);
+  assert.equal(enfocado, ver);
+});
+
+test("abrir desde el nombre devuelve el foco a la miniatura", async () => {
+  const a = crear({ fetchImpl: async () => respuesta(200, lista([adjunto()])) });
+  await a.sandbox.iniciarAdjuntos();
+  a.conBody();
+  const fila = a.ids["adj-lista"].children[0];
+  buscarTodos(fila, (n) => /adjunto-nombre-boton/.test(n.className))[0].listeners.click[0]();
+  await esperar();
+  const visor = a.body.children.find((n) => n.id === "adj-visor");
+  a.teclado[0]({ key: "Escape", preventDefault() {} });
+  assert.equal(visor.removed, true);
+  assert.equal(enfocado, fila.children[0]);
+});
+
+test("si la imagen no se puede bajar, la vista previa lo dice", async () => {
+  const { visor } = await abrirVisor({
+    fetchImpl: async (url) => (url.endsWith("/archivo") ? respuesta(500, null) : respuesta(200, lista([adjunto()]))),
+  });
+  assert.equal(buscarTodos(visor, (n) => n.className === "adj-visor-estado")[0].textContent, "No se pudo cargar la imagen.");
+  assert.equal(buscarTodos(visor, (n) => n.className === "adj-visor-imagen")[0].hidden, true);
 });

@@ -15,6 +15,9 @@ const ADJ_CALIDAD_JPG = 0.85;
 let adjDatos = { adjuntos: [], puede_subir: false, cerrado: false, max_archivos: 10, max_bytes: 4 * 1024 * 1024 };
 let adjOcupado = false;
 let adjUrls = [];
+/* id del adjunto → URL local de su imagen (la miniatura y la vista previa
+   usan la misma descarga). */
+let adjImagenes = new Map();
 let adjEstadoTicket = null;
 
 function adjTicketId() {
@@ -80,6 +83,7 @@ function adjLiberarUrls() {
     adjUrls.forEach((url) => URL.revokeObjectURL(url));
   }
   adjUrls = [];
+  adjImagenes = new Map();
 }
 
 async function adjPedirArchivo(adjunto) {
@@ -88,14 +92,87 @@ async function adjPedirArchivo(adjunto) {
   return response.blob();
 }
 
+/* URL local de una imagen, pedida con la sesión una sola vez. */
+function adjUrlImagen(adjunto) {
+  if (!adjImagenes.has(adjunto.id)) {
+    const pedido = adjPedirArchivo(adjunto).then((blob) => {
+      const url = URL.createObjectURL(blob);
+      adjUrls.push(url);
+      return url;
+    });
+    pedido.catch(() => adjImagenes.delete(adjunto.id));
+    adjImagenes.set(adjunto.id, pedido);
+  }
+  return adjImagenes.get(adjunto.id);
+}
+
 async function pintarMiniatura(adjunto, img) {
   try {
-    const url = URL.createObjectURL(await adjPedirArchivo(adjunto));
-    adjUrls.push(url);
-    img.src = url;
+    img.src = await adjUrlImagen(adjunto);
   } catch (error) {
     img.hidden = true;
   }
+}
+
+/* Vista previa: la imagen grande (ajustada a la pantalla, sin deformarla)
+   sobre un fondo oscuro, con el nombre y ✕. Se cierra con ✕, Esc o tocando
+   afuera; el foco empieza en ✕, queda dentro y vuelve a ``volverA``. */
+function abrirVistaPrevia(adjunto, volverA) {
+  if (document.getElementById("adj-visor")) return null;
+  const fondo = adjNodo("div", "adj-visor-fondo");
+  fondo.id = "adj-visor";
+  fondo.setAttribute("role", "dialog");
+  fondo.setAttribute("aria-modal", "true");
+  fondo.setAttribute("aria-labelledby", "adj-visor-titulo");
+  const caja = adjNodo("div", "adj-visor");
+  const cabecera = adjNodo("div", "adj-visor-cabecera");
+  const titulo = adjNodo("p", "adj-visor-titulo", adjunto.nombre);
+  titulo.id = "adj-visor-titulo";
+  const cerrarBoton = adjNodo("button", "adj-visor-cerrar", "✕");
+  cerrarBoton.type = "button";
+  cerrarBoton.setAttribute("aria-label", "Cerrar vista previa");
+  cabecera.appendChild(titulo);
+  cabecera.appendChild(cerrarBoton);
+  const estado = adjNodo("p", "adj-visor-estado", "Cargando imagen…");
+  const img = adjNodo("img", "adj-visor-imagen");
+  img.alt = adjunto.nombre;
+  img.hidden = true;
+  caja.appendChild(cabecera);
+  caja.appendChild(estado);
+  caja.appendChild(img);
+  fondo.appendChild(caja);
+
+  const teclas = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cerrar();
+    } else if (event.key === "Tab") {
+      /* ✕ es lo único enfocable: Tab no sale de la ventana. */
+      event.preventDefault();
+      cerrarBoton.focus();
+    }
+  };
+  function cerrar() {
+    document.removeEventListener("keydown", teclas, true);
+    fondo.remove();
+    if (volverA && typeof volverA.focus === "function") volverA.focus();
+  }
+  cerrarBoton.addEventListener("click", cerrar);
+  fondo.addEventListener("click", (event) => {
+    if (event.target === fondo || event.target === caja) cerrar();
+  });
+  document.addEventListener("keydown", teclas, true);
+  document.body.appendChild(fondo);
+  cerrarBoton.focus();
+
+  const cargada = adjUrlImagen(adjunto).then((url) => {
+    img.src = url;
+    img.hidden = false;
+    estado.remove();
+  }).catch(() => {
+    estado.textContent = "No se pudo cargar la imagen.";
+  });
+  return { cerrar, cargada };
 }
 
 async function descargarAdjunto(adjunto) {
@@ -167,32 +244,51 @@ function renderAdjuntos(datos) {
   adjMostrarEstado("");
   adjuntos.forEach((adjunto) => {
     const fila = adjNodo("li", "adjunto");
+    let ver = null;
     if (adjunto.es_imagen) {
+      ver = adjNodo("button", "adjunto-ver");
+      ver.type = "button";
+      ver.setAttribute("aria-label", `Ver imagen ${adjunto.nombre}`);
       const img = adjNodo("img", "adjunto-miniatura");
       img.alt = "";
       img.width = 48;
       img.height = 48;
-      fila.appendChild(img);
+      ver.appendChild(img);
+      ver.addEventListener("click", () => abrirVistaPrevia(adjunto, ver));
+      fila.appendChild(ver);
       pintarMiniatura(adjunto, img);
     } else {
       fila.appendChild(adjNodo("span", "adjunto-icono", extensionDe(adjunto.nombre).slice(1).toUpperCase()));
     }
     const datosFila = adjNodo("div", "adjunto-datos");
-    datosFila.appendChild(adjNodo("span", "adjunto-nombre", adjunto.nombre));
+    if (ver) {
+      /* El nombre de una imagen también abre la vista previa. */
+      const nombre = adjNodo("button", "adjunto-nombre adjunto-nombre-boton", adjunto.nombre);
+      nombre.type = "button";
+      nombre.setAttribute("aria-label", `Ver imagen ${adjunto.nombre}`);
+      nombre.addEventListener("click", () => abrirVistaPrevia(adjunto, ver));
+      datosFila.appendChild(nombre);
+    } else {
+      datosFila.appendChild(adjNodo("span", "adjunto-nombre", adjunto.nombre));
+    }
     datosFila.appendChild(adjNodo(
       "span", "adjunto-meta",
       `${formatoTamano(adjunto.tamano)} · ${adjunto.subido_por || "Sistema"} · ${adjFecha(adjunto.creado)}`,
     ));
     fila.appendChild(datosFila);
 
+    /* Acciones de texto chicas a la derecha: «Descargar · Eliminar». */
     const botones = adjNodo("div", "adjunto-acciones");
-    const descargar = adjNodo("button", "secundario", "Descargar");
+    const descargar = adjNodo("button", "adjunto-accion", "Descargar");
     descargar.type = "button";
     descargar.setAttribute("aria-label", `Descargar ${adjunto.nombre}`);
     descargar.addEventListener("click", () => descargarAdjunto(adjunto));
     botones.appendChild(descargar);
     if (adjunto.puede_eliminar) {
-      const borrar = adjNodo("button", "peligro", "Eliminar");
+      const separador = adjNodo("span", "adjunto-separador", "·");
+      separador.setAttribute("aria-hidden", "true");
+      botones.appendChild(separador);
+      const borrar = adjNodo("button", "adjunto-accion adjunto-accion-peligro", "Eliminar");
       borrar.type = "button";
       borrar.setAttribute("aria-label", `Eliminar ${adjunto.nombre}`);
       borrar.addEventListener("click", () => eliminarAdjunto(adjunto));
