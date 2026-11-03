@@ -1,5 +1,9 @@
 """Adjuntos que llegan por correo (parte 2), con Graph simulado.
 
+Las imágenes pegadas en el texto (en línea) se guardan, salvo las de la
+firma (menos de 15 KB o repetidas como logo); las marcas ``[cid:…]`` no
+quedan en la descripción ni en los comentarios.
+
 Se pide primero la lista (sin contenido) y se descargan solo los que entran:
 firma e imágenes chicas se ignoran; tipo no permitido, más de 4 MB, más de 5
 o de 10 MB por correo se omiten y se avisan en la respuesta, el historial y
@@ -14,8 +18,8 @@ import pytest
 from sqlalchemy import create_engine, inspect, select, text
 
 from backend.database import Base, enable_sqlite_foreign_keys
-from backend.migrate_add_attachments import migrate_add_attachment_source
-from backend.models import Attachment, History, Ticket
+from backend.migrate_add_attachments import migrate_add_attachment_hash, migrate_add_attachment_source
+from backend.models import Attachment, Comment, History, Ticket
 from backend.services import adjuntos_service
 from backend.services import correo_adjuntos as ca
 from backend.services import correo_service as cs
@@ -38,13 +42,26 @@ def _docx() -> bytes:
 def archivo(nombre, contenido, tipo, inline=False, odata="#microsoft.graph.fileAttachment",
             tamano=None):
     """Un adjunto como lo lista Graph, más su contenido para ``$value``."""
-    return {"@odata.type": odata, "name": nombre, "contentType": tipo,
-            "size": len(contenido) + 200 if tamano is None else tamano,
-            "isInline": inline, "_contenido": contenido}
+    adjunto = {"@odata.type": odata, "name": nombre, "contentType": tipo,
+               "size": len(contenido) + 200 if tamano is None else tamano,
+               "isInline": inline, "_contenido": contenido}
+    if inline:
+        adjunto["contentId"] = f"{nombre}@01DB2C3A.5F1E9B20"
+    return adjunto
 
 
 def firma():
-    return archivo("image001.png", PNG, "image/png", inline=True)
+    """El logo chico de la firma, pegado en línea."""
+    return archivo("image001.png", PNG_CHICA, "image/png", inline=True)
+
+
+def en_linea(nombre, contenido, tipo="image/png"):
+    """Una imagen pegada dentro del texto (una captura, por ejemplo)."""
+    return archivo(nombre, contenido, tipo, inline=True)
+
+
+def png(kb: int, relleno: bytes = b"\x00") -> bytes:
+    return b"\x89PNG\r\n\x1a\n" + relleno * (kb * 1024)
 
 
 def correo_otro():
@@ -81,7 +98,7 @@ class GraphConAdjuntos(FakeGraph):
                 if self.fallar_lista:
                     return httpx.Response(500, json={"error": {"message": "Graph caído"}})
                 # Se pide solo la lista: nunca el contenido de todos.
-                assert request.url.params["$select"] == "id,name,contentType,size,isInline"
+                assert request.url.params["$select"] == "id,name,contentType,size,isInline,contentId"
                 return httpx.Response(200, json={"value": [
                     {k: v for k, v in a.items() if k != "_contenido"} for a in lista]})
             if len(partes) == 7 and partes[6] == "$value":
@@ -166,7 +183,7 @@ def test_guarda_los_archivos_e_ignora_firma_imagen_chica_correo_y_onedrive(facto
     assert historial(session, "attachments_skipped") == []
     assert [(h.new_value, h.field) for h in historial(session, "attachment_added")] == [
         ("captura.png", "correo"), ("factura.pdf", "correo"), ("informe.docx", "correo")]
-    assert "image001.png (imagen en línea (firma))" in log.text
+    assert "image001.png (imagen en línea de menos de 15 KB (firma))" in log.text
     assert "logo.png (imagen de menos de 15 KB)" in log.text
     assert "RE: presupuesto (otro correo)" in log.text
     assert "Planilla.xlsx (enlace a OneDrive/SharePoint)" in log.text
@@ -401,3 +418,125 @@ def test_nota_singular_plural_y_motivos():
     assert ca.nota_omitidos([("a", ca.MOTIVO_CANTIDAD), ("b", ca.MOTIVO_TOTAL), ("c", ca.MOTIVO_GRANDE)],
                             enlace).startswith(
         "No se guardaron 3 adjuntos (más de 4 MB, más de 5 por correo o más de 10 MB en el correo).")
+
+
+# --- Imágenes pegadas en el texto (en línea) ----------------------------------
+
+CID = "[cid:image001.png@01DB2C3A.5F1E9B20]"
+
+
+def test_la_captura_pegada_se_guarda_por_correo_y_sin_cid_en_la_descripcion(factory, session, usuario, auth_client):
+    captura = png(60)
+    mensaje = con_adjuntos(en_linea("image001.png", captura), firma(),
+                           cuerpo=f"La impresora muestra este error:\r\n{CID}\r\n\r\nSaludos,\r\nAna "
+                                  "[cid:image002.png@01DB2C3A.5F1E9B20]")
+    graph = GraphConAdjuntos([mensaje])
+    assert revisar(factory, graph) == {"ticket": 1}
+
+    ticket = session.scalars(select(Ticket)).one()
+    [adjunto] = adjuntos_en_bd(session)
+    assert (adjunto.filename, adjunto.source, adjunto.content_type) == ("image001.png", "correo", "image/png")
+    assert adjunto.sha256 == adjuntos_service.huella(captura)
+    assert "cid:" not in ticket.description
+    assert ticket.description.startswith("La impresora muestra este error:\n\nSaludos,\nAna")
+    lista = auth_client.get(f"/api/tickets/{ticket.id}/adjuntos").json()["adjuntos"]
+    assert [(a["nombre"], a["por_correo"], a["es_imagen"]) for a in lista] == [("image001.png", True, True)]
+    assert "No se guard" not in texto_respuesta(graph)
+
+
+def test_imagen_en_linea_sin_extension_toma_la_de_su_tipo(factory, session, usuario):
+    jpg = b"\xff\xd8\xff\xe0" + b"\x00" * (30 * 1024)
+    graph = GraphConAdjuntos([con_adjuntos(en_linea("Pasted image", jpg, "image/jpeg"),
+                                           cuerpo=f"Mire la foto {CID}")])
+    revisar(factory, graph)
+    assert [a.filename for a in adjuntos_en_bd(session)] == ["Pasted image.jpg"]
+
+
+def test_firma_imagenes_chicas_logo_repetido_y_gif_en_linea_no_se_guardan_ni_avisan(factory, session, usuario, log):
+    logo = png(20, b"L")
+    graph = GraphConAdjuntos([con_adjuntos(
+        firma(),
+        en_linea("image002.png", logo), en_linea("image003.png", logo),  # el mismo logo, dos veces
+        archivo("image004.gif", b"GIF89a" + b"0" * 40_000, "image/gif", inline=True),
+        en_linea("image005.png", png(50)),  # la captura de verdad
+    )])
+    revisar(factory, graph)
+    assert [a.filename for a in adjuntos_en_bd(session)] == ["image005.png"]
+    assert graph.descargas == ["image005.png"], "los repetidos ni se bajan"
+    assert "No se guard" not in texto_respuesta(graph)
+    assert historial(session, "attachments_skipped") == []
+    assert "image002.png (imagen en línea repetida (logo))" in log.text
+    assert "image003.png (imagen en línea repetida (logo))" in log.text
+    assert "image004.gif (imagen en línea de un tipo que no se guarda)" in log.text
+
+
+def test_el_logo_que_ya_llego_en_otro_correo_del_mismo_remitente_no_se_vuelve_a_guardar(factory, session, usuario, log):
+    logo = png(25, b"L")
+    primero = GraphConAdjuntos([con_adjuntos(en_linea("image001.png", logo), msg_id="<uno@data.cr>",
+                                             asunto="La impresora no imprime")])
+    revisar(factory, primero)
+    assert len(adjuntos_en_bd(session)) == 1  # la primera vez no se sabe que es un logo
+
+    segundo = GraphConAdjuntos([con_adjuntos(en_linea("image001.png", logo), en_linea("image002.png", png(40)),
+                                             msg_id="<dos@data.cr>", asunto="No funciona el escáner")])
+    assert revisar(factory, segundo) == {"ticket": 1}
+    nuevo = session.scalars(select(Ticket).order_by(Ticket.id.desc())).first()
+    assert [a.filename for a in adjuntos_en_bd(session, nuevo.id)] == ["image002.png"]
+    assert "No se guard" not in texto_respuesta(segundo)
+    assert f"Ticket #{nuevo.id}: adjuntos del correo ignorados: image001.png (imagen en línea repetida (logo))" in log.text
+
+
+def test_un_adjunto_comun_repetido_si_se_guarda(factory, session, usuario):
+    """La regla del logo es solo para imágenes en línea."""
+    foto = png(30)
+    revisar(factory, GraphConAdjuntos([con_adjuntos(archivo("foto.png", foto, "image/png"), msg_id="<a@x>")]))
+    revisar(factory, GraphConAdjuntos([con_adjuntos(archivo("foto.png", foto, "image/png"), msg_id="<b@x>",
+                                                    asunto="Otra consulta de impresora")]))
+    assert len(adjuntos_en_bd(session)) == 2
+
+
+def test_comentario_por_correo_sin_cid_y_con_la_captura(factory, session, usuario):
+    revisar(factory, GraphConAdjuntos([crear_correo()]))
+    ticket = session.scalars(select(Ticket)).one()
+
+    respuesta = con_adjuntos(en_linea("image001.png", png(45)), firma(),
+                             asunto=f"RE: Ticket #{ticket.id} creado: {ticket.title}",
+                             cuerpo=f"Ahora sale este mensaje {CID} en pantalla.", msg_id="<sigue@data.cr>")
+    assert revisar(factory, GraphConAdjuntos([respuesta])) == {"comentario": 1}
+    session.expire_all()
+    [comentario] = session.scalars(select(Comment)).all()
+    assert comentario.content == "Ahora sale este mensaje en pantalla."
+    assert [a.filename for a in adjuntos_en_bd(session, ticket.id)] == ["image001.png"]
+
+
+def test_respuesta_con_solo_una_captura_igual_es_comentario(factory, session, usuario):
+    revisar(factory, GraphConAdjuntos([crear_correo()]))
+    ticket = session.scalars(select(Ticket)).one()
+    respuesta = con_adjuntos(en_linea("image001.png", png(45)),
+                             asunto=f"RE: Ticket #{ticket.id} creado: {ticket.title}",
+                             cuerpo=CID, msg_id="<sigue@data.cr>")
+    assert revisar(factory, GraphConAdjuntos([respuesta])) == {"comentario": 1}
+    session.expire_all()
+    assert session.scalars(select(Comment)).one().content == "(Imagen pegada en el correo.)"
+    assert len(adjuntos_en_bd(session, ticket.id)) == 1
+
+
+def test_cid_en_html_y_en_texto():
+    for cuerpo in ({"contentType": "text", "content": f"Hola {CID} chau"},
+                   {"contentType": "html", "content": '<p>Hola <img src="cid:image001.png@01DB"> chau</p>'}):
+        correo = cs.correo_desde_graph({"id": "1", "subject": "x", "body": cuerpo,
+                                        "from": {"emailAddress": {"address": "ana@data.cr"}}})
+        assert correo.cuerpo == "Hola chau"
+
+
+def test_migracion_agrega_sha256(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'sin_huella.db'}")
+    Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text("DROP INDEX ix_adjuntos_sha256"))
+        conn.execute(text("ALTER TABLE adjuntos DROP COLUMN sha256"))
+    assert migrate_add_attachment_hash(engine) is True
+    assert "sha256" in {c["name"] for c in inspect(engine).get_columns("adjuntos")}
+    assert "ix_adjuntos_sha256" in {i["name"] for i in inspect(engine).get_indexes("adjuntos")}
+    assert migrate_add_attachment_hash(engine) is False
+    engine.dispose()

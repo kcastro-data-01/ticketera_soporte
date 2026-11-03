@@ -11,6 +11,7 @@
   Nunca hay enlaces públicos: todo se descarga por la API con sesión.
 """
 
+import hashlib
 import io
 import logging
 import os
@@ -239,6 +240,11 @@ def almacen_de(adjunto: Attachment):
 # ---------------------------------------------------------------------------
 
 
+def huella(contenido: bytes) -> str:
+    """SHA-256 del contenido (hexadecimal)."""
+    return hashlib.sha256(contenido).hexdigest()
+
+
 def listar(session, ticket_id: int) -> list[Attachment]:
     return list(session.scalars(
         select(Attachment).where(Attachment.ticket_id == ticket_id)
@@ -287,6 +293,7 @@ def subir(session, ticket: Ticket, user: User, nombre: str | None, contenido: by
     adjunto = Attachment(
         ticket_id=ticket.id, filename=limpio, content_type=content_type,
         size=len(contenido), storage=almacen.nombre, storage_key=ref, source=origen,
+        sha256=huella(contenido),
         uploaded_by=autor, uploaded_by_id=autor_id,
     )
     session.add(adjunto)

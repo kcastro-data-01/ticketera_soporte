@@ -588,7 +588,8 @@ ticket queda creado igual: la página dice cuál falló y por qué, con el enlac
   `403` borrar uno ajeno sin ser Administrador, `404` ticket que no se ve.
 - La tabla `adjuntos` se crea sola al arrancar (`migrate_add_attachments`), y
   la columna `source` (`app` o `correo`) se agrega sola a la de la parte 1
-  (`migrate_add_attachment_source`).
+  (`migrate_add_attachment_source`), igual que `sha256`, la huella del
+  contenido (`migrate_add_attachment_hash`).
 
 ### Adjuntos que llegan por correo
 
@@ -597,16 +598,28 @@ correo»), sus adjuntos se guardan en el ticket con el mismo almacén y las
 mismas validaciones, marcados «por correo» (`backend/services/correo_adjuntos.py`):
 
 1. Primero se pide a Graph **solo la lista** (`/me/messages/{id}/attachments`
-   con `$select=id,name,contentType,size,isInline`, sin el contenido).
+   con `$select=id,name,contentType,size,isInline,contentId`, sin el contenido).
 2. Se eligen los que entran y se descargan **solo esos**, uno por uno
    (`…/attachments/{adjunto}/$value`): como máximo **5 archivos y 10 MB por
    correo**, para no pasarse del tiempo de la función de Vercel (en modo
    cron, la descarga del correo en curso tiene 15 s más que el límite de 25 s
    de la revisión).
 
-- Se **ignoran** sin avisar: imágenes en línea (logos de la firma), imágenes de
-  menos de 15 KB, adjuntos que son otro correo y enlaces a OneDrive o
-  SharePoint. Quedan en el log.
+- **Imágenes pegadas en el texto** (en línea, `isInline` con `contentId`; por
+  ejemplo una captura): se guardan como los demás adjuntos, marcadas «por
+  correo», salvo las de la firma. Una imagen en línea sin extensión toma la de
+  su tipo (`Pasted image` → `Pasted image.jpg`).
+- Las marcas `[cid:…]` que Graph deja en el texto en lugar de esas imágenes
+  se quitan de la descripción y de los comentarios. Si el correo solo traía la
+  imagen, el texto queda «(Imagen pegada en el correo.)».
+- Se **ignoran** sin avisar (quedan en el log): imágenes de menos de 15 KB;
+  imágenes en línea que se repiten como logo (dos o más con el mismo tamaño y
+  tipo en el mismo correo, sin descargarlas, o la misma imagen —misma huella
+  SHA-256, columna `adjuntos.sha256`— que ya está en el ticket o que ya llegó
+  en un correo anterior del mismo remitente); imágenes en línea de un tipo que
+  no se guarda (gif, bmp…); adjuntos que son otro correo y enlaces a OneDrive
+  o SharePoint. Un logo de 15 KB o más se guarda la primera vez que llega
+  (todavía no se sabe que se repite); desde el segundo correo, no.
 - Se **omiten** los de tipo no permitido, más de 4 MB, los que pasan de 5 o de
   10 MB en el correo y los que no entran porque el ticket ya tiene 10. El
   ticket o el comentario se crea igual; queda una fila «Adjuntos no guardados»

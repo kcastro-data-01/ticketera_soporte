@@ -275,6 +275,9 @@ class Attachment(Base):
     storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
     source: Mapped[str] = mapped_column(String(10), nullable=False, default="app",
                                         server_default="app")
+    # SHA-256 del contenido: reconoce una imagen que se repite en los correos
+    # (el logo de una firma). ``None`` en los adjuntos de antes.
+    sha256: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     uploaded_by: Mapped[str | None] = mapped_column(String(120))
     uploaded_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True

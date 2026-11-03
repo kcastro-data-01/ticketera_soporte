@@ -9,10 +9,18 @@ como ``correo``.
 2. Después se descargan **solo los elegidos**, uno por uno: así una revisión
    del buzón no se pasa del tiempo de la función de Vercel.
 
+Las **imágenes en línea** (pegadas dentro del texto, ``isInline`` con
+``contentId``: por ejemplo una captura de pantalla) se guardan como los demás
+adjuntos, salvo las de la firma.
+
 Se ignoran sin avisar (no son archivos que la persona quiso mandar):
 
-* las imágenes en línea (logos y fotos de la firma);
-* las imágenes de menos de :data:`MIN_BYTES_IMAGEN`;
+* las imágenes de menos de :data:`MIN_BYTES_IMAGEN` (íconos y logos chicos);
+* las imágenes en línea que **se repiten como logo**: dos o más con el mismo
+  tamaño y tipo en el mismo correo (no se descargan), o la misma imagen
+  (misma huella SHA-256) que ya llegó en un correo anterior del mismo
+  remitente o que ya está en el ticket;
+* las imágenes en línea de un tipo que no se guarda (gif, bmp…);
 * los adjuntos que son otro correo (``itemAttachment``) o un enlace a
   OneDrive o SharePoint (``referenceAttachment``).
 
@@ -29,9 +37,11 @@ import os
 import time
 from dataclasses import dataclass, field, replace
 
-from sqlalchemy import func, select
+from collections import Counter
 
-from backend.models import Ticket, User
+from sqlalchemy import and_, func, or_, select
+
+from backend.models import Attachment, Ticket, User
 from backend.services import adjuntos_service, ticket_service
 from backend.services.adjuntos_service import (
     AdjuntoInvalidoError,
@@ -56,6 +66,11 @@ MARGEN_DESCARGA_S = 15.0
 TIPO_ARCHIVO = "#microsoft.graph.fileAttachment"
 EXTENSIONES_IMAGEN = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff",
                       ".heic", ".heif", ".svg", ".ico", ".emf", ".wmf")
+
+# Extensión para una imagen en línea que vino sin ella («Pasted image»).
+EXTENSION_POR_TIPO = {"image/jpeg": ".jpg", "image/jpg": ".jpg", "image/pjpeg": ".jpg",
+                      "image/png": ".png"}
+POR_QUE_LOGO = "imagen en línea repetida (logo)"
 
 MOTIVO_TIPO = "tipo no permitido"
 MOTIVO_GRANDE = "más de 4 MB"
@@ -98,16 +113,38 @@ def _es_archivo(adjunto: dict) -> bool:
     return not (adjunto.get("contentType") or "").lower().startswith("message/")
 
 
+def _en_linea(adjunto: dict) -> bool:
+    nombre = adjunto.get("name") or ""
+    tipo = (adjunto.get("contentType") or "").lower()
+    return bool(adjunto.get("isInline")) and _es_archivo(adjunto) and _es_imagen(nombre, tipo)
+
+
+def _nombre(adjunto: dict, en_linea: bool) -> str:
+    """Nombre limpio; a una imagen en línea sin extensión se le pone la de su tipo."""
+    nombre = adjuntos_service.limpiar_nombre(adjunto.get("name")) or ("imagen" if en_linea else "adjunto")
+    tipo = (adjunto.get("contentType") or "").lower()
+    if en_linea and os.path.splitext(nombre)[1].lower() not in adjuntos_service.TIPOS:
+        nombre += EXTENSION_POR_TIPO.get(tipo, "")
+    return nombre
+
+
 def elegir(adjuntos: list[dict], libres: int) -> Eleccion:
     """Decide, solo con la lista de Graph, qué adjuntos se descargan.
 
     ``libres`` es cuántos adjuntos más admite el ticket. Se respetan el orden
-    del correo, :data:`MAX_ARCHIVOS_CORREO` y :data:`MAX_BYTES_CORREO`.
+    del correo, :data:`MAX_ARCHIVOS_CORREO` y :data:`MAX_BYTES_CORREO`. Las
+    imágenes en línea elegidas llevan ``en_linea``: después de bajarlas se
+    revisa si son un logo que ya llegó antes.
     """
     eleccion = Eleccion()
     total = 0
+    # Imágenes en línea con el mismo tamaño y tipo: el logo de la firma
+    # repetido (en las respuestas, una vez por cada correo citado).
+    repetidas = Counter((int(a.get("size") or 0), (a.get("contentType") or "").lower())
+                        for a in adjuntos if _en_linea(a))
     for adjunto in adjuntos:
-        nombre = adjuntos_service.limpiar_nombre(adjunto.get("name")) or "adjunto"
+        en_linea = _en_linea(adjunto)
+        nombre = _nombre(adjunto, en_linea)
         tipo = (adjunto.get("contentType") or "").lower()
         tamano = int(adjunto.get("size") or 0)
         ext = os.path.splitext(nombre)[1].lower()
@@ -115,8 +152,12 @@ def elegir(adjuntos: list[dict], libres: int) -> Eleccion:
             por_que = ("enlace a OneDrive/SharePoint"
                        if "reference" in (adjunto.get("@odata.type") or "") else "otro correo")
             eleccion.ignorados.append((nombre, por_que))
-        elif _es_imagen(nombre, tipo) and adjunto.get("isInline"):
-            eleccion.ignorados.append((nombre, "imagen en línea (firma)"))
+        elif en_linea and tamano < MIN_BYTES_IMAGEN:
+            eleccion.ignorados.append((nombre, "imagen en línea de menos de 15 KB (firma)"))
+        elif en_linea and repetidas[(tamano, tipo)] > 1:
+            eleccion.ignorados.append((nombre, POR_QUE_LOGO))
+        elif en_linea and ext not in adjuntos_service.TIPOS:
+            eleccion.ignorados.append((nombre, "imagen en línea de un tipo que no se guarda"))
         elif _es_imagen(nombre, tipo) and tamano < MIN_BYTES_IMAGEN:
             eleccion.ignorados.append((nombre, "imagen de menos de 15 KB"))
         elif ext not in adjuntos_service.TIPOS:
@@ -131,8 +172,22 @@ def elegir(adjuntos: list[dict], libres: int) -> Eleccion:
             eleccion.omitidos.append((nombre, MOTIVO_TOTAL))
         else:
             total += tamano
-            eleccion.elegidos.append({**adjunto, "name": nombre})
+            eleccion.elegidos.append({**adjunto, "name": nombre, "en_linea": en_linea})
     return eleccion
+
+
+def _es_logo_conocido(session, ticket: Ticket, usuario: User | None, contenido: bytes) -> bool:
+    """La misma imagen ya está en el ticket o ya llegó en un correo anterior
+    del mismo remitente (el logo de su firma)."""
+    condiciones = [Attachment.ticket_id == ticket.id]
+    if usuario is not None:
+        condiciones.append(and_(Attachment.source == adjuntos_service.ORIGEN_CORREO,
+                                Attachment.uploaded_by_id == usuario.id))
+    return session.scalar(
+        select(Attachment.id)
+        .where(Attachment.sha256 == adjuntos_service.huella(contenido), or_(*condiciones))
+        .limit(1)
+    ) is not None
 
 
 def _motivo_invalido(contenido: bytes) -> str:
@@ -171,6 +226,9 @@ def guardar(session_factory, cliente, mensaje_id: str, ticket_id: int, remitente
             except Exception:  # noqa: BLE001 — se avisa como omitido
                 logger.exception("No se pudo descargar el adjunto «%s» del correo", nombre)
                 resultado.omitidos.append((nombre, MOTIVO_ERROR))
+                continue
+            if adjunto.get("en_linea") and _es_logo_conocido(session, ticket, usuario, contenido):
+                resultado.ignorados.append((nombre, POR_QUE_LOGO))
                 continue
             try:
                 adjuntos_service.subir(session, ticket, usuario, nombre, contenido,

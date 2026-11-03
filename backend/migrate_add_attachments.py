@@ -5,7 +5,9 @@ Corre al arrancar (``init_db``) en SQLite (local, Docker) y en Postgres
 
 * crea ``adjuntos`` si no existe (bases de antes de los adjuntos);
 * le agrega ``source`` (``app`` o ``correo``) si es de la parte 1, sin esa
-  columna: los adjuntos que ya había quedan como ``app``.
+  columna: los adjuntos que ya había quedan como ``app``;
+* le agrega ``sha256`` (huella del contenido) si falta: los de antes quedan
+  sin huella.
 """
 
 from sqlalchemy import inspect, text
@@ -38,10 +40,24 @@ def migrate_add_attachment_source(target_engine=None) -> bool:
     return True
 
 
+def migrate_add_attachment_hash(target_engine=None) -> bool:
+    """Agrega ``adjuntos.sha256`` (con índice) si falta. ``True`` si la agregó."""
+    db_engine = target_engine or engine
+    inspector = inspect(db_engine)
+    if not inspector.has_table("adjuntos"):
+        return False
+    if "sha256" in {col["name"] for col in inspector.get_columns("adjuntos")}:
+        return False
+    with db_engine.begin() as conn:
+        conn.execute(text("ALTER TABLE adjuntos ADD COLUMN sha256 VARCHAR(64)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_adjuntos_sha256 ON adjuntos (sha256)"))
+    return True
+
+
 if __name__ == "__main__":
     if migrate_add_attachments():
         print("Migración aplicada: tabla 'adjuntos' creada.")
-    elif migrate_add_attachment_source():
-        print("Migración aplicada: columna 'source' agregada a 'adjuntos'.")
+    elif migrate_add_attachment_source() | migrate_add_attachment_hash():
+        print("Migración aplicada: columnas nuevas en 'adjuntos'.")
     else:
         print("La tabla 'adjuntos' ya está al día. No se requiere migración.")

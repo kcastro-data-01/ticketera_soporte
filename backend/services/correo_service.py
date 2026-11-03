@@ -458,12 +458,26 @@ def asunto_base(asunto: str) -> str:
     return PREFIJOS_RESPUESTA.sub("", asunto).strip()
 
 
+# Marca de una imagen pegada en el texto: Graph deja «[cid:image001.png@01DB…]»
+# en la versión de texto del correo (en HTML es <img src="cid:…">).
+PATRON_CID = re.compile(r"\[cid:[^\]]*\]", re.IGNORECASE)
+# Cuerpo de un correo que solo traía una imagen pegada (sin texto).
+TEXTO_SOLO_IMAGEN = "(Imagen pegada en el correo.)"
+
+
+def _tiene_imagen_en_linea(parte: dict | None) -> bool:
+    contenido = (parte or {}).get("content") or ""
+    return bool(PATRON_CID.search(contenido) or re.search(r"""(?i)src\s*=\s*["']?cid:""", contenido))
+
+
 def _texto_graph(parte: dict | None) -> str:
+    """Texto del correo, sin las marcas ``[cid:…]`` de las imágenes pegadas
+    (las imágenes se guardan como adjuntos)."""
     parte = parte or {}
     contenido = parte.get("content") or ""
     if (parte.get("contentType") or "").lower() == "html":
         contenido = _html_a_texto(contenido)
-    return _limpiar_cuerpo(contenido)
+    return _limpiar_cuerpo(PATRON_CID.sub("", contenido))
 
 
 def _es_automatico(cabeceras: dict[str, str], remitente: str) -> bool:
@@ -519,6 +533,10 @@ def correo_desde_graph(mensaje: dict) -> CorreoEntrante:
 
     # uniqueBody es solo lo nuevo de este correo (sin lo citado de antes).
     cuerpo = _texto_graph(mensaje.get("uniqueBody")) or _texto_graph(mensaje.get("body"))
+    if not cuerpo and (_tiene_imagen_en_linea(mensaje.get("uniqueBody"))
+                       or _tiene_imagen_en_linea(mensaje.get("body"))):
+        # Solo una imagen pegada: igual es una descripción o un comentario.
+        cuerpo = TEXTO_SOLO_IMAGEN
 
     cabeceras = {
         (c.get("name") or "").lower(): c.get("value") or ""
@@ -1355,7 +1373,7 @@ class ClienteGraph:
         """Lista de adjuntos de un correo: nombre, tipo, tamaño y si va en
         línea, **sin** el contenido (``contentBytes``)."""
         datos = self._pedir("GET", f"/me/messages/{mensaje_id}/attachments",
-                            params={"$select": "id,name,contentType,size,isInline"})
+                            params={"$select": "id,name,contentType,size,isInline,contentId"})
         return datos.get("value", [])
 
     def descargar_adjunto(self, mensaje_id: str, adjunto_id: str) -> bytes:
