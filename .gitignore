@@ -40,3 +40,4 @@ Thumbs.db
 
 # Adjuntos guardados en local (fuera de Docker)
 /adjuntos/
+.env*
