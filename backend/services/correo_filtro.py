@@ -43,6 +43,10 @@ SISTEMA = (
     "su dueño le envía a un compañero. Decidí si el correo es una SOLICITUD DE SOPORTE.\n"
     "Es solicitud si la persona reporta un problema técnico (algo no funciona, se dañó, da error, "
     "no puede entrar) o pide ayuda, un acceso, un permiso, una instalación o soporte.\n"
+    "También es solicitud si avisa de un problema de seguridad: daños en la seguridad o en un "
+    "sistema, accesos no autorizados o sospechosos, confidencialidad o seguridad comprometida, "
+    "una cuenta hackeada. Aunque sea corto y no diga «ayuda», es un pedido de soporte.\n"
+    "Un aviso legal de confidencialidad al pie del correo NO lo vuelve solicitud.\n"
     "NO es solicitud si es un resumen, un informe o un reporte; la presentación de un proyecto "
     "(aunque hable de tickets, ticketeras o soporte); un aviso automático de un sistema; un "
     "saludo; un agradecimiento; una invitación o reunión; coordinación de trabajo o personal; "
@@ -67,6 +71,15 @@ EJEMPLOS: tuple[tuple[str, str, bool, str], ...] = (
      "Les presento el proyecto: una ticketera para registrar los problemas de soporte con "
      "prioridades y estados. Adjunto la presentación.",
      False, "presenta un proyecto"),
+    # Problemas de seguridad: cortos y sin «ayuda», pero son soporte.
+    ("Confidencialidad comprometida", "Daños en el bloque de seguridad de la empresa",
+     True, "reporta un problema de seguridad"),
+    ("Seguridad comprometida", "Hay accesos que no reconozco en mi cuenta del sistema.",
+     True, "reporta accesos sospechosos"),
+    ("Informe trimestral",
+     "Adjunto el informe. AVISO DE CONFIDENCIALIDAD: este correo y sus adjuntos son "
+     "confidenciales; la empresa no se responsabiliza por daños causados por virus.",
+     False, "es un envío de archivos con el aviso legal"),
     ("Gracias", "Muchas gracias por la ayuda de ayer, ya quedó funcionando.", False,
      "es un agradecimiento"),
     ("Reunión del viernes", "Les recuerdo la reunión de seguimiento a las 10 am.", False,
@@ -101,6 +114,20 @@ SEÑALES_ESTRICTAS = tuple(re.compile(p) for p in (
     r"\b(me|nos) (pueden|podrian|puede|podria) ayudar\b",
     r"\b(ayudenme|ayudame|ayudenos)\b",
     r"\b(solicito|requiero|ocupo) (acceso|permisos?|ayuda|soporte|instalar|la instalacion)\b",
+    # Seguridad. Van como frases y no sueltas: «confidencialidad», «daños» o
+    # «accesos» solos salen en los avisos legales del pie de muchos correos.
+    r"\b(seguridad|confidencialidad|informacion|datos|cuentas?|correo|sistemas?|servidor(es)?|"
+    r"red|equipos?) (esta |estan |fue |fueron |ha sido |han sido |quedo |quedaron )?"
+    r"(comprometid|vulnerad|hackead|violad|expuest)",
+    r"\bdanos? (en|a|al|del|de) (el |la |los |las |nuestro |nuestra )?(bloque|sistemas?|"
+    r"servidor(es)?|red|equipos?|seguridad|base de datos|firewall|antivirus)\b",
+    r"\b(seguridad|confidencialidad)\b[^.\n]{0,60}\b(esta|estan|fue|fueron|ha sido|han sido|quedo)"
+    r" (comprometid|vulnerad|violad|expuest)",
+    r"\bbloque de seguridad\b",
+    r"\baccesos? (no autorizad|indebid|sospechos|extran|irregular|ilegal)",
+    r"\b(incidente|brecha|violacion|ataque|falla|fallo|problema|alerta|vulnerabilidad)(e?s)? "
+    r"de (la )?seguridad\b",
+    r"\b(me|nos|le) (hackearon|robaron (la |mi )?(cuenta|contrasena|clave))\b",
 ))
 # Aunque traiga una frase de problema, esto es un informe (p. ej. un resumen
 # que lista tickets ajenos), no una solicitud.

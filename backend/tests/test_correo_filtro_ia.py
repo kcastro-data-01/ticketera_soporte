@@ -420,3 +420,78 @@ def test_filter_default_reads_the_assistant_provider(monkeypatch):
     assert cs.filtro_desde_entorno({}) == "ia"
     monkeypatch.setenv("ASISTENTE_PROVEEDOR", "ninguno")
     assert cs.filtro_desde_entorno({}) == "auto"
+
+
+# --- Problemas de seguridad (caso real del 04/11/2026) -----------------------------
+
+ASUNTO_SEGURIDAD = "Confidencialidad comprometida"
+TEXTO_SEGURIDAD = "Daños en el bloque de seguridad de la empresa"
+ADJUNTO_SEGURIDAD = "vencimiento-ticket-19-2026-11-04.pdf"
+
+
+def _caso_seguridad(**datos):
+    mensaje = crear_correo(remitente="dsaenz@data.cr", nombre="D. Sáenz", asunto=ASUNTO_SEGURIDAD,
+                           cuerpo=TEXTO_SEGURIDAD, msg_id="<seguridad@data.cr>", **datos)
+    mensaje["toRecipients"] = [{"emailAddress": {"address": "kcastro@data.cr"}}]
+    mensaje["hasAttachments"] = True
+    return mensaje
+
+
+def test_caso_real_seguridad_no_lo_descartan_las_reglas_fijas():
+    """Ni el nombre del adjunto (con «ticket-19») ni el asunto lo vuelven aviso de
+    una ticketera: el descarte era de la IA."""
+    correo = cs.correo_desde_graph(_caso_seguridad())
+    assert cs.descarte_fijo(correo) is None
+    assert cs.descarte_destinatarios(correo, CONFIG_IA) is None
+    # Aunque el nombre del adjunto apareciera en el texto, tampoco.
+    assert not cs.es_de_ticketera(cs.replace(correo, cuerpo=f"{TEXTO_SEGURIDAD}\n{ADJUNTO_SEGURIDAD}"))
+
+
+def test_caso_real_seguridad_la_ia_recibe_la_regla_y_el_ejemplo(session, ia):
+    cs_usuario = User(name="D. Sáenz", email="dsaenz@data.cr", role="Solicitante",
+                      password_hash="x", is_active=True)
+    session.add(cs_usuario)
+    session.commit()
+    ia.solicitudes.add(ASUNTO_SEGURIDAD)
+    assert procesar(session, _caso_seguridad(), CONFIG_IA)[0] == "ticket"
+    mensajes = ia.pedidos[0]
+    assert "seguridad comprometida" in mensajes[0]["content"]
+    ejemplos = list(zip(mensajes[1:-1:2], mensajes[2:-1:2]))
+    seguridad = [json.loads(r["content"]) for p, r in ejemplos if "confidencial" in p["content"].lower()]
+    assert any(r["es_solicitud"] for r in seguridad)
+    assert any(not r["es_solicitud"] for r in seguridad)  # el aviso legal no cuenta
+    assert mensajes[-1]["content"] == f"Asunto: {ASUNTO_SEGURIDAD}\n\n{TEXTO_SEGURIDAD}"
+
+
+def test_caso_real_seguridad_con_la_ia_caida_igual_crea_el_ticket(session, ia, log_correo):
+    """Antes el respaldo estricto también lo descartaba («sin frases de problema»)."""
+    session.add(User(name="D. Sáenz", email="dsaenz@data.cr", role="Solicitante",
+                     password_hash="x", is_active=True))
+    session.commit()
+    ia.error = AsistenteNoDisponible("No se pudo conectar con Groq")
+    assert procesar(session, _caso_seguridad(), CONFIG_IA)[0] == "ticket"
+    assert [t.title for t in tickets(session)] == [ASUNTO_SEGURIDAD]
+    assert "se usó el filtro de respaldo" in log_correo.text
+
+
+@pytest.mark.parametrize("asunto,cuerpo", [
+    (ASUNTO_SEGURIDAD, TEXTO_SEGURIDAD),
+    ("Seguridad comprometida", ""),
+    ("Urgente", "La confidencialidad de los datos de clientes está comprometida."),
+    ("Accesos", "Vimos accesos no autorizados al servidor de planillas."),
+    ("Correo", "Me hackearon la cuenta, están enviando correos raros."),
+    ("Alerta", "Hay un incidente de seguridad en la red de bodega."),
+    ("Firewall", "Daños en el firewall desde anoche."),
+])
+def test_strict_fallback_accepts_security_problems(asunto, cuerpo):
+    assert cf.es_solicitud_estricta(asunto, cuerpo)[0]
+
+
+@pytest.mark.parametrize("asunto,cuerpo", [
+    ("Informe trimestral", "Adjunto el informe.\n\nAVISO DE CONFIDENCIALIDAD: este correo es "
+     "confidencial. La empresa no se responsabiliza por daños causados por virus."),
+    ("Reunión", "Les paso los accesos a la sala virtual del viernes."),
+    ("Política", "Les comparto la política de seguridad de la información actualizada."),
+])
+def test_strict_fallback_still_rejects_legal_notices_and_security_mentions(asunto, cuerpo):
+    assert not cf.es_solicitud_estricta(asunto, cuerpo)[0]

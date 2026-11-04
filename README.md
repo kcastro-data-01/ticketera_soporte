@@ -1045,12 +1045,17 @@ En este orden:
 3. Más de 3 destinatarios (Para + CC) o remitente de otro dominio → se ignora.
 4. El resto lo decide la IA (`ASISTENTE_PROVEEDOR`, p. ej. Groq) con solo el
    asunto y los primeros 800 caracteres: es solicitud si reporta un problema
-   técnico o pide ayuda, acceso o soporte; no lo es un resumen, un informe,
+   técnico, pide ayuda, acceso o soporte, o avisa de un problema de seguridad
+   («Confidencialidad comprometida», «daños en el bloque de seguridad»,
+   accesos no autorizados, una cuenta hackeada); no lo es un resumen, un informe,
    la presentación de un proyecto (aunque hable de tickets), un saludo, un
    agradecimiento, una reunión o un envío de archivos.
 5. Si la IA falla o llega a su límite (429), un filtro de palabras estricto
-   (solo frases de un problema real, como «no puedo entrar» o «se dañó»;
-   «ticket», «soporte» o «estado» sueltas no cuentan) y queda en el log
+   (solo frases de un problema real, como «no puedo entrar», «se dañó»,
+   «seguridad comprometida», «daños en el sistema», «accesos no autorizados» o
+   «bloque de seguridad»; «ticket», «soporte», «estado» y también
+   «confidencialidad», «daños» o «accesos» sueltas no cuentan, porque salen en
+   los avisos legales del pie de los correos) y queda en el log
    «se usó el filtro de respaldo». Tras una falla la IA descansa 60 s.
 
 En el log queda cada decisión («Correo aceptado/ignorado (ia: motivo)»),
