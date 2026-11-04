@@ -60,6 +60,7 @@ from backend.services.adjuntos_service import (
     ImagenDanadaError,
     LimiteAdjuntosError,
 )
+from backend.services.correo_auth import SinSesionError
 from backend.services.ticket_service import TicketClosedError
 
 # Hijo del logger de correo_service: hereda su salida («CORREO: …») y su
@@ -102,6 +103,8 @@ MOTIVO_ALMACEN = "los adjuntos no están configurados en el servidor"
 MOTIVO_ERROR = "no se pudo descargar"
 MOTIVO_DANADA = "imagen dañada o incompleta"
 MOTIVO_ENLACE = web.MOTIVO_ENLACE
+# Lo que se anota cuando Graph no dio la lista de adjuntos.
+NOMBRE_SIN_LISTA = "adjuntos del correo"
 ORDEN_MOTIVOS = (MOTIVO_TIPO, MOTIVO_DANADA, MOTIVO_GRANDE, MOTIVO_CANTIDAD, MOTIVO_TOTAL, MOTIVO_LLENO,
                  MOTIVO_TIEMPO, MOTIVO_ALMACEN, MOTIVO_ERROR, MOTIVO_ENLACE)
 
@@ -249,8 +252,10 @@ def guardar(session_factory, cliente, mensaje_id: str, ticket_id: int, remitente
     """Guarda en ``ticket_id`` los adjuntos del correo ``mensaje_id`` de Graph.
 
     Devuelve ``None`` si no se guardó nada porque el ticket no existe o está
-    Cerrado. Los errores de un adjunto puntual se anotan como omitidos; un
-    error de Graph al pedir la lista sube a quien llama.
+    Cerrado. Los errores de un adjunto puntual se anotan como omitidos. Si
+    Graph no da la lista de adjuntos, se avisa como omitido («adjuntos del
+    correo») y se siguen guardando las imágenes del cuerpo; solo
+    ``SinSesionError`` sube a quien llama.
     """
     limite = None if hasta is None else hasta + MARGEN_DESCARGA_S
     with session_factory() as session:
@@ -263,11 +268,23 @@ def guardar(session_factory, cliente, mensaje_id: str, ticket_id: int, remitente
         usuario = session.scalar(select(User).where(func.lower(User.email) == remitente.lower()))
         libres = adjuntos_service.MAX_POR_TICKET - adjuntos_service.contar(session, ticket_id)
 
-        lista = cliente.adjuntos(mensaje_id)
-        logger.info("Ticket #%s: el correo trae %d adjunto(s): %s", ticket_id, len(lista),
-                    "; ".join(f"«{a.get('name')}» ({_datos(a)})" for a in lista) or "ninguno")
-        eleccion = elegir(lista, libres, ticket_id)
+        try:
+            lista = cliente.adjuntos(mensaje_id)
+        except SinSesionError:
+            raise
+        except Exception as error:  # noqa: BLE001 — se sigue con las imágenes del cuerpo
+            # Antes este error cortaba todo: ni las imágenes del cuerpo ni un
+            # aviso en la respuesta o el historial (ticket «Odoo fallas»).
+            logger.warning("Ticket #%s: no se pudo pedir la lista de adjuntos del correo: %s",
+                           ticket_id, error, exc_info=True)
+            lista = None
+        if lista is not None:
+            logger.info("Ticket #%s: el correo trae %d adjunto(s): %s", ticket_id, len(lista),
+                        "; ".join(f"«{a.get('name')}» ({_datos(a)})" for a in lista) or "ninguno")
+        eleccion = elegir(lista or [], libres, ticket_id)
         resultado = Resultado(omitidos=list(eleccion.omitidos), ignorados=eleccion.ignorados)
+        if lista is None:
+            resultado.omitidos.append((NOMBRE_SIN_LISTA, MOTIVO_ERROR))
         bytes_guardados, cerrado = 0, False
         for posicion, adjunto in enumerate(eleccion.elegidos):
             nombre = adjunto["name"]

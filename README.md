@@ -603,7 +603,12 @@ correo»), sus adjuntos se guardan en el ticket con el mismo almacén y las
 mismas validaciones, marcados «por correo» (`backend/services/correo_adjuntos.py`):
 
 1. Primero se pide a Graph **solo la lista** (`/me/messages/{id}/attachments`
-   con `$select=id,name,contentType,size,isInline,contentId`, sin el contenido).
+   con `$select=id,name,contentType,size,isInline`, sin el contenido). Solo
+   propiedades del tipo base `attachment`: con `contentId` (que es de
+   `fileAttachment`) Graph contesta **400** a todo el pedido, y así ningún
+   adjunto por correo se guardaba en producción. Si Graph igual no da la
+   lista, se avisa «adjuntos del correo (no se pudo descargar)» en la
+   respuesta y el historial, y se siguen guardando las imágenes del cuerpo.
 2. Se eligen los que entran y se descargan **solo esos**, uno por uno
    (`…/attachments/{adjunto}/$value`): como máximo **5 archivos y 10 MB por
    correo**, para no pasarse del tiempo de la función de Vercel (en modo

@@ -669,3 +669,66 @@ def test_mailpit_devuelve_el_html():
     cliente._leidos["m2"] = {"HTML": "", "Text": "hola"}
     assert cliente.cuerpo_html("m1") == ["<p>hola</p>"]
     assert cliente.cuerpo_html("m2") == []
+
+
+# --- Caso real: «Odoo fallas» (ticket #12 en producción) -----------------------
+
+
+def _png_pegado_por_outlook(ancho=172, alto=178) -> bytes:
+    """Outlook guarda la imagen copiada de Google como ``image001.png`` en
+    línea (con ``cid``), no como enlace: un PNG de la foto."""
+    imagen = Image.frombytes("RGB", (ancho, alto), os.urandom(ancho * alto * 3))
+    salida = io.BytesIO()
+    imagen.save(salida, format="PNG")
+    return salida.getvalue()
+
+
+def test_caso_real_odoo_fallas_la_imagen_pegada_en_outlook_se_guarda(factory, session, log, red):
+    """Producción, 2026-11-04: dsaenz@data.cr mandó «Odoo fallas» con una
+    imagen copiada de Google y pegada en Outlook. Outlook la dejó en línea
+    (``isInline``, ``contentId``, ``[cid:…]`` en el texto) y Graph dijo
+    ``hasAttachments: false``. La lista de adjuntos se pedía con
+    ``$select=…,contentId`` y Graph contestaba 400 («Could not find a property
+    named 'contentId' on type 'microsoft.graph.attachment'»): el ticket se
+    creaba con 0 adjuntos y sin ningún aviso."""
+    from backend.models import User
+    session.add(User(name="Daniel Alejandro Sáenz Maroto", email="dsaenz@data.cr",
+                     role="Solicitante", password_hash="x", is_active=True))
+    session.commit()
+    cid = "image001.png@01DD4E2B.3A5C7F10"
+    pegada = archivo("image001.png", _png_pegado_por_outlook(), "image/png", inline=True)
+    pegada["contentId"] = cid
+    mensaje = correo_html(
+        f'<html><body><p>Buenas, Odoo me da este error al facturar:</p>'
+        f'<p><img width="172" height="178" style="width:1.79in;height:1.85in" id="Imagen_x0020_1" '
+        f'src="cid:{cid}"></p><p>Saludos</p></body></html>',
+        remitente="dsaenz@data.cr", nombre="Daniel Alejandro Sáenz Maroto", asunto="Odoo fallas",
+        cuerpo="Buenas, Odoo me da este error al facturar:\r\n\r\nSaludos", msg_id="<MN0PR12MB5954@x>")
+    mensaje["_adjuntos"] = [pegada]
+    graph = GraphConAdjuntos([mensaje])
+    assert mensaje["hasAttachments"] is False and f"[cid:{cid}]" in mensaje["body"]["content"]
+
+    assert revisar(factory, graph) == {"ticket": 1}
+    ticket = session.scalars(select(Ticket)).one()
+    [adjunto] = adjuntos_en_bd(session, ticket.id)
+    assert (adjunto.filename, adjunto.source, adjunto.content_type) == ("image001.png", "correo", "image/png")
+    assert "No se guard" not in texto_respuesta(graph)
+    assert "400" not in log.text and "No se pudieron guardar" not in log.text
+    assert "el correo trae 1 adjunto(s)" in log.text
+    assert red.pedidos == []  # la cid no se baja de la red
+
+
+def test_si_graph_no_da_la_lista_igual_se_guardan_las_imagenes_del_cuerpo(factory, session, usuario, log, red):
+    red.paginas["https://www.ejemplo.com/error-odoo.jpg"] = FOTO
+    graph = GraphConAdjuntos([correo_html(cuerpo(img("https://www.ejemplo.com/error-odoo.jpg")))])
+    graph.fallar_lista = True
+    assert revisar(factory, graph) == {"ticket": 1}
+    assert [a.filename for a in adjuntos_en_bd(session)] == ["error-odoo.jpg"]
+    assert "no se pudo pedir la lista de adjuntos del correo" in log.text
+    assert "No se guardó 1 adjunto (no se pudo descargar)." in texto_respuesta(graph)
+
+
+def test_la_lista_de_adjuntos_se_pide_sin_contentid():
+    from backend.services import correo_service as cs
+    assert "contentId" not in cs.SELECT_ADJUNTOS.split(",")
+    assert set(cs.SELECT_ADJUNTOS.split(",")) <= {"id", "name", "contentType", "size", "isInline"}

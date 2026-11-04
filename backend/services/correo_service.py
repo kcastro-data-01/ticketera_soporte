@@ -200,6 +200,7 @@ PROPIEDAD_REFERENCES = "String 0x1039"
 PROPIEDAD_X_TICKETERA = "String {00020386-0000-0000-C000-000000000046} Name x-ticketera"
 _EXPANDIR_PROPIEDADES = "singleValueExtendedProperties($filter=" + " or ".join(
     f"id eq '{p}'" for p in (PROPIEDAD_IN_REPLY_TO, PROPIEDAD_REFERENCES, PROPIEDAD_X_TICKETERA)) + ")"
+SELECT_ADJUNTOS = "id,name,contentType,size,isInline"
 _SELECT_MENSAJE = ("id,internetMessageId,conversationId,subject,from,toRecipients,ccRecipients,body,uniqueBody,"
                    "receivedDateTime,sentDateTime,internetMessageHeaders,hasAttachments")
 # «RE:», «RV:», «FW:», «Fwd:», «RE[2]:»… (también repetidos) al inicio del asunto.
@@ -1381,9 +1382,14 @@ class ClienteGraph:
 
     def adjuntos(self, mensaje_id: str) -> list[dict]:
         """Lista de adjuntos de un correo: nombre, tipo, tamaño y si va en
-        línea, **sin** el contenido (``contentBytes``)."""
+        línea, **sin** el contenido (``contentBytes``).
+
+        Solo propiedades del tipo base ``attachment``: ``contentId`` es de
+        ``fileAttachment`` y Graph rechaza todo el pedido si se pone en
+        ``$select`` (400 «Could not find a property named 'contentId' on type
+        'microsoft.graph.attachment'»). ``@odata.type`` viene igual."""
         datos = self._pedir("GET", f"/me/messages/{mensaje_id}/attachments",
-                            params={"$select": "id,name,contentType,size,isInline,contentId"})
+                            params={"$select": SELECT_ADJUNTOS})
         return datos.get("value", [])
 
     def descargar_adjunto(self, mensaje_id: str, adjunto_id: str) -> bytes:

@@ -75,6 +75,10 @@ def onedrive():
                    odata="#microsoft.graph.referenceAttachment", tamano=900)
 
 
+# Propiedades del tipo base ``microsoft.graph.attachment`` (Graph v1.0).
+BASE_ATTACHMENT = {"id", "name", "contentType", "size", "isInline", "lastModifiedDateTime"}
+
+
 class GraphConAdjuntos(FakeGraph):
     """FakeGraph con ``/attachments`` (lista con ``$select``) y ``$value``."""
 
@@ -106,10 +110,20 @@ class GraphConAdjuntos(FakeGraph):
             if len(partes) == 5:
                 if self.fallar_lista:
                     return httpx.Response(500, json={"error": {"message": "Graph caído"}})
-                # Se pide solo la lista: nunca el contenido de todos.
-                assert request.url.params["$select"] == "id,name,contentType,size,isInline,contentId"
+                # Se pide solo la lista: nunca el contenido de todos. Como
+                # Graph: en ``$select`` solo valen propiedades del tipo base
+                # ``attachment`` (``contentId`` es de ``fileAttachment``: 400),
+                # y devuelve solo esas, más ``@odata.type``.
+                campos = request.url.params["$select"].split(",")
+                for campo in campos:
+                    if campo not in BASE_ATTACHMENT:
+                        return httpx.Response(400, json={"error": {
+                            "code": "BadRequest",
+                            "message": "Parsing OData Select and Expand failed: Could not find a "
+                                       f"property named '{campo}' on type 'microsoft.graph.attachment'."}})
+                assert "contentBytes" not in campos
                 return httpx.Response(200, json={"value": [
-                    {k: v for k, v in a.items() if k != "_contenido"} for a in lista]})
+                    {k: v for k, v in a.items() if k in campos or k == "@odata.type"} for a in lista]})
             if len(partes) == 7 and partes[6] == "$value":
                 adjunto = next(a for a in lista if a["id"] == partes[5])
                 self.descargas.append(adjunto["name"])
@@ -379,7 +393,11 @@ def test_si_graph_falla_el_ticket_se_crea_y_se_responde(factory, session, usuari
     assert revisar(factory, graph) == {"ticket": 1}
     assert session.scalars(select(Ticket)).one() is not None
     assert len(graph.respuestas) == 1
-    assert "No se pudieron guardar los adjuntos del correo" in log.text
+    assert "no se pudo pedir la lista de adjuntos del correo" in log.text
+    # Ahora se avisa en la respuesta y en el historial (antes, nada).
+    assert "No se guardó 1 adjunto (no se pudo descargar)." in texto_respuesta(graph)
+    [entrada] = historial(session, "attachments_skipped")
+    assert "adjuntos del correo (no se pudo descargar)" in entrada.new_value
 
 
 def test_sin_tiempo_los_que_faltan_se_omiten(factory, session, usuario, monkeypatch):
@@ -644,7 +662,7 @@ def test_cada_descartado_queda_como_warning_con_sus_datos(factory, session, usua
     revisar(factory, graph)
     avisos = [r.getMessage() for r in log.records if r.levelname == "WARNING"]
     firma_ = next(a for a in avisos if "«image001.png»" in a)
-    assert "isInline=True" in firma_ and "contentId=image001.png@01DB2C3A.5F1E9B20" in firma_
+    assert "isInline=True" in firma_ and "tipo=image/png" in firma_
     assert f"tamaño={len(PNG_CHICA) + 200}" in firma_
     assert "motivo: imagen en línea de menos de 15 KB (firma)" in firma_
     exe = next(a for a in avisos if "«virus.exe»" in a)
@@ -665,7 +683,7 @@ def test_si_falla_la_descarga_queda_warning_con_el_error(factory, session, usuar
     assert adjuntos_en_bd(session) == []
     aviso = next(r.getMessage() for r in log.records
                  if r.levelname == "WARNING" and "«image001.png»" in r.getMessage())
-    assert "isInline=True" in aviso and "contentId=image001.png@01DB2C3A.5F1E9B20" in aviso
+    assert "isInline=True" in aviso
     assert "motivo: no se pudo descargar: RuntimeError('Graph devolvió 503')" in aviso
     assert "No se guard" in texto_respuesta(graph)
 
