@@ -647,6 +647,32 @@ mismas validaciones, marcados «por correo» (`backend/services/correo_adjuntos.
   adjunto descartado o que falló (`adjunto del correo descartado «nombre»
   (tamaño=… isInline=… contentId=… tipo=…) motivo: …`), con el error si falló
   la descarga o el almacén.
+- **Imágenes copiadas de una página** (por ejemplo de Google) y pegadas en
+  Outlook: no vienen como adjunto, solo en el HTML (`<img src="https://…">` o
+  `<img src="data:image/…;base64,…">`). Como la bandeja se lee en texto, para
+  los correos que crean un ticket o un comentario se pide aparte el HTML
+  (`GET /me/messages/{id}?$select=uniqueBody,body` con
+  `Prefer: outlook.body-content-type="html"`) y se juntan las `<img>` que no
+  son `cid:`, antes de la firma y de lo citado. Se guardan «por correo»
+  **después** de los adjuntos y con los mismos límites (lo que quede de los 5
+  y 10 MB del correo y de los 10 del ticket; nada en Cerrado). Ver
+  `backend/services/correo_imagenes_web.py`:
+  - `data:` se decodifica; `https://` se baja **solo por https y puerto
+    443**, bloqueando IP privadas, locales, link-local y de metadatos
+    (también la que da el DNS y en cada redirección, máximo 3; la conexión va
+    a la IP ya revisada), 5 s por imagen sin pasarse del tiempo de la
+    revisión, se corta a los 4 MB, sin cookies ni credenciales y con un
+    User-Agent genérico. Como máximo 10 imágenes del cuerpo por correo.
+  - Se valida por contenido (jpg o png entera). WebP, GIF y AVIF se
+    convierten a PNG con Pillow (sin Pillow: «tipo no permitido»).
+  - Se ignoran sin avisar los píxeles de rastreo y logos (menos de 15 KB, o
+    1 px de ancho o alto; con `width="1"` u ocultas ni se bajan), las de la
+    firma y las que ya están en el ticket.
+  - Nombre: el del enlace si es razonable (`…/router-roto.jpg`), si no
+    `imagen_web_1.png`, `imagen_web_2.jpg`… Las que no se guardan van en la
+    respuesta y el historial («enlace de imagen no permitido», «no se pudo
+    descargar»…) y cada descarte es un WARNING con `url=` (sin la consulta
+    ni el base64) y el tamaño.
 - Solo con Graph: con `CORREO_PROVEEDOR=mailpit` no se lee ningún buzón.
 - Usa el permiso `Mail.ReadWrite` que la app ya tiene; no hace falta otro.
 
@@ -1311,6 +1337,10 @@ texto como Outlook: HTML con `<img src="cid:…">`, la imagen en línea con
 `Content-ID` y `[cid:…]` en el texto; las dos se pueden repetir),
 `--imagen-de-prueba` (pega una imagen PNG real generada al momento, distinta
 cada vez, para no necesitar un archivo),
+`--imagen-web URL` (una imagen copiada de una página: solo
+`<img src="URL">` en el HTML, sin adjunto; la ticketera la baja de Internet)
+y `--imagen-data ARCHIVO` (la imagen como `data:image/…;base64,…` en el HTML),
+las dos se pueden repetir,
 `--responder` (contesta en el hilo del último correo que `--para` le mandó a
 `--de`, o sea la respuesta de la ticketera) y `--en-respuesta-a <Message-ID>`.
 `--para` tiene que ser `CORREO_USUARIO`, y el remitente necesita una cuenta

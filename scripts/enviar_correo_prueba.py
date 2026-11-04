@@ -14,6 +14,12 @@ Ejemplos::
     python scripts/enviar_correo_prueba.py --de dsaenz@data.cr --para kcastro@data.cr \\
         --responder --texto "Así quedó" --imagen-en-linea foto2.jpg
 
+    # Imagen copiada de Google y pegada en Outlook (sin adjunto, solo en el HTML)
+    python scripts/enviar_correo_prueba.py --de dsaenz@data.cr --para kcastro@data.cr \\
+        --asunto "Error en pantalla" --texto "Me sale esto" \\
+        --imagen-web "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg" \\
+        --imagen-data captura.png
+
 La imagen en línea va como la pega Outlook: parte HTML con
 ``<img src="cid:…">``, la imagen en ``multipart/related`` con
 ``Content-Disposition: inline`` y ``Content-ID``, y ``[cid:…]`` en la parte
@@ -23,6 +29,7 @@ de texto. El adjunto va como ``attachment``.
 from __future__ import annotations
 
 import argparse
+import base64
 import html
 import json
 import mimetypes
@@ -112,11 +119,21 @@ def armar(args) -> EmailMessage:
         texto += "\n\n" + "\n".join(f"[cid:{cid}]" for _, cid in imagenes)
     correo.set_content(texto + "\n")
 
-    if imagenes:
-        cuerpo_html = "<html><body><p>{}</p>{}</body></html>".format(
+    # Imágenes copiadas de una página y pegadas: sin adjunto, solo en el HTML.
+    sin_adjunto = [f'<p><img src="{html.escape(url, quote=True)}"></p>' for url in args.imagen_web]
+    for nombre in args.imagen_data:
+        ruta = Path(nombre)
+        tipo = mimetypes.guess_type(ruta.name)[0] or "image/png"
+        datos = base64.b64encode(ruta.read_bytes()).decode("ascii")
+        sin_adjunto.append(f'<p><img src="data:{tipo};base64,{datos}"></p>')
+
+    if imagenes or sin_adjunto:
+        cuerpo_html = "<html><body><p>{}</p>{}{}</body></html>".format(
             html.escape(args.texto).replace("\n", "<br>"),
-            "".join(f'<p><img src="cid:{cid}" alt="{html.escape(r.name)}"></p>' for r, cid in imagenes))
+            "".join(f'<p><img src="cid:{cid}" alt="{html.escape(r.name)}"></p>' for r, cid in imagenes),
+            "".join(sin_adjunto))
         correo.add_alternative(cuerpo_html, subtype="html")
+    if imagenes:
         parte_html = correo.get_payload()[1]
         for ruta, cid in imagenes:
             principal, secundario = _tipo(ruta)
@@ -145,6 +162,12 @@ def main(argv=None) -> None:
                         help="imagen pegada en el texto (en línea, con cid); se puede repetir")
     parser.add_argument("--imagen-de-prueba", action="store_true",
                         help="pegar en el texto una imagen PNG real generada al momento (sin archivo)")
+    parser.add_argument("--imagen-web", action="append", default=[], metavar="URL",
+                        help="imagen copiada de una página: solo <img src=\"URL\"> en el HTML, "
+                             "sin adjunto; se puede repetir")
+    parser.add_argument("--imagen-data", action="append", default=[], metavar="ARCHIVO",
+                        help="imagen pegada como <img src=\"data:image/…;base64,…\">, sin adjunto; "
+                             "se puede repetir")
     parser.add_argument("--responder", action="store_true",
                         help="responder en el hilo del último correo que --para le mandó a --de")
     parser.add_argument("--en-respuesta-a", default="", metavar="MESSAGE_ID",
@@ -155,7 +178,7 @@ def main(argv=None) -> None:
                         help="dirección de Mailpit para --responder (por defecto http://localhost:8025)")
     args = parser.parse_args(argv)
 
-    for archivo in [*args.adjunto, *args.imagen_en_linea]:
+    for archivo in [*args.adjunto, *args.imagen_en_linea, *args.imagen_data]:
         if not Path(archivo).is_file():
             parser.error(f"no existe el archivo {archivo}")
 
@@ -163,7 +186,8 @@ def main(argv=None) -> None:
     with smtplib.SMTP(args.servidor, args.puerto, timeout=10) as smtp:
         smtp.send_message(correo)
     print(f"Enviado a Mailpit: «{correo['Subject']}» de {args.de} para {', '.join(args.para)} "
-          f"({len(args.imagen_en_linea)} imagen(es) en línea, {len(args.adjunto)} adjunto(s)). "
+          f"({len(args.imagen_en_linea)} imagen(es) en línea, {len(args.imagen_web)} de la web, "
+          f"{len(args.imagen_data)} data:, {len(args.adjunto)} adjunto(s)). "
           f"Míralo en {args.api}")
 
 

@@ -29,6 +29,14 @@ Se **omiten** (y se avisa en la respuesta automática, el historial y el log):
 tipo no permitido, más de 4 MB, más de :data:`MAX_ARCHIVOS_CORREO` archivos o
 de :data:`MAX_BYTES_CORREO` en el correo, o el ticket ya tiene 10 adjuntos.
 En un ticket Cerrado no se guarda nada.
+
+**Imágenes del cuerpo HTML** que no vienen como adjunto (copiadas de una
+página y pegadas en Outlook: ``<img src="https://…">`` o ``data:image/…``):
+después de los adjuntos, con los mismos límites (lo que queda de los 5 y
+10 MB del correo y de los 10 del ticket). Cómo se bajan sin riesgo y se
+validan: :mod:`backend.services.correo_imagenes_web`. Se ignoran sin avisar
+los píxeles de rastreo y logos (menos de 15 KB, o 1 px de ancho o alto), las
+de la firma o lo citado y las que ya están en el ticket.
 """
 
 from __future__ import annotations
@@ -43,7 +51,7 @@ from collections import Counter
 from sqlalchemy import func, select
 
 from backend.models import Attachment, Ticket, User
-from backend.services import adjuntos_service, ticket_service
+from backend.services import adjuntos_service, correo_imagenes_web as web, ticket_service
 from backend.services.adjuntos_service import (
     AdjuntoInvalidoError,
     AlmacenNoConfiguradoError,
@@ -91,8 +99,9 @@ MOTIVO_TIEMPO = "no hubo tiempo de descargarlo"
 MOTIVO_ALMACEN = "los adjuntos no están configurados en el servidor"
 MOTIVO_ERROR = "no se pudo descargar"
 MOTIVO_DANADA = "imagen dañada o incompleta"
+MOTIVO_ENLACE = web.MOTIVO_ENLACE
 ORDEN_MOTIVOS = (MOTIVO_TIPO, MOTIVO_DANADA, MOTIVO_GRANDE, MOTIVO_CANTIDAD, MOTIVO_TOTAL, MOTIVO_LLENO,
-                 MOTIVO_TIEMPO, MOTIVO_ALMACEN, MOTIVO_ERROR)
+                 MOTIVO_TIEMPO, MOTIVO_ALMACEN, MOTIVO_ERROR, MOTIVO_ENLACE)
 
 
 @dataclass
@@ -140,7 +149,9 @@ def _nombre(adjunto: dict, en_linea: bool) -> str:
 
 
 def _datos(adjunto: dict) -> str:
-    """Lo que Graph dijo del adjunto, para el log."""
+    """Lo que Graph dijo del adjunto (o el enlace de la imagen del cuerpo), para el log."""
+    if "url" in adjunto:
+        return f"url={adjunto['url']} tamaño={adjunto.get('size') if adjunto.get('size') is not None else '-'}"
     return (f"tamaño={adjunto.get('size')} isInline={bool(adjunto.get('isInline'))} "
             f"contentId={adjunto.get('contentId') or '-'} tipo={adjunto.get('contentType') or '-'}")
 
@@ -255,6 +266,7 @@ def guardar(session_factory, cliente, mensaje_id: str, ticket_id: int, remitente
                     "; ".join(f"«{a.get('name')}» ({_datos(a)})" for a in lista) or "ninguno")
         eleccion = elegir(lista, libres, ticket_id)
         resultado = Resultado(omitidos=list(eleccion.omitidos), ignorados=eleccion.ignorados)
+        bytes_guardados, cerrado = 0, False
         for posicion, adjunto in enumerate(eleccion.elegidos):
             nombre = adjunto["name"]
             if limite is not None and time.monotonic() >= limite:
@@ -275,30 +287,16 @@ def guardar(session_factory, cliente, mensaje_id: str, ticket_id: int, remitente
                         f"{por_que}, ya llegó antes" if por_que == POR_QUE_LOGO else por_que)
                 resultado.ignorados.append((nombre, por_que))
                 continue
-            try:
-                adjuntos_service.subir(session, ticket, usuario, nombre, contenido,
-                                       origen=adjuntos_service.ORIGEN_CORREO)
-            except AdjuntoInvalidoError as error:
-                motivo = _motivo_invalido(contenido, error)
-                _avisar(ticket_id, adjunto, nombre,
-                        f"{motivo} ({error}; {len(contenido)} bytes descargados)", None)
-                resultado.omitidos.append((nombre, motivo))
-            except LimiteAdjuntosError:
-                _avisar(ticket_id, adjunto, nombre, MOTIVO_LLENO, resultado.omitidos)
-            except AlmacenNoConfiguradoError:
-                _avisar(ticket_id, adjunto, nombre,
-                        f"{MOTIVO_ALMACEN} (falta BLOB_READ_WRITE_TOKEN)", None)
-                resultado.omitidos.append((nombre, MOTIVO_ALMACEN))
-            except TicketClosedError:
-                _avisar(ticket_id, adjunto, nombre, "el ticket se cerró mientras se guardaba")
+            estado = _subir(session, ticket, usuario, adjunto, nombre, contenido, resultado)
+            if estado == "cerrado":
+                cerrado = True
                 break
-            except Exception as error:  # noqa: BLE001 — Blob caído, etc.: se avisa como omitido
-                _avisar(ticket_id, adjunto, nombre, f"no se pudo guardar: {error!r}", None)
-                logger.warning("Detalle del error al guardar «%s»", nombre, exc_info=True)
-                session.rollback()
-                resultado.omitidos.append((nombre, MOTIVO_ERROR))
-            else:
-                resultado.guardados.append(nombre)
+            if estado == "ok":
+                bytes_guardados += len(contenido)
+
+        if not cerrado:
+            _guardar_imagenes_web(session, cliente, mensaje_id, ticket, usuario, resultado,
+                                  bytes_guardados, limite)
 
         if resultado.ignorados:
             logger.info("Ticket #%s: adjuntos del correo ignorados: %s", ticket_id,
@@ -311,6 +309,144 @@ def guardar(session_factory, cliente, mensaje_id: str, ticket_id: int, remitente
             logger.info("Ticket #%s: %d adjunto(s) del correo guardado(s)", ticket_id,
                         len(resultado.guardados))
     return resultado
+
+
+def _subir(session, ticket: Ticket, usuario: User | None, datos: dict, nombre: str,
+           contenido: bytes, resultado: Resultado) -> str:
+    """Guarda un archivo del correo. Devuelve ``ok``, ``omitido`` o
+    ``cerrado`` (el ticket se cerró mientras tanto: no seguir)."""
+    ticket_id = ticket.id
+    try:
+        adjuntos_service.subir(session, ticket, usuario, nombre, contenido,
+                               origen=adjuntos_service.ORIGEN_CORREO)
+    except AdjuntoInvalidoError as error:
+        motivo = _motivo_invalido(contenido, error)
+        _avisar(ticket_id, datos, nombre,
+                f"{motivo} ({error}; {len(contenido)} bytes descargados)", None)
+        resultado.omitidos.append((nombre, motivo))
+    except LimiteAdjuntosError:
+        _avisar(ticket_id, datos, nombre, MOTIVO_LLENO, resultado.omitidos)
+    except AlmacenNoConfiguradoError:
+        _avisar(ticket_id, datos, nombre,
+                f"{MOTIVO_ALMACEN} (falta BLOB_READ_WRITE_TOKEN)", None)
+        resultado.omitidos.append((nombre, MOTIVO_ALMACEN))
+    except TicketClosedError:
+        _avisar(ticket_id, datos, nombre, "el ticket se cerró mientras se guardaba")
+        return "cerrado"
+    except Exception as error:  # noqa: BLE001 — Blob caído, etc.: se avisa como omitido
+        _avisar(ticket_id, datos, nombre, f"no se pudo guardar: {error!r}", None)
+        logger.warning("Detalle del error al guardar «%s»", nombre, exc_info=True)
+        session.rollback()
+        resultado.omitidos.append((nombre, MOTIVO_ERROR))
+    else:
+        resultado.guardados.append(nombre)
+        return "ok"
+    return "omitido"
+
+
+def _htmls(cliente, mensaje_id: str, ticket_id: int) -> list[str]:
+    """El HTML de ``uniqueBody`` y ``body`` (el cliente sabe pedirlo)."""
+    pedir = getattr(cliente, "cuerpo_html", None)
+    if pedir is None:
+        return []
+    try:
+        return pedir(mensaje_id)
+    except Exception as error:  # noqa: BLE001 — sin el HTML, solo los adjuntos
+        logger.warning("Ticket #%s: no se pudo leer el HTML del correo para buscar imágenes: %r",
+                       ticket_id, error)
+        return []
+
+
+def _ya_en_el_ticket(session, ticket_id: int, contenido: bytes) -> bool:
+    return session.scalar(select(Attachment.id).where(
+        Attachment.sha256 == adjuntos_service.huella(contenido),
+        Attachment.ticket_id == ticket_id).limit(1)) is not None
+
+
+def _guardar_imagenes_web(session, cliente, mensaje_id: str, ticket: Ticket, usuario: User | None,
+                          resultado: Resultado, bytes_guardados: int, limite: float | None) -> None:
+    """Las imágenes del cuerpo HTML que no son adjuntos (``https://`` o
+    ``data:``), con lo que queda de los límites del correo y del ticket."""
+    ticket_id = ticket.id
+    imagenes = web.extraer(_htmls(cliente, mensaje_id, ticket_id))
+    if not imagenes:
+        return
+    logger.info("Ticket #%s: el cuerpo del correo trae %d imagen(es) sin adjunto: %s", ticket_id,
+                len(imagenes), "; ".join(web.recortar(i.src) for i in imagenes))
+    sin_nombre = 0
+    for posicion, imagen in enumerate(imagenes):
+        datos = {"url": web.recortar(imagen.src), "size": None}
+        # Para el log y los avisos antes de saber qué imagen es.
+        provisorio = web.nombre_del_enlace(imagen.src, "") or "imagen_web"
+        if posicion >= web.MAX_IMAGENES:
+            _avisar(ticket_id, datos, provisorio,
+                    f"más de {web.MAX_IMAGENES} imágenes en el cuerpo", resultado.ignorados)
+            continue
+        if imagen.parece_pixel():
+            _avisar(ticket_id, datos, provisorio, "píxel de rastreo u oculta (1 px)",
+                    resultado.ignorados)
+            continue
+        if len(resultado.guardados) >= MAX_ARCHIVOS_CORREO:
+            _avisar(ticket_id, datos, provisorio, MOTIVO_CANTIDAD, resultado.omitidos)
+            continue
+        if adjuntos_service.contar(session, ticket_id) >= adjuntos_service.MAX_POR_TICKET:
+            _avisar(ticket_id, datos, provisorio, MOTIVO_LLENO, resultado.omitidos)
+            continue
+        ahora = time.monotonic()
+        if limite is not None and ahora >= limite:
+            _avisar(ticket_id, datos, provisorio, MOTIVO_TIEMPO, resultado.omitidos)
+            continue
+        hasta = ahora + web.TIMEOUT_S if limite is None else min(ahora + web.TIMEOUT_S, limite)
+        bajada = b""
+        try:
+            if imagen.es_data:
+                bajada = web.decodificar_data(imagen.src)
+            elif imagen.src[:8].lower() == "https://":
+                bajada = descargar_imagen(imagen.src, hasta)
+            else:
+                esquema = imagen.src.split(":", 1)[0][:20] if ":" in imagen.src else "relativo"
+                raise web.ImagenWebError(MOTIVO_ENLACE, f"esquema «{esquema}» (solo https o data:)")
+            datos["size"] = len(bajada)
+            img = web.preparar(bajada)
+        except web.ImagenWebError as error:
+            _avisar(ticket_id, datos, provisorio, f"{error.motivo} ({error.detalle})", None)
+            resultado.omitidos.append((provisorio, error.motivo))
+            continue
+        except Exception as error:  # noqa: BLE001 — cualquier otra falla: se avisa y se sigue
+            _avisar(ticket_id, datos, provisorio, f"{MOTIVO_ERROR}: {error!r}", None)
+            logger.warning("Detalle del error con la imagen %s", datos["url"], exc_info=True)
+            resultado.omitidos.append((provisorio, MOTIVO_ERROR))
+            continue
+
+        del_enlace = web.nombre_del_enlace(imagen.src, img.ext)
+        nombre = del_enlace or f"imagen_web{img.ext}"
+        if img.convertida:
+            logger.info("Ticket #%s: imagen %s convertida de %s a PNG", ticket_id, datos["url"],
+                        img.convertida)
+        if len(bajada) < MIN_BYTES_IMAGEN or img.ancho == 1 or img.alto == 1:
+            _avisar(ticket_id, datos, nombre,
+                    f"píxel de rastreo o logo ({len(bajada)} bytes, {img.ancho}×{img.alto} px)",
+                    resultado.ignorados)
+            continue
+        if _ya_en_el_ticket(session, ticket_id, img.contenido):
+            _avisar(ticket_id, datos, nombre, POR_QUE_YA_ESTA, resultado.ignorados)
+            continue
+        if bytes_guardados + len(img.contenido) > MAX_BYTES_CORREO:
+            _avisar(ticket_id, datos, nombre, MOTIVO_TOTAL, resultado.omitidos)
+            continue
+        if del_enlace is None:  # se numeran solo las que se guardan
+            sin_nombre += 1
+            nombre = f"imagen_web_{sin_nombre}{img.ext}"
+        estado = _subir(session, ticket, usuario, datos, nombre, img.contenido, resultado)
+        if estado == "cerrado":
+            return
+        if estado == "ok":
+            bytes_guardados += len(img.contenido)
+
+
+def descargar_imagen(src: str, hasta: float) -> bytes:
+    """Baja una imagen ``https://`` (las pruebas la reemplazan)."""
+    return web.descargar(src, hasta)
 
 
 def _lista_o(partes: list[str]) -> str:

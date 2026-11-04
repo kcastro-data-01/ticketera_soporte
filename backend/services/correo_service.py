@@ -1391,6 +1391,16 @@ class ClienteGraph:
         return self._pedir("GET", f"/me/messages/{mensaje_id}/attachments/{adjunto_id}/$value",
                            crudo=True)
 
+    def cuerpo_html(self, mensaje_id: str) -> list[str]:
+        """El HTML de ``uniqueBody`` y ``body`` (en ese orden). La bandeja se
+        lee en texto, y ahí se pierden las ``<img src="https://…">`` y
+        ``data:`` de una imagen copiada de una página y pegada en Outlook."""
+        datos = self._pedir("GET", f"/me/messages/{mensaje_id}",
+                            params={"$select": "uniqueBody,body"},
+                            headers={"Prefer": 'outlook.body-content-type="html"'})
+        return [parte.get("content") or "" for parte in (datos.get("uniqueBody"), datos.get("body"))
+                if parte and (parte.get("contentType") or "").lower() == "html"]
+
     def no_leidos(self) -> list[dict]:
         """Correos no leídos de la bandeja de entrada (todas las páginas)."""
         mensajes: list[dict] = []
@@ -1693,6 +1703,11 @@ class ClienteMailpit(ClienteSMTP):
 
     def descargar_adjunto(self, mensaje_id: str, adjunto_id: str) -> bytes:
         return self._pedir("GET", f"/api/v1/message/{mensaje_id}/part/{adjunto_id}", crudo=True)
+
+    def cuerpo_html(self, mensaje_id: str) -> list[str]:
+        """El HTML del correo (Mailpit no tiene ``uniqueBody``)."""
+        datos = self._leidos.get(mensaje_id) or self._pedir("GET", f"/api/v1/message/{mensaje_id}")
+        return [datos["HTML"]] if datos.get("HTML") else []
 
     def id_carpeta(self, nombre: str) -> str:
         return nombre

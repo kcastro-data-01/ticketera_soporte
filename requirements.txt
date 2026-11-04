@@ -17,6 +17,10 @@ psycopg[binary]>=3.2.0
 # Adjuntos en Vercel Blob privado (solo se usa con BLOB_READ_WRITE_TOKEN)
 vercel-blob>=0.5.0
 
+# Imágenes copiadas de una página y pegadas en un correo: WebP, GIF y AVIF
+# se convierten a PNG (sin Pillow se descartan con motivo)
+Pillow>=11.2.1
+
 # Autenticación
 PyJWT>=2.9.0
 passlib[bcrypt]>=1.7.4
