@@ -35,8 +35,10 @@ página y pegadas en Outlook: ``<img src="https://…">`` o ``data:image/…``):
 después de los adjuntos, con los mismos límites (lo que queda de los 5 y
 10 MB del correo y de los 10 del ticket). Cómo se bajan sin riesgo y se
 validan: :mod:`backend.services.correo_imagenes_web`. Se ignoran sin avisar
-los píxeles de rastreo y logos (menos de 15 KB, o 1 px de ancho o alto), las
-de la firma o lo citado y las que ya están en el ticket.
+los píxeles de rastreo e íconos (un lado de menos de 48 px, o menos de
+1 KB; **no** se usa el mínimo de 15 KB de los adjuntos, porque una imagen
+copiada de Google suele pesar menos), las de la firma o lo citado y las que
+ya están en el ticket.
 """
 
 from __future__ import annotations
@@ -423,10 +425,10 @@ def _guardar_imagenes_web(session, cliente, mensaje_id: str, ticket: Ticket, usu
         if img.convertida:
             logger.info("Ticket #%s: imagen %s convertida de %s a PNG", ticket_id, datos["url"],
                         img.convertida)
-        if len(bajada) < MIN_BYTES_IMAGEN or img.ancho == 1 or img.alto == 1:
-            _avisar(ticket_id, datos, nombre,
-                    f"píxel de rastreo o logo ({len(bajada)} bytes, {img.ancho}×{img.alto} px)",
-                    resultado.ignorados)
+        # Sin el mínimo de 15 KB de los adjuntos: ver web.por_que_chica.
+        chica = web.por_que_chica(len(bajada), img)
+        if chica:
+            _avisar(ticket_id, datos, nombre, chica, resultado.ignorados)
             continue
         if _ya_en_el_ticket(session, ticket_id, img.contenido):
             _avisar(ticket_id, datos, nombre, POR_QUE_YA_ESTA, resultado.ignorados)

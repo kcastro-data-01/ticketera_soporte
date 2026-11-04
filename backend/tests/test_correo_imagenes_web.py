@@ -22,9 +22,48 @@ from backend.tests.test_correo import crear_correo, factory, usuario  # noqa: F4
 from backend.tests.test_correo_adjuntos import (  # noqa: F401
     GraphConAdjuntos, adjuntos_en_bd, archivo, carpeta, historial, log, revisar, texto_respuesta)
 
+from PIL import Image
+
 MB = 1024 * 1024
-FOTO = imagenes.jpeg(40, relleno=b"\x07")
-CAPTURA = imagenes.png(30, relleno=b"\x05")
+
+
+def foto_jpeg(ancho=100, alto=100, calidad=90) -> bytes:
+    """Un JPEG real con ruido (distinto cada vez) de ``ancho``×``alto``."""
+    imagen = Image.frombytes("RGB", (ancho, alto), os.urandom(ancho * alto * 3))
+    salida = io.BytesIO()
+    imagen.save(salida, format="JPEG", quality=calidad)
+    return salida.getvalue()
+
+
+def como_de_google(ancho=172, alto=178) -> bytes:
+    """Una imagen como las que se copian de Google: 172×178 y unos 9 KB
+    (menos de 15 KB). Degradado con un poco de ruido, en JPEG."""
+    base = Image.linear_gradient("L").resize((ancho, alto)).convert("RGB")
+    ruido = Image.frombytes("RGB", (ancho, alto), os.urandom(ancho * alto * 3))
+    imagen = Image.blend(base, ruido, 0.12)
+    for calidad in range(95, 10, -5):
+        salida = io.BytesIO()
+        imagen.save(salida, format="JPEG", quality=calidad)
+        if 8 * 1024 <= len(salida.getvalue()) <= 10 * 1024:
+            return salida.getvalue()
+    raise AssertionError("no se llegó a unos 9 KB")
+
+
+def png_chico(lado: int, kb: float = 2) -> bytes:
+    """Un PNG de ``lado``×``lado`` px y unos ``kb`` KB."""
+    return imagenes.png(kb, relleno=os.urandom(1), lado=lado)
+
+
+def png_liso(lado: int) -> bytes:
+    """Un PNG de un solo color: ``lado``×``lado`` px y menos de 1 KB."""
+    salida = io.BytesIO()
+    Image.new("RGB", (lado, lado), (200, 30, 30)).save(salida, format="PNG")
+    assert len(salida.getvalue()) < 1024
+    return salida.getvalue()
+
+
+FOTO = foto_jpeg()
+CAPTURA = imagenes.png(30, relleno=b"\x05", lado=64)
 IP_PUBLICA = "93.184.216.34"
 
 
@@ -151,8 +190,8 @@ def test_https_se_descarga_con_ip_fija_sin_credenciales_y_toma_el_nombre(factory
 def test_nombre_del_enlace_raro_o_sin_extension_queda_imagen_web_n(factory, session, usuario, red):
     feo = "https://cdn.ejemplo.com/images?q=tbn:ANd9GcR"
     codigo = "https://www.ejemplo.com/AAAAbbbbCCCCddddEEEEffffGGGGhhhh1234.png"
-    red.paginas[feo] = imagenes.jpeg(30, relleno=b"\x01")
-    red.paginas[codigo] = imagenes.png(30, relleno=b"\x02")
+    red.paginas[feo] = foto_jpeg()
+    red.paginas[codigo] = imagenes.png(30, relleno=b"\x02", lado=64)
     graph = GraphConAdjuntos([correo_html(cuerpo(img(feo), img(codigo)))])
     revisar(factory, graph)
     assert [a.filename for a in adjuntos_en_bd(session)] == ["imagen_web_1.jpg", "imagen_web_2.png"]
@@ -371,7 +410,7 @@ def test_una_imagen_lenta_no_impide_guardar_las_demas(factory, session, usuario,
 def test_pixel_de_rastreo_logo_firma_y_repetida_se_ignoran_sin_avisar(factory, session, usuario, log, red):
     red.paginas["https://www.ejemplo.com/pixel.gif"] = b"GIF89a\x01\x00\x01\x00"
     red.paginas["https://www.ejemplo.com/p.png"] = imagenes.png(1)       # chica, sin atributos
-    red.paginas["https://www.ejemplo.com/logo-firma.png"] = imagenes.png(40, relleno=b"\x09")
+    red.paginas["https://www.ejemplo.com/logo-firma.png"] = imagenes.png(40, relleno=b"\x09", lado=64)
     red.paginas["https://www.ejemplo.com/foto.jpg"] = FOTO
     red.paginas["https://cdn.ejemplo.com/la-misma.jpg"] = FOTO               # misma huella
     html = cuerpo(
@@ -391,7 +430,7 @@ def test_pixel_de_rastreo_logo_firma_y_repetida_se_ignoran_sin_avisar(factory, s
     hosts = [p.url.raw_path.decode() for p in red.pedidos]
     assert hosts == ["/p.png", "/foto.jpg", "/la-misma.jpg"]
     assert "píxel de rastreo u oculta" in log.text
-    assert "píxel de rastreo o logo" in log.text
+    assert "píxel de rastreo o ícono (menos de 48 px: 8×8 px" in log.text
     assert "la misma imagen ya está en el ticket" in log.text
 
 
@@ -432,6 +471,56 @@ def test_las_cid_siguen_siendo_adjuntos_en_linea_y_no_se_bajan_de_la_red(factory
     revisar(factory, graph)
     assert [a.filename for a in adjuntos_en_bd(session)] == ["image002.png"]
     assert red.pedidos == []
+
+
+def test_imagen_de_google_de_172x178_y_9_kb_se_guarda(factory, session, usuario, log, red):
+    """Antes se descartaba como «píxel de rastreo o logo» por pesar menos de
+    15 KB. Por https y como data:."""
+    google, pegada = como_de_google(), como_de_google()
+    assert len(google) < ca.MIN_BYTES_IMAGEN and len(pegada) < ca.MIN_BYTES_IMAGEN
+    assert web.preparar(google).ancho == 172 and web.preparar(google).alto == 178
+    red.dns["encrypted-tbn0.gstatic.com"] = ["142.250.64.78"]
+    red.paginas["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9Gc"] = google
+    graph = GraphConAdjuntos([correo_html(cuerpo(
+        img("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9Gc"), img(data_uri(pegada, "image/jpeg"))))])
+    revisar(factory, graph)
+    guardados = adjuntos_en_bd(session)
+    assert [(a.filename, a.size) for a in guardados] == [
+        ("imagen_web_1.jpg", len(google)), ("imagen_web_2.jpg", len(pegada))]
+    assert "píxel de rastreo" not in log.text
+    assert "No se guard" not in texto_respuesta(graph)
+
+
+@pytest.mark.parametrize("contenido, motivo", [
+    (lambda: png_chico(1), "menos de 48 px: 1×1 px"),
+    (lambda: png_chico(16, kb=20), "menos de 48 px: 16×16 px"),
+    (lambda: foto_jpeg(300, 20), "menos de 48 px: 300×20 px"),
+    (lambda: png_liso(64), "menos de 1 KB"),
+])
+def test_pixel_icono_o_menos_de_1_kb_se_ignoran_sin_avisar(factory, session, usuario, log, red,
+                                                         contenido, motivo):
+    datos = contenido()
+    red.paginas["https://www.ejemplo.com/icono.png"] = datos
+    graph = GraphConAdjuntos([correo_html(cuerpo(img("https://www.ejemplo.com/icono.png"),
+                                                 img(data_uri(datos))))])
+    revisar(factory, graph)
+    assert adjuntos_en_bd(session) == []
+    assert "No se guard" not in texto_respuesta(graph)
+    assert historial(session, "attachments_skipped") == []
+    descartes = [r for r in log.records if r.levelname == "WARNING" and motivo in r.getMessage()]
+    assert len(descartes) == 2  # la de https y la data:
+
+
+def test_los_adjuntos_y_las_cid_siguen_con_el_minimo_de_15_kb(factory, session, usuario, log, red):
+    google = como_de_google()
+    mensaje = correo_html(cuerpo(img("cid:image001.jpg@01DB2C3A.5F1E9B20")))
+    mensaje["_adjuntos"] = [archivo("image001.jpg", google, "image/jpeg", inline=True),
+                            archivo("chica.jpg", como_de_google(), "image/jpeg")]
+    graph = GraphConAdjuntos([mensaje])
+    revisar(factory, graph)
+    assert adjuntos_en_bd(session) == []
+    assert "imagen en línea de menos de 15 KB (firma)" in log.text
+    assert "chica.jpg (imagen de menos de 15 KB)" in log.text
 
 
 # --- WebP, GIF y AVIF ----------------------------------------------------------
@@ -482,7 +571,7 @@ def test_gif_animado_se_convierte_con_su_primer_cuadro():
 
 def test_jpeg_cortado_se_rechaza_por_contenido():
     with pytest.raises(web.ImagenWebError) as error:
-        web.preparar(FOTO[:2000])
+        web.preparar(FOTO[:300])  # cortado antes de los datos de la imagen
     assert error.value.motivo == web.MOTIVO_DANADA
 
 
@@ -491,7 +580,7 @@ def test_jpeg_cortado_se_rechaza_por_contenido():
 
 def test_los_5_por_correo_se_comparten_con_los_adjuntos(factory, session, usuario, red):
     for i in range(3):
-        red.paginas[f"https://www.ejemplo.com/web{i}.png"] = imagenes.png(30, relleno=bytes([40 + i]))
+        red.paginas[f"https://www.ejemplo.com/web{i}.png"] = imagenes.png(30, relleno=bytes([40 + i]), lado=64)
     adjuntos = [archivo(f"adj{i}.png", imagenes.png(30, relleno=bytes([10 + i])), "image/png")
                 for i in range(4)]
     mensaje = correo_html(cuerpo(*[img(f"https://www.ejemplo.com/web{i}.png") for i in range(3)]))

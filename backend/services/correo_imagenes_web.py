@@ -55,6 +55,12 @@ MAX_BYTES = adjuntos_service.MAX_BYTES
 # Imágenes del cuerpo que se miran como máximo por correo (un boletín con
 # decenas de imágenes no debe gastar la revisión entera).
 MAX_IMAGENES = 10
+# Las imágenes del cuerpo se descartan como píxel de rastreo o ícono si un
+# lado mide menos de esto o si pesan menos de MIN_BYTES. No se usa el mínimo
+# de 15 KB de los adjuntos: una imagen copiada de Google suele pesar menos
+# (por ejemplo 9 KB con 172×178 px).
+MIN_LADO_PX = 48
+MIN_BYTES = 1024
 # Más píxeles que esto no se convierten (una «bomba» de descompresión).
 MAX_PIXELES = 25_000_000
 USER_AGENT = "Mozilla/5.0 (compatible; TicketeraSoporte/1.0)"
@@ -424,6 +430,19 @@ class Imagen:
     ancho: int | None
     alto: int | None
     convertida: str = ""  # «webp», «gif»… si se pasó a PNG
+
+
+def por_que_chica(tamano: int, imagen: Imagen) -> str | None:
+    """Por qué se descarta (píxel de rastreo o ícono) o ``None``. ``tamano``
+    es lo que se bajó o decodificó; si no se pudieron leer las medidas de un
+    JPEG, se mira solo el peso."""
+    if tamano < MIN_BYTES:
+        return f"píxel de rastreo o ícono (menos de 1 KB: {tamano} bytes)"
+    lados = [lado for lado in (imagen.ancho, imagen.alto) if lado is not None]
+    if any(lado < MIN_LADO_PX for lado in lados):
+        return (f"píxel de rastreo o ícono (menos de {MIN_LADO_PX} px: "
+                f"{imagen.ancho}×{imagen.alto} px, {tamano} bytes)")
+    return None
 
 
 def preparar(contenido: bytes) -> Imagen:

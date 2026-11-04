@@ -20,6 +20,9 @@ Ejemplos::
         --imagen-web "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg" \\
         --imagen-data captura.png
 
+Las de ``--imagen-web`` y ``--imagen-data`` se guardan aunque pesen menos de
+15 KB; se descartan solo si un lado mide menos de 48 px o pesan menos de 1 KB.
+
 La imagen en línea va como la pega Outlook: parte HTML con
 ``<img src="cid:…">``, la imagen en ``multipart/related`` con
 ``Content-Disposition: inline`` y ``Content-ID``, y ``[cid:…]`` en la parte
@@ -164,10 +167,11 @@ def main(argv=None) -> None:
                         help="pegar en el texto una imagen PNG real generada al momento (sin archivo)")
     parser.add_argument("--imagen-web", action="append", default=[], metavar="URL",
                         help="imagen copiada de una página: solo <img src=\"URL\"> en el HTML, "
-                             "sin adjunto; se puede repetir")
+                             "sin adjunto; se puede repetir. Se descarta si un lado mide menos "
+                             "de 48 px o pesa menos de 1 KB (sin el mínimo de 15 KB)")
     parser.add_argument("--imagen-data", action="append", default=[], metavar="ARCHIVO",
                         help="imagen pegada como <img src=\"data:image/…;base64,…\">, sin adjunto; "
-                             "se puede repetir")
+                             "se puede repetir; mismas reglas que --imagen-web (48 px, 1 KB)")
     parser.add_argument("--responder", action="store_true",
                         help="responder en el hilo del último correo que --para le mandó a --de")
     parser.add_argument("--en-respuesta-a", default="", metavar="MESSAGE_ID",

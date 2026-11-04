@@ -665,9 +665,12 @@ mismas validaciones, marcados «por correo» (`backend/services/correo_adjuntos.
     User-Agent genérico. Como máximo 10 imágenes del cuerpo por correo.
   - Se valida por contenido (jpg o png entera). WebP, GIF y AVIF se
     convierten a PNG con Pillow (sin Pillow: «tipo no permitido»).
-  - Se ignoran sin avisar los píxeles de rastreo y logos (menos de 15 KB, o
-    1 px de ancho o alto; con `width="1"` u ocultas ni se bajan), las de la
-    firma y las que ya están en el ticket.
+  - Se ignoran sin avisar los píxeles de rastreo e íconos: un lado de menos
+    de **48 px** o menos de **1 KB** (con `width="1"` u ocultas ni se bajan).
+    A estas imágenes **no** se les aplica el mínimo de 15 KB de los adjuntos
+    y de las imágenes `cid:`: una imagen copiada de Google suele pesar menos
+    (por ejemplo 9 KB con 172×178 px) y se guarda. También se ignoran las de
+    la firma, las de lo citado y las que ya están en el ticket.
   - Nombre: el del enlace si es razonable (`…/router-roto.jpg`), si no
     `imagen_web_1.png`, `imagen_web_2.jpg`… Las que no se guardan van en la
     respuesta y el historial («enlace de imagen no permitido», «no se pudo
