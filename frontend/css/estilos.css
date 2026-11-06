@@ -4689,3 +4689,89 @@ summary:focus-visible,
   align-items: center;
   gap: var(--espaciado-xs);
 }
+
+/* ---------- Filtros del listado (index.html) ----------
+   Todos los campos y botones con el mismo alto. En escritorio, una sola
+   fila: Buscar un poco más ancho y el resto al ancho de su contenido
+   («Asignado a» y «Área de IT» con un tope, porque sus opciones son
+   nombres); los botones van al final, alineados abajo con los campos. En
+   pantallas angostas siguen bajando a varias líneas, como antes. */
+#form-filtros .campo :is(input, select),
+#form-filtros .acciones button {
+  box-sizing: border-box;
+  height: var(--alto-control);
+  min-height: var(--alto-control);
+}
+
+#form-filtros .campo > span {
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  #form-filtros .campo :is(input, select),
+  #form-filtros .acciones button {
+    height: 40px;
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* En el celular los botones ocupan todo el ancho, como los campos. */
+  #form-filtros > .acciones {
+    flex: 1 1 100%;
+  }
+}
+
+/* Una sola fila desde 1340 px: con el menú lateral, el contenido (máximo
+   1100 px) recién ahí tiene el ancho para los 7 campos y los 2 botones. */
+@media (min-width: 1340px) {
+  #form-filtros {
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+  }
+
+  #form-filtros .campo :is(input, select),
+  #form-filtros .acciones button {
+    font-size: var(--texto-sm);
+  }
+
+  /* Al ancho de su contenido, sin achicarse (no se corta «Todas»). */
+  #form-filtros > .campo {
+    flex: none;
+  }
+
+  #form-filtros > .campo :is(select, input[type="date"]) {
+    width: auto;
+    padding-left: 0.5rem;
+    padding-right: 0.35rem;
+  }
+
+  #form-filtros > .campo-busqueda input {
+    padding-left: 0.55rem;
+    padding-right: 0.4rem;
+  }
+
+  /* Sus opciones son nombres de personas y de áreas: ancho fijo. */
+  #form-filtros #assigned,
+  #form-filtros #area {
+    width: 6.75rem;
+  }
+
+  /* Buscar toma lo que sobra: un poco más ancho que el resto. */
+  #form-filtros > .campo-busqueda {
+    flex: 1 1 auto;
+    min-width: 8.5rem;
+  }
+
+  #form-filtros > .acciones {
+    flex: none;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+  }
+
+  #form-filtros > .acciones button {
+    white-space: nowrap;
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+  }
+}
