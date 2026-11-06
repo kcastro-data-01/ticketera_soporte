@@ -90,6 +90,9 @@ const PERMISOS = {
   eliminar: ["Administrador"],
   explicar_ia: ["Administrador", "Técnico"],
   metricas: ["Administrador"],
+  /* «Ver departamentos»: la pantalla «Departamentos» (espejo de
+     ROLES_DEPARTAMENTOS en backend/routers/auth.py). */
+  departamentos: ["Administrador"],
   /* Pasar un ticket a otra área de IT (detalle, «Cambiar área»). Las áreas
      son fijas: nadie las administra. */
   cambiar_area: ["Administrador", "Técnico"],

@@ -11,6 +11,7 @@ from backend.entorno import en_vercel
 from backend.services import asistente_service, correo_service
 from backend.routers.adjuntos import router as adjuntos_router
 from backend.routers.areas import router as areas_router
+from backend.routers.departamentos import router as departamentos_router
 from backend.routers.asistente import router as asistente_router
 from backend.routers.auth import router as auth_router
 from backend.routers.comentarios import router as comments_router
@@ -62,6 +63,7 @@ app.include_router(comments_router)
 app.include_router(adjuntos_router)
 app.include_router(users_router)
 app.include_router(areas_router)
+app.include_router(departamentos_router)
 app.include_router(history_router)
 app.include_router(config_router)
 app.include_router(asistente_router)

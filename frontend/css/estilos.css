@@ -4812,3 +4812,134 @@ summary:focus-visible,
   font-size: inherit;
   font-weight: 600;
 }
+
+/* ---------- Pantalla «Departamentos» (solo Administrador) ----------
+   Mismas tarjetas que Métricas; la tabla con números que son enlaces a la
+   lista filtrada y los técnicos activos debajo de su cantidad. */
+.departamentos .metricas-tarjetas {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.departamentos .tarjeta-numero.tarjeta-texto {
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+/* El nombre del departamento (encabezado de fila) con letra normal, no en
+   mayúsculas como los títulos de las columnas. */
+.listado.tabla-departamentos tbody th[scope="row"] {
+  font-size: var(--texto-md);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-texto);
+  background: transparent;
+  border-bottom-color: var(--color-borde);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.listado.tabla-departamentos tbody tr:last-child th[scope="row"] {
+  border-bottom: none;
+}
+
+.tabla-departamentos thead th:not(:first-child):not(:last-child),
+.tabla-departamentos .celda-numero {
+  text-align: right;
+}
+
+.tabla-departamentos .enlace-numero {
+  display: inline-block;
+  min-width: 2.2rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radio-suave);
+  color: var(--color-primario-texto);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  text-decoration: none;
+}
+
+.tabla-departamentos .enlace-numero:hover,
+.tabla-departamentos .enlace-numero:focus-visible {
+  background: var(--color-primario-tenue);
+  text-decoration: underline;
+}
+
+.tabla-departamentos .celda-tecnicos {
+  min-width: 12rem;
+}
+
+.tabla-departamentos .tecnicos-cantidad {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-departamentos .tecnicos-nombres {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue);
+}
+
+.listado.tabla-departamentos .fila-sin-departamento th[scope="row"] {
+  color: var(--color-tenue-fuerte);
+  font-style: italic;
+}
+
+/* En el celular cada departamento es una tarjeta: el nombre arriba y cada
+   número con su etiqueta al lado (sin la tabla ancha ni scroll de costado). */
+@media (max-width: 600px) {
+  .tabla-departamentos thead {
+    display: none;
+  }
+
+  .tabla-departamentos,
+  .tabla-departamentos tbody,
+  .tabla-departamentos tr {
+    display: block;
+    width: 100%;
+  }
+
+  .listado.tabla-departamentos tbody tr {
+    padding: 0.4rem 0.85rem 0.6rem;
+    border-bottom: 1px solid var(--color-borde);
+  }
+
+  .listado.tabla-departamentos tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .listado.tabla-departamentos tbody th[scope="row"] {
+    display: block;
+    padding: 0.35rem 0;
+    border: none;
+  }
+
+  .listado.tabla-departamentos tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.2rem 0;
+    border: none;
+    text-align: right;
+  }
+
+  .listado.tabla-departamentos tbody td::before {
+    content: attr(data-label);
+    color: var(--color-tenue);
+    font-size: var(--texto-sm);
+    text-align: left;
+  }
+
+  .tabla-departamentos .celda-tecnicos {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .tabla-departamentos .celda-tecnicos .tecnicos-nombres {
+    flex-basis: 100%;
+    text-align: right;
+  }
+}

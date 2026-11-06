@@ -74,9 +74,12 @@ function getElements() {
   };
 }
 
-/* Estados del filtro «Estado» (además de «Todos»). Un valor viejo como
+/* Estados del filtro «Estado» (además de «Todos»). «abiertos» pide Nuevo y
+   En proceso (lo abre la pantalla «Departamentos»). Un valor viejo como
    «Pendientes» («Nuevo,En proceso») o «Resuelto,Cerrado» vuelve a «Todos». */
-const ESTADOS_FILTRO = ["Nuevo", "En proceso", "Resuelto", "Cerrado"];
+const ESTADO_ABIERTOS = "abiertos";
+const ESTADOS_ABIERTOS = ["Nuevo", "En proceso"];
+const ESTADOS_FILTRO = [ESTADO_ABIERTOS, "Nuevo", "En proceso", "Resuelto", "Cerrado"];
 
 function estadoFiltro(valor) {
   return ESTADOS_FILTRO.includes(valor) ? valor : "";
@@ -135,7 +138,8 @@ function buildTicketsUrl(filters) {
   if (filters.category) params.set("category", filters.category);
   if (filters.priority) params.set("priority", filters.priority);
   const estado = estadoFiltro(filters.state);
-  if (estado) params.set("state", estado);
+  if (estado === ESTADO_ABIERTOS) ESTADOS_ABIERTOS.forEach((e) => params.append("state", e));
+  else if (estado) params.set("state", estado);
   if (filters.mios) params.set("mios", "true");
   if (filters.asignado === "sin") params.set("sin_asignar", "true");
   else if (/^\d+$/.test(filters.asignado || "")) params.set("assigned_to", filters.asignado);
@@ -705,10 +709,32 @@ function init() {
     comoda.addEventListener("click", () => cambiarDensidad("comoda"));
   }
   aplicarDensidad();
+  let areasListas = Promise.resolve();
   if (!vistaSolicitante && elements.area && typeof cargarAreas === "function") {
-    cargarAreas().then((areas) => llenarSelectAreas(elements.area, areas, { primera: "Todos", sinArea: true }));
+    areasListas = cargarAreas().then((areas) => llenarSelectAreas(elements.area, areas, { primera: "Todos", sinArea: true }));
   }
-  loadUsers().then(fetchTickets);
+  /* Con los departamentos ya en su filtro, se aplican los de la dirección
+     (?area=…&estado=…, desde la pantalla «Departamentos») y se pide la lista. */
+  Promise.all([loadUsers(), areasListas]).then(() => {
+    aplicarFiltrosDeUrl();
+    fetchTickets();
+  });
+}
+
+/* Filtros que llegan en la dirección: ``area`` (id o «sin») y ``estado``
+   (un estado o «abiertos»). Lo que no está entre las opciones se ignora. */
+function aplicarFiltrosDeUrl(search = typeof window !== "undefined" && window.location ? window.location.search : "") {
+  if (!search) return;
+  const params = new URLSearchParams(search);
+  const elements = getElements();
+  const poner = (select, valor) => {
+    if (!select || !valor) return;
+    const opciones = select.options ? [...select.options].map((o) => o.value) : null;
+    if (!opciones || opciones.includes(valor)) select.value = valor;
+  };
+  if (!vistaSolicitante) poner(elements.area, params.get("area"));
+  const estado = estadoFiltro(params.get("estado") || "");
+  if (estado) poner(elements.state, estado);
 }
 
 if (typeof document !== "undefined") {

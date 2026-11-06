@@ -120,7 +120,7 @@ test("guardia.js: sin el permiso corta la inicialización de la página", () => 
 
 test("cada página carga sus guardas con guardia.js, sin defer", () => {
   const esperadas = {
-    "historial.html": ["historial_global"], "metricas.html": ["metricas"],
+    "historial.html": ["historial_global"], "metricas.html": ["metricas"], "departamentos.html": ["departamentos"],
     "usuarios.html": ["usuarios", ""], "index.html": [""], "crear.html": [""],
     "cuenta.html": [""], "detalle.html": [""], "ayuda.html": [""],
   };

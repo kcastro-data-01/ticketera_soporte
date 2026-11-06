@@ -43,6 +43,7 @@ Documentación de los endpoints **realmente implementados** en el código
 | `GET` | `/api/users` | Listar usuarios |
 | `GET` | `/api/areas` | Listar los 4 departamentos (fijos; en el código, «áreas») |
 | `GET` | `/api/areas/{area_id}` | Consultar un departamento (no se crean, cambian ni borran: `405`) |
+| `GET` | `/api/departamentos/resumen` | Tickets por departamento y estado, y técnicos activos (solo Administrador) |
 
 ## Objetos comunes
 

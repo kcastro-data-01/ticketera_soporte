@@ -102,11 +102,12 @@ test("Buscar (o Enter en el campo) envía el formulario y pide el listado filtra
   assert.match(pedidos.at(-1), /search=impresora/);
 });
 
-test("index.html: el filtro «Estado» tiene solo Todos y los cuatro estados", () => {
+test("index.html: el filtro «Estado» tiene Todos, Abiertos y los cuatro estados", () => {
   const select = indexHtml.slice(indexHtml.indexOf('<select id="state"'), indexHtml.indexOf("</select>", indexHtml.indexOf('<select id="state"')));
   const opciones = [...select.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(opciones, [
-    ["", "Todos"], ["Nuevo", "Nuevo"], ["En proceso", "En proceso"], ["Resuelto", "Resuelto"], ["Cerrado", "Cerrado"],
+    ["", "Todos"], ["abiertos", "Abiertos (Nuevo y En proceso)"], ["Nuevo", "Nuevo"], ["En proceso", "En proceso"],
+    ["Resuelto", "Resuelto"], ["Cerrado", "Cerrado"],
   ]);
   assert.doesNotMatch(indexHtml, /Pendientes|Resueltos y cerrados|opt-pendientes|opt-resueltos/);
   assert.doesNotMatch(leer("js/app.js"), /opt-pendientes|opt-resueltos|Abiertas|Resueltas/);
@@ -134,6 +135,6 @@ test("elegir un estado pide solo ese estado", async () => {
 
 test("ayuda.html describe el filtro «Estado» sin los grupos viejos", () => {
   const ayuda = leer("ayuda.html");
-  assert.match(ayuda, /El filtro «Estado» ofrece Todos, Nuevo, En proceso, Resuelto o Cerrado/);
+  assert.match(ayuda, /El filtro «Estado» ofrece Todos, Abiertos \(Nuevo y En proceso\), Nuevo, En proceso, Resuelto o Cerrado/);
   assert.doesNotMatch(ayuda, /Resueltos y cerrados|«Pendientes»/);
 });

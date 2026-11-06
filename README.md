@@ -607,6 +607,14 @@ Reglas:
 7. **Filtro «Departamento»** en la lista (también «Sin departamento») y en las
    métricas. El departamento se ve en el detalle y su cambio queda en el
    historial («Cambió el departamento: Soporte → Programación»).
+8. **Pantalla «Departamentos»** (`departamentos.html`, solo Administrador:
+   permiso «Ver departamentos»; en el menú debajo de «Métricas»): una fila por
+   departamento y otra «Sin departamento» con el total de tickets, los
+   abiertos (Nuevo + En proceso), cada estado y los Técnicos activos; arriba,
+   el total de abiertos y el departamento con más abiertos. Cada número abre
+   la lista filtrada (`index.html?area=ID&estado=…`; `area=sin` es «Sin
+   departamento» y `estado=abiertos`, Nuevo y En proceso: el filtro «Estado»
+   tiene también la opción «Abiertos»).
 
 API:
 
@@ -617,6 +625,7 @@ API:
 | `POST`, `PUT`, `PATCH`, `DELETE` en `/api/areas` o `/api/areas/{id}` | Nadie | `405 Method Not Allowed` (son fijos), también para el Administrador. |
 | `PATCH /api/tickets/{id}/area` | Administrador, Técnico | `{"area_id": 3, "reasignar": true}`. `404` departamento o ticket inexistente, `409` ticket Cerrado. |
 | `GET /api/tickets?area=ID` / `?sin_area=true` | Todos | Filtro de la lista. |
+| `GET /api/departamentos/resumen` | Administrador | Lo de la pantalla «Departamentos»: `total_abiertos`, `mas_abiertos` y `departamentos` (por cada uno: `total`, `abiertos`, `por_estado` y `tecnicos`). `403` para los demás roles. |
 
 No hace falta ninguna variable de entorno nueva (ni en Docker ni en Vercel):
 la migración corre sola al arrancar.

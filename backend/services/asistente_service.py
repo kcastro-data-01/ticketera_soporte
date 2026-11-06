@@ -119,6 +119,7 @@ TABLA_PERMISOS = [
     ("Cambiar departamento", "cambiar el departamento de un ticket", ("Sí", "Sí", "No")),
     ("Historial global", "ver el historial global", ("Sí", "Sí", "No")),
     ("Métricas", "ver las métricas", ("Sí", "No", "No")),
+    ("Ver departamentos", "ver la pantalla «Departamentos»", ("Sí", "No", "No")),
     ("Explicar con IA", "usar «Explicar con IA»", ("Sí", "Sí", "No")),
     ("Eliminar ticket", "eliminar tickets", ("Sí", "No", "No")),
     ("Administrar usuarios", "administrar usuarios", ("Sí", "No", "No")),
@@ -168,7 +169,10 @@ un rol. Si preguntan cómo funciona, describe la aplicación.
 - Menú lateral: Tickets (listado), Nuevo ticket, Historial (no para Solicitante), \
 Métricas (solo Administrador: cola de hoy, resueltos, tiempo promedio \
 de resolución, correo frente a web y gráficos por estado, categoría, persona y día; \
-se pueden filtrar por departamento), Usuarios (solo Administrador), Ayuda y Mi cuenta.
+se pueden filtrar por departamento), Departamentos (solo Administrador: por cada \
+departamento y «Sin departamento», el total de tickets, los abiertos, cada estado y \
+sus técnicos activos; tocar un número abre la lista filtrada), Usuarios (solo \
+Administrador), Ayuda y Mi cuenta.
 - La ticketera es de IT: el Administrador es el jefe de IT, cada Técnico \
 pertenece a un departamento de IT y el Solicitante es cualquier persona de la empresa, sin \
 departamento. IT solo recibe: un ticket nunca se asigna a un Solicitante.
@@ -1593,7 +1597,10 @@ REGLA_AREAS = (
     "Redes e Infraestructura, Accesos → Ciberseguridad; Programación solo se elige a mano. El "
     "Técnico y el Administrador pueden cambiar el departamento de un ticket desde su detalle "
     "(«Cambiar departamento») y, al hacerlo, reasignarlo al técnico del nuevo departamento; el cambio queda "
-    "en el historial. La lista de tickets y las métricas se filtran por departamento, incluido "
+    "en el historial. Solo el Administrador ve la pantalla «Departamentos» (en el menú, debajo "
+    "de «Métricas»): por cada departamento y «Sin departamento», el total de tickets, los "
+    "abiertos, cada estado y sus técnicos activos, con el total de abiertos y el departamento "
+    "con más abiertos. La lista de tickets y las métricas se filtran por departamento, incluido "
     "«Sin departamento» (tickets de antes de los departamentos o de departamentos que ya no existen)."
 )
 REGLA_SOLICITANTE = (

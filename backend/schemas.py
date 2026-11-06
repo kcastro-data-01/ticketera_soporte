@@ -281,6 +281,37 @@ class AreaResponse(BaseModel):
     tecnicos: int = 0
 
 
+class DepartamentoTecnico(BaseModel):
+    id: int
+    name: str
+
+
+class DepartamentoFila(BaseModel):
+    """Una fila de la pantalla «Departamentos»; ``area_id`` ``None`` es «Sin
+    departamento». ``por_estado``: Nuevo, En proceso, Resuelto y Cerrado."""
+
+    area_id: int | None
+    nombre: str
+    total: int
+    abiertos: int
+    por_estado: dict[str, int]
+    tecnicos: list[DepartamentoTecnico]
+
+
+class DepartamentoMasAbiertos(BaseModel):
+    area_id: int
+    nombre: str
+    abiertos: int
+
+
+class DepartamentosResumen(BaseModel):
+    """Respuesta de ``GET /api/departamentos/resumen`` (solo Administrador)."""
+
+    total_abiertos: int
+    mas_abiertos: DepartamentoMasAbiertos | None
+    departamentos: list[DepartamentoFila]
+
+
 class TicketStateUpdate(BaseModel):
     """Payload accepted by ``PATCH /api/tickets/{ticket_id}/state`` (RF3).
 

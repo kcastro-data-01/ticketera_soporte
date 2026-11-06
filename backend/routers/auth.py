@@ -36,6 +36,9 @@ ROLES_TODOS = {role.value for role in UserRole}
 # un ticket: quien lo creó (mientras está «Nuevo») o el Administrador
 # (ticket_service.edit_denied_reason). Un ticket Cerrado no lo cambia nadie.
 ROLES_EQUIPO = ROLES_TODOS - {UserRole.REQUESTER.value}
+# «Ver departamentos» (pantalla «Departamentos» y su resumen): solo el
+# Administrador, como las métricas.
+ROLES_DEPARTAMENTOS = ROLES_ADMIN
 
 
 def role_required(allowed_roles: set[str]) -> callable:

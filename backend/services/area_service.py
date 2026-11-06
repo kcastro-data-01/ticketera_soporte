@@ -66,3 +66,52 @@ def area_for_category(session, category: str) -> ItArea | None:
     if nombre is None:
         return None
     return session.scalar(select(ItArea).where(ItArea.name == nombre, ItArea.is_active.is_(True)))
+
+
+def resumen_departamentos(session) -> dict:
+    """Pantalla «Departamentos» (solo Administrador): por cada departamento
+    fijo y «Sin departamento», cuántos tickets hay en total, abiertos (Nuevo
+    + En proceso) y en cada estado, y sus Técnicos activos. Arriba, el total
+    de abiertos y el departamento con más abiertos (``None`` si ninguno
+    tiene; empate: el primero en el orden de ``IT_AREAS``)."""
+    from backend.constants import TICKET_STATES, TicketState
+    from backend.models import Ticket
+
+    abiertos_estados = (TicketState.NEW.value, TicketState.IN_PROGRESS.value)
+    conteos: dict[int | None, dict[str, int]] = {}
+    for area_id, estado, cantidad in session.execute(
+        select(Ticket.area_id, Ticket.state, func.count()).group_by(Ticket.area_id, Ticket.state)
+    ).all():
+        conteos.setdefault(area_id, {})[estado] = cantidad
+
+    tecnicos: dict[int, list[dict]] = {}
+    for usuario in session.scalars(
+        select(User).where(User.area_id.is_not(None), User.is_active.is_(True),
+                           User.role == UserRole.TECHNICIAN.value).order_by(func.lower(User.name))
+    ).all():
+        tecnicos.setdefault(usuario.area_id, []).append({"id": usuario.id, "name": usuario.name})
+
+    def fila(area_id: int | None, nombre: str) -> dict:
+        por_estado = {estado: conteos.get(area_id, {}).get(estado, 0) for estado in TICKET_STATES}
+        lista = tecnicos.get(area_id, []) if area_id is not None else []
+        return {
+            "area_id": area_id,
+            "nombre": nombre,
+            "total": sum(por_estado.values()),
+            "abiertos": sum(por_estado[e] for e in abiertos_estados),
+            "por_estado": por_estado,
+            "tecnicos": lista,
+        }
+
+    from backend.constants import NO_AREA_LABEL
+
+    filas = [fila(area.id, area.name) for area in list_areas(session)]
+    filas.append(fila(None, NO_AREA_LABEL))
+    con_abiertos = [f for f in filas if f["area_id"] is not None and f["abiertos"] > 0]
+    mayor = max(con_abiertos, key=lambda f: f["abiertos"], default=None)
+    return {
+        "total_abiertos": sum(f["abiertos"] for f in filas),
+        "mas_abiertos": ({"area_id": mayor["area_id"], "nombre": mayor["nombre"],
+                          "abiertos": mayor["abiertos"]} if mayor else None),
+        "departamentos": filas,
+    }

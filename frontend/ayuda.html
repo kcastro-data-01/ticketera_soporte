@@ -33,6 +33,7 @@
       <div class="menu-seccion" role="group" aria-labelledby="menu-administracion">
         <p class="menu-titulo" id="menu-administracion">Administración</p>
         <a href="metricas.html" class="menu-enlace" data-permiso="metricas"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Métricas</span></a>
+        <a href="departamentos.html" class="menu-enlace" data-permiso="departamentos"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Departamentos</span></a>
         <a href="usuarios.html" class="menu-enlace" data-permiso="usuarios"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span>Usuarios</span></a>
       </div>
       <div class="menu-seccion" role="group" aria-labelledby="menu-soporte">
@@ -102,7 +103,7 @@
           <p>En escritorio van en una sola fila; en pantallas angostas bajan a varias líneas.</p>
           <ul>
             <li><strong>Buscar</strong>: texto en el título o la descripción.</li>
-            <li><strong>Categoría</strong>, <strong>Prioridad</strong> y <strong>Estado</strong>. El filtro «Estado» ofrece Todos, Nuevo, En proceso, Resuelto o Cerrado (un estado por vez).</li>
+            <li><strong>Categoría</strong>, <strong>Prioridad</strong> y <strong>Estado</strong>. El filtro «Estado» ofrece Todos, Abiertos (Nuevo y En proceso), Nuevo, En proceso, Resuelto o Cerrado.</li>
             <li><strong>«Asignado a»</strong>: Todos, Sin asignar o una persona.</li>
             <li><strong>Departamento</strong>: Todos, Sin departamento o uno de los cuatro departamentos.</li>
             <li><strong>«Fecha de creación»</strong>: los tickets creados ese día, de 00:00 a 23:59 en hora de Costa Rica.</li>
@@ -175,6 +176,7 @@
             <li><strong>Si un ticket llega sin departamento</strong> (por ejemplo, un correo al buzón de soporte), se toma de la categoría: Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad. Programación solo se elige a mano.</li>
             <li><strong>Cambiar el departamento</strong>: el Técnico y el Administrador, en el detalle del ticket, con «Cambiar departamento». Si marcan «Reasignar al técnico del nuevo departamento», el ticket pasa al de ese departamento con menos tickets abiertos. El cambio queda en el historial.</li>
             <li><strong>El departamento de cada Técnico</strong> lo elige el Administrador en «Usuarios». El Administrador también puede tener uno (opcional).</li>
+            <li><strong>Pantalla «Departamentos»</strong> (solo el Administrador, en el menú debajo de «Métricas»): una fila por departamento y otra «Sin departamento», con el total de tickets, los abiertos, cada estado y los técnicos activos (sus nombres aparecen debajo de la cantidad). Arriba, el total de abiertos de la ticketera y el departamento con más abiertos. Al tocar un número se abre la lista de tickets de ese departamento y ese estado.</li>
             <li><strong>«Sin departamento»</strong>: tickets de antes de los departamentos. Se pueden filtrar en la lista y en las métricas, y pasar a un departamento.</li>
           </ul>
         </div>
@@ -215,6 +217,7 @@
                 <tr><td>Cambiar departamento</td><td>Sí</td><td>Sí</td><td>No</td></tr>
                 <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>No</td></tr>
                 <tr><td>Métricas</td><td>Sí</td><td>No</td><td>No</td></tr>
+                <tr><td>Ver departamentos</td><td>Sí</td><td>No</td><td>No</td></tr>
                 <tr><td>Explicar con IA</td><td>Sí</td><td>Sí</td><td>No</td></tr>
                 <tr><td>Eliminar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
                 <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td></tr>

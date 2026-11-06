@@ -1,5 +1,5 @@
 /* Menú lateral con secciones: Gestión (Tickets, Nuevo ticket, Historial),
-   Administración (Métricas, Usuarios) y Soporte (Ayuda), con título chico
+   Administración (Métricas, Departamentos, Usuarios) y Soporte (Ayuda), con título chico
    en mayúsculas, línea fina entre secciones y título oculto si el rol no
    ve ninguno de sus enlaces o si el menú está plegado.
    Ejecutar con: node --test frontend/tests/menu_secciones.test.js */
@@ -19,7 +19,7 @@ const PAGINAS_CON_MENU = fs.readdirSync(carpeta)
 
 const ESPERADO = [
   ["gestion", "Gestión", ["index.html", "crear.html", "historial.html"]],
-  ["administracion", "Administración", ["metricas.html", "usuarios.html"]],
+  ["administracion", "Administración", ["metricas.html", "departamentos.html", "usuarios.html"]],
   ["soporte", "Soporte", ["ayuda.html"]],
 ];
 
@@ -30,7 +30,7 @@ const regla = (selector) => {
 };
 
 test("cada página con menú tiene las tres secciones con sus enlaces", () => {
-  assert.equal(PAGINAS_CON_MENU.length, 8, PAGINAS_CON_MENU.join(", "));
+  assert.equal(PAGINAS_CON_MENU.length, 9, PAGINAS_CON_MENU.join(", "));
   for (const pagina of PAGINAS_CON_MENU) {
     const nav = leer(pagina).match(/<nav class="menu"[\s\S]*?<\/nav>/)[0];
     const secciones = [...nav.matchAll(/<div class="menu-seccion" role="group" aria-labelledby="menu-([a-z]+)">\s*<p class="menu-titulo" id="menu-\1">([^<]+)<\/p>([\s\S]*?)<\/div>/g)]

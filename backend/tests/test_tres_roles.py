@@ -116,6 +116,7 @@ PERMISOS = {
     "editar": {"Administrador"},
     "asignar": {"Administrador"},
     "metricas": {"Administrador"},
+    "departamentos": {"Administrador"},
     "eliminar": {"Administrador"},
     "usuarios": {"Administrador"},
     "cambiar_estado": {"Administrador", "Técnico"},
@@ -139,6 +140,8 @@ def _accion(client, session, headers, accion):
         })
     if accion == "metricas":
         return client.get("/api/metricas", headers=headers)
+    if accion == "departamentos":
+        return client.get("/api/departamentos/resumen", headers=headers)
     if accion == "historial_global":
         return client.get("/api/history", headers=headers)
     if accion == "usuarios":
