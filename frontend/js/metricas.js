@@ -454,8 +454,7 @@ async function iniciarMetricas() {
   const { form, desde, hasta, area } = elementos();
   if (!form) return;
   if (area && typeof cargarAreas === "function") {
-    /* Con las desactivadas: sus tickets siguen contando. */
-    llenarSelectAreas(area, await cargarAreas(true), { primera: "Todas", sinArea: true });
+    llenarSelectAreas(area, await cargarAreas(), { primera: "Todas", sinArea: true });
     area.addEventListener("change", () => cargarMetricas());
   }
   const rango = rangoPorDefecto();

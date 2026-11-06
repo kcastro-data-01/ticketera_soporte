@@ -47,10 +47,11 @@ filtrarlos, y consultar su historial de cambios.
   `node:test` (52 pruebas en cuatro ficheros) y documentación en
   [docs/api.md](docs/api.md).
 
-- **Áreas de IT** (la ticketera es de IT): el Administrador las administra en
-  «Áreas de IT», cada Técnico pertenece a un área, al crear un ticket se elige
-  el área y se asigna al técnico de esa área con menos tickets abiertos; IT
-  solo recibe (nunca se asigna a un Solicitante). Ver [Áreas de IT](#áreas-de-it).
+- **Áreas de IT fijas** (la ticketera es de IT): Soporte, Redes e
+  Infraestructura, Ciberseguridad y Programación. Cada Técnico pertenece a un
+  área; al crear un ticket se elige el área y se asigna al técnico de esa área
+  con menos tickets abiertos; sin área, sale de la categoría. IT solo recibe
+  (nunca se asigna a un Solicitante). Ver [Áreas de IT](#áreas-de-it).
 - Tres roles: Administrador, Técnico y Solicitante. Asignar, eliminar,
   métricas y usuarios son solo del Administrador; editar un ticket, quien lo
   creó (mientras está «Nuevo») o el Administrador (ver «Integridad de los
@@ -311,10 +312,10 @@ curl -X POST http://127.0.0.1:8000/api/tickets \
 ```
 
 Devuelve `201 Created` con el ticket creado (el estado inicial es `Nuevo`),
-con `area_id` y `area_name`. `area_id` (un área de IT activa) es obligatorio
-mientras haya áreas activas: sin él, o con un área inexistente o desactivada,
-responde `422`. El ticket se asigna al técnico de esa área con menos tickets
-abiertos (ver [Áreas de IT](#áreas-de-it)).
+con `area_id` y `area_name`. `area_id` es una de las 4 áreas fijas (`422` si no
+existe); sin él, el área sale de la categoría. El ticket se asigna al técnico
+de esa área con menos tickets abiertos (ver [Áreas de IT](#áreas-de-it)). En el
+formulario de la app el área es obligatoria.
 Categorías válidas: `Hardware`, `Software`, `Red`, `Accesos`.
 Prioridades válidas: `Baja`, `Media`, `Alta`, `Crítica`. Los datos inválidos
 responden `422 Unprocessable Entity`.
@@ -464,12 +465,14 @@ al arrancar la API (`init_db()` se ejecuta en el arranque).
 El archivo está excluido de Git (`.gitignore`) y sus tablas principales son:
 `it_areas`, `users`, `tickets`, `comments` y `history`.
 
-La migración de las áreas (`backend/migrate_add_it_areas.py`, en SQLite y en
-Postgres) crea `it_areas`, agrega `users.area_id` y `tickets.area_id` (los
-técnicos y tickets que ya había quedan «Sin área») y carga **una sola vez** las
-áreas de ejemplo Soporte técnico, Redes, Infraestructura y Ciberseguridad
-(marca `areas_it_ejemplo` en `schema_migrations`: si después se renombran o
-desactivan, no vuelven).
+La migración de las áreas (`backend/migrate_add_it_areas.py`, en cada arranque,
+en SQLite y en Postgres) crea `it_areas`, agrega `users.area_id` y
+`tickets.area_id` (los técnicos y tickets que ya había quedan «Sin área») y deja
+**exactamente** las 4 áreas fijas: «Soporte técnico» pasa a «Soporte», «Redes» e
+«Infraestructura» se unen en «Redes e Infraestructura» (con sus tickets y
+técnicos), cualquier otra área se borra (lo suyo queda «Sin área») y las que
+falten se crean. En una base nueva (Neon) solo crea las 4. Cada cambio queda en
+el log.
 
 Al arrancar también se ejecutan migraciones incrementales e idempotentes.
 La de categorías (`backend/migrate_categories.py`) reconstruye la tabla
@@ -556,50 +559,57 @@ enviados), tampoco se comenta, y no se le envía el aviso a sí mismo.
 
 La ticketera es de IT. Los roles no cambian de nombre:
 
-- **Administrador**: jefe (supervisor) de IT. Puede tener un área (opcional): los
-  tickets que llegan a su buzón quedan en esa área; si no tiene, «Sin área».
+- **Administrador**: jefe (supervisor) de IT. Puede tener un área (opcional).
 - **Técnico**: empleado de IT; pertenece a un área de IT.
 - **Solicitante**: cualquier persona de la empresa; no tiene área.
 
+Las **áreas son fijas**, definidas en el código (`IT_AREAS` en
+`backend/constants.py`); nadie las crea, renombra, desactiva ni borra, tampoco
+el Administrador:
+
+| Área | Atiende |
+|---|---|
+| Soporte | computadoras, impresoras, programas |
+| Redes e Infraestructura | internet, wifi, servidores, VPN |
+| Ciberseguridad | accesos, contraseñas, cuentas, incidentes de seguridad |
+| Programación | sistemas internos, Odoo, desarrollos y reportes |
+
 Reglas:
 
-1. **Áreas en la base** (`it_areas`), administradas por el Administrador en
-   «Áreas de IT» (`areas.html`): crear, renombrar, desactivar y reactivar (no se
-   borran). Un área desactivada no se ofrece al crear tickets ni al cambiar el
-   área de un ticket; los tickets y técnicos que ya la tienen la conservan. El
-   área de cada Técnico se elige en «Usuarios».
-2. **Crear un ticket en la app**: «Área de IT» es obligatoria (áreas activas).
-   Se asigna al **Técnico activo de esa área con menos tickets abiertos**
-   (Nuevo o En proceso; empate: el de menor id). Si el área no tiene técnicos,
-   al Técnico activo con menos tickets abiertos de cualquier área; si no hay
-   ninguno, queda sin asignar. El área del ticket es siempre la elegida. Si el
-   Administrador desactivara todas las áreas, los tickets se crean «Sin área».
-3. **Tickets por correo**: como antes. Al buzón general → al dueño del buzón,
-   en su área. El dueño le escribe a un técnico (Elementos enviados) → a ese
-   técnico, en su área.
-4. **IT solo recibe**: un ticket nunca queda asignado a un Solicitante (`422`
+1. El área de cada Técnico la elige el Administrador en «Usuarios».
+2. **Crear un ticket en la app**: «Área de IT» es obligatoria (con la ayuda de
+   qué atiende cada una). Se asigna al **Técnico activo de esa área con menos
+   tickets abiertos** (Nuevo o En proceso; empate: el de menor id). Si el área
+   no tiene técnicos, al Técnico activo con menos tickets abiertos de cualquier
+   área; si no hay ninguno, queda sin asignar.
+3. **Ticket sin área** (por ejemplo, un correo al buzón general, o la API sin
+   `area_id`): el área sale de la categoría (`CATEGORY_IT_AREA`): Hardware y
+   Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad.
+   Programación solo se elige a mano.
+4. **Tickets por correo**: al buzón general → asignado al dueño del buzón, con
+   el área de la categoría. El dueño le escribe a un técnico (Elementos
+   enviados) → asignado a ese técnico, en su área (si no tiene, la de la
+   categoría).
+5. **IT solo recibe**: un ticket nunca queda asignado a un Solicitante (`422`
    en `PATCH .../assign`). Un correo de IT a un Solicitante, o a alguien sin
    cuenta, no crea ticket ni usuario (queda en el log con el motivo). Las
    respuestas, comentarios y avisos de IT al solicitante funcionan igual.
-5. **«Asignar a»** solo muestra Técnicos y Administradores. El Técnico y el
+6. **«Asignar a»** solo muestra Técnicos y Administradores. El Técnico y el
    Administrador pueden **cambiar el área** de un ticket desde el detalle
    («Cambiar área»), y con «Reasignar al técnico de la nueva área» pasa al de
    esa área con menos tickets abiertos (con aviso por correo, si está activo).
-6. **Filtro «Área de IT»** en la lista (también «Sin área») y en las métricas.
+7. **Filtro «Área de IT»** en la lista (también «Sin área») y en las métricas.
    El área se ve en el detalle y su cambio queda en el historial («Cambió el
-   área: Redes → Infraestructura»).
-7. **Migración automática**: los técnicos y tickets que ya había quedan «Sin
-   área» hasta que el Administrador los asigne; los tickets viejos asignados a
-   un Solicitante quedan como están y se pueden reasignar.
+   área: Soporte → Redes e Infraestructura»).
 
 API:
 
 | Método y ruta | Quién | Qué hace |
 |---|---|---|
-| `GET /api/areas` | Todos | Áreas activas (con `tecnicos`: Técnicos activos en cada una). `?todas=true` incluye las desactivadas (solo Administrador). |
-| `POST /api/areas` | Administrador | `{"name": "Redes"}` → `201`. `409` si el nombre ya existe (sin distinguir mayúsculas), `422` si no tiene entre 2 y 60 caracteres. |
-| `PATCH /api/areas/{id}` | Administrador | `{"name": …}` y/o `{"is_active": false}`. |
-| `PATCH /api/tickets/{id}/area` | Administrador, Técnico | `{"area_id": 3, "reasignar": true}`. `404` área o ticket inexistente, `422` área desactivada, `409` ticket Cerrado. |
+| `GET /api/areas` | Todos | Las 4 áreas (con `tecnicos`: Técnicos activos en cada una). |
+| `GET /api/areas/{id}` | Todos | Un área. |
+| `POST`, `PUT`, `PATCH`, `DELETE` en `/api/areas` o `/api/areas/{id}` | Nadie | `405 Method Not Allowed` (las áreas son fijas), también para el Administrador. |
+| `PATCH /api/tickets/{id}/area` | Administrador, Técnico | `{"area_id": 3, "reasignar": true}`. `404` área o ticket inexistente, `409` ticket Cerrado. |
 | `GET /api/tickets?area=ID` / `?sin_area=true` | Todos | Filtro de la lista. |
 
 No hace falta ninguna variable de entorno nueva (ni en Docker ni en Vercel):

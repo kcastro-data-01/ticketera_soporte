@@ -71,8 +71,7 @@ def main(argv=None) -> int:
         tickets = [t for t in TICKETS if not args.solo or args.solo.lower() in t[0].lower()]
         for titulo, descripcion, categoria in tickets:
             ticket = ticket_service.create_ticket(session, TicketCreate(
-                title=titulo, description=descripcion, category=categoria, priority="Media"), admin,
-                requiere_area=False)
+                title=titulo, description=descripcion, category=categoria, priority="Media"), admin)
             creados.append(ticket.id)
             print("\n" + "=" * 70)
             print(f"Ticket #{ticket.id} «{titulo}» ({len(descripcion.split())} palabras)")

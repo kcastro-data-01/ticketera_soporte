@@ -120,7 +120,6 @@ TABLA_PERMISOS = [
     ("Explicar con IA", "usar «Explicar con IA»", ("Sí", "Sí", "No")),
     ("Eliminar ticket", "eliminar tickets", ("Sí", "No", "No")),
     ("Administrar usuarios", "administrar usuarios", ("Sí", "No", "No")),
-    ("Administrar áreas de IT", "administrar las áreas de IT", ("Sí", "No", "No")),
 ]
 
 
@@ -162,12 +161,15 @@ un rol. Si preguntan cómo funciona, describe la aplicación.
 - Menú lateral: Tickets (listado), Nuevo ticket, Historial (no para Solicitante), \
 Métricas (solo Administrador: cola de hoy, resueltos, tiempo promedio \
 de resolución, correo frente a web y gráficos por estado, categoría, persona y día; \
-se pueden filtrar por área de IT), Usuarios (solo Administrador), Áreas de IT (solo \
-Administrador), Ayuda y Mi cuenta.
+se pueden filtrar por área de IT), Usuarios (solo Administrador), Ayuda y Mi cuenta.
 - La ticketera es de IT: el Administrador es el jefe de IT, cada Técnico \
-pertenece a un área de IT (Soporte técnico, Redes, Infraestructura, Ciberseguridad \
-u otras que defina el Administrador) y el Solicitante es cualquier persona de la \
-empresa, sin área. IT solo recibe: un ticket nunca se asigna a un Solicitante.
+pertenece a un área de IT y el Solicitante es cualquier persona de la empresa, sin \
+área. IT solo recibe: un ticket nunca se asigna a un Solicitante.
+- Las áreas de IT son fijas (nadie las crea, renombra ni borra, tampoco el \
+Administrador): Soporte (computadoras, impresoras, programas), Redes e \
+Infraestructura (internet, wifi, servidores, VPN), Ciberseguridad (accesos, \
+contraseñas, cuentas, incidentes de seguridad) y Programación (sistemas internos, \
+Odoo, desarrollos y reportes).
 - Crear un ticket: menú «Nuevo ticket»; se indica título, descripción, área de IT \
 (obligatoria), categoría (Hardware, Software, Red, Accesos) y prioridad (Baja, Media, \
 Alta, Crítica). Al crearse se asigna solo al Técnico activo de esa área con menos \
@@ -197,9 +199,6 @@ empresa (la ticketera no la guarda).
 - Usuarios (solo Administrador): «Agregar usuario» con nombre, correo, rol y área \
 de IT (Técnico; opcional para el Administrador); «Editar» para cambiar datos, rol \
 o área; «Desactivar» / «Reactivar» en la fila de cada persona.
-- Áreas de IT (solo Administrador): crear, renombrar, desactivar y reactivar áreas. \
-Un área desactivada no se ofrece al crear tickets; los tickets y técnicos que ya la \
-tienen la conservan.
 """
 
 INSTRUCCIONES = """\
@@ -1522,6 +1521,8 @@ _PIDE_REGLA = re.compile(
     rf"|\b(quien|quienes|que rol\w*)\b.*\b{_PUEDE}\b"
     r"|\bcomo se (reparten|reparte|distribuyen|distribuye|asignan|asigna|crean|crea|generan)\b"
     r"|\bque (ve|ven|puede ver|pueden ver)\b"
+    # «¿qué áreas hay?», «¿cuáles son las áreas de IT?»: las áreas fijas.
+    r"|\b(que|cuales)\s+(son\s+las\s+)?areas\b"
 )
 _HABLA_DE_CARGA = re.compile(rf"\b({_TICKET}|{_ASIGNADO}|persona\w*|tecnic\w*|usuario\w*)\b")
 _QUIEN = r"\b(quien|quienes|que rol\w*)\b"
@@ -1549,7 +1550,8 @@ REGLA_REPARTO = (
     "hay ningún Técnico activo, queda sin asignar. Después, un Administrador puede "
     "reasignarlo manualmente, y el Técnico o el Administrador pueden pasarlo a otra área. "
     "Los tickets que llegan por correo al buzón de soporte se asignan al dueño del buzón y "
-    "quedan en su área (o «Sin área»)."
+    "su área sale de la categoría (Hardware y Software → Soporte, Red → Redes e "
+    "Infraestructura, Accesos → Ciberseguridad)."
 )
 REGLA_QUIEN_CAMBIA_ESTADO = (
     "El Técnico y el Administrador pueden cambiar el estado de cualquier "
@@ -1569,15 +1571,20 @@ REGLA_CERRADO = NOTA_CERRADO + (
     "responde una sola vez que envíe un correo nuevo para crear otro ticket."
 )
 REGLA_AREAS = (
-    "La ticketera es de IT y tiene áreas de IT (Soporte técnico, Redes, Infraestructura, "
-    "Ciberseguridad u otras): el Administrador (jefe de IT) las crea, renombra y "
-    "desactiva en «Áreas de IT» y le asigna el área a cada Técnico en «Usuarios» (el "
-    "Administrador también puede tener área; el Solicitante no). Al crear un ticket se elige "
-    "el área (obligatoria) y se asigna al Técnico de esa área con menos tickets abiertos. El "
+    "La ticketera es de IT y tiene 4 áreas de IT fijas: Soporte (computadoras, impresoras, "
+    "programas), Redes e Infraestructura (internet, wifi, servidores, VPN), Ciberseguridad "
+    "(accesos, contraseñas, cuentas, incidentes de seguridad) y Programación (sistemas "
+    "internos, Odoo, desarrollos y reportes). Nadie las crea, renombra, desactiva ni borra, "
+    "tampoco el Administrador. El Administrador (jefe de IT) le asigna el área a cada "
+    "Técnico en «Usuarios» (el Administrador también puede tener área; el Solicitante no). "
+    "Al crear un ticket se elige el área (obligatoria) y se asigna al Técnico de esa área "
+    "con menos tickets abiertos. Si un ticket llega sin área (por ejemplo, un correo al "
+    "buzón general), el área sale de la categoría: Hardware y Software → Soporte, Red → "
+    "Redes e Infraestructura, Accesos → Ciberseguridad; Programación solo se elige a mano. El "
     "Técnico y el Administrador pueden cambiar el área de un ticket desde su detalle "
     "(«Cambiar área») y, al hacerlo, reasignarlo al técnico de la nueva área; el cambio queda "
     "en el historial. La lista de tickets y las métricas se filtran por área, incluida "
-    "«Sin área» (tickets de antes de las áreas o de un buzón sin área)."
+    "«Sin área» (tickets de antes de las áreas o de áreas que ya no existen)."
 )
 REGLA_SOLICITANTE = (
     "El Solicitante es cualquier persona de la empresa y no tiene área de IT. "
@@ -1590,7 +1597,7 @@ REGLA_CORREO = (
     "Cuando la función de correo está activa, la ticketera revisa el buzón de soporte cada "
     "minuto. Quien envía el correo es el solicitante y quien lo recibe, el asignado. Un correo que pide "
     "ayuda (o cuyo asunto empieza con «Ticket:») de un usuario con cuenta crea un ticket a "
-    "su nombre, asignado al dueño del buzón y en su área de IT (o «Sin área»), y se le "
+    "su nombre, asignado al dueño del buzón y en el área de IT de su categoría, y se le "
     "responde con el número del ticket. "
     "Quien es del dominio de la empresa y no tiene cuenta recibe una sola respuesta: primero "
     "debe ingresar a la ticketera con su cuenta de Microsoft y volver a enviar la solicitud; "

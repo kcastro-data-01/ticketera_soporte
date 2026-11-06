@@ -187,7 +187,7 @@ test("init lista los usuarios con nombre, correo, rol y estado", async () => {
 
   await harness.init();
 
-  assert.deepEqual(harness.urls(), ["/api/auth/config", "/api/areas?todas=true", "/api/users?todos=true"]);
+  assert.deepEqual(harness.urls(), ["/api/auth/config", "/api/areas", "/api/users?todos=true"]);
   const rows = harness.node("cuerpo-usuarios").children;
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[0].children.map((cell) => cell.textContent), [

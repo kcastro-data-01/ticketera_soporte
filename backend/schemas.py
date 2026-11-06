@@ -270,47 +270,8 @@ class TicketAreaUpdate(BaseModel):
     reasignar: bool = False
 
 
-def _validate_area_name(value: str) -> str:
-    cleaned = " ".join(value.split())
-    if len(cleaned) < 2:
-        raise ValueError("el nombre del área debe tener al menos 2 caracteres")
-    if len(cleaned) > 60:
-        raise ValueError("el nombre del área debe tener como máximo 60 caracteres")
-    return cleaned
-
-
-class AreaCreate(BaseModel):
-    """Payload de ``POST /api/areas`` (solo Administrador)."""
-
-    name: str
-
-    @field_validator("name")
-    @classmethod
-    def name_must_be_valid(cls, value: str) -> str:
-        return _validate_area_name(value)
-
-
-class AreaUpdate(BaseModel):
-    """Payload de ``PATCH /api/areas/{area_id}``: renombrar, desactivar o
-    reactivar (al menos un campo)."""
-
-    name: str | None = None
-    is_active: bool | None = None
-
-    @field_validator("name")
-    @classmethod
-    def name_must_be_valid(cls, value: str | None) -> str | None:
-        return None if value is None else _validate_area_name(value)
-
-    @model_validator(mode="after")
-    def at_least_one_field(self) -> "AreaUpdate":
-        if self.name is None and self.is_active is None:
-            raise ValueError("la petición debe incluir name o is_active")
-        return self
-
-
 class AreaResponse(BaseModel):
-    """Área de IT devuelta por la API (``tecnicos``: Técnicos activos en ella)."""
+    """Área de IT (fija) devuelta por la API (``tecnicos``: Técnicos activos en ella)."""
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -34,7 +34,6 @@
         <p class="menu-titulo" id="menu-administracion">Administración</p>
         <a href="metricas.html" class="menu-enlace" data-permiso="metricas"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Métricas</span></a>
         <a href="usuarios.html" class="menu-enlace" data-permiso="usuarios"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span>Usuarios</span></a>
-        <a href="areas.html" class="menu-enlace" data-permiso="areas"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg><span>Áreas de IT</span></a>
       </div>
       <div class="menu-seccion" role="group" aria-labelledby="menu-soporte">
         <p class="menu-titulo" id="menu-soporte">Soporte</p>
@@ -192,7 +191,6 @@
                 <tr><td>Explicar con IA</td><td>Sí</td><td>Sí</td><td>No</td></tr>
                 <tr><td>Eliminar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
                 <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td></tr>
-                <tr><td>Administrar áreas de IT</td><td>Sí</td><td>No</td><td>No</td></tr>
               </tbody>
             </table>
           </div>
@@ -204,13 +202,20 @@
       <details class="ayuda-tema" id="areas">
         <summary>Áreas de IT</summary>
         <div class="ayuda-cuerpo">
-          <p>La ticketera es de IT. Cada Técnico pertenece a un área de IT (por ejemplo Soporte técnico, Redes, Infraestructura o Ciberseguridad); el Administrador es el jefe de IT y el Solicitante es cualquier persona de la empresa, sin área.</p>
+          <p>La ticketera es de IT. Cada Técnico pertenece a un área de IT; el Administrador es el jefe de IT y el Solicitante es cualquier persona de la empresa, sin área. Las áreas son fijas: nadie las crea, renombra, desactiva ni borra, tampoco el Administrador.</p>
+          <ul>
+            <li><strong>Soporte</strong>: computadoras, impresoras, programas.</li>
+            <li><strong>Redes e Infraestructura</strong>: internet, wifi, servidores, VPN.</li>
+            <li><strong>Ciberseguridad</strong>: accesos, contraseñas, cuentas, incidentes de seguridad.</li>
+            <li><strong>Programación</strong>: sistemas internos, Odoo, desarrollos y reportes.</li>
+          </ul>
           <ul>
             <li><strong>Al crear un ticket</strong> se elige el «Área de IT» (obligatoria). El ticket se asigna solo al Técnico activo de esa área con menos tickets abiertos (Nuevo o En proceso). Si el área no tiene técnicos, va al Técnico con menos tickets abiertos de cualquier área; si no hay ninguno, queda sin asignar.</li>
+            <li><strong>Si un ticket llega sin área</strong> (por ejemplo, un correo al buzón general), el área sale de la categoría: Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad. Programación solo se elige a mano.</li>
             <li><strong>IT solo recibe</strong>: un ticket nunca se asigna a un Solicitante. «Asignar a» muestra solo Técnicos y Administradores. Los tickets viejos asignados a un Solicitante se pueden reasignar.</li>
             <li><strong>Cambiar el área</strong>: el Técnico y el Administrador, en el detalle del ticket, con «Cambiar área». Si marcan «Reasignar al técnico de la nueva área», pasa al de esa área con menos tickets abiertos. El cambio queda en el historial.</li>
-            <li><strong>Administrar las áreas</strong> (solo Administrador): en «Áreas de IT» se crean, renombran, desactivan y reactivan. Un área desactivada no se ofrece al crear tickets ni al cambiar el área, pero los tickets y técnicos que ya la tienen la conservan. El área de cada Técnico se elige en «Usuarios»; el Administrador también puede tener un área (opcional).</li>
-            <li><strong>«Sin área»</strong>: los tickets de antes de las áreas y los que llegan a un buzón cuyo dueño no tiene área. Se pueden filtrar en la lista y en las métricas, y pasar a un área.</li>
+            <li><strong>El área de cada Técnico</strong> la elige el Administrador en «Usuarios»; el Administrador también puede tener un área (opcional).</li>
+            <li><strong>«Sin área»</strong>: tickets de antes de las áreas o de áreas que ya no existen. Se pueden filtrar en la lista y en las métricas, y pasar a un área.</li>
           </ul>
         </div>
       </details>
@@ -235,9 +240,9 @@
           <ul>
             <li>Para crear tickets por correo hay que tener cuenta: primero se ingresa a la ticketera con la cuenta de Microsoft de la empresa. Si alguien de la empresa sin cuenta escribe al buzón, no se crea el ticket: se le responde una sola vez que ingrese primero y vuelva a enviar su solicitud. Los correos de fuera de la empresa se ignoran. Si su cuenta está desactivada, se le pide que se comunique con un administrador.</li>
             <li>El correo tiene que enviarse desde la misma dirección con la que el usuario está registrado en la ticketera. El asunto se usa como título y el texto como descripción. La respuesta automática indica el número del ticket y el enlace para consultarlo.</li>
-            <li>Los correos que llegan al buzón quedan asignados a su dueño y en su área de IT (o «Sin área» si no tiene).</li>
+            <li>Los correos que llegan al buzón quedan asignados a su dueño, en el área de IT de su categoría (Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad).</li>
             <li>Si el asunto empieza con «Ticket:», siempre crea un ticket (sin «Ticket:» en el título), aunque no parezca una solicitud de ayuda.</li>
-            <li>Los correos que el dueño del buzón envía a alguien de la empresa pasan por el mismo filtro que los que llegan: crean un ticket si el asunto empieza con «Ticket:» o si le reporta a un compañero un problema técnico o le pide soporte, acceso o ayuda (por ejemplo «No me funciona la impresora, ¿la podés revisar?»). La coordinación, los saludos, los envíos de archivos, las reuniones, los agradecimientos y los informes no crean tickets, ni los que van a más de 3 personas o solo a gente de fuera de la empresa. Queda asignado al primer destinatario de la empresa en «Para» y en su área de IT. IT solo recibe: si ese destinatario es Solicitante o no tiene cuenta, no se crea ticket (las respuestas en el hilo de un ticket sí se agregan como comentario). Si el aviso al asignado está activo, recibe un correo «Se le asignó el ticket #N» con el enlace.</li>
+            <li>Los correos que el dueño del buzón envía a alguien de la empresa pasan por el mismo filtro que los que llegan: crean un ticket si el asunto empieza con «Ticket:» o si le reporta a un compañero un problema técnico o le pide soporte, acceso o ayuda (por ejemplo «No me funciona la impresora, ¿la podés revisar?»). La coordinación, los saludos, los envíos de archivos, las reuniones, los agradecimientos y los informes no crean tickets, ni los que van a más de 3 personas o solo a gente de fuera de la empresa. Queda asignado al primer destinatario de la empresa en «Para» y en su área de IT (si no tiene, la de la categoría). IT solo recibe: si ese destinatario es Solicitante o no tiene cuenta, no se crea ticket (las respuestas en el hilo de un ticket sí se agregan como comentario). Si el aviso al asignado está activo, recibe un correo «Se le asignó el ticket #N» con el enlace.</li>
             <li>Los avisos que envía la ticketera (confirmaciones, «Se le asignó el ticket #N», «Nuevo comentario…», «El ticket #N pasó a…», «El ticket #N fue asignado a…») nunca crean tickets, y un correo de una conversación que ya se procesó tampoco. Por seguridad, en cada revisión del buzón se crean como máximo 5 tickets; el resto espera a la siguiente.</li>
             <li>Responder en el hilo de un ticket, o con «[Ticket #N]» en el asunto, agrega un comentario y nunca crea otro ticket. Pueden comentar así el solicitante, el asignado y cualquier usuario activo que esté en el hilo (en «Para» o en copia). Quien no tiene cuenta no puede comentar por correo.</li>
             <li><strong>Adjuntos del correo</strong>: los archivos de un correo que crea un ticket o agrega un comentario se guardan en el ticket, con los mismos tipos y límites que en la ticketera (jpg, png, pdf, docx, xlsx o txt, hasta 4 MB cada uno), y como máximo 5 archivos y 10 MB por correo. Las imágenes pegadas dentro del texto (por ejemplo, una captura de pantalla) también se guardan, y en la descripción o el comentario no queda la marca «[cid:…]». No se guardan las imágenes de la firma (las de menos de 15 KB y los logos que se repiten), los correos adjuntos ni los enlaces a OneDrive. Si alguno no se guarda, el ticket o el comentario se crea igual, queda en el historial y la respuesta automática dice «No se guardaron N adjuntos (tipo no permitido o más de 4 MB). Puede subirlos desde la ticketera:» con el enlace. En un ticket <code>Cerrado</code> no se guardan.</li>

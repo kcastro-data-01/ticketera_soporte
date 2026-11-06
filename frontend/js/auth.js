@@ -90,9 +90,8 @@ const PERMISOS = {
   eliminar: ["Administrador"],
   explicar_ia: ["Administrador", "Técnico"],
   metricas: ["Administrador"],
-  /* Áreas de IT: administrarlas (pantalla «Áreas de IT») y pasar un ticket
-     a otra área (detalle, «Cambiar área»). */
-  areas: ["Administrador"],
+  /* Pasar un ticket a otra área de IT (detalle, «Cambiar área»). Las áreas
+     son fijas: nadie las administra. */
   cambiar_area: ["Administrador", "Técnico"],
 };
 
@@ -101,11 +100,11 @@ const PERMISOS = {
 const ROLES_IT = ["Administrador", "Técnico"];
 const SIN_AREA = "Sin área";
 
-/* Áreas de IT de la API (activas; con todas=true también las desactivadas,
-   solo Administrador). [] si falla: la pantalla sigue funcionando. */
-async function cargarAreas(todas = false) {
+/* Las 4 áreas de IT fijas, de la API. [] si falla: la pantalla sigue
+   funcionando. */
+async function cargarAreas() {
   try {
-    const response = await fetchWithAuth(todas ? "/api/areas?todas=true" : "/api/areas");
+    const response = await fetchWithAuth("/api/areas");
     if (!response.ok) return [];
     const areas = await response.json();
     return Array.isArray(areas) ? areas : [];
@@ -128,7 +127,7 @@ function llenarSelectAreas(select, areas, { primera = "Todas", sinArea = false }
   };
   if (primera !== null) opcion("", primera);
   if (sinArea) opcion("sin", SIN_AREA);
-  areas.forEach((area) => opcion(String(area.id), area.is_active === false ? `${area.name} (desactivada)` : area.name));
+  areas.forEach((area) => opcion(String(area.id), area.name));
   if ([...(select.options || [])].some((o) => o.value === elegido)) select.value = elegido;
 }
 

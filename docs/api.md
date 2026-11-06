@@ -41,9 +41,8 @@ Documentación de los endpoints **realmente implementados** en el código
 | `GET` | `/api/tickets/{ticket_id}/history` | Historial de cambios (solo lectura) |
 | `POST` | `/api/users` | Crear un usuario |
 | `GET` | `/api/users` | Listar usuarios |
-| `GET` | `/api/areas` | Listar áreas de IT (`?todas=true`: también las desactivadas, solo Administrador) |
-| `POST` | `/api/areas` | Crear un área de IT (solo Administrador) |
-| `PATCH` | `/api/areas/{area_id}` | Renombrar, desactivar o reactivar un área (solo Administrador) |
+| `GET` | `/api/areas` | Listar las 4 áreas de IT (fijas) |
+| `GET` | `/api/areas/{area_id}` | Consultar un área (las áreas no se crean, cambian ni borran: `405`) |
 
 ## Objetos comunes
 
@@ -111,7 +110,7 @@ body.
 | `description` | string | no puede quedar vacía |
 | `category` | enum | uno de los valores de `category` |
 | `priority` | enum | uno de los valores de `priority` |
-| `area_id` | integer | área de IT activa; obligatoria mientras haya áreas activas |
+| `area_id` | integer | opcional; una de las áreas fijas. Sin él, sale de la categoría (Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad) |
 
 El ticket se asigna al Técnico activo de esa área con menos tickets abiertos
 (si el área no tiene, al de cualquier área con menos abiertos). La respuesta
@@ -119,7 +118,7 @@ trae `area_id` y `area_name` (`null` = «Sin área»).
 
 **Respuestas:** `201` con el ticket creado · `422` si falta un campo, el
 título tiene < 3 o > 200 caracteres, la descripción está vacía, un enum no es
-válido o falta el área (o no existe o está desactivada).
+válido o el área no existe.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/tickets \
@@ -242,16 +241,15 @@ para el Solicitante). Queda en el historial (`action: "area_changed"`,
 | `reasignar` | boolean | opcional (`false`); `true` asigna al técnico de la nueva área con menos tickets abiertos |
 
 **Respuestas:** `200` con el ticket · `404` ticket o área inexistente · `409`
-ticket `Cerrado` · `422` área desactivada.
+ticket `Cerrado`.
 
-### Áreas de IT: `GET` / `POST /api/areas`, `PATCH /api/areas/{area_id}`
+### Áreas de IT: `GET /api/areas` y `GET /api/areas/{area_id}`
 
-`GET` (todos los roles) devuelve `[{id, name, is_active, tecnicos}]` ordenado
-por nombre; solo las activas, salvo `?todas=true` (solo Administrador; `403`
-para los demás). `POST {"name": "Redes"}` → `201` y `PATCH {"name": …,
-"is_active": …}` → `200` son solo del Administrador; `409` si el nombre ya
-existe (sin distinguir mayúsculas), `422` si no tiene entre 2 y 60
-caracteres, `404` si el área no existe. Las áreas no se borran.
+Las áreas son fijas: Soporte, Redes e Infraestructura, Ciberseguridad y
+Programación. `GET /api/areas` (todos los roles) devuelve
+`[{id, name, is_active, tecnicos}]` en ese orden; `GET /api/areas/{id}`, una
+(`404` si no existe). Cualquier otro método (`POST`, `PUT`, `PATCH`, `DELETE`)
+responde `405 Method Not Allowed`, también al Administrador.
 
 ### `DELETE /api/tickets/{ticket_id}`
 

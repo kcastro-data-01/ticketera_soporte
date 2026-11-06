@@ -85,13 +85,6 @@ class AssigneeNotITError(Exception):
             "o Administradores.")
 
 
-class AreaRequiredError(Exception):
-    """Crear un ticket en la app sin elegir el área de IT (HTTP 422)."""
-
-    def __init__(self):
-        super().__init__("Elija el área de IT del ticket.")
-
-
 class TicketNotFoundError(Exception):
     """Raised when the target ticket of an operation does not exist."""
 
@@ -206,7 +199,7 @@ def create_ticket(
     *,
     asignado: User | None = None,
     origen: str | None = None,
-    requiere_area: bool = True,
+    area_del_asignado: bool = False,
 ) -> Ticket:
     """Persist a new ticket.
 
@@ -221,17 +214,23 @@ def create_ticket(
     available.
 
     ``asignado`` (tickets que llegan por correo: quien recibe el correo)
-    reemplaza el reparto automático, y el ticket toma el área de esa persona
-    (o «Sin área»). Tiene que ser de IT (:class:`AssigneeNotITError`).
-    ``origen`` es el texto que queda en el historial de la creación («Ticket
-    creado desde correo enviado por … a …»).
+    reemplaza el reparto automático. Tiene que ser de IT
+    (:class:`AssigneeNotITError`). ``origen`` es el texto que queda en el
+    historial de la creación («Ticket creado desde correo enviado por … a
+    …»).
 
-    Área de IT (``payload.area_id``): tiene que existir y estar activa
-    (``area_service.AreaNotFoundError`` / ``AreaInactiveError``). En la app es
-    obligatoria mientras haya áreas activas (:class:`AreaRequiredError`;
-    los correos pasan ``requiere_area=False``); el
-    ticket va al técnico del área con menos tickets abiertos
-    (:func:`pick_next_assignee`).
+    Área de IT, en este orden:
+
+    1. ``payload.area_id`` (la elegida en la app): tiene que existir
+       (``area_service.AreaNotFoundError`` / ``AreaInactiveError``);
+    2. con ``area_del_asignado`` (un correo de IT a un técnico), el área del
+       asignado, si tiene;
+    3. si no, según la categoría (``CATEGORY_IT_AREA``: Hardware y Software
+       → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad;
+       Programación solo se elige a mano).
+
+    Sin asignado, el ticket va al técnico de esa área con menos tickets
+    abiertos (:func:`pick_next_assignee`).
 
     Registra una entrada de historial por la creación del ticket (RF9).
     """
@@ -239,12 +238,11 @@ def create_ticket(
         raise AssigneeNotITError(asignado)
     if payload.area_id is not None:
         area_id = area_service.get_active_area(session, payload.area_id).id
-    elif asignado is not None:
+    elif area_del_asignado and asignado is not None and asignado.area_id is not None:
         area_id = asignado.area_id
-    elif requiere_area and area_service.has_active_areas(session):
-        raise AreaRequiredError()
     else:
-        area_id = None
+        por_categoria = area_service.area_for_category(session, payload.category.value)
+        area_id = por_categoria.id if por_categoria is not None else None
 
     ticket = Ticket(
         title=payload.title,

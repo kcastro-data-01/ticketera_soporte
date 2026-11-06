@@ -20,7 +20,6 @@ from backend.schemas import (
 )
 from backend.services import area_service, correo_service, ticket_service
 from backend.services.ticket_service import (
-    AreaRequiredError,
     AssigneeNotITError,
     InvalidTransitionError,
     TicketClosedError,
@@ -58,14 +57,12 @@ def create_ticket(
     ),
 ) -> TicketResponse:
     """Create a ticket with title, description, category, priority and IT
-    area (RF1, RF2). The area is required while there are active areas
-    (``422`` without it, or with an area that does not exist or is
-    inactive); the ticket goes to the area's technician with fewest open
-    tickets."""
+    area (RF1, RF2). ``area_id`` es una de las áreas fijas (``422`` si no
+    existe); sin ella, el área sale de la categoría. El ticket va al técnico
+    de esa área con menos tickets abiertos."""
     try:
         ticket = ticket_service.create_ticket(session, payload, current_user)
-    except (AreaRequiredError, area_service.AreaNotFoundError,
-            area_service.AreaInactiveError) as error:
+    except (area_service.AreaNotFoundError, area_service.AreaInactiveError) as error:
         raise HTTPException(status_code=422, detail=str(error))
     return TicketResponse.model_validate(ticket)
 

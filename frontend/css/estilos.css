@@ -4772,3 +4772,20 @@ summary:focus-visible,
     padding-right: 0.7rem;
   }
 }
+
+/* «Nuevo ticket»: qué atiende cada área de IT, debajo del selector. */
+.ayuda-campo.ayuda-areas {
+  margin: 0.3rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ayuda-campo.ayuda-areas li + li {
+  margin-top: 0.1rem;
+}
+
+.ayuda-campo.ayuda-areas strong {
+  color: var(--color-texto);
+  font-size: inherit;
+  font-weight: 600;
+}

@@ -334,8 +334,7 @@ function areaElegida(selectRol, selectArea) {
 async function iniciarAreasUsuarios() {
   const elements = getElements();
   if (typeof cargarAreas !== "function") return;
-  /* Con las desactivadas: un Técnico puede seguir en una. */
-  const areas = await cargarAreas(true);
+  const areas = await cargarAreas();
   for (const select of [elements.area, elements.editarArea]) {
     llenarSelectAreas(select, areas, { primera: "Sin área" });
   }

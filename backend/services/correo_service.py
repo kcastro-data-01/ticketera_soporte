@@ -11,7 +11,7 @@ y, por cada correo nuevo que pide ayuda (o cuyo asunto empieza con
 * Si el remitente es un usuario activo de la ticketera, se crea un ticket a
   su nombre (asunto = título, cuerpo = descripción, categoría y prioridad
   según palabras clave), asignado al dueño del buzón (``CORREO_USUARIO``)
-  y en su área de IT (o «Sin área»), y se le responde con el número y el
+  y en el área de IT de su categoría, y se le responde con el número y el
   enlace. Si el dueño no es de IT, va al técnico con menos tickets abiertos.
   Si responde en el hilo de un correo que ya es ticket (In-Reply-To /
   References / conversationId), se agrega como comentario si es el
@@ -38,7 +38,7 @@ También se revisan los **Elementos enviados** del buzón (ver
 empresa crea un ticket si el asunto empieza con «Ticket:» o, con
 ``CORREO_FILTRO=ia``, si la IA ve que pide soporte (mismo filtro que la
 bandeja), a nombre del dueño y asignado al primer destinatario de la empresa en «Para», en el
-área de ese destinatario. **IT solo recibe**: si ese destinatario es Solicitante o no tiene
+área de ese destinatario (si no tiene, la de la categoría). **IT solo recibe**: si ese destinatario es Solicitante o no tiene
 cuenta, no se crea ticket (ni usuario) y queda el motivo en el log.
 
 Contra los ciclos de correos: todo correo que manda la app se registra
@@ -1197,7 +1197,8 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
         return "frenado", None
 
     # Quien escribe es el solicitante; quien recibe (el dueño del buzón), el
-    # asignado, y el ticket queda en su área (o «Sin área»). IT solo recibe:
+    # asignado. El área sale de la categoría (Hardware y Software → Soporte,
+    # Red → Redes e Infraestructura, Accesos → Ciberseguridad). IT solo recibe:
     # si el dueño del buzón no es de IT, va al técnico con menos tickets
     # abiertos (o sin asignar si no hay técnicos).
     categoria, prioridad = clasificar(correo.asunto, correo.cuerpo)
@@ -1218,7 +1219,6 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
         usuario,
         asignado=asignado,
         origen=_origen(usuario, asignado or dueno),
-        requiere_area=False,
     )
     _registrar(session, correo, "ticket", ticket.id)
     return "ticket", _respuesta_ticket(correo, usuario, ticket, config)
@@ -1248,7 +1248,8 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
       tiene cuenta → ``ignorado`` con el motivo en el log (IT solo recibe:
       no se crea ticket ni usuario).
     * Si no, ``ticket``: solicitante = el dueño; asignado = ese destinatario
-      (Técnico o Administrador), y el ticket queda en su área.
+      (Técnico o Administrador), y el ticket queda en su área (si no
+      tiene, en la de la categoría).
 
     Todos quedan registrados por su Message-ID: el mismo correo nunca crea
     dos tickets ni se revisa otra vez.
@@ -1348,7 +1349,7 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
         dueno,
         asignado=asignado,
         origen=_origen(dueno, asignado),
-        requiere_area=False,
+        area_del_asignado=True,
     )
     _registrar(session, correo, "ticket", ticket.id)
     logger.info("Enviado «%s» → ticket #%s asignado a %s", correo.asunto, ticket.id, correo_asignado)

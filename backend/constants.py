@@ -94,9 +94,40 @@ AUTO_ASSIGN_ROLES: tuple[str, ...] = (UserRole.TECHNICIAN.value,)
 # Solicitante). Son también los que pueden tener área de IT.
 IT_ROLES: tuple[str, ...] = (UserRole.ADMIN.value, UserRole.TECHNICIAN.value)
 
-# Áreas de ejemplo que la migración carga una sola vez (se cambian desde la
-# pantalla «Áreas de IT» cuando la empresa defina las reales).
-EXAMPLE_IT_AREAS: tuple[str, ...] = ("Soporte técnico", "Redes", "Infraestructura", "Ciberseguridad")
+# Áreas de IT fijas (no se crean, renombran ni desactivan desde la app). La
+# migración ``backend.migrate_add_it_areas`` deja exactamente estas, en este
+# orden, que es también el orden en que se muestran.
+IT_AREA_SUPPORT = "Soporte"
+IT_AREA_NETWORK = "Redes e Infraestructura"
+IT_AREA_SECURITY = "Ciberseguridad"
+IT_AREA_PROGRAMMING = "Programación"
+IT_AREAS: tuple[str, ...] = (IT_AREA_SUPPORT, IT_AREA_NETWORK, IT_AREA_SECURITY, IT_AREA_PROGRAMMING)
+
+# Qué atiende cada área (ayuda del formulario «Nuevo ticket» y del chat).
+IT_AREA_SCOPE: dict[str, str] = {
+    IT_AREA_SUPPORT: "computadoras, impresoras, programas",
+    IT_AREA_NETWORK: "internet, wifi, servidores, VPN",
+    IT_AREA_SECURITY: "accesos, contraseñas, cuentas, incidentes de seguridad",
+    IT_AREA_PROGRAMMING: "sistemas internos, Odoo, desarrollos y reportes",
+}
+
+# Área de un ticket que no la trae (p. ej. un correo al buzón general),
+# según su categoría. Programación solo se elige a mano.
+CATEGORY_IT_AREA: dict[str, str] = {
+    TicketCategory.HARDWARE.value: IT_AREA_SUPPORT,
+    TicketCategory.SOFTWARE.value: IT_AREA_SUPPORT,
+    TicketCategory.NETWORK.value: IT_AREA_NETWORK,
+    TicketCategory.ACCESS.value: IT_AREA_SECURITY,
+}
+
+# Nombres de antes que la migración convierte en un área fija (los tickets y
+# técnicos pasan a esa área). Cualquier otra área se borra: lo suyo queda
+# «Sin área».
+LEGACY_IT_AREA_NAMES: dict[str, str] = {
+    "Soporte técnico": IT_AREA_SUPPORT,
+    "Redes": IT_AREA_NETWORK,
+    "Infraestructura": IT_AREA_NETWORK,
+}
 
 # Texto que se muestra para un ticket o usuario sin área.
 NO_AREA_LABEL = "Sin área"

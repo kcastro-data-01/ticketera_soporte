@@ -52,29 +52,31 @@ const respuesta = (status, cuerpo) => ({ ok: status < 300, status, json: async (
 
 // --- auth.js ---------------------------------------------------------------------
 
-test("permisos: áreas solo Administrador; cambiar el área, Administrador y Técnico", () => {
-  for (const [rol, areas, cambiar] of [["Administrador", true, true], ["Técnico", false, true], ["Solicitante", false, false]]) {
+test("permisos: nadie administra áreas (son fijas); cambiar el área, Administrador y Técnico", () => {
+  for (const [rol, cambiar] of [["Administrador", true], ["Técnico", true], ["Solicitante", false]]) {
     const { sandbox } = sandboxCon(rol, async () => respuesta(200, []));
-    assert.equal(sandbox.puede("areas"), areas, rol);
+    assert.equal(sandbox.puede("areas"), false, rol);
     assert.equal(sandbox.puede("cambiar_area"), cambiar, rol);
   }
 });
 
-test("llenarSelectAreas: «Todas», «Sin área» y las áreas (las desactivadas marcadas)", () => {
+test("llenarSelectAreas: «Todas», «Sin área» y las áreas fijas", () => {
   const { sandbox } = sandboxCon("Administrador", async () => respuesta(200, []));
   const select = nodo("area");
-  sandbox.llenarSelectAreas(select, [{ id: 2, name: "Redes", is_active: true }, { id: 5, name: "Viejas", is_active: false }],
+  sandbox.llenarSelectAreas(select, [{ id: 1, name: "Soporte" }, { id: 2, name: "Redes e Infraestructura" }],
     { primera: "Todas", sinArea: true });
   assert.deepEqual(select.children.map((o) => [o.value, o.textContent]),
-    [["", "Todas"], ["sin", "Sin área"], ["2", "Redes"], ["5", "Viejas (desactivada)"]]);
+    [["", "Todas"], ["sin", "Sin área"], ["1", "Soporte"], ["2", "Redes e Infraestructura"]]);
 });
 
-test("cargarAreas pide las activas (o todas) y devuelve [] si falla", async () => {
-  const { sandbox, llamadas } = sandboxCon("Administrador", async (url) =>
-    (url.includes("todas") ? respuesta(500, {}) : respuesta(200, [{ id: 1, name: "Redes" }])));
+test("cargarAreas pide las áreas fijas y devuelve [] si falla", async () => {
+  let falla = false;
+  const { sandbox, llamadas } = sandboxCon("Administrador", async () =>
+    (falla ? respuesta(500, {}) : respuesta(200, [{ id: 1, name: "Soporte" }])));
   assert.equal((await sandbox.cargarAreas()).length, 1);
-  assert.deepEqual(JSON.parse(JSON.stringify(await sandbox.cargarAreas(true))), []);
-  assert.deepEqual(llamadas.map((l) => l.url), ["/api/areas", "/api/areas?todas=true"]);
+  falla = true;
+  assert.deepEqual(JSON.parse(JSON.stringify(await sandbox.cargarAreas())), []);
+  assert.deepEqual(llamadas.map((l) => l.url), ["/api/areas", "/api/areas"]);
 });
 
 test("el historial muestra el cambio de área", () => {
@@ -143,31 +145,27 @@ test("detalle.html: «Área de IT» en los datos y la sección «Cambiar área»
   assert.match(html, /<input type="checkbox" id="area-reasignar" checked>/);
 });
 
-// --- Pantalla «Áreas de IT» ------------------------------------------------------
+// --- Áreas fijas: sin pantalla de administración --------------------------------
 
-test("areas.html: solo Administrador, formulario, tabla y sin código inline", () => {
-  const html = leer("areas.html");
-  assert.match(html, /<script src="js\/guardia\.js" data-permiso="areas"><\/script>/);
-  assert.match(html, /<form id="form-area"/);
-  assert.match(html, /<th>Técnicos activos<\/th>/);
-  assert.match(html, /<a href="areas.html" class="menu-enlace activo" aria-current="page" data-permiso="areas">/);
-  assert.doesNotMatch(html, /<script>(?!<\/script>)/);
+test("ya no existe la pantalla «Áreas de IT» ni su enlace en el menú", () => {
+  assert.equal(fs.existsSync(path.join(__dirname, "..", "areas.html")), false);
+  assert.equal(fs.existsSync(path.join(__dirname, "..", "js", "areas.js")), false);
+  for (const pagina of fs.readdirSync(path.join(__dirname, "..")).filter((f) => f.endsWith(".html"))) {
+    assert.doesNotMatch(leer(pagina), /areas\.html/, pagina);
+  }
 });
 
-test("areas.js: valida el nombre y pinta cada área con sus acciones", () => {
-  const ids = ["cuerpo-areas", "tabla-areas", "areas-estado"];
-  const { sandbox, nodos } = sandboxCon("Administrador", async () => respuesta(200, []), ids);
-  vm.runInNewContext(leer("js/areas.js"), sandbox, { filename: "areas.js" });
-  assert.deepEqual({ ...sandbox.validarNombreArea("  Mesa   de ayuda ") }, { nombre: "Mesa de ayuda" });
-  assert.match(sandbox.validarNombreArea("x").error, /al menos 2/);
-  sandbox.renderAreas([{ id: 1, name: "Redes", is_active: true, tecnicos: 2 },
-    { id: 2, name: "Vieja", is_active: false, tecnicos: 0 }]);
-  const filas = nodos.get("cuerpo-areas").children;
-  assert.equal(filas.length, 2);
-  assert.deepEqual(filas[0].children.slice(0, 2).map((c) => c.textContent), ["Redes", "2"]);
-  assert.equal(filas[0].children[2].children[0].textContent, "Activa");
-  assert.deepEqual(filas[1].children[3].children.map((b) => b.textContent), ["Renombrar", "Reactivar"]);
-  assert.equal(nodos.get("tabla-areas").hidden, false);
+test("«Nuevo ticket»: debajo de «Área de IT», qué atiende cada área", () => {
+  const html = leer("crear.html");
+  const bloque = html.slice(html.indexOf('<select id="area"'), html.indexOf("</ul>", html.indexOf('id="ayuda-area"')));
+  const items = [...bloque.matchAll(/<li><strong>([^<]+)<\/strong>: ([^<]+)<\/li>/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(items, [
+    ["Soporte", "computadoras, impresoras, programas."],
+    ["Redes e Infraestructura", "internet, wifi, servidores, VPN."],
+    ["Ciberseguridad", "accesos, contraseñas, cuentas, incidentes de seguridad."],
+    ["Programación", "sistemas internos, Odoo, desarrollos y reportes."],
+  ]);
+  assert.match(html, /<select id="area" name="area" required aria-describedby="ayuda-area">/);
 });
 
 test("métricas: el filtro de área existe y se manda a la API", () => {

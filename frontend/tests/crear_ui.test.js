@@ -71,8 +71,10 @@ test("el formulario tiene texto de ayuda y botones en lugar de la lista", () => 
   for (const v of ["Baja", "Media", "Alta", "Crítica"]) {
     assert.match(html, new RegExp(`name="opcion-prioridad" value="${v}"`));
   }
-  // Título, descripción, área de IT, categoría, prioridad y adjuntos.
-  assert.equal((html.match(/class="ayuda-campo"/g) || []).length, 6);
+  // Título, descripción, categoría, prioridad y adjuntos; el área de IT
+  // lleva su lista de qué atiende cada una.
+  assert.equal((html.match(/class="ayuda-campo"/g) || []).length, 5);
+  assert.match(html, /<ul id="ayuda-area" class="ayuda-campo ayuda-areas">/);
   assert.match(html, /<select id="area" name="area" required aria-describedby="ayuda-area">/);
 });
 

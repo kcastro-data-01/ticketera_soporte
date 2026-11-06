@@ -1,8 +1,9 @@
-"""Áreas de IT: tabla administrada por el Administrador, área obligatoria al
-crear un ticket en la app, reparto al técnico del área con menos tickets
-abiertos, «IT solo recibe» (nunca se asigna a un Solicitante), cambio de
-área (Administrador y Técnico), filtros en la lista y en las métricas, y la
-migración automática de una base de antes de las áreas."""
+"""Áreas de IT fijas (Soporte, Redes e Infraestructura, Ciberseguridad,
+Programación): nadie las crea, renombra, desactiva ni borra (405), la
+migración deja exactamente esas, un ticket sin área la toma de la categoría,
+reparto al técnico del área con menos tickets abiertos, «IT solo recibe»
+(nunca se asigna a un Solicitante), cambio de área (Administrador y Técnico)
+y filtros en la lista y en las métricas."""
 
 from datetime import datetime, timezone
 
@@ -10,9 +11,9 @@ import pytest
 from sqlalchemy import create_engine, select, text
 
 from backend.auth import hash_password
-from backend.constants import EXAMPLE_IT_AREAS
+from backend.constants import CATEGORY_IT_AREA, IT_AREAS
 from backend.database import init_db
-from backend.migrate_add_it_areas import migrate_it_areas
+from backend.migrate_add_it_areas import fix_it_areas, migrate_it_areas
 from backend.models import History, ItArea, Ticket, User
 from backend.services import correo_service as cs
 from backend.services import ticket_service
@@ -31,12 +32,15 @@ def headers_de(client, session, role, email, name, area=None):
     return user, {"Authorization": f"Bearer {token['access_token']}"}
 
 
+# Nombres cortos de las 4 áreas fijas en las pruebas.
+SOP, RED, CIB, PROG = IT_AREAS
+
+
 @pytest.fixture
-def areas(session):
-    filas = {n: ItArea(name=n) for n in ("Soporte técnico", "Redes", "Infraestructura")}
-    session.add_all(filas.values())
-    session.commit()
-    return filas
+def areas(engine, session):
+    """Las 4 áreas fijas, como las deja la migración."""
+    fix_it_areas(engine)
+    return {a.name: a for a in session.scalars(select(ItArea)).all()}
 
 
 def tecnico(session, nombre, area=None, activo=True):
@@ -58,7 +62,7 @@ def ticket_abierto(session, asignado, estado="Nuevo", area=None):
 # --- Migración ------------------------------------------------------------------
 
 
-def test_migration_adds_areas_to_an_old_database_and_keeps_everything_sin_area(tmp_path):
+def _vieja(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'vieja.db'}")
     with engine.begin() as conn:
         conn.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY, name VARCHAR(120), "
@@ -71,89 +75,140 @@ def test_migration_adds_areas_to_an_old_database_and_keeps_everything_sin_area(t
         ahora = datetime.now(timezone.utc)
         conn.execute(text("INSERT INTO tickets VALUES (1, 'Viejo', 'Desc', 'Red', 'Media', 'Nuevo', 2, 1, "
                           ":a, :a)"), {"a": ahora})
-    init_db(engine)
+    return engine
+
+
+def _areas_de(engine):
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT name FROM it_areas ORDER BY id")).scalars().all() == list(EXAMPLE_IT_AREAS)
+        return conn.execute(text("SELECT name FROM it_areas ORDER BY id")).scalars().all()
+
+
+def test_migration_on_a_base_without_areas_creates_exactly_the_four(tmp_path):
+    """Como en Neon: todavía no hay áreas. Lo de antes queda «Sin área»."""
+    engine = _vieja(tmp_path)
+    init_db(engine)
+    assert _areas_de(engine) == list(IT_AREAS)
+    with engine.connect() as conn:
         assert conn.execute(text("SELECT area_id FROM users")).scalars().all() == [None, None]
         # El ticket viejo asignado a un Solicitante queda como estaba, «Sin área».
         assert conn.execute(text("SELECT assigned_to_id, area_id FROM tickets")).one() == (2, None)
+    init_db(engine)  # idempotente
+    assert _areas_de(engine) == list(IT_AREAS)
     engine.dispose()
 
 
-def test_example_areas_are_loaded_only_once(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path / 'nueva.db'}")
+def test_migration_turns_the_old_areas_into_the_fixed_ones(tmp_path, caplog):
+    """La base local: «Soporte técnico» → «Soporte», «Redes» e
+    «Infraestructura» → «Redes e Infraestructura», «Ciberseguridad» igual y
+    cualquier otra («Samuel Mendez», las de prueba) se borra: sus tickets y
+    técnicos quedan «Sin área»."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'local.db'}")
     init_db(engine)
     with engine.begin() as conn:
-        conn.execute(text("UPDATE it_areas SET name = 'Mesa de ayuda' WHERE name = 'Soporte técnico'"))
-        conn.execute(text("DELETE FROM it_areas WHERE name = 'Redes'"))
-    init_db(engine)
-    migrate_it_areas(engine)
+        conn.execute(text("DELETE FROM it_areas"))
+        viejas = ["Soporte técnico", "Redes", "Infraestructura", "Ciberseguridad", "Samuel Mendez",
+                  "Mesa de prueba", "Programacion"]
+        for n, nombre in enumerate(viejas, start=1):
+            conn.execute(text("INSERT INTO it_areas (id, name, is_active, created_at) "
+                              "VALUES (:i, :n, :a, CURRENT_TIMESTAMP)"),
+                         {"i": n, "n": nombre, "a": nombre != "Mesa de prueba"})
+        # Un técnico y un ticket en cada área vieja.
+        for n in range(1, 8):
+            conn.execute(text("INSERT INTO users (id, name, email, role, is_active, area_id) "
+                              "VALUES (:i, :n, :e, 'Técnico', 1, :a)"),
+                         {"i": n, "n": f"T{n}", "e": f"t{n}@data.cr", "a": n})
+            conn.execute(text("INSERT INTO tickets (id, title, description, category, priority, state, "
+                              "area_id, created_at, updated_at) VALUES (:i, 'Ticket viejo', 'D', 'Red', "
+                              "'Media', 'Nuevo', :a, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"), {"i": n, "a": n})
+    with caplog.at_level("WARNING"):
+        init_db(engine)
+    assert sorted(_areas_de(engine)) == sorted(IT_AREAS)
     with engine.connect() as conn:
-        nombres = conn.execute(text("SELECT name FROM it_areas ORDER BY id")).scalars().all()
-    assert nombres == ["Mesa de ayuda", "Infraestructura", "Ciberseguridad"]
+        nombre_de = dict(conn.execute(text("SELECT id, name FROM it_areas")).all())
+        areas_tickets = [nombre_de.get(a) for a in conn.execute(
+            text("SELECT area_id FROM tickets ORDER BY id")).scalars().all()]
+        areas_usuarios = [nombre_de.get(a) for a in conn.execute(
+            text("SELECT area_id FROM users ORDER BY id")).scalars().all()]
+    # «Programacion» (sin tilde) es Programación: no se pierde su ticket.
+    esperado = [SOP, RED, RED, CIB, None, None, PROG]
+    assert areas_tickets == esperado
+    assert areas_usuarios == esperado
+    assert "«Samuel Mendez»" in caplog.text and "«Soporte técnico» pasa a «Soporte»" in caplog.text
+    caplog.clear()
+    init_db(engine)
+    assert "Áreas de IT" not in caplog.text, "ya al día: no hace nada"
     engine.dispose()
 
 
-# --- Administración de áreas ----------------------------------------------------
+# --- Las áreas son fijas: nadie las cambia (405) -------------------------------
 
 
-def test_admin_creates_renames_deactivates_and_reactivates(auth_client):
-    creada = auth_client.post("/api/areas", json={"name": "  Mesa   de ayuda "})
-    assert creada.status_code == 201, creada.text
-    area = creada.json()
-    assert (area["name"], area["is_active"], area["tecnicos"]) == ("Mesa de ayuda", True, 0)
-
-    assert auth_client.post("/api/areas", json={"name": "MESA DE AYUDA"}).status_code == 409
-    assert auth_client.post("/api/areas", json={"name": "x"}).status_code == 422
-
-    renombrada = auth_client.patch(f"/api/areas/{area['id']}", json={"name": "Soporte en sitio"})
-    assert renombrada.json()["name"] == "Soporte en sitio"
-    assert auth_client.patch(f"/api/areas/{area['id']}", json={"is_active": False}).json()["is_active"] is False
-    assert auth_client.get("/api/areas").json() == []
-    todas = auth_client.get("/api/areas?todas=1").json()
-    assert [(a["name"], a["is_active"]) for a in todas] == [("Soporte en sitio", False)]
-    assert auth_client.patch(f"/api/areas/{area['id']}", json={"is_active": True}).json()["is_active"] is True
-    assert auth_client.patch("/api/areas/999", json={"is_active": True}).status_code == 404
+def test_everyone_lists_the_four_fixed_areas_in_order(client, session, areas):
+    tecnico(session, "Pedro", areas[RED])
+    tecnico(session, "Luis", areas[RED], activo=False)
+    for rol in ("Administrador", "Técnico", "Solicitante"):
+        _, h = headers_de(client, session, rol, f"{rol[:3].lower()}@data.cr", rol)
+        lista = client.get("/api/areas", headers=h).json()
+        assert [a["name"] for a in lista] == list(IT_AREAS), rol
+    assert {a["name"]: a["tecnicos"] for a in lista}[RED] == 1
+    uno = client.get(f"/api/areas/{areas[CIB].id}", headers=h)
+    assert (uno.status_code, uno.json()["name"]) == (200, CIB)
 
 
-def test_area_listing_counts_active_technicians(auth_client, session, areas):
-    tecnico(session, "Pedro", areas["Redes"])
-    tecnico(session, "Luis", areas["Redes"], activo=False)
-    lista = {a["name"]: a["tecnicos"] for a in auth_client.get("/api/areas").json()}
-    assert lista == {"Infraestructura": 0, "Redes": 1, "Soporte técnico": 0}
+@pytest.mark.parametrize("rol", ["Administrador", "Técnico", "Solicitante"])
+def test_no_role_can_create_rename_deactivate_or_delete_areas(client, session, areas, rol):
+    _, h = headers_de(client, session, rol, "quien@data.cr", "Quien")
+    area = areas[SOP]
+    for metodo, url, cuerpo in [
+        ("POST", "/api/areas", {"name": "Nueva"}),
+        ("PUT", "/api/areas", {"name": "Nueva"}),
+        ("PATCH", "/api/areas", {"name": "Nueva"}),
+        ("DELETE", "/api/areas", None),
+        ("POST", f"/api/areas/{area.id}", {"name": "Otra"}),
+        ("PUT", f"/api/areas/{area.id}", {"name": "Otra"}),
+        ("PATCH", f"/api/areas/{area.id}", {"name": "Otra"}),
+        ("PATCH", f"/api/areas/{area.id}", {"is_active": False}),
+        ("DELETE", f"/api/areas/{area.id}", None),
+    ]:
+        resp = client.request(metodo, url, json=cuerpo, headers=h)
+        assert resp.status_code == 405, f"{rol} {metodo} {url}: {resp.status_code}"
+    session.expire_all()
+    assert [a["name"] for a in client.get("/api/areas", headers=h).json()] == list(IT_AREAS)
+    assert session.get(ItArea, area.id).is_active is True
 
 
-@pytest.mark.parametrize("rol", ["Técnico", "Solicitante"])
-def test_only_admin_manages_areas_but_everyone_lists_active_ones(client, session, areas, rol):
-    _, h = headers_de(client, session, rol, "otro@data.cr", "Otro")
-    assert client.post("/api/areas", json={"name": "Nueva"}, headers=h).status_code == 403
-    assert client.patch(f"/api/areas/{areas['Redes'].id}", json={"is_active": False},
-                        headers=h).status_code == 403
-    assert client.get("/api/areas?todas=1", headers=h).status_code == 403
-    assert len(client.get("/api/areas", headers=h).json()) == 3
+def test_the_areas_page_and_menu_link_are_gone():
+    from pathlib import Path
+
+    frontend = Path(__file__).resolve().parents[2] / "frontend"
+    assert not (frontend / "areas.html").exists()
+    for pagina in frontend.glob("*.html"):
+        assert "areas.html" not in pagina.read_text(encoding="utf-8"), pagina.name
 
 
 # --- Crear ticket: área obligatoria y reparto ----------------------------------
 
 
-def test_area_is_required_when_there_are_active_areas(auth_client, areas):
-    resp = auth_client.post("/api/tickets", json=TICKET)
-    assert resp.status_code == 422
-    assert resp.json()["detail"] == "Elija el área de IT del ticket."
+@pytest.mark.parametrize("categoria,area", sorted(CATEGORY_IT_AREA.items()))
+def test_a_ticket_without_area_takes_it_from_its_category(auth_client, areas, categoria, area):
+    data = auth_client.post("/api/tickets", json=TICKET | {"category": categoria}).json()
+    assert data["area_name"] == area
 
 
-def test_inactive_or_unknown_area_is_rejected(auth_client, session, areas):
-    areas["Redes"].is_active = False
-    session.commit()
-    assert auth_client.post("/api/tickets", json=TICKET | {"area_id": areas["Redes"].id}).status_code == 422
+def test_programming_is_only_chosen_by_hand():
+    assert PROG not in CATEGORY_IT_AREA.values()
+    assert set(CATEGORY_IT_AREA.values()) == {SOP, RED, CIB}
+
+
+def test_unknown_area_is_rejected(auth_client, areas):
     assert auth_client.post("/api/tickets", json=TICKET | {"area_id": 999}).status_code == 422
 
 
 def test_ticket_goes_to_the_area_technician_with_fewest_open_tickets(auth_client, session, areas):
-    redes = areas["Redes"]
+    redes = areas[RED]
     pedro = tecnico(session, "Pedro", redes)
     luis = tecnico(session, "Luis", redes)
-    tecnico(session, "Otro", areas["Infraestructura"])  # de otra área: no cuenta
+    tecnico(session, "Otro", areas[PROG])  # de otra área: no cuenta
     ticket_abierto(session, pedro)
     # Los cerrados y resueltos no cuentan: Luis tiene 2 pero ninguno abierto.
     ticket_abierto(session, luis, "Cerrado")
@@ -161,28 +216,28 @@ def test_ticket_goes_to_the_area_technician_with_fewest_open_tickets(auth_client
     resp = auth_client.post("/api/tickets", json=TICKET | {"area_id": redes.id})
     assert resp.status_code == 201, resp.text
     data = resp.json()
-    assert (data["assigned_to_id"], data["area_id"], data["area_name"]) == (luis.id, redes.id, "Redes")
+    assert (data["assigned_to_id"], data["area_id"], data["area_name"]) == (luis.id, redes.id, RED)
 
 
 def test_area_without_technicians_goes_to_any_technician_with_fewest(auth_client, session, areas):
-    pedro = tecnico(session, "Pedro", areas["Redes"])
+    pedro = tecnico(session, "Pedro", areas[RED])
     ana = tecnico(session, "Ana")  # sin área
     ticket_abierto(session, pedro)
-    data = auth_client.post("/api/tickets", json=TICKET | {"area_id": areas["Infraestructura"].id}).json()
+    data = auth_client.post("/api/tickets", json=TICKET | {"area_id": areas[PROG].id}).json()
     # El área es la que se eligió, aunque lo atienda alguien de otra.
-    assert (data["assigned_to_id"], data["area_name"]) == (ana.id, "Infraestructura")
+    assert (data["assigned_to_id"], data["area_name"]) == (ana.id, PROG)
 
 
 def test_without_technicians_the_ticket_stays_unassigned(auth_client, areas):
-    data = auth_client.post("/api/tickets", json=TICKET | {"area_id": areas["Redes"].id}).json()
-    assert (data["assigned_to_id"], data["area_name"]) == (None, "Redes")
+    data = auth_client.post("/api/tickets", json=TICKET | {"area_id": areas[RED].id}).json()
+    assert (data["assigned_to_id"], data["area_name"]) == (None, RED)
 
 
 def test_requester_creates_a_ticket_with_area(client, session, areas):
-    pedro = tecnico(session, "Pedro", areas["Redes"])
+    pedro = tecnico(session, "Pedro", areas[RED])
     _, h = headers_de(client, session, "Solicitante", "sofia@data.cr", "Sofía")
-    data = client.post("/api/tickets", json=TICKET | {"area_id": areas["Redes"].id}, headers=h).json()
-    assert (data["assigned_to_id"], data["area_name"]) == (pedro.id, "Redes")
+    data = client.post("/api/tickets", json=TICKET | {"area_id": areas[RED].id}, headers=h).json()
+    assert (data["assigned_to_id"], data["area_name"]) == (pedro.id, RED)
 
 
 # --- IT solo recibe -------------------------------------------------------------
@@ -192,7 +247,7 @@ def test_a_ticket_can_not_be_assigned_to_a_requester(auth_client, session, areas
     sofia = User(name="Sofía", email="sofia@data.cr", role="Solicitante")
     session.add(sofia)
     session.commit()
-    ticket = auth_client.post("/api/tickets", json=TICKET | {"area_id": areas["Redes"].id}).json()
+    ticket = auth_client.post("/api/tickets", json=TICKET | {"area_id": areas[RED].id}).json()
     resp = auth_client.patch(f"/api/tickets/{ticket['id']}/assign", json={"assigned_to_id": sofia.id})
     assert resp.status_code == 422
     assert "Solicitante" in resp.json()["detail"]
@@ -209,25 +264,18 @@ def test_old_ticket_assigned_to_a_requester_can_be_reassigned(auth_client, sessi
     assert resp.json()["assigned_to_id"] == pedro.id
 
 
-def test_inbox_ticket_takes_the_area_of_the_mailbox_owner(session, areas):
+def test_inbox_ticket_goes_to_the_owner_with_the_area_of_its_category(session, areas):
+    """Correo al buzón general: asignado al dueño (como antes) y el área sale
+    de la categoría, aunque la dueña tenga otra área."""
     duena = User(name="Kristin Castro", email="kcastro@data.cr", role="Administrador",
-                 area_id=areas["Soporte técnico"].id)
-    ana = User(name="Ana Pérez", email="ana@data.cr", role="Solicitante")
-    session.add_all([duena, ana])
+                 area_id=areas[PROG].id)
+    session.add_all([duena, User(name="Ana Pérez", email="ana@data.cr", role="Solicitante")])
     session.commit()
     resultado, _ = cs.procesar_correo(session, cs.correo_desde_graph(crear_correo()), CONFIG)
     assert resultado == "ticket"
     ticket = session.scalars(select(Ticket)).one()
-    assert (ticket.assigned_to_id, ticket.area_id) == (duena.id, areas["Soporte técnico"].id)
-
-
-def test_inbox_ticket_is_sin_area_when_the_owner_has_no_area(session):
-    duena = User(name="Kristin Castro", email="kcastro@data.cr", role="Administrador")
-    session.add_all([duena, User(name="Ana Pérez", email="ana@data.cr", role="Solicitante")])
-    session.commit()
-    cs.procesar_correo(session, cs.correo_desde_graph(crear_correo()), CONFIG)
-    ticket = session.scalars(select(Ticket)).one()
-    assert (ticket.assigned_to_id, ticket.area_id) == (duena.id, None)
+    assert ticket.assigned_to_id == duena.id
+    assert ticket.area.name == CATEGORY_IT_AREA[ticket.category]
 
 
 def test_inbox_owner_who_is_a_requester_never_gets_the_ticket(session, caplog):
@@ -248,34 +296,33 @@ def test_create_ticket_rejects_a_requester_as_assignee(session):
     from backend.schemas import TicketCreate
 
     with pytest.raises(ticket_service.AssigneeNotITError):
-        ticket_service.create_ticket(session, TicketCreate(**TICKET), None, asignado=sofia,
-                                     requiere_area=False)
+        ticket_service.create_ticket(session, TicketCreate(**TICKET), None, asignado=sofia)
 
 
 # --- Cambiar el área ------------------------------------------------------------
 
 
 def test_technician_moves_the_ticket_to_another_area_and_it_is_in_the_history(client, session, areas):
-    pedro = tecnico(session, "Pedro", areas["Redes"])
-    _, h = headers_de(client, session, "Técnico", "luis@data.cr", "Luis", areas["Infraestructura"])
-    ticket = ticket_abierto(session, pedro, area=areas["Redes"])
+    pedro = tecnico(session, "Pedro", areas[RED])
+    _, h = headers_de(client, session, "Técnico", "luis@data.cr", "Luis", areas[PROG])
+    ticket = ticket_abierto(session, pedro, area=areas[RED])
     resp = client.patch(f"/api/tickets/{ticket.id}/area",
-                        json={"area_id": areas["Infraestructura"].id}, headers=h)
+                        json={"area_id": areas[PROG].id}, headers=h)
     assert resp.status_code == 200, resp.text
-    assert (resp.json()["area_name"], resp.json()["assigned_to_id"]) == ("Infraestructura", pedro.id)
+    assert (resp.json()["area_name"], resp.json()["assigned_to_id"]) == (PROG, pedro.id)
     entrada = session.scalars(select(History).where(History.action == "area_changed")).one()
     assert (entrada.field, entrada.old_value, entrada.new_value, entrada.author) == (
-        "area", "Redes", "Infraestructura", "Luis")
+        "area", RED, PROG, "Luis")
     historial = client.get(f"/api/tickets/{ticket.id}/history", headers=h).json()
     assert historial[-1]["action"] == "area_changed"
 
 
 def test_changing_the_area_with_reassign_goes_to_the_new_area_technician(auth_client, session, areas):
-    pedro = tecnico(session, "Pedro", areas["Redes"])
-    marta = tecnico(session, "Marta", areas["Infraestructura"])
-    ticket = ticket_abierto(session, pedro, area=areas["Redes"])
+    pedro = tecnico(session, "Pedro", areas[RED])
+    marta = tecnico(session, "Marta", areas[PROG])
+    ticket = ticket_abierto(session, pedro, area=areas[RED])
     resp = auth_client.patch(f"/api/tickets/{ticket.id}/area",
-                             json={"area_id": areas["Infraestructura"].id, "reasignar": True})
+                             json={"area_id": areas[PROG].id, "reasignar": True})
     assert resp.json()["assigned_to_id"] == marta.id
     acciones = session.scalars(select(History.action).where(History.ticket_id == ticket.id)
                                .order_by(History.id)).all()
@@ -285,24 +332,21 @@ def test_changing_the_area_with_reassign_goes_to_the_new_area_technician(auth_cl
 def test_sin_area_ticket_gets_an_area(auth_client, session, areas):
     pedro = tecnico(session, "Pedro")
     ticket = ticket_abierto(session, pedro)
-    auth_client.patch(f"/api/tickets/{ticket.id}/area", json={"area_id": areas["Redes"].id})
+    auth_client.patch(f"/api/tickets/{ticket.id}/area", json={"area_id": areas[RED].id})
     entrada = session.scalars(select(History).where(History.action == "area_changed")).one()
-    assert (entrada.old_value, entrada.new_value) == (None, "Redes")
+    assert (entrada.old_value, entrada.new_value) == (None, RED)
 
 
 def test_area_change_rules(client, auth_client, session, areas):
-    pedro = tecnico(session, "Pedro", areas["Redes"])
-    ticket = ticket_abierto(session, pedro, area=areas["Redes"])
+    pedro = tecnico(session, "Pedro", areas[RED])
+    ticket = ticket_abierto(session, pedro, area=areas[RED])
     _, sol = headers_de(client, session, "Solicitante", "sofia@data.cr", "Sofía")
     url = f"/api/tickets/{ticket.id}/area"
-    assert client.patch(url, json={"area_id": areas["Infraestructura"].id}, headers=sol).status_code == 403
-    areas["Infraestructura"].is_active = False
-    session.commit()
-    assert auth_client.patch(url, json={"area_id": areas["Infraestructura"].id}).status_code == 422
+    assert client.patch(url, json={"area_id": areas[PROG].id}, headers=sol).status_code == 403
     assert auth_client.patch(url, json={"area_id": 999}).status_code == 404
     ticket.state = "Cerrado"
     session.commit()
-    assert auth_client.patch(url, json={"area_id": areas["Soporte técnico"].id}).status_code == 409
+    assert auth_client.patch(url, json={"area_id": areas[SOP].id}).status_code == 409
 
 
 # --- Usuarios -------------------------------------------------------------------
@@ -310,26 +354,26 @@ def test_area_change_rules(client, auth_client, session, areas):
 
 def test_admin_assigns_an_area_to_a_technician_and_to_themself(auth_client, session, areas):
     pedro = tecnico(session, "Pedro")
-    resp = auth_client.patch(f"/api/users/{pedro.id}", json={"area_id": areas["Redes"].id})
-    assert (resp.json()["area_id"], resp.json()["area_name"]) == (areas["Redes"].id, "Redes")
+    resp = auth_client.patch(f"/api/users/{pedro.id}", json={"area_id": areas[RED].id})
+    assert (resp.json()["area_id"], resp.json()["area_name"]) == (areas[RED].id, RED)
     yo = auth_client.get("/api/auth/me").json()
-    assert auth_client.patch(f"/api/users/{yo['id']}", json={"area_id": areas["Soporte técnico"].id}
-                             ).json()["area_name"] == "Soporte técnico"
+    assert auth_client.patch(f"/api/users/{yo['id']}", json={"area_id": areas[SOP].id}
+                             ).json()["area_name"] == SOP
     # null quita el área.
     assert auth_client.patch(f"/api/users/{pedro.id}", json={"area_id": None}).json()["area_id"] is None
 
 
 def test_a_requester_has_no_area(auth_client, session, areas):
     resp = auth_client.post("/api/users", json={"name": "Sofía", "email": "sofia@data.cr",
-                                                 "role": "Solicitante", "area_id": areas["Redes"].id})
+                                                 "role": "Solicitante", "area_id": areas[RED].id})
     assert resp.status_code == 422
     creado = auth_client.post("/api/users", json={"name": "Pedro", "email": "pedro@data.cr",
-                                                   "role": "Técnico", "area_id": areas["Redes"].id})
-    assert creado.json()["area_name"] == "Redes"
+                                                   "role": "Técnico", "area_id": areas[RED].id})
+    assert creado.json()["area_name"] == RED
 
 
 def test_demoting_to_requester_clears_the_area_and_needs_no_open_tickets(auth_client, session, areas):
-    pedro = tecnico(session, "Pedro", areas["Redes"])
+    pedro = tecnico(session, "Pedro", areas[RED])
     abierto = ticket_abierto(session, pedro)
     resp = auth_client.patch(f"/api/users/{pedro.id}", json={"role": "Solicitante"})
     assert resp.status_code == 409
@@ -341,40 +385,29 @@ def test_demoting_to_requester_clears_the_area_and_needs_no_open_tickets(auth_cl
     assert (resp.json()["role"], resp.json()["area_id"]) == ("Solicitante", None)
 
 
-def test_a_technician_keeps_an_area_that_was_deactivated(auth_client, session, areas):
-    pedro = tecnico(session, "Pedro", areas["Redes"])
-    areas["Redes"].is_active = False
-    session.commit()
-    resp = auth_client.patch(f"/api/users/{pedro.id}", json={"name": "Pedro R.", "area_id": areas["Redes"].id})
-    assert resp.status_code == 200
-    assert resp.json()["area_name"] == "Redes"
-    otro = tecnico(session, "Luis")
-    assert auth_client.patch(f"/api/users/{otro.id}", json={"area_id": areas["Redes"].id}).status_code == 422
-
-
 # --- Filtros ---------------------------------------------------------------------
 
 
 def test_list_filters_by_area_and_sin_area(auth_client, session, areas):
     pedro = tecnico(session, "Pedro")
-    en_redes = ticket_abierto(session, pedro, area=areas["Redes"])
+    en_redes = ticket_abierto(session, pedro, area=areas[RED])
     sin = ticket_abierto(session, pedro)
-    assert [t["id"] for t in auth_client.get(f"/api/tickets?area={areas['Redes'].id}").json()] == [en_redes.id]
+    assert [t["id"] for t in auth_client.get(f"/api/tickets?area={areas[RED].id}").json()] == [en_redes.id]
     assert [t["id"] for t in auth_client.get("/api/tickets?sin_area=true").json()] == [sin.id]
-    assert auth_client.get(f"/api/tickets?area={areas['Redes'].id}&sin_area=true").status_code == 422
+    assert auth_client.get(f"/api/tickets?area={areas[RED].id}&sin_area=true").status_code == 422
 
 
 def test_metrics_filter_by_area(auth_client, session, areas):
     pedro = tecnico(session, "Pedro")
-    ticket_abierto(session, pedro, area=areas["Redes"])
-    ticket_abierto(session, pedro, area=areas["Redes"])
+    ticket_abierto(session, pedro, area=areas[RED])
+    ticket_abierto(session, pedro, area=areas[RED])
     ticket_abierto(session, pedro)
     todas = auth_client.get("/api/metricas").json()
-    redes = auth_client.get(f"/api/metricas?area={areas['Redes'].id}").json()
+    redes = auth_client.get(f"/api/metricas?area={areas[RED].id}").json()
     sin = auth_client.get("/api/metricas?sin_area=true").json()
     assert (todas["tarjetas"]["abiertos"], redes["tarjetas"]["abiertos"], sin["tarjetas"]["abiertos"]) == (3, 2, 1)
     assert redes["por_persona"][0]["abiertos"] == 2
-    assert auth_client.get(f"/api/metricas?area={areas['Redes'].id}&sin_area=1").status_code == 422
+    assert auth_client.get(f"/api/metricas?area={areas[RED].id}&sin_area=1").status_code == 422
 
 
 # --- Chat: reglas y permisos -----------------------------------------------------
@@ -391,7 +424,7 @@ from backend.tests.test_asistente_interpretacion import _respuesta, ia  # noqa: 
 
 @pytest.mark.parametrize("pregunta", [
     "¿quién puede cambiar el área de un ticket?",
-    "que areas hay y quien las puede administrar?",
+    "que areas hay?",
 ])
 def test_chat_answers_the_area_rule_without_ai(client, session, ia, pregunta):
     h = login_as(client, session, "Técnico", "tec@tec.local", "José Solano")
@@ -405,6 +438,10 @@ def test_chat_rules_and_permissions_talk_about_areas():
     assert "Técnico activo de esa área con menos tickets abiertos" in REGLA_REPARTO
     assert REGLA_AREAS in REGLAS_PARA_IA
     assert "cambiar el área de IT de un ticket" in PERMISOS_POR_ROL["Técnico"].split("No puede")[0]
-    assert "administrar las áreas de IT" in PERMISOS_POR_ROL["Técnico"].split("No puede")[1]
+    for rol in PERMISOS_POR_ROL:
+        assert "administrar las áreas" not in PERMISOS_POR_ROL[rol], rol
+    for area in IT_AREAS:
+        assert area in REGLA_AREAS
+    assert "Hardware y Software → Soporte" in REGLA_AREAS
     assert "cambiar el área de IT de un ticket" in PERMISOS_POR_ROL["Solicitante"].split("No puede")[1]
     assert "No puede" not in PERMISOS_POR_ROL["Administrador"]

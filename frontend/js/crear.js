@@ -202,7 +202,7 @@ async function iniciarAreas() {
   const areas = await cargarAreas();
   hayAreas = areas.length > 0;
   llenarSelectAreas(elements.area, areas, {
-    primera: hayAreas ? "Elija un área" : "No hay áreas: queda «Sin área»",
+    primera: hayAreas ? "Elija un área" : "No se pudieron cargar: se elige por la categoría",
   });
   elements.area.required = hayAreas;
 }

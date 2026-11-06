@@ -706,9 +706,7 @@ function init() {
   }
   aplicarDensidad();
   if (!vistaSolicitante && elements.area && typeof cargarAreas === "function") {
-    /* El Administrador también ve las desactivadas (sus tickets se siguen
-       pudiendo filtrar); el Técnico, las activas. */
-    cargarAreas(typeof puede === "function" && puede("areas")).then((areas) => llenarSelectAreas(elements.area, areas, { primera: "Todas", sinArea: true }));
+    cargarAreas().then((areas) => llenarSelectAreas(elements.area, areas, { primera: "Todas", sinArea: true }));
   }
   loadUsers().then(fetchTickets);
 }
