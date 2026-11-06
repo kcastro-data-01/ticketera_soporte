@@ -161,6 +161,9 @@
       <a href="crear.html" class="enlace-boton">Nuevo ticket</a>
     </div>
 
+    <!-- Total de tickets que cumplen los filtros (se muestran todos). -->
+    <p id="total-tickets" class="total-listado" aria-live="polite" hidden></p>
+
     <div class="tabla-scroll" id="tabla-tickets">
       <table class="listado">
         <thead>
@@ -183,11 +186,6 @@
     <!-- Tablero: una columna por estado con los tickets ya cargados (app.js). -->
     <div id="tablero" class="tablero" aria-label="Tickets por estado" hidden></div>
 
-    <nav class="paginacion" id="paginacion" aria-label="Páginas del listado" hidden>
-      <button type="button" id="pagina-anterior" class="secundario">← Anterior</button>
-      <span id="pagina-info"></span>
-      <button type="button" id="pagina-siguiente" class="secundario">Siguiente →</button>
-    </nav>
     </main>
 
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>

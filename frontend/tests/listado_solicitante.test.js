@@ -17,7 +17,7 @@ const indexHtml = leer("index.html");
 
 const IDS = [
   "form-filtros", "search", "category", "priority", "state", "limpiar", "estado-carga", "lista-tickets",
-  "paginacion", "pagina-anterior", "pagina-siguiente", "pagina-info",
+  "total-tickets",
   "titulo-listado", "subtitulo-listado",
   "th-asignado", "nuevo-ticket-solicitante", "sin-solicitudes", "tabla-tickets",
 ];

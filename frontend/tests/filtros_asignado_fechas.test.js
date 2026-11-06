@@ -18,8 +18,7 @@ const indexHtml = leer("index.html");
 const CAMPOS = ["search", "category", "priority", "state", "assigned", "fecha"];
 const INICIAL = {};
 const IDS = [
-  "form-filtros", ...CAMPOS, "limpiar", "estado-carga", "lista-tickets", "paginacion",
-  "pagina-anterior", "pagina-siguiente", "pagina-info", "tabla-tickets", "tablero",
+  "form-filtros", ...CAMPOS, "limpiar", "estado-carga", "lista-tickets", "total-tickets", "tabla-tickets", "tablero",
   "vista-todos", "vista-mios", "ver-tabla", "ver-tablero",
 ];
 const USUARIOS = [

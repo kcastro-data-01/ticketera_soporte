@@ -132,7 +132,8 @@ def list_tickets(
         None, description="Hasta este día (hora de Costa Rica, incluido)."
     ),
     limit: int | None = Query(
-        None, ge=1, le=100, description="Tamaño de página (sin él, todos)."
+        None, ge=1, le=1000,
+        description="Cuántos tickets como máximo (sin él, todos; la lista de la app pide 1000).",
     ),
     offset: int = Query(0, ge=0, description="Tickets a saltar (paginación)."),
     session: Session = Depends(get_session),

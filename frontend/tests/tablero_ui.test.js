@@ -18,7 +18,7 @@ const css = leer("css/estilos.css");
 
 const IDS = [
   "form-filtros", "search", "category", "priority", "state", "limpiar", "estado-carga", "lista-tickets",
-  "paginacion", "pagina-anterior", "pagina-siguiente", "pagina-info", "tabla-tickets", "tablero",
+  "total-tickets", "tabla-tickets", "tablero",
   "ver-tabla", "ver-tablero", "sin-solicitudes", "densidad", "densidad-compacta", "densidad-comoda",
 ];
 

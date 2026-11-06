@@ -176,7 +176,8 @@ tickets abiertos (si el área no tiene técnicos, al Técnico con menos tickets 
 ticket Cerrado no cambia más.
 - Listado: tarjetas de resumen (pulsarlas filtra la lista), pestañas «Todos / Mis \
 tickets», búsqueda por texto, filtros por categoría, prioridad, estado y área de \
-IT (también «Sin área»), y páginas de 20 tickets.
+IT (también «Sin área»). Se ven todos los tickets que cumplen los filtros, con el \
+total arriba de la lista.
 - Detalle de un ticket: datos, comentarios (firmados con el nombre de quien los \
 escribe) e historial de cambios; a la derecha, el área de IT, asignación y \
 cambio de estado según el rol. El Técnico y el Administrador pueden pasar el \

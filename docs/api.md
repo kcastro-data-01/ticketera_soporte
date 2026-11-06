@@ -148,7 +148,7 @@ responde `200` con `[]`.
 | `fecha_campo` | `creacion` (por defecto), `en_proceso`, `resuelto`, `cerrado` | qué fecha miran `desde`/`hasta`: la creación o la **primera** vez que el ticket pasó a ese estado (según su historial); un ticket que nunca pasó por ese estado no aparece |
 | `desde` | `AAAA-MM-DD` | desde ese día, incluido (hora de Costa Rica, UTC−6) |
 | `hasta` | `AAAA-MM-DD` | hasta ese día, incluido (hora de Costa Rica); `desde` posterior a `hasta` → `422` |
-| `limit` / `offset` | enteros (`limit` de 1 a 100) | paginación; el total de coincidencias llega en la cabecera `X-Total-Count` |
+| `limit` / `offset` | enteros (`limit` de 1 a 1000) | máximo de tickets y desde cuál; sin `limit`, todos. El total de coincidencias llega en la cabecera `X-Total-Count` |
 
 Se puede usar solo `desde`, solo `hasta` o los dos; `fecha_campo` sin días no
 filtra. La pantalla del listado filtra por un solo día de creación («Fecha de

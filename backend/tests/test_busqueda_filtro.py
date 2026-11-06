@@ -420,3 +420,13 @@ def test_closed_tickets_count_as_resolved_and_filter_by_several_states(auth_clie
     ids = {t["id"] for t in auth_client.get("/api/tickets?state=Resuelto&state=Cerrado").json()}
     assert ids == {resuelto["id"], cerrado["id"]}
     assert nuevo["id"] not in ids
+
+
+def test_list_accepts_up_to_1000_per_request(auth_client):
+    """La lista de la app ya no pagina: pide todos con limit=1000 (el tope)."""
+    created = [_ticket(auth_client, title=f"Ticket {n}") for n in range(3)]
+    resp = auth_client.get("/api/tickets?limit=1000")
+    assert resp.status_code == 200
+    assert len(resp.json()) == len(created)
+    assert resp.headers["X-Total-Count"] == "3"
+    assert auth_client.get("/api/tickets?limit=1001").status_code == 422

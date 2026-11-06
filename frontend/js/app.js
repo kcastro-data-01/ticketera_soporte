@@ -5,12 +5,12 @@
 const API_TICKETS_URL = "/api/tickets";
 const API_USERS_URL = "/api/users";
 
-/* Tickets por página del listado. */
-const PAGE_SIZE = 20;
+/* Sin paginación: se piden todos los tickets que cumplen los filtros, con
+   este tope (el mismo máximo que acepta la API en ``limit``). */
+const LIMITE_LISTADO = 1000;
 
 let usersById = new Map();
-/* Página actual (empieza en 0) y vista «Mis tickets». */
-let paginaActual = 0;
+/* Vista «Mis tickets». */
 let soloMios = false;
 /* Vista simple del Solicitante: solo ve sus tickets (el servidor ya los
    filtra) y no los resuelve, así que se le ocultan los datos del equipo. */
@@ -68,10 +68,7 @@ function getElements() {
     limpiar: document.getElementById("limpiar"),
     estado: document.getElementById("estado-carga"),
     tbody: document.getElementById("lista-tickets"),
-    paginacion: document.getElementById("paginacion"),
-    paginaAnterior: document.getElementById("pagina-anterior"),
-    paginaSiguiente: document.getElementById("pagina-siguiente"),
-    paginaInfo: document.getElementById("pagina-info"),
+    total: document.getElementById("total-tickets"),
     vistaTodos: document.getElementById("vista-todos"),
     vistaMios: document.getElementById("vista-mios"),
   };
@@ -130,8 +127,9 @@ function renderFiltroAsignado(users) {
   select.value = elegido;
 }
 
-/* La página se pide con limit/offset; el total llega en X-Total-Count. */
-function buildTicketsUrl(filters, pagina = 0) {
+/* Todos los que cumplen los filtros (hasta LIMITE_LISTADO); el total de
+   coincidencias llega en X-Total-Count. */
+function buildTicketsUrl(filters) {
   const params = new URLSearchParams();
   if (filters.search) params.set("search", filters.search);
   if (filters.category) params.set("category", filters.category);
@@ -150,8 +148,7 @@ function buildTicketsUrl(filters, pagina = 0) {
     params.set("desde", filters.fecha);
     params.set("hasta", filters.fecha);
   }
-  params.set("limit", String(PAGE_SIZE));
-  if (pagina > 0) params.set("offset", String(pagina * PAGE_SIZE));
+  params.set("limit", String(LIMITE_LISTADO));
   const query = params.toString();
   return query ? `${API_TICKETS_URL}?${query}` : API_TICKETS_URL;
 }
@@ -560,13 +557,14 @@ async function fetchTickets() {
   mostrarSinSolicitudes(false);
   ticketsActuales = [];
   clearRows();
+  renderTotal(0, 0);
   pintarFilasEsqueleto();
 
   const filtros = getFilters();
 
   /* 1) La URL se construye una sola vez. 2) Una única petición HTTP por
      ejecución de fetchTickets(). */
-  const url = buildTicketsUrl(filtros, paginaActual);
+  const url = buildTicketsUrl(filtros);
 
   let response;
   try {
@@ -612,7 +610,7 @@ async function fetchTickets() {
       ? response.headers.get("X-Total-Count")
       : NaN
   );
-  renderPaginacion(Number.isFinite(totalCabecera) ? totalCabecera : tickets.length);
+  renderTotal(Number.isFinite(totalCabecera) ? totalCabecera : tickets.length, tickets.length);
 
   if (tickets.length === 0) {
     const conFiltros = hayFiltros(filtros);
@@ -637,23 +635,24 @@ async function fetchTickets() {
   }
 }
 
-/* Controles «← Anterior · Página X de Y · Siguiente →». */
-function renderPaginacion(total) {
+/* Texto del total arriba de la lista («23 tickets»). Si hay más que el tope,
+   dice cuántos se muestran. */
+function textoTotal(total, mostrados = total) {
+  const tickets = (n) => (n === 1 ? "1 ticket" : `${n} tickets`);
+  if (total > mostrados) {
+    return `Se muestran ${mostrados} de ${tickets(total)}. Use los filtros para acotar la lista.`;
+  }
+  return tickets(total);
+}
+
+function renderTotal(total, mostrados) {
   const elements = getElements();
-  if (!elements.paginacion) return;
-  const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  elements.paginacion.hidden = total <= PAGE_SIZE;
-  elements.paginaInfo.textContent = `Página ${paginaActual + 1} de ${paginas} · ${total} tickets`;
-  elements.paginaAnterior.disabled = paginaActual === 0;
-  elements.paginaSiguiente.disabled = paginaActual + 1 >= paginas;
+  if (!elements.total) return;
+  elements.total.textContent = total > 0 ? textoTotal(total, mostrados) : "";
+  elements.total.hidden = total === 0;
 }
 
-function irAPagina(pagina) {
-  paginaActual = Math.max(0, pagina);
-  fetchTickets();
-}
-
-/* Cambia entre «Todos» y «Mis tickets» y vuelve a la primera página. */
+/* Cambia entre «Todos» y «Mis tickets». */
 function mostrarSoloMios(valor) {
   const elements = getElements();
   soloMios = valor;
@@ -663,7 +662,7 @@ function mostrarSoloMios(valor) {
     elements.vistaTodos.setAttribute("aria-pressed", String(!valor));
     elements.vistaMios.setAttribute("aria-pressed", String(valor));
   }
-  irAPagina(0);
+  fetchTickets();
 }
 
 function init() {
@@ -674,7 +673,7 @@ function init() {
 
   elements.form.addEventListener("submit", (event) => {
     event.preventDefault();
-    irAPagina(0);
+    fetchTickets();
   });
 
   elements.limpiar.addEventListener("click", () => {
@@ -682,10 +681,6 @@ function init() {
     mostrarSoloMios(false);
   });
 
-  if (elements.paginaAnterior) {
-    elements.paginaAnterior.addEventListener("click", () => irAPagina(paginaActual - 1));
-    elements.paginaSiguiente.addEventListener("click", () => irAPagina(paginaActual + 1));
-  }
   if (elements.vistaTodos) {
     elements.vistaTodos.addEventListener("click", () => mostrarSoloMios(false));
     elements.vistaMios.addEventListener("click", () => mostrarSoloMios(true));

@@ -1825,12 +1825,9 @@ body.app {
   color: var(--color-texto-inverso);
 }
 
-.paginacion {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--espaciado-lg);
-  margin-top: var(--espaciado-lg);
+/* Total del listado («23 tickets»): chico y gris, arriba de la tabla. */
+.total-listado {
+  margin: var(--espaciado-md) 0 var(--espaciado-sm);
   font-size: var(--texto-sm);
   color: var(--color-tenue-fuerte);
 }

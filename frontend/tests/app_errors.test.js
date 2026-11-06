@@ -82,6 +82,7 @@ function createHarness(fetchImpl) {
     "limpiar",
     "estado-carga",
     "lista-tickets",
+    "total-tickets",
   ].forEach((id) => nodes.set(id, createNode(id)));
 
   const fetchCalls = [];
@@ -117,6 +118,7 @@ function createHarness(fetchImpl) {
     fetchTickets: () => sandbox.fetchTickets(),
     estado: () => nodes.get("estado-carga"),
     tbody: () => nodes.get("lista-tickets"),
+    total: () => nodes.get("total-tickets"),
     setFilter(id, value) {
       nodes.get(id).value = value;
     },
@@ -141,7 +143,7 @@ test("respuesta 200 con tickets: se pinta la lista y se oculta el estado", async
   await harness.fetchTickets();
 
   assertFetchCount(harness, 1);
-  assert.equal(harness.fetchCalls[0], "/api/tickets?limit=20");
+  assert.equal(harness.fetchCalls[0], "/api/tickets?limit=1000");
   assert.equal(harness.estado().hidden, true);
   assert.equal(harness.tbody().children.length, 1);
   assert.equal(harness.consoleErrors.length, 0);
@@ -170,29 +172,35 @@ test("con filtros la URL conserva los parámetros y siempre pide una página de 
 
   /* Cada ejecución añade exactamente UNA petición. */
   assertFetchCount(harness, 2);
-  assert.equal(harness.fetchCalls[0], "/api/tickets?limit=20");
+  assert.equal(harness.fetchCalls[0], "/api/tickets?limit=1000");
   assert.equal(
     harness.fetchCalls[1],
-    "/api/tickets?search=correo&state=En+proceso&limit=20"
+    "/api/tickets?search=correo&state=En+proceso&limit=1000"
   );
 });
 
-test("buildTicketsUrl: mios y offset de la página", () => {
+test("buildTicketsUrl: sin paginación, pide todos hasta el tope de 1000", () => {
   const harness = createHarness(async () => jsonResponse(200, []));
-  assert.equal(
-    harness.sandbox.buildTicketsUrl({ mios: true }, 2),
-    "/api/tickets?mios=true&limit=20&offset=40"
-  );
+  assert.equal(harness.sandbox.buildTicketsUrl({ mios: true }), "/api/tickets?mios=true&limit=1000");
+  assert.doesNotMatch(harness.sandbox.buildTicketsUrl({}), /offset/);
+});
+
+test("el total va arriba de la lista: «23 tickets», «1 ticket» o cuántos se muestran", () => {
+  const harness = createHarness(async () => jsonResponse(200, []));
+  assert.equal(harness.sandbox.textoTotal(23), "23 tickets");
+  assert.equal(harness.sandbox.textoTotal(1), "1 ticket");
+  assert.equal(harness.sandbox.textoTotal(1500, 1000),
+    "Se muestran 1000 de 1500 tickets. Use los filtros para acotar la lista.");
 });
 
 test("buildTicketsUrl: un estado pide ese estado; los viejos grupos piden «Todos»", () => {
   const harness = createHarness(async () => jsonResponse(200, []));
   assert.equal(
     harness.sandbox.buildTicketsUrl({ state: "En proceso" }),
-    "/api/tickets?state=En+proceso&limit=20"
+    "/api/tickets?state=En+proceso&limit=1000"
   );
   for (const viejo of ["Nuevo,En proceso", "Resuelto,Cerrado", "Pendientes"]) {
-    assert.equal(harness.sandbox.buildTicketsUrl({ state: viejo }), "/api/tickets?limit=20", viejo);
+    assert.equal(harness.sandbox.buildTicketsUrl({ state: viejo }), "/api/tickets?limit=1000", viejo);
   }
 });
 
@@ -320,7 +328,32 @@ test("respuesta vacía con filtros: avisa que no hay coincidencias", async () =>
 
 test("buildTicketsUrl: «Área de IT» pide area o sin_area", () => {
   const harness = createHarness(async () => jsonResponse(200, []));
-  assert.equal(harness.sandbox.buildTicketsUrl({ area: "3" }), "/api/tickets?area=3&limit=20");
-  assert.equal(harness.sandbox.buildTicketsUrl({ area: "sin" }), "/api/tickets?sin_area=true&limit=20");
+  assert.equal(harness.sandbox.buildTicketsUrl({ area: "3" }), "/api/tickets?area=3&limit=1000");
+  assert.equal(harness.sandbox.buildTicketsUrl({ area: "sin" }), "/api/tickets?sin_area=true&limit=1000");
   assert.equal(harness.sandbox.hayFiltros({ area: "3" }), true);
+});
+
+test("se pintan todos los tickets y el total va arriba (sin paginación)", async () => {
+  const muchos = Array.from({ length: 23 }, (_, i) => ({ ...TICKET, id: i + 1 }));
+  const harness = createHarness(async () => ({
+    ...jsonResponse(200, muchos),
+    headers: { get: (nombre) => (nombre === "X-Total-Count" ? "23" : null) },
+  }));
+  await harness.fetchTickets();
+  assert.equal(harness.tbody().children.length, 23);
+  assert.equal(harness.total().textContent, "23 tickets");
+  assert.equal(harness.total().hidden, false);
+});
+
+test("sin tickets el total no se muestra", async () => {
+  const harness = createHarness(async () => jsonResponse(200, []));
+  await harness.fetchTickets();
+  assert.equal(harness.total().hidden, true);
+});
+
+test("index.html: sin botones de página y con el total arriba de la tabla", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.doesNotMatch(html, /id="paginacion"|pagina-anterior|pagina-siguiente|pagina-info/);
+  assert.ok(html.indexOf('id="total-tickets"') < html.indexOf('id="tabla-tickets"'));
+  assert.ok(html.indexOf('id="total-tickets"') < html.indexOf('id="tablero"'));
 });

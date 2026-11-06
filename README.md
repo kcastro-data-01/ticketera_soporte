@@ -64,8 +64,9 @@ filtrarlos, y consultar su historial de cambios.
 
 - Panel de inicio con resumen (Nuevos, En proceso, Resueltos, Críticos sin
   resolver, Asignados a mí; `GET /api/tickets/summary`), vista «Mis tickets»
-  (`?mios=true`) y paginación de 20 en 20 (`limit`/`offset`, total en la
-  cabecera `X-Total-Count`).
+  (`?mios=true`) y sin paginación: se ven todos los tickets que cumplen los
+  filtros (la app pide `limit=1000`) con el total arriba de la lista (cabecera
+  `X-Total-Count`).
 - Inicio de sesión **solo con la cuenta de Microsoft de la empresa**
   (Entra ID); ver [Inicio de sesión con Microsoft](#inicio-de-sesión-con-microsoft).
   «Mi cuenta» muestra los datos del usuario (la contraseña es la de Microsoft).
@@ -363,7 +364,7 @@ Parámetros de consulta (todos opcionales y combinables entre sí):
 | `fecha_campo` | `creacion` (por defecto), `en_proceso`, `resuelto`, `cerrado` | qué fecha miran `desde`/`hasta`: la creación o la **primera** vez que el ticket pasó a ese estado (según su historial); un ticket que nunca pasó por ese estado no aparece |
 | `desde` | `AAAA-MM-DD` | desde ese día, incluido (hora de Costa Rica, UTC−6) |
 | `hasta` | `AAAA-MM-DD` | hasta ese día, incluido (hora de Costa Rica); `desde` posterior a `hasta` → `422` |
-| `limit` / `offset` | enteros (`limit` de 1 a 100) | paginación; el total de coincidencias llega en la cabecera `X-Total-Count` |
+| `limit` / `offset` | enteros (`limit` de 1 a 1000) | máximo de tickets y desde cuál; sin `limit`, todos. El total de coincidencias llega en la cabecera `X-Total-Count` |
 
 Sin parámetros el comportamiento es el original (listado completo). Un valor
 fuera de los enums (`category`, `priority`, `state`, `fecha_campo`), una fecha

@@ -16,7 +16,7 @@ const css = leer("css/estilos.css");
 
 const IDS = [
   "form-filtros", "search", "category", "priority", "state", "limpiar", "estado-carga", "lista-tickets",
-  "paginacion", "pagina-anterior", "pagina-siguiente", "pagina-info", "tabla-tickets", "tablero",
+  "total-tickets", "tabla-tickets", "tablero",
 ];
 
 function nodo(tag) {
@@ -129,7 +129,7 @@ test("elegir un estado pide solo ese estado", async () => {
   nodos.get("state").value = "Resuelto";
   enviar(nodos.get("form-filtros"));
   await esperar();
-  assert.match(pedidos.at(-1), /^\/api\/tickets\?state=Resuelto&limit=20$/);
+  assert.match(pedidos.at(-1), /^\/api\/tickets\?state=Resuelto&limit=1000$/);
 });
 
 test("ayuda.html describe el filtro «Estado» sin los grupos viejos", () => {
