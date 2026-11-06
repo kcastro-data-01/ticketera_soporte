@@ -473,3 +473,26 @@ def test_api_messages_say_departamento(auth_client, session, areas):
     resp = auth_client.post("/api/users", json={"name": "Sofía", "email": "sofia@data.cr",
                                                  "role": "Solicitante", "area_id": areas[RED].id})
     assert resp.json()["detail"] == "El Solicitante no tiene departamento: solo Técnicos y Administradores."
+
+
+def test_help_and_chat_say_the_same():
+    """La ayuda y el chat dicen lo mismo: la tabla de permisos es la misma (otra
+    prueba la compara), los 4 departamentos con lo que atiende cada uno, IT
+    solo recibe, la nota de los tickets de antes y la lista sin páginas."""
+    from pathlib import Path
+
+    from backend.constants import IT_AREA_SCOPE
+    from backend.services import asistente_service as asis
+
+    ayuda = (Path(__file__).resolve().parents[2] / "frontend" / "ayuda.html").read_text(encoding="utf-8")
+    for area, atiende in IT_AREA_SCOPE.items():
+        assert f"<strong>{area}</strong>: {atiende}." in ayuda, area
+        assert f"{area} ({atiende})" in asis.REGLA_AREAS, area
+    assert asis.NOTA_ASIGNADOS_DE_ANTES in ayuda
+    assert asis.NOTA_ASIGNADOS_DE_ANTES in asis.REGLAS_PARA_IA
+    assert "IT solo recibe" in ayuda and "IT solo recibe" in asis.REGLA_SOLICITANTE
+    assert "sin páginas" in ayuda and "sin páginas" in asis.GUIA_APP
+    assert "tarjetas de resumen" not in asis.GUIA_APP
+    assert "asignados a él" not in ayuda
+    for _, _, valores in asis.TABLA_PERMISOS:
+        assert "asignados" not in valores[2]

@@ -95,9 +95,11 @@ test("historial: el ticket creado desde un correo dice quién lo envió y a qui�
   );
 });
 
-test("ayuda: la tabla de permisos explica lo del Solicitante asignado", () => {
-  assert.match(ayuda, /<td>Cambiar estado<\/td>(<td>Sí<\/td>){2}<td>Solo en los asignados a él<\/td>/);
-  assert.match(ayuda, /<td>Ver tickets<\/td>.*<td>Los suyos y los asignados a él<\/td>/);
+test("ayuda: IT solo recibe; el Solicitante ve los que creó y no cambia el estado", () => {
+  assert.match(ayuda, /<td>Cambiar estado<\/td>(<td>Sí<\/td>){2}<td>No<\/td>/);
+  assert.match(ayuda, /<td>Ver tickets<\/td>.*<td>Los que creó<\/td>/);
+  assert.doesNotMatch(ayuda, /asignados a él/);
+  assert.match(ayuda, /<p id="nota-asignados">Si a un Solicitante le quedó asignado un ticket de antes/);
 });
 
 test("ayuda: los correos enviados pasan por el mismo filtro que los que llegan", () => {

@@ -72,7 +72,8 @@ def test_role_texts_follow_the_table():
     assert "editar tickets (los que creó, mientras están en Nuevo)" in tecnico.split("No puede")[0]
     assert "cambiar el estado" in tecnico.split("No puede")[0]
     solicitante = PERMISOS_POR_ROL["Solicitante"]
-    assert "ver tickets (los suyos y los asignados a él)" in solicitante
+    assert "ver tickets (los que creó)" in solicitante
+    assert "cambiar el estado" in solicitante.split("No puede")[1], "IT solo recibe"
     assert "editar tickets (los que creó, mientras están en Nuevo)" in solicitante.split("No puede")[0]
     assert "asignar tickets" in solicitante.split("No puede")[1]
     assert "No puede" not in PERMISOS_POR_ROL["Administrador"]

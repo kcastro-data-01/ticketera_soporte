@@ -534,8 +534,8 @@ def test_warm_up_only_runs_with_qwen_and_ollama_url(monkeypatch):
     [
         ("Administrador", "¿Cómo desactivo a un usuario?", "Entra a «Usuarios» en el menú lateral."),
         ("Técnico", "¿Cómo desactivo a un usuario?", "Con tu rol (Técnico) no puedes desactivar o reactivar usuarios. Pídeselo a un Administrador."),
-        # El Solicitante sí cambia el estado de los tickets asignados a él.
-        ("Solicitante", "¿Cómo cierro un ticket?", "Como Solicitante, solo puede cambiar el estado de los tickets que tiene asignados"),
+        # IT solo recibe: el Solicitante no cambia el estado (salvo un ticket de antes).
+        ("Solicitante", "¿Cómo cierro un ticket?", "Como Solicitante, el estado de sus tickets lo cambian el Técnico asignado o un Administrador"),
         ("Técnico", "¿cómo cierro un ticket?", "Abre el ticket y toca el estado al que quieres pasarlo en el recorrido"),
         ("Técnico", "¿cómo asigno un ticket?", "Con tu rol (Técnico) no puedes asignar tickets. Pídeselo a un Administrador."),
         ("Administrador", "¿cómo asigno un ticket?", "Abre el ticket desde el listado."),

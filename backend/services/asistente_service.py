@@ -102,17 +102,19 @@ DESCRIPCION_ROL = {
 }
 # La tabla «Permisos por rol» de ayuda.html, tal cual (una prueba la compara):
 # (acción en la tabla, cómo se dice en una oración, valor por rol en ROLES_TABLA).
-_SUYOS = "Los suyos y los asignados a él"
+# IT solo recibe: el Solicitante ve y comenta los tickets que creó (los que
+# le quedaron asignados de antes, también: lo dice NOTA_ASIGNADOS_DE_ANTES).
+_SUYOS = "Los que creó"
 _TODOS_MENOS_CERRADOS = "Todos, salvo los Cerrados"
 _CREADOS_NUEVOS = "Los que creó, mientras están en Nuevo"
 TABLA_PERMISOS = [
     ("Ver tickets", "ver tickets", ("Todos", "Todos", _SUYOS)),
     ("Crear ticket", "crear tickets", ("Sí", "Sí", "Sí")),
-    ("Comentar", "comentar", ("Sí", "Sí", "En los suyos y los asignados a él")),
-    ("Adjuntar archivos", "adjuntar archivos", ("Sí", "Sí", "En los suyos y los asignados a él")),
+    ("Comentar", "comentar", ("Sí", "Sí", "En los que creó")),
+    ("Adjuntar archivos", "adjuntar archivos", ("Sí", "Sí", "En los que creó")),
     ("Eliminar adjuntos", "eliminar adjuntos", ("Todos", "Los que subió", "Los que subió")),
     ("Editar ticket", "editar tickets", (_TODOS_MENOS_CERRADOS, _CREADOS_NUEVOS, _CREADOS_NUEVOS)),
-    ("Cambiar estado", "cambiar el estado", ("Sí", "Sí", "Solo en los asignados a él")),
+    ("Cambiar estado", "cambiar el estado", ("Sí", "Sí", "No")),
     ("Asignar ticket", "asignar tickets", ("Sí", "No", "No")),
     ("Cambiar departamento", "cambiar el departamento de un ticket", ("Sí", "Sí", "No")),
     ("Historial global", "ver el historial global", ("Sí", "Sí", "No")),
@@ -148,6 +150,11 @@ def permisos_del_rol(rol: str) -> str:
 
 # Qué puede hacer cada rol (la tabla de permisos de ayuda.html).
 PERMISOS_POR_ROL = {rol: permisos_del_rol(rol) for rol in ROLES_TABLA}
+# Otra nota debajo de la tabla de ayuda.html: tickets que un Solicitante
+# tenía asignados antes de que IT solo recibiera.
+NOTA_ASIGNADOS_DE_ANTES = ("Si a un Solicitante le quedó asignado un ticket de antes, lo sigue "
+                           "viendo y puede comentarlo y cambiarle el estado hasta que un "
+                           "Administrador lo reasigne a alguien de IT.")
 # La nota debajo de la tabla de ayuda.html: vale para todos los roles.
 NOTA_CERRADO = ("Un ticket Cerrado es de solo lectura para todos, también para el Administrador: "
                 "no se edita, no se reasigna, no se comenta, no se elimina, no cambia de estado "
@@ -176,10 +183,12 @@ Alta, Crítica). Al crearse se asigna solo al Técnico activo de ese departament
 tickets abiertos (si el departamento no tiene técnicos, al Técnico con menos tickets abiertos).
 - Estados: Nuevo → En proceso → Resuelto → Cerrado, siempre en ese orden; un \
 ticket Cerrado no cambia más.
-- Listado: tarjetas de resumen (pulsarlas filtra la lista), pestañas «Todos / Mis \
-tickets», búsqueda por texto, filtros por categoría, prioridad, estado y \
-departamento (también «Sin departamento»). Se ven todos los tickets que cumplen los filtros, con el \
-total arriba de la lista.
+- Listado: en la barra de arriba, «Todos / Mis tickets» (Mis tickets: los asignados \
+a usted), «Tabla / Tablero» y «Compacta / Cómoda»; debajo, los filtros en una fila: \
+Buscar, Categoría, Prioridad, Estado, Asignado a, Departamento (también «Sin \
+departamento») y Fecha de creación, con «Buscar» y «Limpiar filtros». Se ven todos \
+los tickets que cumplen los filtros, sin páginas, con el total arriba de la lista. \
+El Solicitante ve «Mis solicitudes»: sus tickets, con búsqueda, estado y fecha.
 - Detalle de un ticket: datos, comentarios (firmados con el nombre de quien los \
 escribe) e historial de cambios; a la derecha, el departamento, asignación y \
 cambio de estado según el rol. El Técnico y el Administrador pueden pasar el \
@@ -1556,7 +1565,7 @@ REGLA_REPARTO = (
 )
 REGLA_QUIEN_CAMBIA_ESTADO = (
     "El Técnico y el Administrador pueden cambiar el estado de cualquier "
-    "ticket; el Solicitante, solo el de los tickets que tiene asignados. El orden es "
+    "ticket; el Solicitante, no (salvo un ticket de antes que le quedó asignado). El orden es "
     "Nuevo → En proceso → Resuelto → Cerrado: se puede avanzar a cualquier estado "
     "posterior saltando pasos; hacia atrás solo se reabre un ticket Resuelto "
     "pasándolo a En proceso, y un ticket Cerrado ya no cambia."
@@ -1589,10 +1598,10 @@ REGLA_AREAS = (
 )
 REGLA_SOLICITANTE = (
     "El Solicitante es cualquier persona de la empresa y no tiene departamento. "
-    "Solo ve los tickets que él mismo creó y los que tiene asignados (solo tickets viejos: "
-    "IT solo recibe, ya no se le asignan tickets nuevos). "
-    "Puede crear tickets, editar los que creó mientras están en «Nuevo», comentar en ellos y "
-    "cambiar el estado de los que tiene asignados. No ve el historial global, las métricas ni la lista de usuarios."
+    "Ve los tickets que él mismo creó: puede crearlos, editarlos mientras están en «Nuevo», "
+    "comentarlos y adjuntar archivos. IT solo recibe: nunca se le asignan tickets, y el "
+    "estado lo cambian el Técnico o el Administrador. " + NOTA_ASIGNADOS_DE_ANTES + " "
+    "No ve el historial global, las métricas ni la lista de usuarios."
 )
 REGLA_CORREO = (
     "Cuando la función de correo está activa, la ticketera revisa el buzón de soporte cada "
@@ -1651,6 +1660,7 @@ REGLAS_PARA_IA = (
     + "\nPermisos de cada rol (son exactamente estos; no agregues ni quites ninguno):\n"
     + "\n".join(f"- {rol}: {PERMISOS_POR_ROL[rol]}" for rol in ROLES_TABLA)
     + f"\n- {NOTA_CERRADO}"
+    + f"\n- {NOTA_ASIGNADOS_DE_ANTES}"
     + "\nCuando hables de un rol, habla del rol: no le pongas nombres de personas ni "
     "digas quién tiene ese rol, salvo que la pregunta sea sobre una persona concreta."
 )
@@ -1766,7 +1776,7 @@ def _app_general(user: User) -> str:
 def _app_mis_tickets(user: User) -> str:
     if user.role == UserRole.REQUESTER.value:
         return ("En «Tickets», en el menú lateral, se abre «Mis solicitudes»: ahí están los "
-                "tickets que usted creó y los que tiene asignados, con su estado.")
+                "tickets que usted creó, con su estado.")
     return ("En «Tickets», en el menú lateral, pulse la pestaña «Mis tickets»: muestra los "
             "tickets asignados a usted. La pestaña «Todos» muestra todos los tickets.")
 
@@ -1818,8 +1828,8 @@ def _app_reabrir(user: User) -> str:
              "reabrir uno Resuelto, abra el ticket y toque «En proceso» en el recorrido; "
              "puede escribir el motivo, que queda como comentario.")
     if user.role == UserRole.REQUESTER.value:
-        texto += (" Como Solicitante, solo puede hacerlo en los tickets que tiene asignados; "
-                  "si no, pídaselo al Técnico asignado o a un Administrador.")
+        texto += (" Como Solicitante, el estado no lo cambia usted: pídaselo al Técnico "
+                  "asignado o a un Administrador.")
     return texto + (" Si el problema de un ticket Cerrado vuelve a aparecer, cree un ticket "
                     "nuevo con «Nuevo ticket» y mencione el número del anterior.")
 
@@ -1889,7 +1899,7 @@ def _app_adjuntos(user: User) -> str:
         lineas.append("Usted puede eliminar cualquier adjunto. En un ticket Cerrado no se agregan "
                       "ni se eliminan adjuntos.")
     else:
-        extra = (" Como Solicitante, adjunta en sus tickets y en los asignados a usted."
+        extra = (" Como Solicitante, adjunta en los tickets que creó."
                  if user.role == UserRole.REQUESTER.value else "")
         lineas.append(f"Puede eliminar los adjuntos que subió usted; los demás, un Administrador."
                       f"{extra} En un ticket Cerrado no se agregan ni se eliminan adjuntos.")
@@ -1902,9 +1912,9 @@ _ARCHIVO = r"(archivos?|adjuntos?|fotos?|fotografias?|imagen(es)?|capturas?|pant
 def _app_cambiar_estado_solicitante(user: User) -> str | None:
     if user.role != UserRole.REQUESTER.value:
         return None  # la guía de siempre
-    return ("Como Solicitante, solo puede cambiar el estado de los tickets que tiene asignados: "
-            "abra el ticket y toque el estado al que quiere pasarlo en el recorrido, arriba, "
-            "debajo del título. Los de los demás los cambia el Técnico asignado o un Administrador.")
+    return ("Como Solicitante, el estado de sus tickets lo cambian el Técnico asignado o un "
+            "Administrador: si necesita un cambio, déjelo en un comentario del ticket. "
+            + NOTA_ASIGNADOS_DE_ANTES)
 
 
 # (cómo se reconoce en la pregunta normalizada, respuesta según el usuario), en orden.

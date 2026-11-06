@@ -112,8 +112,8 @@ def test_summary_does_not_detail_the_permissions_table(client, session, ia):
     ("Técnico", "como uso explicar con ia", "pulse «Explicar con IA»"),
     ("Solicitante", "que es explicar con ia", "lo usan el Técnico y el Administrador"),
     ("Técnico", "como veo el detalle de un ticket", "se abre su detalle"),
-    ("Solicitante", "como cambio el estado", "solo puede cambiar el estado de los tickets que tiene asignados"),
-    ("Solicitante", "como cierro un ticket", "solo puede cambiar el estado de los tickets que tiene asignados"),
+    ("Solicitante", "como cambio el estado", "el estado de sus tickets lo cambian el Técnico asignado o un Administrador"),
+    ("Solicitante", "como cierro un ticket", "el estado de sus tickets lo cambian el Técnico asignado o un Administrador"),
 ])
 def test_common_app_questions_have_a_fixed_answer(client, session, ia, rol, pregunta, contiene):
     respuesta = _respuesta(preguntar(client, session, rol, pregunta), "directa")
