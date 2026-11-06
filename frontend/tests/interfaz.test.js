@@ -153,6 +153,9 @@ test("todas las páginas aplican el tema guardado en el <head>", () => {
   for (const f of fs.readdirSync(dir).filter((n) => n.endsWith(".html"))) {
     const html = fs.readFileSync(path.join(dir, f), "utf8");
     const cabeza = html.slice(0, html.indexOf("</head>"));
-    assert.match(cabeza, /localStorage\.getItem\("tema"\)==="oscuro"/, f);
+    // Sin defer: tiene que correr antes de pintar.
+    assert.match(cabeza, /<script src="js\/tema\.js"><\/script>/, f);
   }
+  const tema = fs.readFileSync(path.join(dir, "js", "tema.js"), "utf8");
+  assert.match(tema, /localStorage\.getItem\("tema"\)==="oscuro"/);
 });

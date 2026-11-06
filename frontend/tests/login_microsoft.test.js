@@ -12,7 +12,7 @@ const test = require("node:test");
 const vm = require("node:vm");
 
 const html = fs.readFileSync(path.join(__dirname, "..", "login.html"), "utf8");
-const script = html.slice(html.lastIndexOf("<script>") + "<script>".length, html.lastIndexOf("</script>"));
+const script = fs.readFileSync(path.join(__dirname, "..", "js", "login.js"), "utf8");
 
 test("login.html: un solo botón de Microsoft, MSAL con versión fija y sin registro", () => {
   assert.match(html, /<button type="button" id="btn-microsoft" class="btn-primario btn-microsoft">[\s\S]*?Iniciar sesión con Microsoft<\/button>/);

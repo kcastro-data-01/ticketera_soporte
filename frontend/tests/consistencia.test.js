@@ -11,7 +11,7 @@ const test = require("node:test");
 
 const leer = (archivo) => fs.readFileSync(path.join(__dirname, "..", archivo), "utf8");
 const css = leer("css/estilos.css");
-const login = leer("login.html");
+const login = leer("css/login.css");
 
 const regla = (fuente, selector) => {
   const i = fuente.indexOf(`${selector} {`);
@@ -31,7 +31,7 @@ test("botones y campos usan la misma altura en la app y en el login", () => {
   assert.match(regla(css, ".campo select"), /min-height: var\(--alto-control\);/);
   assert.match(regla(css, "\n.btn-accion"), /min-height: var\(--alto-control-chico\);/);
   assert.match(regla(login, ".auth-container .login-der .campo .form-input"), /min-height: var\(--alto-control\);[\s\S]*font-size: var\(--texto-md\);/);
-  assert.match(regla(login, "    .btn-primario"), /min-height: var\(--alto-control\);/);
+  assert.match(regla(login, "\n.btn-primario"), /min-height: var\(--alto-control\);/);
 });
 
 test("ventanas con 8 px, tarjetas con 6 px y títulos con la misma escala", () => {

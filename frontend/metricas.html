@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Métricas · American Data Networks</title>
   <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
-  <script>try{if(localStorage.getItem("tema")==="oscuro")document.documentElement.setAttribute("data-tema","oscuro")}catch(e){}</script>
+  <script src="js/tema.js"></script>
   <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -125,13 +125,7 @@
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
-  <script>
-    /* Se registra antes que los scripts diferidos: sin permiso se redirige
-       y no se ejecuta la inicialización de la página. */
-    document.addEventListener("DOMContentLoaded", function (event) {
-      if (!requirePermiso("metricas")) event.stopImmediatePropagation();
-    });
-  </script>
+  <script src="js/guardia.js" data-permiso="metricas"></script>
   <script src="js/auth.js" defer></script>
   <script src="js/asistente.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
