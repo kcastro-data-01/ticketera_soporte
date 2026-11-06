@@ -130,4 +130,4 @@ LEGACY_IT_AREA_NAMES: dict[str, str] = {
 }
 
 # Texto que se muestra para un ticket o usuario sin área.
-NO_AREA_LABEL = "Sin área"
+NO_AREA_LABEL = "Sin departamento"

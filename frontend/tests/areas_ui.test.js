@@ -60,13 +60,13 @@ test("permisos: nadie administra áreas (son fijas); cambiar el área, Administr
   }
 });
 
-test("llenarSelectAreas: «Todas», «Sin área» y las áreas fijas", () => {
+test("llenarSelectAreas: «Todos», «Sin departamento» y los departamentos fijos", () => {
   const { sandbox } = sandboxCon("Administrador", async () => respuesta(200, []));
   const select = nodo("area");
   sandbox.llenarSelectAreas(select, [{ id: 1, name: "Soporte" }, { id: 2, name: "Redes e Infraestructura" }],
-    { primera: "Todas", sinArea: true });
+    { primera: "Todos", sinArea: true });
   assert.deepEqual(select.children.map((o) => [o.value, o.textContent]),
-    [["", "Todas"], ["sin", "Sin área"], ["1", "Soporte"], ["2", "Redes e Infraestructura"]]);
+    [["", "Todos"], ["sin", "Sin departamento"], ["1", "Soporte"], ["2", "Redes e Infraestructura"]]);
 });
 
 test("cargarAreas pide las áreas fijas y devuelve [] si falla", async () => {
@@ -79,12 +79,12 @@ test("cargarAreas pide las áreas fijas y devuelve [] si falla", async () => {
   assert.deepEqual(llamadas.map((l) => l.url), ["/api/areas", "/api/areas"]);
 });
 
-test("el historial muestra el cambio de área", () => {
+test("el historial muestra el cambio de departamento", () => {
   const { sandbox } = sandboxCon("Técnico", async () => respuesta(200, []));
-  assert.deepEqual({ ...sandbox.describirHistorial({ action: "area_changed", old_value: "Redes", new_value: "Infraestructura" }) },
-    { accion: "Cambió el área", detalle: "Redes → Infraestructura" });
+  assert.deepEqual({ ...sandbox.describirHistorial({ action: "area_changed", old_value: "Soporte", new_value: "Programación" }) },
+    { accion: "Cambió el departamento", detalle: "Soporte → Programación" });
   assert.equal(sandbox.describirHistorial({ action: "area_changed", old_value: null, new_value: "Redes" }).detalle,
-    "Sin área → Redes");
+    "Sin departamento → Redes");
 });
 
 // --- Detalle -------------------------------------------------------------------
@@ -138,9 +138,13 @@ test("«Cambiar área» sin elegir un área no llama a la API", async () => {
   assert.equal(llamadas.length, 0);
 });
 
-test("detalle.html: «Área de IT» en los datos y la sección «Cambiar área» para quien puede", () => {
+test("detalle.html: «Departamento» en los datos y la sección «Cambiar departamento» para quien puede", () => {
   const html = leer("detalle.html");
-  assert.match(html, /<dt>Área de IT<\/dt>\s*<dd id="ver-area">/);
+  assert.match(html, /<dt>Departamento<\/dt>\s*<dd id="ver-area">/);
+  assert.match(html, /<h2>Cambiar departamento<\/h2>/);
+  assert.match(html, /id="cambiar-area">Cambiar departamento<\/button>/);
+  assert.match(html, /Reasignar al técnico del nuevo departamento con menos tickets abiertos/);
+  assert.doesNotMatch(html.replace(/<!--[\s\S]*?-->/g, ""), /[ÁáA]rea/);
   assert.match(html, /<section id="seccion-area"[^>]*data-permiso="cambiar_area">/);
   assert.match(html, /<input type="checkbox" id="area-reasignar" checked>/);
 });
@@ -155,7 +159,7 @@ test("ya no existe la pantalla «Áreas de IT» ni su enlace en el menú", () =>
   }
 });
 
-test("«Nuevo ticket»: debajo de «Área de IT», qué atiende cada área", () => {
+test("«Nuevo ticket»: debajo de «Departamento», qué atiende cada uno", () => {
   const html = leer("crear.html");
   const bloque = html.slice(html.indexOf('<select id="area"'), html.indexOf("</ul>", html.indexOf('id="ayuda-area"')));
   const items = [...bloque.matchAll(/<li><strong>([^<]+)<\/strong>: ([^<]+)<\/li>/g)].map((m) => [m[1], m[2]]);
@@ -178,4 +182,17 @@ test("métricas: el filtro de área existe y se manda a la API", () => {
   assert.equal(ctx.urlMetricas("2026-10-01", "2026-10-31", "sin"),
     "/api/metricas?desde=2026-10-01&hasta=2026-10-31&sin_area=true");
   assert.equal(ctx.urlMetricas("2026-10-01", "2026-10-31"), "/api/metricas?desde=2026-10-01&hasta=2026-10-31");
+});
+
+test("ninguna pantalla muestra «Área»: se llama «Departamento»", () => {
+  const carpeta = path.join(__dirname, "..");
+  for (const pagina of fs.readdirSync(carpeta).filter((f) => f.endsWith(".html"))) {
+    const visible = leer(pagina).replace(/<!--[\s\S]*?-->/g, "").replace(/área de TI/g, "");
+    assert.doesNotMatch(visible, /[ÁáAa]reas? de IT|>[^<]*\b[Áá]reas?\b|«Sin área»|Cambiar área/, pagina);
+  }
+  for (const archivo of ["js/auth.js", "js/crear.js", "js/detalle.js", "js/usuarios.js", "js/app.js", "js/metricas.js"]) {
+    const textos = [...leer(archivo).matchAll(/(["`])((?:(?!\1).)*)\1/g)].map((m) => m[2]);
+    const conArea = textos.filter((t) => /\b[Áá]reas?\b|Sin área/.test(t));
+    assert.deepEqual(conArea, [], archivo);
+  }
 });

@@ -11,7 +11,7 @@ from backend.models import ItArea, User
 class AreaNotFoundError(LookupError):
     def __init__(self, area_id: int):
         self.area_id = area_id
-        super().__init__(f"Área {area_id} no encontrada")
+        super().__init__(f"Departamento {area_id} no encontrado")
 
 
 class AreaInactiveError(ValueError):
@@ -19,7 +19,7 @@ class AreaInactiveError(ValueError):
 
     def __init__(self, area: ItArea):
         self.area = area
-        super().__init__(f"El área «{area.name}» no está disponible.")
+        super().__init__(f"El departamento «{area.name}» no está disponible.")
 
 
 def _orden(area: ItArea) -> tuple[int, int]:

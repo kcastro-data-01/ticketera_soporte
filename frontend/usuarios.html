@@ -87,14 +87,14 @@
               <small id="ayuda-rol" class="ayuda-campo">Define qué puede ver y hacer en la ticketera (ver Ayuda › Roles y permisos).</small>
               <small id="error-rol" class="error-campo" role="alert" hidden></small>
             </label>
-            <!-- Área de IT: solo Técnico y Administrador (opcional); el
+            <!-- Departamento (en el código «área»): solo Técnico y Administrador (opcional); el
                  Solicitante no tiene. usuarios.js la muestra según el rol. -->
             <label class="campo campo-area">
-              <span>Área de IT</span>
+              <span>Departamento</span>
               <select id="area" name="area" aria-describedby="ayuda-area">
-                <option value="">Sin área</option>
+                <option value="">Sin departamento</option>
               </select>
-              <small id="ayuda-area" class="ayuda-campo">El Técnico recibe los tickets de su área. Son fijas: Soporte, Redes e Infraestructura, Ciberseguridad y Programación.</small>
+              <small id="ayuda-area" class="ayuda-campo">El Técnico recibe los tickets de su departamento. Son fijos: Soporte, Redes e Infraestructura, Ciberseguridad y Programación.</small>
             </label>
           </div>
 
@@ -117,7 +117,7 @@
                 <th>Nombre</th>
                 <th>Correo</th>
                 <th>Rol</th>
-                <th>Área de IT</th>
+                <th>Departamento</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -163,11 +163,11 @@
               <small id="error-editar-rol" class="error-campo" role="alert" hidden></small>
             </label>
             <label class="campo campo-area">
-              <span>Área de IT</span>
+              <span>Departamento</span>
               <select id="editar-area" name="area" aria-describedby="ayuda-editar-area">
-                <option value="">Sin área</option>
+                <option value="">Sin departamento</option>
               </select>
-              <small id="ayuda-editar-area" class="ayuda-campo">Solo Técnico y Administrador. Pasar a Solicitante le quita el área.</small>
+              <small id="ayuda-editar-area" class="ayuda-campo">Solo Técnico y Administrador. Pasar a Solicitante le quita el departamento.</small>
             </label>
           </div>
 

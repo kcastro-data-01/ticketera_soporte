@@ -144,10 +144,10 @@ test("Solicitante: los tickets asignados a él dicen «Asignado a usted»", asyn
   assert.equal(textos(filas[1])[3], "José Solano");
 });
 
-test("index.html marca como «equipo» Categoría, Prioridad, Asignado a, Área de IT y Tabla/Tablero", () => {
+test("index.html marca como «equipo» Categoría, Prioridad, Asignado a, Departamento y Tabla/Tablero", () => {
   const marcados = [...indexHtml.matchAll(/<[^>]*data-vista="equipo"[^>]*>(?:\s*<[^>]*>)*\s*([^<]*)/g)].map((m) => m[0]);
   assert.equal(marcados.length, 7);
-  for (const texto of [">Categoría", ">Prioridad", ">Asignado a", ">Área de IT", 'aria-label="Cómo ver los tickets"']) {
+  for (const texto of [">Categoría", ">Prioridad", ">Asignado a", ">Departamento", 'aria-label="Cómo ver los tickets"']) {
     assert.ok(marcados.some((m) => m.includes(texto)), texto);
   }
 });

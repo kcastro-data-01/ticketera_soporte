@@ -16,7 +16,7 @@ class RequesterAreaError(ValueError):
     """El Solicitante no tiene área de IT (HTTP 422)."""
 
     def __init__(self):
-        super().__init__("El Solicitante no tiene área de IT: solo Técnicos y Administradores.")
+        super().__init__("El Solicitante no tiene departamento: solo Técnicos y Administradores.")
 
 
 class OpenTicketsAssignedError(ValueError):

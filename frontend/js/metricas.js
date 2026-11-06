@@ -454,7 +454,7 @@ async function iniciarMetricas() {
   const { form, desde, hasta, area } = elementos();
   if (!form) return;
   if (area && typeof cargarAreas === "function") {
-    llenarSelectAreas(area, await cargarAreas(), { primera: "Todas", sinArea: true });
+    llenarSelectAreas(area, await cargarAreas(), { primera: "Todos", sinArea: true });
     area.addEventListener("change", () => cargarMetricas());
   }
   const rango = rangoPorDefecto();

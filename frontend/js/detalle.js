@@ -624,7 +624,7 @@ async function cambiarAreaTicket() {
   const elements = getElements();
   const valor = elements.areaDestino ? String(elements.areaDestino.value || "") : "";
   if (!/^\d+$/.test(valor)) {
-    avisar("Elija el área de IT a la que pasa el ticket.", "error");
+    avisar("Elija el departamento al que pasa el ticket.", "error");
     return;
   }
   const reasignar = Boolean(elements.areaReasignar && elements.areaReasignar.checked);
@@ -636,16 +636,16 @@ async function cambiarAreaTicket() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ area_id: Number(valor), reasignar }),
     });
-    if (await rechazoDeReglas(response, "No tiene permiso para cambiar el área de este ticket.")) return;
+    if (await rechazoDeReglas(response, "No tiene permiso para cambiar el departamento de este ticket.")) return;
     if (!response.ok) {
-      avisar(await mensajeDeDetalle(response, `No se pudo cambiar el área (HTTP ${response.status}).`), "error");
+      avisar(await mensajeDeDetalle(response, `No se pudo cambiar el departamento (HTTP ${response.status}).`), "error");
       return;
     }
     const ticket = await response.json();
     const quien = ticket.assigned_to_id ? usersById.get(ticket.assigned_to_id) : null;
     avisar(reasignar && quien
-      ? `El ticket pasó a «${ticket.area_name}» y quedó asignado a ${quien}.`
-      : `El ticket pasó a «${ticket.area_name}».`, "exito");
+      ? `El ticket pasó al departamento «${ticket.area_name}» y quedó asignado a ${quien}.`
+      : `El ticket pasó al departamento «${ticket.area_name}».`, "exito");
     await cargarTicket({ silencioso: true });
   } catch (error) {
     avisar("Error al comunicarse con la API.", "error");
@@ -658,7 +658,7 @@ async function cambiarAreaTicket() {
 async function cargarAreasDestino() {
   const elements = getElements();
   if (!elements.areaDestino || typeof cargarAreas !== "function" || !puede("cambiar_area")) return;
-  llenarSelectAreas(elements.areaDestino, await cargarAreas(), { primera: "Elija un área" });
+  llenarSelectAreas(elements.areaDestino, await cargarAreas(), { primera: "Elija un departamento" });
   if (ticketActual && ticketActual.area_id) elements.areaDestino.value = String(ticketActual.area_id);
 }
 

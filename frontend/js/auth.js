@@ -98,7 +98,7 @@ const PERMISOS = {
 /* IT solo recibe: «Asignar a» ofrece solo estos roles (espejo de
    backend.constants.IT_ROLES). */
 const ROLES_IT = ["Administrador", "Técnico"];
-const SIN_AREA = "Sin área";
+const SIN_AREA = "Sin departamento";
 
 /* Las 4 áreas de IT fijas, de la API. [] si falla: la pantalla sigue
    funcionando. */
@@ -496,7 +496,7 @@ function describirHistorial(entry) {
         detalle: `${nombreAsignacion(antes)} → ${nombreAsignacion(despues)}`,
       };
     case "area_changed":
-      return { accion: "Cambió el área", detalle: `${antes || SIN_AREA} → ${despues || SIN_AREA}` };
+      return { accion: "Cambió el departamento", detalle: `${antes || SIN_AREA} → ${despues || SIN_AREA}` };
     case "Cambio de estado":
     case "state_changed":
       return { accion: "Cambió el estado", detalle: `${antes ?? "—"} → ${despues ?? "—"}` };

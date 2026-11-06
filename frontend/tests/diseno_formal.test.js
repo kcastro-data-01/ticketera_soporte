@@ -89,10 +89,10 @@ test("detalle: «Detalles» arriba del panel derecho, fijo al bajar y debajo en 
   const inicio = detalleHtml.indexOf('<aside class="detalle-lateral"');
   const lateral = detalleHtml.slice(inicio, detalleHtml.indexOf("</aside>", inicio));
   const secciones = [...lateral.matchAll(/<section[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(secciones, ["Detalles del ticket", "Asignación del ticket", "Área de IT del ticket"]);
+  assert.deepEqual(secciones, ["Detalles del ticket", "Asignación del ticket", "Departamento del ticket"]);
   const datos = [...lateral.matchAll(/<dt>([^<]+)<\/dt>\s*<dd id="(ver-[a-z]+)">/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(datos, [
-    ["Categoría", "ver-category"], ["Área de IT", "ver-area"], ["Asignado a", "ver-assigned"], ["Solicitante", "ver-creator"],
+    ["Categoría", "ver-category"], ["Departamento", "ver-area"], ["Asignado a", "ver-assigned"], ["Solicitante", "ver-creator"],
     ["Fecha de creación", "ver-created"], ["Fecha de actualización", "ver-updated"],
   ]);
   const tarjeta = detalleHtml.slice(detalleHtml.indexOf('id="panel-ticket"'), detalleHtml.indexOf("</section>", detalleHtml.indexOf('id="panel-ticket"')));

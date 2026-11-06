@@ -110,10 +110,10 @@ def list_tickets(
         description="Solo los tickets sin asignar (no se combina con assigned_to).",
     ),
     area: int | None = Query(
-        None, ge=1, description="Solo los tickets de esa área de IT (filtro «Área»)."
+        None, ge=1, description="Solo los tickets de ese departamento (filtro «Departamento»)."
     ),
     sin_area: bool = Query(
-        False, description="Solo los tickets «Sin área» (no se combina con area)."
+        False, description="Solo los tickets «Sin departamento» (no se combina con area)."
     ),
     fecha_campo: TicketDateField = Query(
         TicketDateField.CREATED,
@@ -165,7 +165,7 @@ def list_tickets(
     if area is not None and sin_area:
         raise HTTPException(
             status_code=422,
-            detail="Elija un área o «Sin área», no las dos.",
+            detail="Elija un departamento o «Sin departamento», no los dos.",
         )
     if assigned_to is not None and session.get(User, assigned_to) is None:
         raise HTTPException(
@@ -349,7 +349,7 @@ def assign_ticket(
 @router.patch(
     "/{ticket_id}/area",
     response_model=TicketResponse,
-    summary="Cambiar el área de IT de un ticket",
+    summary="Cambiar el departamento de un ticket",
 )
 def change_ticket_area(
     ticket_id: int,

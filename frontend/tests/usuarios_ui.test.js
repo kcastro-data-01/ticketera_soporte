@@ -194,7 +194,7 @@ test("init lista los usuarios con nombre, correo, rol y estado", async () => {
     "Ana Pérez",
     "ana@soporte.local",
     "", // la celda de rol contiene la etiqueta
-    "Sin área", // Técnico sin área de IT
+    "Sin departamento", // Técnico sin departamento
     "", // la celda de estado contiene el badge
     "", // la celda de acciones contiene el botón Editar
   ]);
@@ -509,17 +509,17 @@ test("usuarios.html: contraseña y nueva contraseña ocultas salvo LOGIN_LOCAL",
 
 // --- Área de IT --------------------------------------------------------------
 
-test("el área de IT: «—» para el Solicitante, «Sin área» o su nombre para IT", () => {
+test("el departamento: «—» para el Solicitante, «Sin departamento» o su nombre para IT", () => {
   const ctx = {};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "js", "usuarios.js"), "utf8"), ctx);
   assert.equal(ctx.textoAreaUsuario({ role: "Solicitante", area_name: null }), "—");
-  assert.equal(ctx.textoAreaUsuario({ role: "Técnico", area_name: null }), "Sin área");
+  assert.equal(ctx.textoAreaUsuario({ role: "Técnico", area_name: null }), "Sin departamento");
   assert.equal(ctx.textoAreaUsuario({ role: "Administrador", area_name: "Redes" }), "Redes");
   const rol = { value: "Técnico" };
   const area = { value: "4" };
   assert.equal(ctx.areaElegida(rol, area), 4);
   area.value = "";
-  assert.equal(ctx.areaElegida(rol, area), null, "Sin área se envía como null");
+  assert.equal(ctx.areaElegida(rol, area), null, "Sin departamento se envía como null");
   rol.value = "Solicitante";
   assert.equal(ctx.areaElegida(rol, area), undefined, "al Solicitante no se le envía área");
   const campo = { hidden: false };
@@ -531,9 +531,9 @@ test("el área de IT: «—» para el Solicitante, «Sin área» o su nombre par
   assert.deepEqual([campo.hidden, select.disabled], [false, false]);
 });
 
-test("usuarios.html tiene «Área de IT» en agregar y editar, y la columna en la tabla", () => {
+test("usuarios.html tiene «Departamento» en agregar y editar, y la columna en la tabla", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "usuarios.html"), "utf8");
   assert.match(html, /<select id="area" name="area"/);
   assert.match(html, /<select id="editar-area" name="area"/);
-  assert.match(html, /<th>Rol<\/th>\s*<th>Área de IT<\/th>/);
+  assert.match(html, /<th>Rol<\/th>\s*<th>Departamento<\/th>/);
 });

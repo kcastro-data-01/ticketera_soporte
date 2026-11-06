@@ -344,9 +344,9 @@ test("crear.js envía el área elegida y la exige cuando hay áreas", async () =
   sandbox.llenarSelectAreas = (select, areas, opciones) => { select.lista = areas; select.primera = opciones.primera; };
   await sandbox.iniciarAreas();
   assert.equal(nodos.area.required, true);
-  assert.equal(nodos.area.primera, "Elija un área");
+  assert.equal(nodos.area.primera, "Elija un departamento");
   nodos.area.value = "";
-  assert.equal(sandbox.validatePayload(sandbox.getPayload()), "Elija el área de IT del ticket.");
+  assert.equal(sandbox.validatePayload(sandbox.getPayload()), "Elija el departamento del ticket.");
 });
 
 test("sin áreas activas el ticket se crea «Sin área» (no se exige)", async () => {

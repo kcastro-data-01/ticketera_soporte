@@ -202,7 +202,7 @@ async function iniciarAreas() {
   const areas = await cargarAreas();
   hayAreas = areas.length > 0;
   llenarSelectAreas(elements.area, areas, {
-    primera: hayAreas ? "Elija un área" : "No se pudieron cargar: se elige por la categoría",
+    primera: hayAreas ? "Elija un departamento" : "No se pudieron cargar: se elige por la categoría",
   });
   elements.area.required = hayAreas;
 }
@@ -219,14 +219,14 @@ function validatePayload(payload) {
     return "La descripción es obligatoria.";
   }
   if (hayAreas && !payload.area_id) {
-    return "Elija el área de IT del ticket.";
+    return "Elija el departamento del ticket.";
   }
   return "";
 }
 
 /* Convierte el detalle de validación de FastAPI (422) en un mensaje legible. */
 function formatValidation(detail) {
-  /* Un motivo en texto («Elija el área de IT del ticket.», área desactivada). */
+  /* Un motivo en texto («Elija el departamento del ticket.», departamento que no existe). */
   if (detail && typeof detail.detail === "string") return detail.detail;
   if (!detail || !Array.isArray(detail.detail)) {
     return "El servidor rechazó los datos enviados. Revise el formulario.";

@@ -59,7 +59,7 @@
           <li><a href="#crear">Crear un ticket</a></li>
           <li><a href="#seguimiento">Seguimiento</a></li>
           <li><a href="#roles">Roles y permisos</a></li>
-          <li><a href="#areas">Áreas de IT</a></li>
+          <li><a href="#areas">Departamentos</a></li>
           <li><a href="#asistente">Asistente virtual</a></li>
           <li><a href="#correo">Tickets por correo</a></li>
           <li><a href="#faq">Preguntas frecuentes</a></li>
@@ -74,12 +74,12 @@
 
           <h3>Funcionalidades principales</h3>
           <ul>
-            <li><strong>Creación de tickets</strong>: Altas de nuevos tickets con título, descripción, área de IT, categoría y prioridad</li>
+            <li><strong>Creación de tickets</strong>: Altas de nuevos tickets con título, descripción, departamento, categoría y prioridad</li>
             <li><strong>Gestión de estados</strong>: Flujo de estados <code>Nuevo → En proceso → Resuelto → Cerrado</code>, con saltos hacia adelante y reapertura</li>
-            <li><strong>Asignación de tickets</strong>: Automática al técnico del área elegida; a mano, solo a <code>Técnico</code> o <code>Administrador</code> (IT solo recibe: nunca a un <code>Solicitante</code>)</li>
+            <li><strong>Asignación de tickets</strong>: Automática al técnico del departamento elegido; a mano, solo a <code>Técnico</code> o <code>Administrador</code> (IT solo recibe: nunca a un <code>Solicitante</code>)</li>
             <li><strong>Comentarios</strong>: Cada comentario queda firmado con el nombre del usuario que lo escribió</li>
             <li><strong>Adjuntos</strong>: Archivos y fotos en cada ticket, al crearlo o después desde el detalle</li>
-            <li><strong>Búsqueda y filtros</strong>: Búsqueda por título/descripción y filtros por categoría, prioridad, estado y área de IT (también «Sin área»). El filtro «Estado» ofrece Todos, Nuevo, En proceso, Resuelto o Cerrado (un estado por vez)</li>
+            <li><strong>Búsqueda y filtros</strong>: Búsqueda por título/descripción y filtros por categoría, prioridad, estado y departamento (también «Sin departamento»). El filtro «Estado» ofrece Todos, Nuevo, En proceso, Resuelto o Cerrado (un estado por vez)</li>
             <li><strong>Filtro «Asignado a»</strong>: Todos, Sin asignar o una persona activa. Solo lo ven el Administrador y el Técnico (el Solicitante ya ve solo sus tickets)</li>
             <li><strong>Filtro «Fecha de creación»</strong>: elija un día y se muestran los tickets creados ese día, de 00:00 a 23:59 en hora de Costa Rica. Vacío, no filtra por fecha</li>
             <li><strong>Combinar filtros</strong>: todos los filtros se suman entre sí y con «Mis tickets», en la vista Tabla y en Tablero. «Limpiar filtros» los borra todos</li>
@@ -89,7 +89,7 @@
           <ol>
             <li><strong>Crear un ticket</strong>: Desde el formulario en <code>index.html</code> o <code>crear.html</code></li>
             <li><strong>Asignar un ticket</strong>: Se asigna solo al crearlo; el Administrador lo reasigna en el detalle, en «Asignación»</li>
-            <li><strong>Cambiar el área</strong>: El Técnico o el Administrador, en el detalle, con «Cambiar área» (y, si quiere, reasignarlo al técnico de la nueva área)</li>
+            <li><strong>Cambiar el departamento</strong>: El Técnico o el Administrador, en el detalle, con «Cambiar departamento» (y, si quiere, reasignarlo al técnico del nuevo departamento)</li>
             <li><strong>Comentar un ticket</strong>: Agregar comentarios, que quedan firmados con su nombre</li>
             <li><strong>Cambiar estado</strong>: En el detalle, toque el estado en el recorrido del ticket (debajo del título), confirme y, si quiere, escriba un motivo</li>
           </ol>
@@ -140,7 +140,7 @@
                 <tr><td>Creó el ticket</td><td>Alguien registra un ticket nuevo. Si se asignó solo a un Técnico, se indica a quién.</td><td>Asignado automáticamente a José Solano</td></tr>
                 <tr><td>Editó el ticket</td><td>Se cambia el título, la descripción, la categoría o la prioridad (una fila por cada dato).</td><td>Prioridad: «Media» → «Alta»</td></tr>
                 <tr><td>Asignó el ticket</td><td>Se cambia la persona responsable.</td><td>José Solano → Carlos Rojas</td></tr>
-                <tr><td>Cambió el área</td><td>Un Técnico o un Administrador pasa el ticket a otra área de IT.</td><td>Redes → Infraestructura</td></tr>
+                <tr><td>Cambió el departamento</td><td>Un Técnico o un Administrador pasa el ticket a otro departamento.</td><td>Soporte → Programación</td></tr>
                 <tr><td>Quitó la asignación</td><td>El ticket queda sin responsable.</td><td>Carlos Rojas → Sin asignar</td></tr>
                 <tr><td>Cambió el estado</td><td>El ticket avanza en el flujo, salta pasos o se reabre (de Resuelto a En proceso).</td><td>Nuevo → Cerrado</td></tr>
                 <tr><td>Comentó</td><td>Alguien agrega un comentario.</td><td>«Ya revisé el cable de red»</td></tr>
@@ -161,8 +161,8 @@
           <p>El sistema cuenta con 3 roles de usuario:</p>
           <ul>
             <li><strong>Administrador</strong>: Jefe de IT: tiene permisos completos</li>
-            <li><strong>Técnico</strong>: Empleado de IT de un área: atiende los tickets (recibe las asignaciones automáticas de su área)</li>
-            <li><strong>Solicitante</strong>: Cualquier persona de la empresa: crea tickets para IT (no tiene área)</li>
+            <li><strong>Técnico</strong>: Empleado de IT de un departamento: atiende los tickets (recibe las asignaciones automáticas de su departamento)</li>
+            <li><strong>Solicitante</strong>: Cualquier persona de la empresa: crea tickets para IT (no tiene departamento)</li>
           </ul>
 
           <h3>Permisos por rol</h3>
@@ -185,7 +185,7 @@
                 <tr><td>Editar ticket</td><td>Todos, salvo los Cerrados</td><td>Los que creó, mientras están en Nuevo</td><td>Los que creó, mientras están en Nuevo</td></tr>
                 <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>Solo en los asignados a él</td></tr>
                 <tr><td>Asignar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
-                <tr><td>Cambiar área</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+                <tr><td>Cambiar departamento</td><td>Sí</td><td>Sí</td><td>No</td></tr>
                 <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>No</td></tr>
                 <tr><td>Métricas</td><td>Sí</td><td>No</td><td>No</td></tr>
                 <tr><td>Explicar con IA</td><td>Sí</td><td>Sí</td><td>No</td></tr>
@@ -200,9 +200,9 @@
       </details>
 
       <details class="ayuda-tema" id="areas">
-        <summary>Áreas de IT</summary>
+        <summary>Departamentos</summary>
         <div class="ayuda-cuerpo">
-          <p>La ticketera es de IT. Cada Técnico pertenece a un área de IT; el Administrador es el jefe de IT y el Solicitante es cualquier persona de la empresa, sin área. Las áreas son fijas: nadie las crea, renombra, desactiva ni borra, tampoco el Administrador.</p>
+          <p>La ticketera es de IT. Cada Técnico pertenece a un departamento de IT; el Administrador es el jefe de IT y el Solicitante es cualquier persona de la empresa, sin departamento. Los departamentos son fijos: nadie los crea, renombra, desactiva ni borra, tampoco el Administrador.</p>
           <ul>
             <li><strong>Soporte</strong>: computadoras, impresoras, programas.</li>
             <li><strong>Redes e Infraestructura</strong>: internet, wifi, servidores, VPN.</li>
@@ -210,12 +210,12 @@
             <li><strong>Programación</strong>: sistemas internos, Odoo, desarrollos y reportes.</li>
           </ul>
           <ul>
-            <li><strong>Al crear un ticket</strong> se elige el «Área de IT» (obligatoria). El ticket se asigna solo al Técnico activo de esa área con menos tickets abiertos (Nuevo o En proceso). Si el área no tiene técnicos, va al Técnico con menos tickets abiertos de cualquier área; si no hay ninguno, queda sin asignar.</li>
-            <li><strong>Si un ticket llega sin área</strong> (por ejemplo, un correo al buzón general), el área sale de la categoría: Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad. Programación solo se elige a mano.</li>
+            <li><strong>Al crear un ticket</strong> se elige el «Departamento» (obligatorio). El ticket se asigna solo al Técnico activo de ese departamento con menos tickets abiertos (Nuevo o En proceso). Si el departamento no tiene técnicos, va al Técnico con menos tickets abiertos de cualquier departamento; si no hay ninguno, queda sin asignar.</li>
+            <li><strong>Si un ticket llega sin departamento</strong> (por ejemplo, un correo al buzón general), el departamento sale de la categoría: Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad. Programación solo se elige a mano.</li>
             <li><strong>IT solo recibe</strong>: un ticket nunca se asigna a un Solicitante. «Asignar a» muestra solo Técnicos y Administradores. Los tickets viejos asignados a un Solicitante se pueden reasignar.</li>
-            <li><strong>Cambiar el área</strong>: el Técnico y el Administrador, en el detalle del ticket, con «Cambiar área». Si marcan «Reasignar al técnico de la nueva área», pasa al de esa área con menos tickets abiertos. El cambio queda en el historial.</li>
-            <li><strong>El área de cada Técnico</strong> la elige el Administrador en «Usuarios»; el Administrador también puede tener un área (opcional).</li>
-            <li><strong>«Sin área»</strong>: tickets de antes de las áreas o de áreas que ya no existen. Se pueden filtrar en la lista y en las métricas, y pasar a un área.</li>
+            <li><strong>Cambiar el departamento</strong>: el Técnico y el Administrador, en el detalle del ticket, con «Cambiar departamento». Si marcan «Reasignar al técnico del nuevo departamento», pasa al de ese departamento con menos tickets abiertos. El cambio queda en el historial.</li>
+            <li><strong>El departamento de cada Técnico</strong> lo elige el Administrador en «Usuarios»; el Administrador también puede tener un departamento (opcional).</li>
+            <li><strong>«Sin departamento»</strong>: tickets de antes de los departamentos o de departamentos que ya no existen. Se pueden filtrar en la lista y en las métricas, y pasar a un departamento.</li>
           </ul>
         </div>
       </details>
@@ -240,9 +240,9 @@
           <ul>
             <li>Para crear tickets por correo hay que tener cuenta: primero se ingresa a la ticketera con la cuenta de Microsoft de la empresa. Si alguien de la empresa sin cuenta escribe al buzón, no se crea el ticket: se le responde una sola vez que ingrese primero y vuelva a enviar su solicitud. Los correos de fuera de la empresa se ignoran. Si su cuenta está desactivada, se le pide que se comunique con un administrador.</li>
             <li>El correo tiene que enviarse desde la misma dirección con la que el usuario está registrado en la ticketera. El asunto se usa como título y el texto como descripción. La respuesta automática indica el número del ticket y el enlace para consultarlo.</li>
-            <li>Los correos que llegan al buzón quedan asignados a su dueño, en el área de IT de su categoría (Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad).</li>
+            <li>Los correos que llegan al buzón quedan asignados a su dueño, en el departamento de su categoría (Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad).</li>
             <li>Si el asunto empieza con «Ticket:», siempre crea un ticket (sin «Ticket:» en el título), aunque no parezca una solicitud de ayuda.</li>
-            <li>Los correos que el dueño del buzón envía a alguien de la empresa pasan por el mismo filtro que los que llegan: crean un ticket si el asunto empieza con «Ticket:» o si le reporta a un compañero un problema técnico o le pide soporte, acceso o ayuda (por ejemplo «No me funciona la impresora, ¿la podés revisar?»). La coordinación, los saludos, los envíos de archivos, las reuniones, los agradecimientos y los informes no crean tickets, ni los que van a más de 3 personas o solo a gente de fuera de la empresa. Queda asignado al primer destinatario de la empresa en «Para» y en su área de IT (si no tiene, la de la categoría). IT solo recibe: si ese destinatario es Solicitante o no tiene cuenta, no se crea ticket (las respuestas en el hilo de un ticket sí se agregan como comentario). Si el aviso al asignado está activo, recibe un correo «Se le asignó el ticket #N» con el enlace.</li>
+            <li>Los correos que el dueño del buzón envía a alguien de la empresa pasan por el mismo filtro que los que llegan: crean un ticket si el asunto empieza con «Ticket:» o si le reporta a un compañero un problema técnico o le pide soporte, acceso o ayuda (por ejemplo «No me funciona la impresora, ¿la podés revisar?»). La coordinación, los saludos, los envíos de archivos, las reuniones, los agradecimientos y los informes no crean tickets, ni los que van a más de 3 personas o solo a gente de fuera de la empresa. Queda asignado al primer destinatario de la empresa en «Para» y en su departamento (si no tiene, el de la categoría). IT solo recibe: si ese destinatario es Solicitante o no tiene cuenta, no se crea ticket (las respuestas en el hilo de un ticket sí se agregan como comentario). Si el aviso al asignado está activo, recibe un correo «Se le asignó el ticket #N» con el enlace.</li>
             <li>Los avisos que envía la ticketera (confirmaciones, «Se le asignó el ticket #N», «Nuevo comentario…», «El ticket #N pasó a…», «El ticket #N fue asignado a…») nunca crean tickets, y un correo de una conversación que ya se procesó tampoco. Por seguridad, en cada revisión del buzón se crean como máximo 5 tickets; el resto espera a la siguiente.</li>
             <li>Responder en el hilo de un ticket, o con «[Ticket #N]» en el asunto, agrega un comentario y nunca crea otro ticket. Pueden comentar así el solicitante, el asignado y cualquier usuario activo que esté en el hilo (en «Para» o en copia). Quien no tiene cuenta no puede comentar por correo.</li>
             <li><strong>Adjuntos del correo</strong>: los archivos de un correo que crea un ticket o agrega un comentario se guardan en el ticket, con los mismos tipos y límites que en la ticketera (jpg, png, pdf, docx, xlsx o txt, hasta 4 MB cada uno), y como máximo 5 archivos y 10 MB por correo. Las imágenes pegadas dentro del texto (por ejemplo, una captura de pantalla) también se guardan, y en la descripción o el comentario no queda la marca «[cid:…]». No se guardan las imágenes de la firma (las de menos de 15 KB y los logos que se repiten), los correos adjuntos ni los enlaces a OneDrive. Si alguno no se guarda, el ticket o el comentario se crea igual, queda en el historial y la respuesta automática dice «No se guardaron N adjuntos (tipo no permitido o más de 4 MB). Puede subirlos desde la ticketera:» con el enlace. En un ticket <code>Cerrado</code> no se guardan.</li>

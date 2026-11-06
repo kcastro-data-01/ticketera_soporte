@@ -113,7 +113,7 @@ def fix_it_areas(target_engine=None) -> list[str]:
         for fila in sobrantes:
             mover(fila.id, None)
             conn.execute(text("DELETE FROM it_areas WHERE id = :id"), {"id": fila.id})
-            cambios.append(f"borrada «{fila.name}» (sus tickets y técnicos quedan «Sin área»)")
+            cambios.append(f"borrada «{fila.name}» (sus tickets y técnicos quedan «Sin departamento»)")
 
         for fija, grupo in por_fija.items():
             # Se queda la que ya se llama así; si no, la de menor id.
@@ -141,7 +141,7 @@ def fix_it_areas(target_engine=None) -> list[str]:
                     {"n": fija, "a": True, "c": ahora})
                 cambios.append(f"creada «{fija}»")
     for cambio in cambios:
-        logger.warning("Áreas de IT: %s", cambio)
+        logger.warning("Departamentos (áreas de IT): %s", cambio)
     return cambios
 
 
@@ -154,4 +154,4 @@ def migrate_it_areas(target_engine=None) -> None:
 
 if __name__ == "__main__":
     migrate_it_areas()
-    print("Áreas de IT al día.")
+    print("Departamentos (áreas de IT) al día.")

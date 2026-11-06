@@ -706,7 +706,7 @@ function init() {
   }
   aplicarDensidad();
   if (!vistaSolicitante && elements.area && typeof cargarAreas === "function") {
-    cargarAreas().then((areas) => llenarSelectAreas(elements.area, areas, { primera: "Todas", sinArea: true }));
+    cargarAreas().then((areas) => llenarSelectAreas(elements.area, areas, { primera: "Todos", sinArea: true }));
   }
   loadUsers().then(fetchTickets);
 }

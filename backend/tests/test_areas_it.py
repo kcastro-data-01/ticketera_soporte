@@ -136,7 +136,7 @@ def test_migration_turns_the_old_areas_into_the_fixed_ones(tmp_path, caplog):
     assert "«Samuel Mendez»" in caplog.text and "«Soporte técnico» pasa a «Soporte»" in caplog.text
     caplog.clear()
     init_db(engine)
-    assert "Áreas de IT" not in caplog.text, "ya al día: no hace nada"
+    assert "Departamentos (áreas de IT)" not in caplog.text, "ya al día: no hace nada"
     engine.dispose()
 
 
@@ -423,6 +423,8 @@ from backend.tests.test_asistente_interpretacion import _respuesta, ia  # noqa: 
 
 
 @pytest.mark.parametrize("pregunta", [
+    "¿quién puede cambiar el departamento de un ticket?",
+    "que departamentos hay?",
     "¿quién puede cambiar el área de un ticket?",
     "que areas hay?",
 ])
@@ -434,14 +436,40 @@ def test_chat_answers_the_area_rule_without_ai(client, session, ia, pregunta):
 
 
 def test_chat_rules_and_permissions_talk_about_areas():
-    assert "área de IT elegida" in REGLA_REPARTO or "área de IT (obligatoria)" in REGLA_REPARTO
-    assert "Técnico activo de esa área con menos tickets abiertos" in REGLA_REPARTO
+    assert "el departamento (obligatorio)" in REGLA_REPARTO
+    assert "Técnico activo de ese departamento con menos tickets abiertos" in REGLA_REPARTO
     assert REGLA_AREAS in REGLAS_PARA_IA
-    assert "cambiar el área de IT de un ticket" in PERMISOS_POR_ROL["Técnico"].split("No puede")[0]
+    assert "cambiar el departamento de un ticket" in PERMISOS_POR_ROL["Técnico"].split("No puede")[0]
     for rol in PERMISOS_POR_ROL:
         assert "administrar las áreas" not in PERMISOS_POR_ROL[rol], rol
     for area in IT_AREAS:
         assert area in REGLA_AREAS
     assert "Hardware y Software → Soporte" in REGLA_AREAS
-    assert "cambiar el área de IT de un ticket" in PERMISOS_POR_ROL["Solicitante"].split("No puede")[1]
+    assert "cambiar el departamento de un ticket" in PERMISOS_POR_ROL["Solicitante"].split("No puede")[1]
     assert "No puede" not in PERMISOS_POR_ROL["Administrador"]
+
+
+def test_people_see_departamento_not_area():
+    """En la app se dice «Departamento» (en el código y la base, «área»)."""
+    import re
+
+    from backend.constants import NO_AREA_LABEL
+    from backend.services import asistente_service as asis
+
+    assert NO_AREA_LABEL == "Sin departamento"
+    textos = [asis.GUIA_APP, asis.REGLAS_PARA_IA, *asis.PERMISOS_POR_ROL.values(),
+              *asis.DESCRIPCION_ROL.values()]
+    for texto in textos:
+        limpio = texto.replace("área de TI", "")
+        assert not re.search(r"\b[Áá]reas?\b", limpio), limpio[:120]
+    assert ("Cambiar departamento", "cambiar el departamento de un ticket", ("Sí", "Sí", "No")) in asis.TABLA_PERMISOS
+
+
+def test_api_messages_say_departamento(auth_client, session, areas):
+    assert auth_client.post("/api/tickets", json=TICKET | {"area_id": 999}).json()["detail"] == (
+        "Departamento 999 no encontrado")
+    filtro = auth_client.get(f"/api/tickets?area={areas[RED].id}&sin_area=true").json()["detail"]
+    assert filtro == "Elija un departamento o «Sin departamento», no los dos."
+    resp = auth_client.post("/api/users", json={"name": "Sofía", "email": "sofia@data.cr",
+                                                 "role": "Solicitante", "area_id": areas[RED].id})
+    assert resp.json()["detail"] == "El Solicitante no tiene departamento: solo Técnicos y Administradores."

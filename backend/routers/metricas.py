@@ -22,8 +22,8 @@ router = APIRouter(prefix="/api", tags=["Métricas"])
 def ver_metricas(
     desde: date | None = Query(None, description="Primer día (YYYY-MM-DD, hora de Costa Rica)"),
     hasta: date | None = Query(None, description="Último día, incluido (por defecto, hoy)"),
-    area: int | None = Query(None, ge=1, description="Solo los tickets de esa área de IT"),
-    sin_area: bool = Query(False, description="Solo los tickets «Sin área»"),
+    area: int | None = Query(None, ge=1, description="Solo los tickets de ese departamento"),
+    sin_area: bool = Query(False, description="Solo los tickets «Sin departamento»"),
     session: Session = Depends(get_session),
     current_user: User = Depends(role_required(ROLES_ADMIN)),
 ) -> dict:
@@ -35,5 +35,5 @@ def ver_metricas(
     except metricas_service.RangoInvalido as error:
         raise HTTPException(status_code=422, detail=str(error))
     if area is not None and sin_area:
-        raise HTTPException(status_code=422, detail="Elija un área o «Sin área», no las dos.")
+        raise HTTPException(status_code=422, detail="Elija un departamento o «Sin departamento», no los dos.")
     return metricas_service.calcular(session, desde, hasta, area_id=area, sin_area=sin_area)

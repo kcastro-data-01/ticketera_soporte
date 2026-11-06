@@ -16,7 +16,7 @@ const TEMAS = [
   ["crear", "Crear un ticket"],
   ["seguimiento", "Seguimiento"],
   ["roles", "Roles y permisos"],
-  ["areas", "Áreas de IT"],
+  ["areas", "Departamentos"],
   ["asistente", "Asistente virtual"],
   ["correo", "Tickets por correo"],
   ["faq", "Preguntas frecuentes"],

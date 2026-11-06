@@ -30,7 +30,7 @@ Documentación de los endpoints **realmente implementados** en el código
 | `GET` | `/api/tickets/{ticket_id}` | Consultar un ticket |
 | `PATCH` | `/api/tickets/{ticket_id}` | Editar título/descripción/categoría/prioridad |
 | `PATCH` | `/api/tickets/{ticket_id}/assign` | Asignar o desasignar un usuario (solo Técnico o Administrador) |
-| `PATCH` | `/api/tickets/{ticket_id}/area` | Pasar el ticket a otra área de IT (Administrador y Técnico) |
+| `PATCH` | `/api/tickets/{ticket_id}/area` | Pasar el ticket a otro departamento (Administrador y Técnico) |
 | `PATCH` | `/api/tickets/{ticket_id}/state` | Cambiar el estado (máquina de estados) |
 | `DELETE` | `/api/tickets/{ticket_id}` | Eliminar un ticket (solo Administrador) |
 | `GET` | `/api/tickets/{ticket_id}/explicacion` | Última explicación de la IA (sin generar) |
@@ -41,8 +41,8 @@ Documentación de los endpoints **realmente implementados** en el código
 | `GET` | `/api/tickets/{ticket_id}/history` | Historial de cambios (solo lectura) |
 | `POST` | `/api/users` | Crear un usuario |
 | `GET` | `/api/users` | Listar usuarios |
-| `GET` | `/api/areas` | Listar las 4 áreas de IT (fijas) |
-| `GET` | `/api/areas/{area_id}` | Consultar un área (las áreas no se crean, cambian ni borran: `405`) |
+| `GET` | `/api/areas` | Listar los 4 departamentos (fijos; en el código, «áreas») |
+| `GET` | `/api/areas/{area_id}` | Consultar un departamento (no se crean, cambian ni borran: `405`) |
 
 ## Objetos comunes
 
@@ -110,15 +110,15 @@ body.
 | `description` | string | no puede quedar vacía |
 | `category` | enum | uno de los valores de `category` |
 | `priority` | enum | uno de los valores de `priority` |
-| `area_id` | integer | opcional; una de las áreas fijas. Sin él, sale de la categoría (Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad) |
+| `area_id` | integer | opcional; uno de los departamentos fijos. Sin él, sale de la categoría (Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad) |
 
-El ticket se asigna al Técnico activo de esa área con menos tickets abiertos
-(si el área no tiene, al de cualquier área con menos abiertos). La respuesta
-trae `area_id` y `area_name` (`null` = «Sin área»).
+El ticket se asigna al Técnico activo de ese departamento con menos tickets
+abiertos (si no tiene, al de cualquier departamento con menos abiertos). La
+respuesta trae `area_id` y `area_name` (`null` = «Sin departamento»).
 
 **Respuestas:** `201` con el ticket creado · `422` si falta un campo, el
 título tiene < 3 o > 200 caracteres, la descripción está vacía, un enum no es
-válido o el área no existe.
+válido o el departamento no existe.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/tickets \
@@ -231,23 +231,23 @@ curl -X PATCH http://127.0.0.1:8000/api/tickets/1/assign \
 
 ### `PATCH /api/tickets/{ticket_id}/area`
 
-Pasa el ticket a otra área de IT activa. **Administrador y Técnico** (`403`
+Pasa el ticket a otro departamento. **Administrador y Técnico** (`403`
 para el Solicitante). Queda en el historial (`action: "area_changed"`,
 `field: "area"`, nombres anterior y nuevo).
 
 | Campo | Tipo | Reglas |
 |-------|------|--------|
-| `area_id` | integer | obligatorio; área existente y activa |
-| `reasignar` | boolean | opcional (`false`); `true` asigna al técnico de la nueva área con menos tickets abiertos |
+| `area_id` | integer | obligatorio; un departamento existente |
+| `reasignar` | boolean | opcional (`false`); `true` asigna al técnico del nuevo departamento con menos tickets abiertos |
 
-**Respuestas:** `200` con el ticket · `404` ticket o área inexistente · `409`
+**Respuestas:** `200` con el ticket · `404` ticket o departamento inexistente · `409`
 ticket `Cerrado`.
 
-### Áreas de IT: `GET /api/areas` y `GET /api/areas/{area_id}`
+### Departamentos: `GET /api/areas` y `GET /api/areas/{area_id}`
 
-Las áreas son fijas: Soporte, Redes e Infraestructura, Ciberseguridad y
+Los departamentos (en el código, «áreas») son fijos: Soporte, Redes e Infraestructura, Ciberseguridad y
 Programación. `GET /api/areas` (todos los roles) devuelve
-`[{id, name, is_active, tecnicos}]` en ese orden; `GET /api/areas/{id}`, una
+`[{id, name, is_active, tecnicos}]` en ese orden; `GET /api/areas/{id}`, uno
 (`404` si no existe). Cualquier otro método (`POST`, `PUT`, `PATCH`, `DELETE`)
 responde `405 Method Not Allowed`, también al Administrador.
 

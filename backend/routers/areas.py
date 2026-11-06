@@ -12,7 +12,7 @@ from backend.routers.auth import ROLES_TODOS, role_required
 from backend.schemas import AreaResponse
 from backend.services import area_service
 
-router = APIRouter(prefix="/api/areas", tags=["Áreas de IT"])
+router = APIRouter(prefix="/api/areas", tags=["Departamentos (áreas de IT)"])
 
 
 def _respuesta(area: ItArea, conteos: dict[int, int]) -> AreaResponse:
@@ -20,7 +20,7 @@ def _respuesta(area: ItArea, conteos: dict[int, int]) -> AreaResponse:
                         tecnicos=conteos.get(area.id, 0))
 
 
-@router.get("", response_model=list[AreaResponse], summary="Listar las áreas de IT (fijas)")
+@router.get("", response_model=list[AreaResponse], summary="Listar los departamentos (fijos)")
 def list_areas(
     session: Session = Depends(get_session),
     current_user: User = Depends(role_required(ROLES_TODOS)),
@@ -29,7 +29,7 @@ def list_areas(
     return [_respuesta(a, conteos) for a in area_service.list_areas(session)]
 
 
-@router.get("/{area_id}", response_model=AreaResponse, summary="Consultar un área de IT")
+@router.get("/{area_id}", response_model=AreaResponse, summary="Consultar un departamento")
 def get_area(
     area_id: int,
     session: Session = Depends(get_session),
@@ -37,5 +37,5 @@ def get_area(
 ) -> AreaResponse:
     area = area_service.get_area(session, area_id)
     if area is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Área {area_id} no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Departamento {area_id} no encontrado")
     return _respuesta(area, area_service.technician_counts(session))

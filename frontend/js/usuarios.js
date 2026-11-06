@@ -309,7 +309,7 @@ function ocultarEdicionEstado() {
    área, «Sin área». */
 function textoAreaUsuario(user) {
   if (!ROLES_IT_USUARIOS.includes(user.role)) return "—";
-  return user.area_name || "Sin área";
+  return user.area_name || "Sin departamento";
 }
 
 const ROLES_IT_USUARIOS = ["Administrador", "Técnico"];
@@ -336,7 +336,7 @@ async function iniciarAreasUsuarios() {
   if (typeof cargarAreas !== "function") return;
   const areas = await cargarAreas();
   for (const select of [elements.area, elements.editarArea]) {
-    llenarSelectAreas(select, areas, { primera: "Sin área" });
+    llenarSelectAreas(select, areas, { primera: "Sin departamento" });
   }
   for (const [rol, area] of [[elements.rol, elements.area], [elements.editarRol, elements.editarArea]]) {
     if (!rol || !area) continue;
