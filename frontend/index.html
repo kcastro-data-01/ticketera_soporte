@@ -43,28 +43,21 @@
   </aside>
 
   <div class="app-principal">
-    <header class="cabecera">
-      <div>
+    <header class="cabecera cabecera-listado">
+      <div class="cabecera-titulo">
         <h1 id="titulo-listado">Tickets</h1>
         <p id="subtitulo-listado">Consulta y gestión de los tickets de soporte</p>
       </div>
-      <div class="cabecera-acciones">
-        <!-- Solo en la vista del Solicitante (app.js lo muestra). -->
-        <a href="crear.html" id="nuevo-ticket-solicitante" class="enlace-boton" hidden>Nuevo ticket</a>
-      </div>
-    </header>
-
-    <main class="contenido">
-    <!-- Una sola fila arriba de los filtros: «Todos / Mis tickets» a la
-         izquierda y las opciones de vista a la derecha. -->
-    <div class="listado-barra">
-      <div class="vista-tabs" role="group" aria-label="Qué tickets ver" data-permiso="cambiar_estado">
-        <button type="button" id="vista-todos" class="vista-tab activa" aria-pressed="true">Todos</button>
-        <button type="button" id="vista-mios" class="vista-tab" aria-pressed="false">Mis tickets</button>
-      </div>
-      <!-- A la derecha, cómo ver el listado; app.js recuerda las elecciones.
-           El Solicitante solo ve la tabla (sin Tabla/Tablero). -->
-      <div class="listado-opciones">
+      <!-- En la barra de arriba, a la derecha del título y antes del modo
+           oscuro: qué tickets ver, cómo verlos y la densidad (app.js
+           recuerda las elecciones). El Solicitante no ve «Todos / Mis
+           tickets» ni «Tabla / Tablero». En pantallas angostas bajan debajo
+           del título. -->
+      <div class="listado-controles">
+        <div class="vista-tabs" role="group" aria-label="Qué tickets ver" data-permiso="cambiar_estado">
+          <button type="button" id="vista-todos" class="vista-tab activa" aria-pressed="true">Todos</button>
+          <button type="button" id="vista-mios" class="vista-tab" aria-pressed="false">Mis tickets</button>
+        </div>
         <div class="vista-tabs" role="group" aria-label="Cómo ver los tickets" data-vista="equipo">
           <button type="button" id="ver-tabla" class="vista-tab activa" aria-pressed="true">Tabla</button>
           <button type="button" id="ver-tablero" class="vista-tab" aria-pressed="false">Tablero</button>
@@ -74,8 +67,13 @@
           <button type="button" id="densidad-comoda" class="vista-tab activa" aria-pressed="true">Cómoda</button>
         </div>
       </div>
-    </div>
+      <div class="cabecera-acciones">
+        <!-- Solo en la vista del Solicitante (app.js lo muestra). -->
+        <a href="crear.html" id="nuevo-ticket-solicitante" class="enlace-boton" hidden>Nuevo ticket</a>
+      </div>
+    </header>
 
+    <main class="contenido">
     <form id="form-filtros" class="filtros">
       <label class="campo campo-busqueda">
         <span>Buscar</span>

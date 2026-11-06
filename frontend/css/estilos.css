@@ -3355,29 +3355,52 @@ td.con-avatar {
   box-shadow: inset 3px 0 0 var(--etiqueta-naranja-texto);
 }
 
-/* ===== Barra del listado: «Todos / Mis tickets» a la izquierda y
-   Tabla / Tablero + Compacta / Cómoda a la derecha, a la misma altura.
-   Si no entran en una fila (celular), bajan en orden. ===== */
-.listado-barra {
+/* ===== Controles del listado en la barra de arriba: «Todos / Mis tickets»,
+   «Tabla / Tablero» y «Compacta / Cómoda» a la derecha del título y antes
+   del modo oscuro, en una línea y con su mismo alto (38 px). En pantallas
+   angostas bajan debajo del título, dentro de la barra; el modo oscuro
+   queda arriba a la derecha. ===== */
+.cabecera-listado .cabecera-titulo {
+  margin-right: auto;
+}
+
+.listado-controles {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--espaciado-md);
-  margin-bottom: var(--espaciado-md);
+  gap: var(--espaciado-sm);
 }
 
-.listado-barra .vista-tabs {
+.listado-controles .vista-tabs {
+  box-sizing: border-box;
+  height: 38px;
+  align-items: center;
   margin-bottom: 0;
 }
 
-/* margin-left: auto la deja a la derecha aunque no esté «Todos / Mis
-   tickets» (Solicitante). */
-.listado-opciones {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--espaciado-md);
-  margin-left: auto;
+.listado-controles .vista-tabs .vista-tab {
+  min-height: 28px;
+}
+
+/* Desde donde no entran a la derecha del título (con el menú lateral, menos
+   de 1240 px): bajan a su propia línea y el modo oscuro queda arriba. */
+@media (max-width: 1239px) {
+  .cabecera-listado .listado-controles {
+    order: 3;
+    flex: 1 1 100%;
+  }
+}
+
+/* En el celular cada grupo ocupa el ancho de la barra y sus dos botones
+   se reparten mitad y mitad. */
+@media (max-width: 480px) {
+  .listado-controles .vista-tabs {
+    flex: 1 1 100%;
+  }
+
+  .listado-controles .vista-tabs .vista-tab {
+    flex: 1 1 0;
+  }
 }
 
 /* Densidad «Compacta» (app.js): menos espacio en las filas de la tabla. */

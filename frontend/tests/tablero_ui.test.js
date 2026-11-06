@@ -90,15 +90,24 @@ async function montar({ rol = "Técnico", guardado = null, densidadGuardada = nu
 const columnas = (nodos) => nodos.get("tablero").children;
 const tarjetas = (columna) => columna.children[1].children.filter((t) => t.tag === "a");
 
-test("index.html: Tabla/Tablero y Compacta/Cómoda en la fila de Todos / Mis tickets, arriba de los filtros", () => {
-  const barra = indexHtml.slice(indexHtml.indexOf('<div class="listado-barra">'), indexHtml.indexOf('<form id="form-filtros"'));
-  assert.ok(indexHtml.indexOf('<div class="listado-barra">') >= 0, "la barra está arriba del formulario");
-  const grupos = [...barra.matchAll(/<div class="vista-tabs"[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(grupos, ["Qué tickets ver", "Cómo ver los tickets", "Densidad de la tabla"], "Todos/Mis a la izquierda y la vista a la derecha");
-  assert.match(barra, /<div class="listado-opciones">\s*<div class="vista-tabs" role="group" aria-label="Cómo ver los tickets" data-vista="equipo">/);
+test("index.html: Todos / Mis tickets, Tabla / Tablero y Compacta / Cómoda en la barra de arriba, antes del modo oscuro", () => {
+  const cabecera = indexHtml.slice(indexHtml.indexOf('<header class="cabecera cabecera-listado">'), indexHtml.indexOf("</header>"));
+  assert.ok(cabecera.length > 0, "la barra de arriba del listado");
+  // Título, después los controles y al final las acciones (ahí va el modo oscuro).
+  const orden = ['class="cabecera-titulo"', 'class="listado-controles"', 'class="cabecera-acciones"'].map((c) => cabecera.indexOf(c));
+  assert.ok(orden.every((n) => n >= 0) && orden[0] < orden[1] && orden[1] < orden[2], String(orden));
+  const grupos = [...cabecera.matchAll(/<div class="vista-tabs"[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(grupos, ["Qué tickets ver", "Cómo ver los tickets", "Densidad de la tabla"]);
+  // Debajo del encabezado van directo los filtros: ya no hay fila aparte.
+  assert.doesNotMatch(indexHtml, /listado-barra|listado-opciones/);
+  const main = indexHtml.slice(indexHtml.indexOf('<main class="contenido">') + '<main class="contenido">'.length);
+  assert.match(main, /^\s*<form id="form-filtros"/);
   const css = fs.readFileSync(path.join(__dirname, "..", "css", "estilos.css"), "utf8");
-  assert.match(css, /\.listado-barra \{\s*display: flex;\s*flex-wrap: wrap;\s*align-items: center;/);
-  assert.match(css, /\.listado-opciones \{[^}]*margin-left: auto;/, "a la derecha también sin Todos / Mis tickets");
+  assert.match(css, /\.listado-controles \{\s*display: flex;\s*flex-wrap: wrap;\s*align-items: center;/);
+  assert.match(css, /\.listado-controles \.vista-tabs \{[^}]*height: 38px;[^}]*margin-bottom: 0;/, "mismo alto que el modo oscuro");
+  assert.match(css, /@media \(max-width: 1239px\) \{\s*\.cabecera-listado \.listado-controles \{\s*order: 3;\s*flex: 1 1 100%;/,
+    "en pantallas angostas bajan debajo del título");
+  assert.match(css, /\.boton-tema \{[^}]*height: 38px;/);
   assert.match(indexHtml, /<button type="button" id="ver-tabla" class="vista-tab activa" aria-pressed="true">Tabla<\/button>/);
   assert.match(indexHtml, /<button type="button" id="ver-tablero" class="vista-tab" aria-pressed="false">Tablero<\/button>/);
   assert.match(indexHtml, /<div id="tablero" class="tablero" aria-label="Tickets por estado" hidden><\/div>/);
