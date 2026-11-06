@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Áreas de IT · American Data Networks</title>
+  <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
+  <script src="js/tema.js"></script>
+  <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
+  <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body class="app">
+  <aside class="barra-lateral">
+    <a href="index.html" class="marca">
+      <img src="images/logo-circular.jpg" alt="" class="marca-logo">
+      <span class="marca-texto">
+        <span class="marca-nombre">American Data Networks</span>
+        <span class="marca-sub">Sistema de tickets</span>
+      </span>
+    </a>
+    <nav class="menu" aria-label="Menú principal">
+      <div class="menu-seccion" role="group" aria-labelledby="menu-gestion">
+        <p class="menu-titulo" id="menu-gestion">Gestión</p>
+        <a href="index.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M13 5v2M13 11v2M13 17v2"/></svg><span>Tickets</span></a>
+        <a href="crear.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Nuevo ticket</span></a>
+        <a href="historial.html" class="menu-enlace" data-permiso="historial_global"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg><span>Historial</span></a>
+      </div>
+      <div class="menu-seccion" role="group" aria-labelledby="menu-administracion">
+        <p class="menu-titulo" id="menu-administracion">Administración</p>
+        <a href="metricas.html" class="menu-enlace" data-permiso="metricas"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Métricas</span></a>
+        <a href="usuarios.html" class="menu-enlace" data-permiso="usuarios"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span>Usuarios</span></a>
+        <a href="areas.html" class="menu-enlace activo" aria-current="page" data-permiso="areas"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg><span>Áreas de IT</span></a>
+      </div>
+      <div class="menu-seccion" role="group" aria-labelledby="menu-soporte">
+        <p class="menu-titulo" id="menu-soporte">Soporte</p>
+        <a href="ayuda.html" class="menu-enlace"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg><span>Ayuda</span></a>
+      </div>
+    </nav>
+  </aside>
+
+  <div class="app-principal">
+    <header class="cabecera">
+      <div>
+        <h1>Áreas de IT</h1>
+        <p>Las áreas de IT que atienden los tickets</p>
+      </div>
+    </header>
+
+    <main class="contenido">
+      <section class="seccion" aria-label="Agregar área">
+        <h2>Agregar área</h2>
+        <form id="form-area" class="filtros formulario formulario-crear" novalidate>
+          <label class="campo">
+            <span>Nombre *</span>
+            <input type="text" id="area-nombre" name="nombre" required minlength="2" maxlength="60" placeholder="Por ejemplo: Redes" aria-describedby="ayuda-area-nombre">
+            <small id="ayuda-area-nombre" class="ayuda-campo">Entre 2 y 60 caracteres. No se repiten nombres.</small>
+          </label>
+          <div class="acciones">
+            <button type="submit" id="crear-area">Agregar área</button>
+          </div>
+        </form>
+        <p id="estado-area" class="estado" role="status" aria-live="polite" hidden></p>
+      </section>
+
+      <section class="seccion" aria-label="Áreas registradas">
+        <h2>Áreas registradas</h2>
+        <p class="ayuda-campo">El área de cada Técnico se elige en <a href="usuarios.html">Usuarios</a>. Un área desactivada no se ofrece al crear tickets ni al cambiar el área de un ticket; los tickets y técnicos que ya la tienen la conservan.</p>
+        <p id="areas-estado" class="estado" role="status" aria-live="polite" hidden></p>
+        <div class="tabla-scroll">
+          <table id="tabla-areas" class="listado" hidden>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Técnicos activos</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="cuerpo-areas"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="seccion" aria-label="Renombrar área" id="seccion-renombrar" hidden>
+        <h2>Renombrar área</h2>
+        <form id="form-renombrar" class="filtros formulario formulario-crear" novalidate>
+          <input type="hidden" id="renombrar-id">
+          <label class="campo">
+            <span>Nuevo nombre *</span>
+            <input type="text" id="renombrar-nombre" required minlength="2" maxlength="60">
+          </label>
+          <div class="acciones">
+            <button type="submit" id="guardar-nombre">Guardar</button>
+            <button type="button" id="cancelar-renombrar" class="secundario">Cancelar</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
+  </div>
+
+  <script src="js/guardia.js" data-permiso="areas"></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/asistente.js" defer></script>
+  <script src="js/areas.js" defer></script>
+</body>
+</html>

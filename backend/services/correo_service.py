@@ -10,8 +10,9 @@ y, por cada correo nuevo que pide ayuda (o cuyo asunto empieza con
 
 * Si el remitente es un usuario activo de la ticketera, se crea un ticket a
   su nombre (asunto = título, cuerpo = descripción, categoría y prioridad
-  según palabras clave), asignado al dueño del buzón (``CORREO_USUARIO``),
-  y se le responde con el número y el enlace.
+  según palabras clave), asignado al dueño del buzón (``CORREO_USUARIO``)
+  y en su área de IT (o «Sin área»), y se le responde con el número y el
+  enlace. Si el dueño no es de IT, va al técnico con menos tickets abiertos.
   Si responde en el hilo de un correo que ya es ticket (In-Reply-To /
   References / conversationId), se agrega como comentario si es el
   solicitante, el asignado o cualquier usuario activo que estuvo en el hilo
@@ -36,8 +37,9 @@ También se revisan los **Elementos enviados** del buzón (ver
 :func:`procesar_enviado`): un correo que el dueño envía a alguien de la
 empresa crea un ticket si el asunto empieza con «Ticket:» o, con
 ``CORREO_FILTRO=ia``, si la IA ve que pide soporte (mismo filtro que la
-bandeja), a nombre del dueño y asignado al primer destinatario de la empresa en «Para» (se crea
-su usuario si no existe).
+bandeja), a nombre del dueño y asignado al primer destinatario de la empresa en «Para», en el
+área de ese destinatario. **IT solo recibe**: si ese destinatario es Solicitante o no tiene
+cuenta, no se crea ticket (ni usuario) y queda el motivo en el log.
 
 Contra los ciclos de correos: todo correo que manda la app se registra
 (``aviso_app``, por Message-ID y conversationId, con el ticket del que habla)
@@ -109,7 +111,7 @@ from pathlib import Path
 import httpx
 from sqlalchemy import func, or_, select
 
-from backend.constants import TicketCategory, TicketPriority, TicketState
+from backend.constants import IT_ROLES, TicketCategory, TicketPriority, TicketState
 from backend.entorno import en_vercel
 from backend.models import ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate
@@ -1195,9 +1197,16 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
         return "frenado", None
 
     # Quien escribe es el solicitante; quien recibe (el dueño del buzón), el
-    # asignado.
+    # asignado, y el ticket queda en su área (o «Sin área»). IT solo recibe:
+    # si el dueño del buzón no es de IT, va al técnico con menos tickets
+    # abiertos (o sin asignar si no hay técnicos).
     categoria, prioridad = clasificar(correo.asunto, correo.cuerpo)
-    asignado = _dueno(session, config)
+    dueno = _dueno(session, config)
+    asignado = dueno if dueno.role in IT_ROLES else ticket_service.pick_next_assignee(session)
+    if asignado is not dueno:
+        logger.warning("El dueño del buzón %s es %s, no de IT: el ticket de «%s» va a %s",
+                       dueno.email, dueno.role, correo.asunto,
+                       asignado.email if asignado is not None else "nadie (sin técnicos)")
     ticket = ticket_service.create_ticket(
         session,
         TicketCreate(
@@ -1208,7 +1217,8 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
         ),
         usuario,
         asignado=asignado,
-        origen=_origen(usuario, asignado),
+        origen=_origen(usuario, asignado or dueno),
+        requiere_area=False,
     )
     _registrar(session, correo, "ticket", ticket.id)
     return "ticket", _respuesta_ticket(correo, usuario, ticket, config)
@@ -1234,9 +1244,11 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
       respaldo estricto): ticket solo si el dueño le reporta un problema
       técnico a un compañero o le pide soporte, acceso o ayuda. Si no →
       ``otro``. Con otro filtro, solo «Ticket:» crea.
-    * Si no, ``ticket``: solicitante = el dueño; asignado = el primer
-      destinatario de la empresa en «Para» (se crea si no existe, para que lo
-      vea al entrar con Microsoft).
+    * El primer destinatario de la empresa en «Para» es Solicitante o no
+      tiene cuenta → ``ignorado`` con el motivo en el log (IT solo recibe:
+      no se crea ticket ni usuario).
+    * Si no, ``ticket``: solicitante = el dueño; asignado = ese destinatario
+      (Técnico o Administrador), y el ticket queda en su área.
 
     Todos quedan registrados por su Message-ID: el mismo correo nunca crea
     dos tickets ni se revisa otra vez.
@@ -1287,6 +1299,20 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
         _registrar(session, correo, "ignorado")
         return "ignorado", None
 
+    # IT solo recibe: un correo de IT a un Solicitante (o a alguien sin
+    # cuenta, que se crearía como Solicitante) no crea ticket ni usuario.
+    correo_asignado = internos[0][0]
+    asignado = _usuario_por_correo(session, correo_asignado)
+    if asignado is None or asignado.role not in IT_ROLES:
+        if asignado is None:
+            motivo = (f"el destinatario {correo_asignado} no tiene cuenta (sería Solicitante; "
+                      "IT solo recibe tickets)")
+        else:
+            motivo = f"el destinatario {correo_asignado} es Solicitante (IT solo recibe tickets)"
+        logger.info("Enviado «%s» ignorado: %s", correo.asunto, motivo)
+        _registrar(session, correo, "ignorado")
+        return "ignorado", None
+
     if not es_forzado(correo.asunto):
         if config.filtro != "ia":
             # Correo normal a un compañero: se anota para no revisarlo de nuevo.
@@ -1305,9 +1331,6 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
     if not puede_crear:
         return "frenado", None
 
-    correo_asignado, nombre_asignado = internos[0]
-    asignado = _usuario_por_correo(session, correo_asignado) or _crear_usuario(
-        session, correo_asignado, nombre_asignado)
     if not asignado.is_active:
         logger.info("Enviado «%s» ignorado: %s está desactivado", correo.asunto, correo_asignado)
         _registrar(session, correo, "ignorado")
@@ -1325,6 +1348,7 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
         dueno,
         asignado=asignado,
         origen=_origen(dueno, asignado),
+        requiere_area=False,
     )
     _registrar(session, correo, "ticket", ticket.id)
     logger.info("Enviado «%s» → ticket #%s asignado a %s", correo.asunto, ticket.id, correo_asignado)

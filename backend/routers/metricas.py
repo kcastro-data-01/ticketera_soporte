@@ -22,13 +22,18 @@ router = APIRouter(prefix="/api", tags=["Métricas"])
 def ver_metricas(
     desde: date | None = Query(None, description="Primer día (YYYY-MM-DD, hora de Costa Rica)"),
     hasta: date | None = Query(None, description="Último día, incluido (por defecto, hoy)"),
+    area: int | None = Query(None, ge=1, description="Solo los tickets de esa área de IT"),
+    sin_area: bool = Query(False, description="Solo los tickets «Sin área»"),
     session: Session = Depends(get_session),
     current_user: User = Depends(role_required(ROLES_ADMIN)),
 ) -> dict:
     """Counts computed by the server. ``abiertos`` and ``en_proceso`` are the
-    queue right now; everything else uses the range (last 30 days by default)."""
+    queue right now; everything else uses the range (last 30 days by default).
+    ``area`` / ``sin_area`` restrict every number to one IT area."""
     try:
         desde, hasta = metricas_service.rango(desde, hasta)
     except metricas_service.RangoInvalido as error:
         raise HTTPException(status_code=422, detail=str(error))
-    return metricas_service.calcular(session, desde, hasta)
+    if area is not None and sin_area:
+        raise HTTPException(status_code=422, detail="Elija un área o «Sin área», no las dos.")
+    return metricas_service.calcular(session, desde, hasta, area_id=area, sin_area=sin_area)

@@ -90,7 +90,47 @@ const PERMISOS = {
   eliminar: ["Administrador"],
   explicar_ia: ["Administrador", "Técnico"],
   metricas: ["Administrador"],
+  /* Áreas de IT: administrarlas (pantalla «Áreas de IT») y pasar un ticket
+     a otra área (detalle, «Cambiar área»). */
+  areas: ["Administrador"],
+  cambiar_area: ["Administrador", "Técnico"],
 };
+
+/* IT solo recibe: «Asignar a» ofrece solo estos roles (espejo de
+   backend.constants.IT_ROLES). */
+const ROLES_IT = ["Administrador", "Técnico"];
+const SIN_AREA = "Sin área";
+
+/* Áreas de IT de la API (activas; con todas=true también las desactivadas,
+   solo Administrador). [] si falla: la pantalla sigue funcionando. */
+async function cargarAreas(todas = false) {
+  try {
+    const response = await fetchWithAuth(todas ? "/api/areas?todas=true" : "/api/areas");
+    if (!response.ok) return [];
+    const areas = await response.json();
+    return Array.isArray(areas) ? areas : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+/* Llena un <select> con las áreas. ``primera``: texto de la opción vacía
+   (o null para no ponerla); ``sinArea``: agrega «Sin área» (valor "sin"). */
+function llenarSelectAreas(select, areas, { primera = "Todas", sinArea = false } = {}) {
+  if (!select || typeof document.createElement !== "function") return;
+  const elegido = select.value;
+  select.replaceChildren();
+  const opcion = (valor, texto) => {
+    const o = document.createElement("option");
+    o.value = valor;
+    o.textContent = texto;
+    select.appendChild(o);
+  };
+  if (primera !== null) opcion("", primera);
+  if (sinArea) opcion("sin", SIN_AREA);
+  areas.forEach((area) => opcion(String(area.id), area.is_active === false ? `${area.name} (desactivada)` : area.name));
+  if ([...(select.options || [])].some((o) => o.value === elegido)) select.value = elegido;
+}
 
 /* Cambiar el estado de un ticket: los roles de «cambiar_estado» en
    cualquiera y, sea cual sea su rol, quien lo tiene asignado (espejo de
@@ -456,6 +496,8 @@ function describirHistorial(entry) {
         accion: despues ? "Asignó el ticket" : "Quitó la asignación",
         detalle: `${nombreAsignacion(antes)} → ${nombreAsignacion(despues)}`,
       };
+    case "area_changed":
+      return { accion: "Cambió el área", detalle: `${antes || SIN_AREA} → ${despues || SIN_AREA}` };
     case "Cambio de estado":
     case "state_changed":
       return { accion: "Cambió el estado", detalle: `${antes ?? "—"} → ${despues ?? "—"}` };

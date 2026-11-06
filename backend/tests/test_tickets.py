@@ -155,6 +155,8 @@ EXPECTED_TICKET_KEYS = {
     "priority",
     "state",
     "assigned_to_id",
+    "area_id",
+    "area_name",
     "created_by_id",
     "created_at",
     "updated_at",

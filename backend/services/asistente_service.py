@@ -96,9 +96,9 @@ GROQ_TIMEOUT_CONEXION = 5.0
 ROLES_TABLA = (UserRole.ADMIN.value, UserRole.TECHNICIAN.value, UserRole.REQUESTER.value)
 # Para qué sirve cada rol («Roles del sistema» en ayuda.html).
 DESCRIPCION_ROL = {
-    UserRole.ADMIN.value: "Tiene permisos completos",
-    UserRole.TECHNICIAN.value: "Atiende los tickets (recibe las asignaciones automáticas)",
-    UserRole.REQUESTER.value: "Quien crea el ticket",
+    UserRole.ADMIN.value: "Jefe de IT: tiene permisos completos",
+    UserRole.TECHNICIAN.value: "Empleado de IT de un área: atiende los tickets (recibe las asignaciones automáticas de su área)",
+    UserRole.REQUESTER.value: "Cualquier persona de la empresa: crea tickets para IT (no tiene área)",
 }
 # La tabla «Permisos por rol» de ayuda.html, tal cual (una prueba la compara):
 # (acción en la tabla, cómo se dice en una oración, valor por rol en ROLES_TABLA).
@@ -114,11 +114,13 @@ TABLA_PERMISOS = [
     ("Editar ticket", "editar tickets", (_TODOS_MENOS_CERRADOS, _CREADOS_NUEVOS, _CREADOS_NUEVOS)),
     ("Cambiar estado", "cambiar el estado", ("Sí", "Sí", "Solo en los asignados a él")),
     ("Asignar ticket", "asignar tickets", ("Sí", "No", "No")),
+    ("Cambiar área", "cambiar el área de IT de un ticket", ("Sí", "Sí", "No")),
     ("Historial global", "ver el historial global", ("Sí", "Sí", "No")),
     ("Métricas", "ver las métricas", ("Sí", "No", "No")),
     ("Explicar con IA", "usar «Explicar con IA»", ("Sí", "Sí", "No")),
     ("Eliminar ticket", "eliminar tickets", ("Sí", "No", "No")),
     ("Administrar usuarios", "administrar usuarios", ("Sí", "No", "No")),
+    ("Administrar áreas de IT", "administrar las áreas de IT", ("Sí", "No", "No")),
 ]
 
 
@@ -159,19 +161,26 @@ un rol. Si preguntan cómo funciona, describe la aplicación.
 - Hay 3 roles: Administrador, Técnico y Solicitante (no hay otros).
 - Menú lateral: Tickets (listado), Nuevo ticket, Historial (no para Solicitante), \
 Métricas (solo Administrador: cola de hoy, resueltos, tiempo promedio \
-de resolución, correo frente a web y gráficos por estado, categoría, persona y día), \
-Usuarios (solo Administrador), Ayuda y Mi cuenta.
-- Crear un ticket: menú «Nuevo ticket»; se indica título, descripción, categoría \
-(Hardware, Software, Red, Accesos) y prioridad (Baja, Media, Alta, Crítica). Al \
-crearse se asigna solo al Técnico activo con menos tickets.
+de resolución, correo frente a web y gráficos por estado, categoría, persona y día; \
+se pueden filtrar por área de IT), Usuarios (solo Administrador), Áreas de IT (solo \
+Administrador), Ayuda y Mi cuenta.
+- La ticketera es de IT: el Administrador es el jefe de IT, cada Técnico \
+pertenece a un área de IT (Soporte técnico, Redes, Infraestructura, Ciberseguridad \
+u otras que defina el Administrador) y el Solicitante es cualquier persona de la \
+empresa, sin área. IT solo recibe: un ticket nunca se asigna a un Solicitante.
+- Crear un ticket: menú «Nuevo ticket»; se indica título, descripción, área de IT \
+(obligatoria), categoría (Hardware, Software, Red, Accesos) y prioridad (Baja, Media, \
+Alta, Crítica). Al crearse se asigna solo al Técnico activo de esa área con menos \
+tickets abiertos (si el área no tiene técnicos, al Técnico con menos tickets abiertos).
 - Estados: Nuevo → En proceso → Resuelto → Cerrado, siempre en ese orden; un \
 ticket Cerrado no cambia más.
 - Listado: tarjetas de resumen (pulsarlas filtra la lista), pestañas «Todos / Mis \
-tickets», búsqueda por texto, filtros por categoría, prioridad y estado, y \
-páginas de 20 tickets.
+tickets», búsqueda por texto, filtros por categoría, prioridad, estado y área de \
+IT (también «Sin área»), y páginas de 20 tickets.
 - Detalle de un ticket: datos, comentarios (firmados con el nombre de quien los \
-escribe) e historial de cambios; a la derecha, asignación y cambio de estado \
-según el rol.
+escribe) e historial de cambios; a la derecha, el área de IT, asignación y \
+cambio de estado según el rol. El Técnico y el Administrador pueden pasar el \
+ticket a otra área («Cambiar área»), y al hacerlo reasignarlo al técnico de esa área.
 - Adjuntos: al crear el ticket («Nuevo ticket») o después, en la sección \
 «Adjuntos» del detalle, con «Adjuntar archivos» (y «Sacar foto» en el celular). \
 Se aceptan jpg, png, pdf, docx, xlsx y txt, hasta 4 MB cada uno y 10 por ticket; \
@@ -184,9 +193,12 @@ ticketera. La primera vez la cuenta se crea sola como Solicitante.
 - Mi cuenta: ver el nombre, el correo y el rol.
 - Contraseña olvidada: es la de Microsoft; la restablece el área de TI de la \
 empresa (la ticketera no la guarda).
-- Usuarios (solo Administrador): «Agregar usuario» con nombre, correo y rol; \
-«Editar» para cambiar datos o rol; «Desactivar» / «Reactivar» en la fila de \
-cada persona.
+- Usuarios (solo Administrador): «Agregar usuario» con nombre, correo, rol y área \
+de IT (Técnico; opcional para el Administrador); «Editar» para cambiar datos, rol \
+o área; «Desactivar» / «Reactivar» en la fila de cada persona.
+- Áreas de IT (solo Administrador): crear, renombrar, desactivar y reactivar áreas. \
+Un área desactivada no se ofrece al crear tickets; los tickets y técnicos que ya la \
+tienen la conservan.
 """
 
 INSTRUCCIONES = """\
@@ -1516,21 +1528,27 @@ _QUIEN = r"\b(quien|quienes|que rol\w*)\b"
 REGLA_LIMITE = (
     "La ticketera no tiene un límite de tickets por persona: no hay un máximo ni un tope. "
     "Cada ticket nuevo se asigna automáticamente al Técnico activo con menos tickets "
-    "asignados (se cuentan todos los que tiene, en cualquier estado; si hay empate, al "
-    "que se registró primero), y así la carga se reparte. Un Administrador también "
-    "puede asignar tickets manualmente, sin tope."
+    "abiertos (Nuevo o En proceso) del área de IT elegida; si hay empate, al que se "
+    "registró primero. Así la carga se reparte. Un Administrador también puede asignar "
+    "tickets manualmente, sin tope."
 )
 REGLA_QUIEN_ASIGNA = (
     "Solo el Administrador puede asignar o reasignar tickets, desde el "
-    "detalle del ticket, en «Asignación». El Técnico y el Solicitante no asignan. Además, "
-    "cada ticket nuevo se asigna automáticamente al Técnico activo con menos tickets asignados."
+    "detalle del ticket, en «Asignación», y solo a Técnicos o Administradores: IT solo "
+    "recibe, un ticket nunca se asigna a un Solicitante. El Técnico no elige a quién, pero "
+    "al cambiar el área de un ticket puede reasignarlo automáticamente al técnico de la "
+    "nueva área. Además, cada ticket nuevo se asigna automáticamente al Técnico activo de "
+    "su área con menos tickets abiertos."
 )
 REGLA_REPARTO = (
-    "Cada ticket nuevo se asigna automáticamente al Técnico activo con menos tickets "
-    "asignados (se cuentan todos los que tiene, en cualquier estado); si hay empate, al "
-    "que se registró primero. Si no hay ningún Técnico activo, el ticket queda sin asignar. "
-    "Después, un Administrador puede reasignarlo manualmente. Los tickets "
-    "que llegan por correo se asignan al dueño del buzón de soporte."
+    "Al crear un ticket en la ticketera se elige el área de IT (obligatoria), y el ticket "
+    "se asigna automáticamente al Técnico activo de esa área con menos tickets abiertos "
+    "(Nuevo o En proceso); si hay empate, al que se registró primero. Si el área no tiene "
+    "técnicos, va al Técnico activo con menos tickets abiertos de cualquier área; si no "
+    "hay ningún Técnico activo, queda sin asignar. Después, un Administrador puede "
+    "reasignarlo manualmente, y el Técnico o el Administrador pueden pasarlo a otra área. "
+    "Los tickets que llegan por correo al buzón de soporte se asignan al dueño del buzón y "
+    "quedan en su área (o «Sin área»)."
 )
 REGLA_QUIEN_CAMBIA_ESTADO = (
     "El Técnico y el Administrador pueden cambiar el estado de cualquier "
@@ -1549,8 +1567,21 @@ REGLA_CERRADO = NOTA_CERRADO + (
     " Si llega una respuesta por correo a un ticket Cerrado, no se agrega como comentario: se "
     "responde una sola vez que envíe un correo nuevo para crear otro ticket."
 )
+REGLA_AREAS = (
+    "La ticketera es de IT y tiene áreas de IT (Soporte técnico, Redes, Infraestructura, "
+    "Ciberseguridad u otras): el Administrador (jefe de IT) las crea, renombra y "
+    "desactiva en «Áreas de IT» y le asigna el área a cada Técnico en «Usuarios» (el "
+    "Administrador también puede tener área; el Solicitante no). Al crear un ticket se elige "
+    "el área (obligatoria) y se asigna al Técnico de esa área con menos tickets abiertos. El "
+    "Técnico y el Administrador pueden cambiar el área de un ticket desde su detalle "
+    "(«Cambiar área») y, al hacerlo, reasignarlo al técnico de la nueva área; el cambio queda "
+    "en el historial. La lista de tickets y las métricas se filtran por área, incluida "
+    "«Sin área» (tickets de antes de las áreas o de un buzón sin área)."
+)
 REGLA_SOLICITANTE = (
-    "Un Solicitante solo ve los tickets que él mismo creó y los que tiene asignados. "
+    "El Solicitante es cualquier persona de la empresa y no tiene área de IT. "
+    "Solo ve los tickets que él mismo creó y los que tiene asignados (solo tickets viejos: "
+    "IT solo recibe, ya no se le asignan tickets nuevos). "
     "Puede crear tickets, editar los que creó mientras están en «Nuevo», comentar en ellos y "
     "cambiar el estado de los que tiene asignados. No ve el historial global, las métricas ni la lista de usuarios."
 )
@@ -1558,15 +1589,18 @@ REGLA_CORREO = (
     "Cuando la función de correo está activa, la ticketera revisa el buzón de soporte cada "
     "minuto. Quien envía el correo es el solicitante y quien lo recibe, el asignado. Un correo que pide "
     "ayuda (o cuyo asunto empieza con «Ticket:») de un usuario con cuenta crea un ticket a "
-    "su nombre, asignado al dueño del buzón, y se le responde con el número del ticket. "
+    "su nombre, asignado al dueño del buzón y en su área de IT (o «Sin área»), y se le "
+    "responde con el número del ticket. "
     "Quien es del dominio de la empresa y no tiene cuenta recibe una sola respuesta: primero "
     "debe ingresar a la ticketera con su cuenta de Microsoft y volver a enviar la solicitud; "
     "los correos de otros dominios se ignoran. Los correos que el dueño del buzón envía a "
     "alguien de la empresa pasan por el mismo filtro: crean un ticket si el asunto empieza con "
     "«Ticket:» o si le reporta a un compañero un problema técnico o le pide soporte, acceso o "
     "ayuda (no si es coordinación, un saludo, un envío de archivos, una reunión, un "
-    "agradecimiento o un informe), asignado al primer destinatario de la empresa en «Para», "
-    "que recibe el aviso «Se le asignó el ticket #N». Los avisos que envía la ticketera nunca crean "
+    "agradecimiento o un informe), asignado al primer destinatario de la empresa en «Para» y "
+    "en su área de IT, que recibe el aviso «Se le asignó el ticket #N». IT solo recibe: si ese "
+    "destinatario es Solicitante o no tiene cuenta, no se crea ticket (sí se agregan como "
+    "comentario las respuestas de IT en el hilo de un ticket). Los avisos que envía la ticketera nunca crean "
     "tickets, y un correo de una conversación ya procesada tampoco. Responder en el hilo de un ticket o con «[Ticket #N]» en "
     "el asunto agrega un comentario; pueden hacerlo el solicitante, el asignado y los "
     "usuarios activos que estén en el hilo; si el ticket está Cerrado, no se agrega el "
@@ -1597,6 +1631,7 @@ REGLAS_APP = [
      or re.search(rf"\bcomo se {_ASIGNADO}", t), REGLA_REPARTO),
     (lambda t: re.search(rf"{_QUIEN}.*\b(estados?|cerrar|cierra\w*|resolver|resuelv\w*)\b", t),
      REGLA_QUIEN_CAMBIA_ESTADO),
+    (lambda t: re.search(r"\bareas?\b", t), REGLA_AREAS),
     (lambda t: re.search(r"\bsolicitantes?\b", t), REGLA_SOLICITANTE),
     (lambda t: re.search(r"\b(correos?|e-?mails?|mails?)\b", t), REGLA_CORREO),
 ]

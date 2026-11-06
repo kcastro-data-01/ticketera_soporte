@@ -9,6 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from backend.constants import (
     DATE_FIELD_STATE,
+    IT_ROLES,
     TicketCategory,
     TicketDateField,
     TicketPriority,
@@ -17,6 +18,7 @@ from backend.constants import (
 )
 from backend.models import Comment, History, ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate, TicketUpdate
+from backend.services import area_service
 from backend.services.user_service import get_auto_assignable_users
 
 
@@ -71,6 +73,23 @@ if not logger.handlers:
     logger.addHandler(_salida)
     logger.setLevel(logging.INFO)
     logger.propagate = False
+
+
+class AssigneeNotITError(Exception):
+    """IT solo recibe: un ticket no se asigna a un Solicitante (HTTP 422)."""
+
+    def __init__(self, user: User):
+        self.user = user
+        super().__init__(
+            f"{user.name} es Solicitante: los tickets solo se asignan a Técnicos "
+            "o Administradores.")
+
+
+class AreaRequiredError(Exception):
+    """Crear un ticket en la app sin elegir el área de IT (HTTP 422)."""
+
+    def __init__(self):
+        super().__init__("Elija el área de IT del ticket.")
 
 
 class TicketNotFoundError(Exception):
@@ -135,23 +154,29 @@ ALLOWED_TRANSITIONS: dict[TicketState, frozenset[TicketState]] = {
 }
 
 
-def pick_next_assignee(session) -> User | None:
-    """Return the eligible user with the fewest assigned tickets.
+def pick_next_assignee(session, area_id: int | None = None) -> User | None:
+    """Return the eligible user with the fewest **open** tickets.
 
-    Round-robin among the active users whose role is in ``AUTO_ASSIGN_ROLES``
-    (``Técnico``): ties are broken by lowest user id. Returns
-    ``None`` when there are no eligible users, so the caller can leave the
-    ticket unassigned. Read-only: it never modifies the ``users`` table.
+    Eligible: the active users whose role is in ``AUTO_ASSIGN_ROLES``
+    (``Técnico``). With ``area_id``, only the technicians of that area; if
+    the area has none, every technician (any area or «Sin área»). Open =
+    ``OPEN_STATES`` (Nuevo, En proceso). Ties are broken by lowest user id.
+    Returns ``None`` when there are no eligible users, so the caller can
+    leave the ticket unassigned. Read-only: it never modifies ``users``.
     """
     eligible_users = get_auto_assignable_users(session)
+    if area_id is not None:
+        del_area = [user for user in eligible_users if user.area_id == area_id]
+        eligible_users = del_area or eligible_users
     if not eligible_users:
         return None
 
-    # Count assigned tickets per user (only counting eligible users).
+    # Count open tickets per user (only counting eligible users).
     eligible_ids = [user.id for user in eligible_users]
     counts: dict[int, int] = {user_id: 0 for user_id in eligible_ids}
     assigned = session.scalars(
-        select(Ticket.assigned_to_id).where(Ticket.assigned_to_id.in_(eligible_ids))
+        select(Ticket.assigned_to_id).where(
+            Ticket.assigned_to_id.in_(eligible_ids), Ticket.state.in_(OPEN_STATES))
     ).all()
     for user_id in assigned:
         if user_id in counts:
@@ -181,6 +206,7 @@ def create_ticket(
     *,
     asignado: User | None = None,
     origen: str | None = None,
+    requiere_area: bool = True,
 ) -> Ticket:
     """Persist a new ticket.
 
@@ -195,23 +221,43 @@ def create_ticket(
     available.
 
     ``asignado`` (tickets que llegan por correo: quien recibe el correo)
-    reemplaza el reparto automático. ``origen`` es el texto que queda en el
-    historial de la creación («Ticket creado desde correo enviado por … a
-    …»).
+    reemplaza el reparto automático, y el ticket toma el área de esa persona
+    (o «Sin área»). Tiene que ser de IT (:class:`AssigneeNotITError`).
+    ``origen`` es el texto que queda en el historial de la creación («Ticket
+    creado desde correo enviado por … a …»).
+
+    Área de IT (``payload.area_id``): tiene que existir y estar activa
+    (``area_service.AreaNotFoundError`` / ``AreaInactiveError``). En la app es
+    obligatoria mientras haya áreas activas (:class:`AreaRequiredError`;
+    los correos pasan ``requiere_area=False``); el
+    ticket va al técnico del área con menos tickets abiertos
+    (:func:`pick_next_assignee`).
 
     Registra una entrada de historial por la creación del ticket (RF9).
     """
+    if asignado is not None and asignado.role not in IT_ROLES:
+        raise AssigneeNotITError(asignado)
+    if payload.area_id is not None:
+        area_id = area_service.get_active_area(session, payload.area_id).id
+    elif asignado is not None:
+        area_id = asignado.area_id
+    elif requiere_area and area_service.has_active_areas(session):
+        raise AreaRequiredError()
+    else:
+        area_id = None
+
     ticket = Ticket(
         title=payload.title,
         description=payload.description,
         category=payload.category.value,
         priority=payload.priority.value,
         created_by_id=current_user.id if current_user is not None else None,
+        area_id=area_id,
     )
 
-    # Automatic round-robin assignment among active Support/Technician users,
-    # unless the caller names the assignee.
-    assignee = asignado if asignado is not None else pick_next_assignee(session)
+    # Automatic assignment to the technician of the area with fewest open
+    # tickets, unless the caller names the assignee.
+    assignee = asignado if asignado is not None else pick_next_assignee(session, area_id)
     if assignee is not None:
         ticket.assigned_to_id = assignee.id
 
@@ -256,6 +302,8 @@ def list_tickets(
     visible_para: User | None = None,
     asignado_a: int | None = None,
     sin_asignar: bool = False,
+    area_id: int | None = None,
+    sin_area: bool = False,
     fecha_campo: TicketDateField = TicketDateField.CREATED,
     desde: date | None = None,
     hasta: date | None = None,
@@ -299,6 +347,10 @@ def list_tickets(
         statement = statement.where(Ticket.assigned_to_id == asignado_a)
     if sin_asignar:
         statement = statement.where(Ticket.assigned_to_id.is_(None))
+    if area_id is not None:
+        statement = statement.where(Ticket.area_id == area_id)
+    if sin_area:
+        statement = statement.where(Ticket.area_id.is_(None))
     if desde is not None or hasta is not None:
         statement = _filtrar_fechas(statement, fecha_campo, desde, hasta)
 
@@ -568,6 +620,8 @@ def assign_ticket(
     Raises:
         ``TicketNotFoundError``: the ticket does not exist.
         ``UserNotFoundError``: the target user does not exist.
+        ``AssigneeNotITError``: the target user is a Solicitante (IT solo
+        recibe; un ticket viejo asignado a un Solicitante sí se reasigna).
         ``TicketClosedError``: the ticket is Cerrado.
     """
     ticket = session.get(Ticket, ticket_id)
@@ -575,8 +629,12 @@ def assign_ticket(
         raise TicketNotFoundError(ticket_id)
     _ensure_open(ticket)
 
-    if assigned_to_id is not None and session.get(User, assigned_to_id) is None:
-        raise UserNotFoundError(assigned_to_id)
+    if assigned_to_id is not None:
+        nuevo = session.get(User, assigned_to_id)
+        if nuevo is None:
+            raise UserNotFoundError(assigned_to_id)
+        if nuevo.role not in IT_ROLES:
+            raise AssigneeNotITError(nuevo)
 
     old_assignee_name = ticket.assignee.name if ticket.assignee is not None else None
     ticket.assigned_to_id = assigned_to_id
@@ -742,3 +800,44 @@ def delete_ticket(session, ticket_id: int, current_user: User) -> None:
         "%s (%s, id %s) eliminó el ticket #%s «%s» el %s",
         current_user.name, current_user.email, current_user.id, ticket_id, titulo, momento,
     )
+
+
+def change_ticket_area(
+    session,
+    ticket_id: int,
+    area_id: int,
+    reasignar: bool,
+    current_user: User | None = None,
+) -> Ticket:
+    """Pasa el ticket a otra área de IT activa (Administrador y Técnico).
+
+    Queda en el historial (``area_changed``: nombre anterior → nuevo). Con
+    ``reasignar`` se asigna al técnico de la nueva área con menos tickets
+    abiertos (:func:`pick_next_assignee`, con su propio registro
+    ``assigned``); si no hay ninguno, la asignación no cambia.
+
+    Raises ``TicketNotFoundError``, ``TicketClosedError`` y los de
+    ``area_service.get_active_area``.
+    """
+    ticket = session.get(Ticket, ticket_id)
+    if ticket is None:
+        raise TicketNotFoundError(ticket_id)
+    _ensure_open(ticket)
+    area = area_service.get_active_area(session, area_id)
+
+    author_name, author_id = _audit_author(current_user)
+    if ticket.area_id != area.id:
+        anterior = ticket.area.name if ticket.area is not None else None
+        ticket.area_id = area.id
+        session.add(History(
+            ticket_id=ticket.id, action="area_changed", field="area",
+            old_value=anterior, new_value=area.name,
+            author=author_name, author_id=author_id,
+        ))
+        session.commit()
+        session.refresh(ticket)
+    if reasignar:
+        nuevo = pick_next_assignee(session, area.id)
+        if nuevo is not None and nuevo.id != ticket.assigned_to_id:
+            ticket = assign_ticket(session, ticket.id, nuevo.id, current_user)
+    return ticket

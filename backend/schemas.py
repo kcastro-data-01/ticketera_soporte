@@ -57,6 +57,9 @@ class TicketCreate(BaseModel):
     description: str
     category: TicketCategory
     priority: TicketPriority
+    # Área de IT (lista de áreas activas). Obligatoria en la app cuando hay
+    # áreas activas (lo revisa ``ticket_service.create_ticket``).
+    area_id: int | None = Field(default=None, gt=0)
 
     @field_validator("title")
     @classmethod
@@ -121,6 +124,9 @@ class TicketResponse(BaseModel):
     state: TicketState
     assigned_to_id: int | None = None
     created_by_id: int | None = None
+    # ``None`` / ``null`` = «Sin área».
+    area_id: int | None = None
+    area_name: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -138,6 +144,8 @@ class UserCreate(BaseModel):
     email: str
     password: str | None = None
     role: UserRole = UserRole.TECHNICIAN
+    # Área de IT: solo Técnico y Administrador (opcional); el Solicitante no.
+    area_id: int | None = Field(default=None, gt=0)
 
     @field_validator("password")
     @classmethod
@@ -180,6 +188,8 @@ class UserUpdate(BaseModel):
     role: UserRole | None = None
     password: str | None = None
     is_active: bool | None = None
+    # ``null`` explícito quita el área («Sin área»).
+    area_id: int | None = Field(default=None, gt=0)
 
     @field_validator("password")
     @classmethod
@@ -218,12 +228,12 @@ class UserUpdate(BaseModel):
         provided = {
             name
             for name in self.model_fields_set
-            if getattr(self, name) is not None
+            if getattr(self, name) is not None or name == "area_id"
         }
         if not provided:
             raise ValueError(
                 "la petición debe incluir al menos un campo a modificar: "
-                "name, email, role, password o is_active"
+                "name, email, role, password, is_active o area_id"
             )
         return self
 
@@ -238,6 +248,8 @@ class UserResponse(BaseModel):
     email: str
     role: UserRole
     is_active: bool = True
+    area_id: int | None = None
+    area_name: str | None = None
 
 
 class TicketAssignment(BaseModel):
@@ -247,6 +259,65 @@ class TicketAssignment(BaseModel):
     """
 
     assigned_to_id: int | None
+
+
+class TicketAreaUpdate(BaseModel):
+    """Payload de ``PATCH /api/tickets/{ticket_id}/area`` (Administrador y
+    Técnico): pasa el ticket a otra área de IT activa. Con ``reasignar`` se
+    asigna al técnico de la nueva área con menos tickets abiertos."""
+
+    area_id: int = Field(gt=0)
+    reasignar: bool = False
+
+
+def _validate_area_name(value: str) -> str:
+    cleaned = " ".join(value.split())
+    if len(cleaned) < 2:
+        raise ValueError("el nombre del área debe tener al menos 2 caracteres")
+    if len(cleaned) > 60:
+        raise ValueError("el nombre del área debe tener como máximo 60 caracteres")
+    return cleaned
+
+
+class AreaCreate(BaseModel):
+    """Payload de ``POST /api/areas`` (solo Administrador)."""
+
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def name_must_be_valid(cls, value: str) -> str:
+        return _validate_area_name(value)
+
+
+class AreaUpdate(BaseModel):
+    """Payload de ``PATCH /api/areas/{area_id}``: renombrar, desactivar o
+    reactivar (al menos un campo)."""
+
+    name: str | None = None
+    is_active: bool | None = None
+
+    @field_validator("name")
+    @classmethod
+    def name_must_be_valid(cls, value: str | None) -> str | None:
+        return None if value is None else _validate_area_name(value)
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> "AreaUpdate":
+        if self.name is None and self.is_active is None:
+            raise ValueError("la petición debe incluir name o is_active")
+        return self
+
+
+class AreaResponse(BaseModel):
+    """Área de IT devuelta por la API (``tecnicos``: Técnicos activos en ella)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    is_active: bool
+    tecnicos: int = 0
 
 
 class TicketStateUpdate(BaseModel):

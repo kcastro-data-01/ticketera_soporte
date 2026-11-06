@@ -13,7 +13,7 @@ const FRONTEND = path.join(__dirname, "..");
 const paginas = fs.readdirSync(FRONTEND).filter((f) => f.endsWith(".html"));
 
 test("cada página enlaza el favicon y el ícono de inicio, y los archivos existen", () => {
-  assert.equal(paginas.length, 11, "9 pantallas + 404 y sin permiso");
+  assert.equal(paginas.length, 12, "10 pantallas + 404 y sin permiso");
   for (const pagina of paginas) {
     const html = fs.readFileSync(path.join(FRONTEND, pagina), "utf8");
     /* 404.html y sin-permiso.html usan rutas absolutas (/images/...). */

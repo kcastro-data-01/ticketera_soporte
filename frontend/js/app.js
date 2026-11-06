@@ -63,6 +63,7 @@ function getElements() {
     priority: document.getElementById("priority"),
     state: document.getElementById("state"),
     assigned: document.getElementById("assigned"),
+    area: document.getElementById("area"),
     fecha: document.getElementById("fecha"),
     limpiar: document.getElementById("limpiar"),
     estado: document.getElementById("estado-carga"),
@@ -100,6 +101,7 @@ function getFilters() {
     state: estadoFiltro(elements.state.value),
     mios: soloMios,
     asignado: vistaSolicitante ? "" : valorDe(elements.assigned),
+    area: vistaSolicitante ? "" : valorDe(elements.area),
     fecha: valorDe(elements.fecha),
   };
 }
@@ -107,7 +109,7 @@ function getFilters() {
 function hayFiltros(filters) {
   return Boolean(
     filters.search || filters.category || filters.priority || filters.state || filters.mios
-      || filters.asignado || filters.fecha
+      || filters.asignado || filters.area || filters.fecha
   );
 }
 
@@ -139,6 +141,9 @@ function buildTicketsUrl(filters, pagina = 0) {
   if (filters.mios) params.set("mios", "true");
   if (filters.asignado === "sin") params.set("sin_asignar", "true");
   else if (/^\d+$/.test(filters.asignado || "")) params.set("assigned_to", filters.asignado);
+  /* «Área de IT»: un área o «Sin área». */
+  if (filters.area === "sin") params.set("sin_area", "true");
+  else if (/^\d+$/.test(filters.area || "")) params.set("area", filters.area);
   /* Los tickets creados ese día (hora de Costa Rica, de 00:00 a 23:59): desde
      y hasta el mismo día; sin fecha_campo la API mira la creación. */
   if (filters.fecha) {
@@ -705,6 +710,11 @@ function init() {
     comoda.addEventListener("click", () => cambiarDensidad("comoda"));
   }
   aplicarDensidad();
+  if (!vistaSolicitante && elements.area && typeof cargarAreas === "function") {
+    /* El Administrador también ve las desactivadas (sus tickets se siguen
+       pudiendo filtrar); el Técnico, las activas. */
+    cargarAreas(typeof puede === "function" && puede("areas")).then((areas) => llenarSelectAreas(elements.area, areas, { primera: "Todas", sinArea: true }));
+  }
   loadUsers().then(fetchTickets);
 }
 

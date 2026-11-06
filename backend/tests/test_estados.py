@@ -121,6 +121,8 @@ def test_allowed_transition_returns_the_updated_ticket_shape(auth_client):
         "priority",
         "state",
         "assigned_to_id",
+    "area_id",
+    "area_name",
         "created_by_id",
         "created_at",
         "updated_at",

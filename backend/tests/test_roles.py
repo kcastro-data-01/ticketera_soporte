@@ -206,8 +206,10 @@ def test_inactive_technician_is_skipped(auth_client, session):
 
 
 def test_existing_assignments_survive_new_tickets(auth_client):
+    # Administrador: de IT pero fuera del reparto automático (a un
+    # Solicitante ya no se le asigna: IT solo recibe).
     requester = create_user(
-        auth_client, "Sara", "sara@soporte.local", role=UserRole.REQUESTER.value
+        auth_client, "Sara", "sara@soporte.local", role=UserRole.ADMIN.value
     )
     support = create_user(auth_client, "Ana", "ana@soporte.local")
 

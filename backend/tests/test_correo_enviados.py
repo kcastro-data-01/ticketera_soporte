@@ -1,9 +1,10 @@
 """Tickets desde los correos que envía el dueño del buzón (Elementos enviados)
 y la regla «quien escribe = solicitante, quien recibe = asignado».
 
-Caso principal: kcastro@data.cr le escribe a pedro@data.cr → ticket asignado
-a Pedro (se crea su usuario) → Pedro entra con Microsoft por primera vez y ve
-el ticket en su lista. Graph y Microsoft simulados."""
+Caso principal: kcastro@data.cr le escribe a pedro@data.cr (Técnico de Redes)
+→ ticket asignado a Pedro y en el área de Pedro → Pedro entra con Microsoft
+y ve el ticket en su lista. IT solo recibe: a un Solicitante, o a alguien sin
+cuenta, no se crea ticket (ni usuario). Graph y Microsoft simulados."""
 
 from datetime import datetime, timedelta, timezone
 from itertools import count
@@ -11,7 +12,7 @@ from itertools import count
 import pytest
 from sqlalchemy import func, select
 
-from backend.models import Comment, History, ProcessedEmail, Ticket, User
+from backend.models import Comment, History, ItArea, ProcessedEmail, Ticket, User
 from backend.services import correo_service as cs
 from backend.tests.test_correo import CONFIG, CONFIG_FILTRO, FakeGraph, crear_correo, factory, usuario  # noqa: F401
 from backend.tests.test_login_microsoft import entrar, id_token, tenant_simulado  # noqa: F401
@@ -54,6 +55,21 @@ def yo(session):
     return user
 
 
+@pytest.fixture
+def equipo(session):
+    """Pedro (Técnico de Redes), Ana y Luis (Técnicos sin área): los
+    compañeros de IT a los que les escribe la dueña del buzón."""
+    redes = ItArea(name="Redes")
+    session.add(redes)
+    session.flush()
+    gente = [User(name="Pedro Rojas", email="pedro@data.cr", role="Técnico", area_id=redes.id),
+             User(name="Ana Mora", email="ana@data.cr", role="Técnico"),
+             User(name="Luis Solís", email="luis@data.cr", role="Técnico")]
+    session.add_all(gente)
+    session.commit()
+    return {u.email: u for u in gente} | {"redes": redes}
+
+
 def enviar(session, mensaje, config=CONFIG):
     return cs.procesar_enviado(session, cs.correo_desde_graph(mensaje), config)
 
@@ -65,14 +81,14 @@ def pedro(session):
 # --- Ticket desde un correo enviado ---------------------------------------------
 
 
-def test_sent_mail_creates_a_ticket_assigned_to_the_recipient(session, yo):
+def test_sent_mail_creates_a_ticket_assigned_to_the_recipient(session, yo, equipo):
     resultado, aviso = enviar(session, crear_enviado())
     assert (resultado, aviso) == ("ticket", None)  # sin AVISAR_ASIGNADO no se avisa
     ticket = session.scalars(select(Ticket)).one()
     p = pedro(session)
-    assert (p.name, p.email, p.role, p.password_hash) == ("Pedro Rojas", "pedro@data.cr", "Solicitante", None)
     assert ticket.created_by_id == yo.id
     assert ticket.assigned_to_id == p.id
+    assert ticket.area_id == equipo["redes"].id  # queda en el área de Pedro
     assert ticket.title == "La impresora no imprime"
     assert "Enviado por correo de kcastro@data.cr a pedro@data.cr" in ticket.description
     creado = session.scalars(select(History).where(History.ticket_id == ticket.id)).one()
@@ -90,7 +106,7 @@ def test_existing_recipient_is_reused_whatever_the_case(session, yo):
     assert existente.name == "Pedro R."
 
 
-def test_first_company_recipient_in_to_is_the_assignee_and_cc_does_not_count(session, yo):
+def test_first_company_recipient_in_to_is_the_assignee_and_cc_does_not_count(session, yo, equipo):
     mensaje = crear_enviado(para=(("cliente@gmail.com", "Cliente"), ("ana@data.cr", "Ana Mora"),
                                   ("luis@data.cr", "Luis Solís")))
     mensaje["ccRecipients"] = [{"emailAddress": {"address": "jefe@data.cr", "name": "Jefe"}}]
@@ -129,14 +145,14 @@ def test_mails_sent_by_the_app_are_ignored(session, yo, mensaje):
     assert session.scalars(select(Ticket)).all() == []
 
 
-def test_same_message_id_never_creates_two_tickets(session, yo):
+def test_same_message_id_never_creates_two_tickets(session, yo, equipo):
     mensaje = crear_enviado(msg_id="<unico@data.cr>")
     assert enviar(session, mensaje)[0] == "ticket"
     assert enviar(session, mensaje)[0] == "repetido"
     assert len(session.scalars(select(Ticket)).all()) == 1
 
 
-def test_sent_mail_without_ticket_prefix_never_creates_even_if_it_asks_for_help(session, yo):
+def test_sent_mail_without_ticket_prefix_never_creates_even_if_it_asks_for_help(session, yo, equipo):
     """Lo que envío solo crea un ticket con «Ticket:» al inicio del asunto
     (lo que llega sigue con el filtro auto)."""
     pide_ayuda = crear_enviado(asunto="No me funciona la impresora", cuerpo="Pedro, ¿la podés revisar?")
@@ -144,16 +160,15 @@ def test_sent_mail_without_ticket_prefix_never_creates_even_if_it_asks_for_help(
     assert session.scalars(select(Ticket)).all() == []
 
 
-def test_sent_mail_that_does_not_ask_for_help_creates_nothing(session, yo):
+def test_sent_mail_that_does_not_ask_for_help_creates_nothing(session, yo, equipo):
     gracias = crear_enviado(asunto="Gracias por el informe", cuerpo="Pedro, lo reviso mañana.")
     assert enviar(session, gracias, CONFIG_FILTRO) == ("otro", None)
     # Queda anotado: no se vuelve a revisar.
     assert enviar(session, gracias, CONFIG_FILTRO) == ("repetido", None)
     assert session.scalars(select(Ticket)).all() == []
-    assert pedro(session) is None, "tampoco se crea el usuario del destinatario"
 
 
-def test_sent_mail_with_filter_todos_still_needs_the_prefix(session, yo):
+def test_sent_mail_with_filter_todos_still_needs_the_prefix(session, yo, equipo):
     gracias = crear_enviado(asunto="Gracias por el informe", cuerpo="Pedro, lo reviso mañana.")
     assert enviar(session, gracias, CONFIG)[0] == "otro"
     assert session.scalars(select(Ticket)).all() == []
@@ -161,7 +176,7 @@ def test_sent_mail_with_filter_todos_still_needs_the_prefix(session, yo):
 
 @pytest.mark.parametrize("asunto", ["Ticket: Cambiar el tóner", "TICKET: Cambiar el tóner",
                                     "  ticket:Cambiar el tóner"])
-def test_ticket_prefix_creates_and_is_removed_from_the_title(session, yo, asunto):
+def test_ticket_prefix_creates_and_is_removed_from_the_title(session, yo, asunto, equipo):
     assert enviar(session, crear_enviado(asunto=asunto, cuerpo="Cuando pueda."), CONFIG_FILTRO)[0] == "ticket"
     assert session.scalars(select(Ticket)).one().title == "Cambiar el tóner"
 
@@ -179,7 +194,7 @@ def test_inactive_recipient_is_ignored(session, yo):
     assert enviar(session, crear_enviado())[0] == "ignorado"
 
 
-def test_avisar_asignado_prepares_the_mail_when_enabled(session, yo):
+def test_avisar_asignado_prepares_the_mail_when_enabled(session, yo, equipo):
     config = cs.ConfigCorreo(usuario=YO, app_url="http://ticketera.data.cr", filtro="todos",
                              dominio_empresa="data.cr", avisar_asignado=True)
     resultado, aviso = enviar(session, crear_enviado(), config)
@@ -201,7 +216,7 @@ def test_avisar_asignado_comes_from_the_environment():
 # --- Hilos: respuestas como comentarios --------------------------------------------
 
 
-def test_reply_chain_is_one_ticket_with_comments(session, yo):
+def test_reply_chain_is_one_ticket_with_comments(session, yo, equipo):
     """Yo le escribo a Pedro → Pedro me responde (bandeja) → yo le respondo
     (enviados): un solo ticket con dos comentarios."""
     original = crear_enviado(msg_id="<original@data.cr>")
@@ -226,7 +241,7 @@ def test_reply_chain_is_one_ticket_with_comments(session, yo):
         ("Pedro Rojas", "Ya la revisé, era el cable."), ("Kristin Castro", "Gracias, Pedro.")]
 
 
-def test_conversation_id_finds_the_thread_without_reply_headers(session, yo):
+def test_conversation_id_finds_the_thread_without_reply_headers(session, yo, equipo):
     """Si la respuesta no trae In-Reply-To/References, el hilo se encuentra
     por el conversationId: la respuesta de Pedro (bandeja) y la mía
     (enviados) son comentarios del mismo ticket."""
@@ -249,7 +264,7 @@ def test_conversation_id_finds_the_thread_without_reply_headers(session, yo):
         "Ya cambié el cable.", "Gracias."]
 
 
-def test_app_confirmation_in_the_same_conversation_is_not_a_comment(session, yo):
+def test_app_confirmation_in_the_same_conversation_is_not_a_comment(session, yo, equipo):
     enviar(session, crear_enviado(conversacion="AAQk-hilo-2"))
     ticket = session.scalars(select(Ticket)).one()
     confirmacion = crear_enviado(asunto=f"Ticket #{ticket.id} creado: {ticket.title}", conversacion="AAQk-hilo-2",
@@ -260,7 +275,7 @@ def test_app_confirmation_in_the_same_conversation_is_not_a_comment(session, yo)
     assert session.scalars(select(Comment)).all() == []
 
 
-def test_reply_with_ticket_number_in_subject_is_a_comment(session, yo):
+def test_reply_with_ticket_number_in_subject_is_a_comment(session, yo, equipo):
     enviar(session, crear_enviado())
     ticket = session.scalars(select(Ticket)).one()
     seguimiento = crear_enviado(asunto=f"RE: Ticket #{ticket.id} creado: {ticket.title}",
@@ -297,7 +312,7 @@ def test_incoming_subject_ticket_prefix_always_creates_and_is_removed(session, y
 # --- revisar_buzon con Elementos enviados -------------------------------------------
 
 
-def test_revisar_buzon_processes_sent_items_without_touching_them(factory, session, yo):
+def test_revisar_buzon_processes_sent_items_without_touching_them(factory, session, yo, equipo):
     viejo = crear_enviado(msg_id="<viejo@data.cr>", fecha=datetime.now(timezone.utc) - timedelta(days=3))
     nuevo = crear_enviado(msg_id="<nuevo@data.cr>")
     graph = FakeGraph([], enviados=[viejo, nuevo])
@@ -318,7 +333,7 @@ def test_revisar_buzon_processes_sent_items_without_touching_them(factory, sessi
     assert len(marcas) == 1
 
 
-def test_revisar_buzon_sends_the_notice_only_with_avisar_asignado(factory, session, yo):
+def test_revisar_buzon_sends_the_notice_only_with_avisar_asignado(factory, session, yo, equipo):
     config = cs.ConfigCorreo(usuario=YO, app_url="http://ticketera.data.cr", filtro="todos",
                              dominio_empresa="data.cr", avisar_asignado=True)
     graph = FakeGraph([], enviados=[crear_enviado()])
@@ -336,7 +351,7 @@ def test_revisar_buzon_sends_the_notice_only_with_avisar_asignado(factory, sessi
 
 
 def test_end_to_end_sent_mail_then_microsoft_login_shows_the_ticket(client, session, factory, yo,
-                                                                    tenant_simulado):  # noqa: F811
+                                                                    tenant_simulado, equipo):  # noqa: F811
     graph = FakeGraph([], enviados=[crear_enviado()])
     cs.revisar_buzon(factory, CONFIG, graph.cliente)
     session.expire_all()
@@ -360,7 +375,7 @@ def test_end_to_end_sent_mail_then_microsoft_login_shows_the_ticket(client, sess
     assert session.get(Ticket, ticket.id).assigned_to_id == creado.id  # sus tickets no cambian
 
 
-def test_reply_in_the_same_check_finds_the_thread(factory, session, yo):
+def test_reply_in_the_same_check_finds_the_thread(factory, session, yo, equipo):
     """Enviado y respuesta de Pedro en la misma revisión: primero se procesan
     los enviados, así la respuesta va como comentario y no crea otro ticket."""
     original = crear_enviado(msg_id="<rapido@data.cr>")
@@ -371,3 +386,51 @@ def test_reply_in_the_same_check_finds_the_thread(factory, session, yo):
     conteo = cs.revisar_buzon(factory, CONFIG, graph.cliente)
     assert conteo == {"enviado_ticket": 1, "comentario": 1}
     assert len(session.scalars(select(Ticket)).all()) == 1
+
+
+# --- IT solo recibe -------------------------------------------------------------
+
+
+def test_sent_mail_to_a_requester_creates_no_ticket(session, yo, caplog):
+    session.add(User(name="Sofía Solano", email="sofia@data.cr", role="Solicitante"))
+    session.commit()
+    with caplog.at_level("INFO"):
+        resultado = enviar(session, crear_enviado(para=(("sofia@data.cr", "Sofía Solano"),)))
+    assert resultado == ("ignorado", None)
+    assert session.scalars(select(Ticket)).all() == []
+    assert session.scalar(select(ProcessedEmail.result)) == "ignorado"
+    assert "el destinatario sofia@data.cr es Solicitante (IT solo recibe tickets)" in caplog.text
+
+
+def test_sent_mail_to_someone_without_account_creates_neither_ticket_nor_user(session, yo, caplog):
+    with caplog.at_level("INFO"):
+        resultado = enviar(session, crear_enviado(para=(("nuevo@data.cr", "Nuevo"),)))
+    assert resultado == ("ignorado", None)
+    assert session.scalars(select(Ticket)).all() == []
+    assert session.scalar(select(User).where(User.email == "nuevo@data.cr")) is None
+    assert "nuevo@data.cr no tiene cuenta" in caplog.text
+
+
+def test_sent_mail_to_a_technician_without_area_is_sin_area(session, yo, equipo):
+    enviar(session, crear_enviado(para=(("ana@data.cr", "Ana Mora"),)))
+    ticket = session.scalars(select(Ticket)).one()
+    assert (ticket.assignee.email, ticket.area_id) == ("ana@data.cr", None)
+
+
+def test_reply_of_it_to_a_requester_thread_is_still_a_comment(session, yo, factory):
+    """Las respuestas de IT al solicitante siguen funcionando: un enviado en el
+    hilo de un ticket del solicitante es comentario, no se ignora."""
+    sofia = User(name="Sofía Solano", email="sofia@data.cr", role="Solicitante")
+    session.add(sofia)
+    session.commit()
+    ticket = Ticket(title="No tengo internet", description="Desde hoy", category="Red",
+                    priority="Media", created_by_id=sofia.id, assigned_to_id=yo.id)
+    session.add(ticket)
+    session.commit()
+    session.add(ProcessedEmail(message_id="<pedido-sofia@data.cr>", result="ticket", ticket_id=ticket.id))
+    session.commit()
+    respuesta = crear_enviado(para=(("sofia@data.cr", "Sofía Solano"),), asunto="RE: No tengo internet",
+                              cuerpo="Sofía, ya revisamos el router.",
+                              en_respuesta_a="<pedido-sofia@data.cr>")
+    assert enviar(session, respuesta)[0] == "comentario"
+    assert session.scalars(select(Comment)).one().content == "Sofía, ya revisamos el router."

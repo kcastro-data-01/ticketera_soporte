@@ -47,6 +47,10 @@ filtrarlos, y consultar su historial de cambios.
   `node:test` (52 pruebas en cuatro ficheros) y documentación en
   [docs/api.md](docs/api.md).
 
+- **Áreas de IT** (la ticketera es de IT): el Administrador las administra en
+  «Áreas de IT», cada Técnico pertenece a un área, al crear un ticket se elige
+  el área y se asigna al técnico de esa área con menos tickets abiertos; IT
+  solo recibe (nunca se asigna a un Solicitante). Ver [Áreas de IT](#áreas-de-it).
 - Tres roles: Administrador, Técnico y Solicitante. Asignar, eliminar,
   métricas y usuarios son solo del Administrador; editar un ticket, quien lo
   creó (mientras está «Nuevo») o el Administrador (ver «Integridad de los
@@ -70,9 +74,9 @@ filtrarlos, y consultar su historial de cambios.
   usuario desactivado no inicia sesión y pierde la sesión abierta.
 - No hay registro público: la cuenta se crea sola al entrar por primera vez
   con Microsoft (como Solicitante, o Administrador si es `ADMIN_INICIAL`) o
-  cuando el dueño del buzón le envía un correo que se vuelve ticket (queda
-  como asignado). Escribir al buzón sin cuenta no la crea: se le pide entrar
-  primero con Microsoft.
+  por el Administrador en «Usuarios». Escribir al buzón sin cuenta no la crea:
+  se le pide entrar primero con Microsoft; y un correo del dueño del buzón a
+  alguien sin cuenta tampoco (IT solo recibe: no se crea ticket).
 
 - Asistente de IA (botón «Asistente» abajo a la derecha, `POST /api/asistente`):
   responde preguntas sobre la app con Claude. El servidor solo le entrega los
@@ -300,11 +304,16 @@ curl -X POST http://127.0.0.1:8000/api/tickets \
     "title": "No enciende la impresora",
     "description": "La impresora del piso 2 no responde desde ayer.",
     "category": "Hardware",
-    "priority": "Alta"
+    "priority": "Alta",
+    "area_id": 1
   }'
 ```
 
-Devuelve `201 Created` con el ticket creado (el estado inicial es `Nuevo`).
+Devuelve `201 Created` con el ticket creado (el estado inicial es `Nuevo`),
+con `area_id` y `area_name`. `area_id` (un área de IT activa) es obligatorio
+mientras haya áreas activas: sin él, o con un área inexistente o desactivada,
+responde `422`. El ticket se asigna al técnico de esa área con menos tickets
+abiertos (ver [Áreas de IT](#áreas-de-it)).
 Categorías válidas: `Hardware`, `Software`, `Red`, `Accesos`.
 Prioridades válidas: `Baja`, `Media`, `Alta`, `Crítica`. Los datos inválidos
 responden `422 Unprocessable Entity`.
@@ -386,8 +395,12 @@ curl http://127.0.0.1:8000/api/users
 
 `POST /api/users` (`password` es opcional: se entra con Microsoft; solo se
 usa con `LOGIN_LOCAL=true`, de 6 a 72 caracteres, y `PATCH /api/users/{id}`
-la acepta para restablecerla) devuelve `201` con `{id, name, email, role}` (si `role`
-se omite, se guarda `Técnico`). Errores:
+la acepta para restablecerla) devuelve `201` con `{id, name, email, role,
+is_active, area_id, area_name}` (si `role` se omite, se guarda `Técnico`).
+`area_id` es el área de IT: solo para Técnico y Administrador (opcional); al
+Solicitante se le responde `422`. En `PATCH`, `"area_id": null` le quita el
+área; pasar a alguien a Solicitante le quita el área y responde `409` si tiene
+tickets abiertos asignados (primero hay que reasignarlos). Errores:
 `422` si `name` está vacío, el `email` no tiene formato válido o el `role` no
 es `Administrador`/`Técnico`/`Solicitante`; `409 Conflict` si el email ya está registrado.
 `GET /api/users` devuelve `200` con los usuarios **activos** disponibles
@@ -407,7 +420,9 @@ curl -X PATCH http://127.0.0.1:8000/api/tickets/1/assign \
 
 Asigna un usuario existente al ticket (o lo desasigna con `null`). Respuestas:
 `200` con el ticket actualizado, `404` si el ticket o el usuario no existen,
-`422` si falta el campo. Solo cambian `assigned_to_id` y `updated_at`.
+`422` si falta el campo o si el usuario es Solicitante (IT solo recibe; un
+ticket viejo asignado a un Solicitante sí se puede reasignar a alguien de IT).
+Solo cambian `assigned_to_id` y `updated_at`.
 
 ### Agregar comentarios a un ticket
 
@@ -445,8 +460,15 @@ opcionales vienen en `null` cuando el registro no los define. Respuestas:
 
 SQLite crea el archivo `ticketera.db` en la raíz del proyecto automáticamente
 al arrancar la API (`init_db()` se ejecuta en el arranque).
-El archivo está excluido de Git (`.gitignore`) y sus tablas son: `users`,
-`tickets`, `comments` y `history`.
+El archivo está excluido de Git (`.gitignore`) y sus tablas principales son:
+`it_areas`, `users`, `tickets`, `comments` y `history`.
+
+La migración de las áreas (`backend/migrate_add_it_areas.py`, en SQLite y en
+Postgres) crea `it_areas`, agrega `users.area_id` y `tickets.area_id` (los
+técnicos y tickets que ya había quedan «Sin área») y carga **una sola vez** las
+áreas de ejemplo Soporte técnico, Redes, Infraestructura y Ciberseguridad
+(marca `areas_it_ejemplo` en `schema_migrations`: si después se renombran o
+desactivan, no vuelven).
 
 Al arrancar también se ejecutan migraciones incrementales e idempotentes.
 La de categorías (`backend/migrate_categories.py`) reconstruye la tabla
@@ -528,6 +550,59 @@ comentario: se le contesta una sola vez (el correo queda registrado como
 correo para crear otro ticket.» y queda en el log (`Comentario no agregado: el
 ticket #N está Cerrado…`). Si quien contesta es el dueño del buzón (Elementos
 enviados), tampoco se comenta, y no se le envía el aviso a sí mismo.
+
+## Áreas de IT
+
+La ticketera es de IT. Los roles no cambian de nombre:
+
+- **Administrador**: jefe (supervisor) de IT. Puede tener un área (opcional): los
+  tickets que llegan a su buzón quedan en esa área; si no tiene, «Sin área».
+- **Técnico**: empleado de IT; pertenece a un área de IT.
+- **Solicitante**: cualquier persona de la empresa; no tiene área.
+
+Reglas:
+
+1. **Áreas en la base** (`it_areas`), administradas por el Administrador en
+   «Áreas de IT» (`areas.html`): crear, renombrar, desactivar y reactivar (no se
+   borran). Un área desactivada no se ofrece al crear tickets ni al cambiar el
+   área de un ticket; los tickets y técnicos que ya la tienen la conservan. El
+   área de cada Técnico se elige en «Usuarios».
+2. **Crear un ticket en la app**: «Área de IT» es obligatoria (áreas activas).
+   Se asigna al **Técnico activo de esa área con menos tickets abiertos**
+   (Nuevo o En proceso; empate: el de menor id). Si el área no tiene técnicos,
+   al Técnico activo con menos tickets abiertos de cualquier área; si no hay
+   ninguno, queda sin asignar. El área del ticket es siempre la elegida. Si el
+   Administrador desactivara todas las áreas, los tickets se crean «Sin área».
+3. **Tickets por correo**: como antes. Al buzón general → al dueño del buzón,
+   en su área. El dueño le escribe a un técnico (Elementos enviados) → a ese
+   técnico, en su área.
+4. **IT solo recibe**: un ticket nunca queda asignado a un Solicitante (`422`
+   en `PATCH .../assign`). Un correo de IT a un Solicitante, o a alguien sin
+   cuenta, no crea ticket ni usuario (queda en el log con el motivo). Las
+   respuestas, comentarios y avisos de IT al solicitante funcionan igual.
+5. **«Asignar a»** solo muestra Técnicos y Administradores. El Técnico y el
+   Administrador pueden **cambiar el área** de un ticket desde el detalle
+   («Cambiar área»), y con «Reasignar al técnico de la nueva área» pasa al de
+   esa área con menos tickets abiertos (con aviso por correo, si está activo).
+6. **Filtro «Área de IT»** en la lista (también «Sin área») y en las métricas.
+   El área se ve en el detalle y su cambio queda en el historial («Cambió el
+   área: Redes → Infraestructura»).
+7. **Migración automática**: los técnicos y tickets que ya había quedan «Sin
+   área» hasta que el Administrador los asigne; los tickets viejos asignados a
+   un Solicitante quedan como están y se pueden reasignar.
+
+API:
+
+| Método y ruta | Quién | Qué hace |
+|---|---|---|
+| `GET /api/areas` | Todos | Áreas activas (con `tecnicos`: Técnicos activos en cada una). `?todas=true` incluye las desactivadas (solo Administrador). |
+| `POST /api/areas` | Administrador | `{"name": "Redes"}` → `201`. `409` si el nombre ya existe (sin distinguir mayúsculas), `422` si no tiene entre 2 y 60 caracteres. |
+| `PATCH /api/areas/{id}` | Administrador | `{"name": …}` y/o `{"is_active": false}`. |
+| `PATCH /api/tickets/{id}/area` | Administrador, Técnico | `{"area_id": 3, "reasignar": true}`. `404` área o ticket inexistente, `422` área desactivada, `409` ticket Cerrado. |
+| `GET /api/tickets?area=ID` / `?sin_area=true` | Todos | Filtro de la lista. |
+
+No hace falta ninguna variable de entorno nueva (ni en Docker ni en Vercel):
+la migración corre sola al arrancar.
 
 ## Eliminar tickets
 
@@ -758,8 +833,11 @@ integridad). Si el navegador no tiene internet, la página muestra las mismas
 cifras en tablas. Los tickets eliminados no cuentan, porque se borran con su
 historial.
 
-API: `GET /api/metricas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` (ver
-[docs/api.md](docs/api.md)).
+El filtro **«Área de IT»** (Todas, Sin área o un área) hace que todos los
+números sean solo de los tickets de esa área.
+
+API: `GET /api/metricas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` (con `&area=ID` o
+`&sin_area=true`; ver [docs/api.md](docs/api.md)).
 
 ## Plan de desarrollo
 
@@ -1066,8 +1144,11 @@ una solicitud.
 
 Regla general: **quien escribe es el solicitante y quien recibe, el asignado**.
 Los correos que llegan al buzón quedan asignados al dueño del buzón
-(`CORREO_USUARIO`), sin reparto automático; los que el dueño envía, al
-destinatario (ver «Correos enviados» más abajo). El historial del ticket dice
+(`CORREO_USUARIO`), sin reparto automático, y en su área de IT (o «Sin área»
+si no tiene; si el dueño no fuera de IT, van al técnico con menos tickets
+abiertos); los que el dueño envía, al destinatario y en su área (ver «Correos
+enviados» más abajo). **IT solo recibe**: si el destinatario es Solicitante o
+no tiene cuenta, no se crea ticket. El historial del ticket dice
 «Ticket creado desde correo enviado por <nombre> a <nombre>».
 
 ### ¿Cómo se decide que un correo «pide ayuda»?
@@ -1128,7 +1209,7 @@ sin el texto, y cuentan para el freno de 5 tickets por revisión.
 
 | Caso | Qué pasa |
 |---|---|
-| Asunto «Ticket: …» y va a alguien de `DOMINIO_EMPRESA` en «Para» | Ticket a nombre del dueño, **asignado al primer destinatario de la empresa en «Para»** (CC no cuenta). Si no tiene cuenta, se crea con el nombre del encabezado y el correo en minúsculas; cuando entre con Microsoft, el login lo encuentra por correo y usa ese mismo usuario y ve el ticket. |
+| Asunto «Ticket: …» y va a alguien de `DOMINIO_EMPRESA` en «Para» | Ticket a nombre del dueño, **asignado al primer destinatario de la empresa en «Para»** (CC no cuenta) y en el área de IT de ese destinatario. **IT solo recibe**: si el destinatario es Solicitante o no tiene cuenta, no se crea ticket ni usuario (`ignorado`, con el motivo en el log: «el destinatario … es Solicitante (IT solo recibe tickets)»). Las respuestas en el hilo de un ticket siguen siendo comentarios. |
 | Responde en el hilo de un ticket (o con «Ticket #N» en uno donde participa) | Comentario del dueño en ese ticket. Nunca crea otro. |
 | Va solo a externos, solo al propio buzón, o solo en CC a la empresa | Se ignora. |
 | Lo envió la ticketera (registrado como `aviso_app` al enviarlo, cabecera `X-Ticketera`, asunto o frases fijas de sus avisos) | Se ignora. |

@@ -67,7 +67,9 @@ def test_permissions_table_is_the_same_as_the_help_page():
 
 def test_role_texts_follow_the_table():
     tecnico = PERMISOS_POR_ROL["Técnico"]
-    assert "No puede asignar tickets, ver las métricas, eliminar tickets ni administrar usuarios." in tecnico
+    assert ("No puede asignar tickets, ver las métricas, eliminar tickets, administrar usuarios "
+            "ni administrar las áreas de IT.") in tecnico
+    assert "cambiar el área de IT de un ticket" in tecnico.split("No puede")[0]
     assert "editar tickets (los que creó, mientras están en Nuevo)" in tecnico.split("No puede")[0]
     assert "cambiar el estado" in tecnico.split("No puede")[0]
     solicitante = PERMISOS_POR_ROL["Solicitante"]

@@ -8,7 +8,7 @@ from backend.database import get_session
 from backend.models import User
 from backend.routers.auth import ROLES_ADMIN, ROLES_TODOS, role_required
 from backend.schemas import UserCreate, UserResponse, UserUpdate
-from backend.services import user_service
+from backend.services import area_service, user_service
 
 router = APIRouter(prefix="/api/users", tags=["Usuarios"])
 
@@ -26,8 +26,14 @@ def create_user(
         role_required(ROLES_ADMIN)
     ),
 ) -> UserResponse:
-    """Create a minimal user used to own tickets (name, email, role)."""
-    user = user_service.create_user(session, payload)
+    """Create a minimal user used to own tickets (name, email, role and, for
+    Técnico or Administrador, an optional IT area)."""
+    try:
+        user = user_service.create_user(session, payload)
+    except (user_service.RequesterAreaError, area_service.AreaInactiveError) as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    except area_service.AreaNotFoundError as error:
+        raise HTTPException(status_code=422, detail=str(error))
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -81,6 +87,9 @@ def update_user(
         )
     try:
         user = user_service.update_user(session, user_id, payload)
+    except (user_service.RequesterAreaError, area_service.AreaInactiveError,
+            area_service.AreaNotFoundError) as error:
+        raise HTTPException(status_code=422, detail=str(error))
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

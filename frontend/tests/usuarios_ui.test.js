@@ -187,13 +187,14 @@ test("init lista los usuarios con nombre, correo, rol y estado", async () => {
 
   await harness.init();
 
-  assert.deepEqual(harness.urls(), ["/api/auth/config", "/api/users?todos=true"]);
+  assert.deepEqual(harness.urls(), ["/api/auth/config", "/api/areas?todas=true", "/api/users?todos=true"]);
   const rows = harness.node("cuerpo-usuarios").children;
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[0].children.map((cell) => cell.textContent), [
     "Ana Pérez",
     "ana@soporte.local",
     "", // la celda de rol contiene la etiqueta
+    "Sin área", // Técnico sin área de IT
     "", // la celda de estado contiene el badge
     "", // la celda de acciones contiene el botón Editar
   ]);
@@ -203,10 +204,10 @@ test("init lista los usuarios con nombre, correo, rol y estado", async () => {
   const rol = rows[0].children[2].children[0];
   assert.equal(rol.className, "badge rol-tecnico");
   assert.equal(rol.textContent, "Técnico");
-  const badge = rows[0].children[3].children[0];
+  const badge = rows[0].children[4].children[0];
   assert.equal(badge.className, "badge badge-activo");
   assert.equal(badge.textContent, "Activo");
-  const editButton = rows[0].children[4].children[0];
+  const editButton = rows[0].children[5].children[0];
   assert.equal(editButton.textContent, "Editar");
   assert.equal(rows[1].children[0].textContent, "Carlos Gómez");
   assert.equal(harness.node("tabla-usuarios").hidden, false);
@@ -503,4 +504,36 @@ test("usuarios.html: contraseña y nueva contraseña ocultas salvo LOGIN_LOCAL",
   assert.match(html, /<label class="campo solo-login-local" hidden>\s*<span>Contraseña \*<\/span>\s*<input type="password" id="password"/);
   assert.match(html, /<label class="campo solo-login-local" hidden>\s*<span>Nueva contraseña<\/span>/);
   assert.doesNotMatch(html, /id="password"[^>]*required/, "no es obligatoria si no se ve");
+});
+
+
+// --- Área de IT --------------------------------------------------------------
+
+test("el área de IT: «—» para el Solicitante, «Sin área» o su nombre para IT", () => {
+  const ctx = {};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "js", "usuarios.js"), "utf8"), ctx);
+  assert.equal(ctx.textoAreaUsuario({ role: "Solicitante", area_name: null }), "—");
+  assert.equal(ctx.textoAreaUsuario({ role: "Técnico", area_name: null }), "Sin área");
+  assert.equal(ctx.textoAreaUsuario({ role: "Administrador", area_name: "Redes" }), "Redes");
+  const rol = { value: "Técnico" };
+  const area = { value: "4" };
+  assert.equal(ctx.areaElegida(rol, area), 4);
+  area.value = "";
+  assert.equal(ctx.areaElegida(rol, area), null, "Sin área se envía como null");
+  rol.value = "Solicitante";
+  assert.equal(ctx.areaElegida(rol, area), undefined, "al Solicitante no se le envía área");
+  const campo = { hidden: false };
+  const select = { value: "", disabled: false, closest: () => campo };
+  ctx.mostrarCampoArea(rol, select);
+  assert.deepEqual([campo.hidden, select.disabled], [true, true]);
+  rol.value = "Administrador";
+  ctx.mostrarCampoArea(rol, select);
+  assert.deepEqual([campo.hidden, select.disabled], [false, false]);
+});
+
+test("usuarios.html tiene «Área de IT» en agregar y editar, y la columna en la tabla", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "usuarios.html"), "utf8");
+  assert.match(html, /<select id="area" name="area"/);
+  assert.match(html, /<select id="editar-area" name="area"/);
+  assert.match(html, /<th>Rol<\/th>\s*<th>Área de IT<\/th>/);
 });

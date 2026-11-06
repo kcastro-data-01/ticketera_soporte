@@ -272,6 +272,14 @@ def _enviado(asunto, cuerpo="Hola", msg_id="<e1@data.cr>", cabeceras=None, para=
     return cs.correo_desde_graph(mensaje)
 
 
+@pytest.fixture(autouse=True)
+def pedro_tecnico(session):
+    """Pedro, el primer destinatario de los enviados, es Técnico: IT solo
+    recibe (a un Solicitante o a alguien sin cuenta no se crea ticket)."""
+    session.add(User(name="Pedro", email="pedro@data.cr", role="Técnico"))
+    session.commit()
+
+
 @pytest.fixture
 def ia_enviados(ia):
     ia.solicitudes = {"Impresora"}

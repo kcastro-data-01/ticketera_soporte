@@ -13,7 +13,7 @@ VALID_USER = {
     "role": UserRole.TECHNICIAN.value,
 }
 
-USER_RESPONSE_KEYS = {"id", "name", "email", "role", "is_active"}
+USER_RESPONSE_KEYS = {"id", "name", "email", "role", "is_active", "area_id", "area_name"}
 
 
 # ---------------------------------------------------------------------------

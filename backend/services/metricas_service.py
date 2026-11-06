@@ -73,13 +73,26 @@ def _como_utc(instante: datetime) -> datetime:
     return instante if instante.tzinfo is not None else instante.replace(tzinfo=timezone.utc)
 
 
-def calcular(session, desde: date, hasta: date) -> dict:
+def filtro_area(area_id: int | None = None, sin_area: bool = False) -> tuple:
+    """Condiciones del filtro «Área» (todas las cuentas usan las mismas)."""
+    if area_id is not None:
+        return (Ticket.area_id == area_id,)
+    if sin_area:
+        return (Ticket.area_id.is_(None),)
+    return ()
+
+
+def calcular(session, desde: date, hasta: date, area_id: int | None = None,
+             sin_area: bool = False) -> dict:
+    """Las métricas del rango; con ``area_id`` (o ``sin_area``) todos los
+    números son solo de esa área de IT (o de los tickets «Sin área»)."""
     inicio, fin = limites_utc(desde, hasta)
-    en_rango = (Ticket.created_at >= inicio, Ticket.created_at < fin)
+    del_area = filtro_area(area_id, sin_area)
+    en_rango = (Ticket.created_at >= inicio, Ticket.created_at < fin, *del_area)
 
     # Hoy: la cola actual.
     por_estado_hoy = dict(session.execute(
-        select(Ticket.state, func.count()).group_by(Ticket.state)
+        select(Ticket.state, func.count()).where(*del_area).group_by(Ticket.state)
     ).all())
     abiertos = sum(por_estado_hoy.get(e, 0) for e in OPEN_STATES)
 
@@ -108,7 +121,7 @@ def calcular(session, desde: date, hasta: date) -> dict:
     resueltos = session.execute(
         select(Ticket.id, Ticket.created_at, Ticket.assigned_to_id, primer_resuelto.c.en)
         .join(primer_resuelto, primer_resuelto.c.ticket_id == Ticket.id)
-        .where(primer_resuelto.c.en >= inicio, primer_resuelto.c.en < fin)
+        .where(primer_resuelto.c.en >= inicio, primer_resuelto.c.en < fin, *del_area)
     ).all()
     horas = [
         (_como_utc(r.en) - _como_utc(r.created_at)).total_seconds() / 3600
@@ -119,7 +132,7 @@ def calcular(session, desde: date, hasta: date) -> dict:
     # Por persona asignada: abiertos hoy y resueltos en el rango.
     abiertos_por_persona = dict(session.execute(
         select(Ticket.assigned_to_id, func.count())
-        .where(Ticket.state.in_(OPEN_STATES))
+        .where(Ticket.state.in_(OPEN_STATES), *del_area)
         .group_by(Ticket.assigned_to_id)
     ).all())
     resueltos_por_persona: dict[int | None, int] = {}

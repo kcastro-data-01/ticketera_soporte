@@ -41,6 +41,7 @@ function getElements() {
       priority: document.getElementById("ver-priority"),
       state: document.getElementById("ver-state"),
       assigned: document.getElementById("ver-assigned"),
+      area: document.getElementById("ver-area"),
       creator: document.getElementById("ver-creator"),
       created: document.getElementById("ver-created"),
       updated: document.getElementById("ver-updated"),
@@ -57,6 +58,9 @@ function getElements() {
     guardar: document.getElementById("guardar"),
     usuario: document.getElementById("usuario"),
     asignar: document.getElementById("asignar"),
+    areaDestino: document.getElementById("area-destino"),
+    areaReasignar: document.getElementById("area-reasignar"),
+    cambiarArea: document.getElementById("cambiar-area"),
     usuariosNota: document.getElementById("usuarios-nota"),
     formComentario: document.getElementById("form-comentario"),
     contenido: document.getElementById("contenido"),
@@ -104,6 +108,7 @@ function bloquearBotones(bloqueado) {
   elements.editar.disabled = bloqueado;
   elements.cancelarEdicion.disabled = bloqueado;
   elements.asignar.disabled = bloqueado;
+  if (elements.cambiarArea) elements.cambiarArea.disabled = bloqueado;
   elements.comentar.disabled = bloqueado;
   elements.historial.disabled = bloqueado;
   if (elements.eliminar) elements.eliminar.disabled = bloqueado;
@@ -268,16 +273,36 @@ function renderTicket(ticket) {
   /* Adjuntos (js/adjuntos.js): si cambió el estado, vuelve a pedir sus permisos. */
   if (typeof adjuntosTicketActualizado === "function") adjuntosTicketActualizado(ticket);
   pintarPersona(elements.ver.assigned, nombreAsignado(ticket));
+  if (elements.ver.area) elements.ver.area.textContent = ticket.area_name || SIN_AREA;
   pintarPersona(elements.ver.creator, nombreSolicitante(ticket));
   elements.ver.created.textContent = formatFecha(ticket.created_at);
   elements.ver.updated.textContent = formatFecha(ticket.updated_at);
 
   rellenarFormularioEdicion(ticket);
 
-  elements.usuario.value =
-    ticket.assigned_to_id === null || ticket.assigned_to_id === undefined
-      ? ""
-      : String(ticket.assigned_to_id);
+  marcarAsignadoActual(ticket);
+  if (elements.areaDestino && ticket.area_id) elements.areaDestino.value = String(ticket.area_id);
+}
+
+/* Elige en «Persona asignada» a quien tiene el ticket. Un ticket viejo
+   asignado a un Solicitante (no está en la lista: IT solo recibe) muestra
+   su nombre aparte, para que se vea y se pueda reasignar. */
+function marcarAsignadoActual(ticket) {
+  const select = getElements().usuario;
+  const id = ticket.assigned_to_id;
+  if (id === null || id === undefined) {
+    select.value = "";
+    return;
+  }
+  const opciones = select.options ? [...select.options] : [];
+  if (usuariosCargados && opciones.length && !opciones.some((o) => o.value === String(id))) {
+    const option = document.createElement("option");
+    option.value = String(id);
+    option.textContent = `${usersById.get(id) || `Usuario #${id}`} (Solicitante: reasígnelo)`;
+    option.disabled = true;
+    select.appendChild(option);
+  }
+  select.value = String(id);
 }
 
 /* Controles según las reglas del ticket (el servidor vuelve a validar):
@@ -297,6 +322,8 @@ function aplicarReglasTicket(ticket) {
   if (elements.eliminar) elements.eliminar.hidden = cerrado || !puede("eliminar");
   const asignacion = document.getElementById("seccion-asignacion");
   if (asignacion) asignacion.hidden = cerrado || !puede("asignar");
+  const area = document.getElementById("seccion-area");
+  if (area) area.hidden = cerrado || !puede("cambiar_area");
   if (elements.formComentario) elements.formComentario.hidden = cerrado;
 }
 
@@ -319,12 +346,15 @@ function renderUsuarios(users) {
   elements.usuario.disabled = false;
   elements.usuariosNota.hidden = true;
 
-  users.forEach((user) => {
-    const option = document.createElement("option");
-    option.value = String(user.id);
-    option.textContent = user.name;
-    elements.usuario.appendChild(option);
-  });
+  /* «Asignar a»: solo Técnicos y Administradores (IT solo recibe). */
+  users
+    .filter((user) => !user.role || ROLES_IT.includes(user.role))
+    .forEach((user) => {
+      const option = document.createElement("option");
+      option.value = String(user.id);
+      option.textContent = user.area_name ? `${user.name} · ${user.area_name}` : user.name;
+      elements.usuario.appendChild(option);
+    });
 }
 
 /* Sin lista de usuarios el select queda deshabilitado con una opción que
@@ -584,6 +614,52 @@ async function guardarAsignacion() {
     ocupado = false;
     bloquearBotones(false);
   }
+}
+
+/* «Cambiar área»: pasa el ticket a otra área de IT activa y, con la
+   casilla marcada, lo reasigna al técnico de esa área con menos tickets
+   abiertos (PATCH .../area). */
+async function cambiarAreaTicket() {
+  if (ocupado || ticketId === null) return;
+  const elements = getElements();
+  const valor = elements.areaDestino ? String(elements.areaDestino.value || "") : "";
+  if (!/^\d+$/.test(valor)) {
+    avisar("Elija el área de IT a la que pasa el ticket.", "error");
+    return;
+  }
+  const reasignar = Boolean(elements.areaReasignar && elements.areaReasignar.checked);
+  ocupado = true;
+  bloquearBotones(true);
+  try {
+    const response = await fetchWithAuth(`/api/tickets/${ticketId}/area`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ area_id: Number(valor), reasignar }),
+    });
+    if (await rechazoDeReglas(response, "No tiene permiso para cambiar el área de este ticket.")) return;
+    if (!response.ok) {
+      avisar(await mensajeDeDetalle(response, `No se pudo cambiar el área (HTTP ${response.status}).`), "error");
+      return;
+    }
+    const ticket = await response.json();
+    const quien = ticket.assigned_to_id ? usersById.get(ticket.assigned_to_id) : null;
+    avisar(reasignar && quien
+      ? `El ticket pasó a «${ticket.area_name}» y quedó asignado a ${quien}.`
+      : `El ticket pasó a «${ticket.area_name}».`, "exito");
+    await cargarTicket({ silencioso: true });
+  } catch (error) {
+    avisar("Error al comunicarse con la API.", "error");
+  } finally {
+    ocupado = false;
+    bloquearBotones(false);
+  }
+}
+
+async function cargarAreasDestino() {
+  const elements = getElements();
+  if (!elements.areaDestino || typeof cargarAreas !== "function" || !puede("cambiar_area")) return;
+  llenarSelectAreas(elements.areaDestino, await cargarAreas(), { primera: "Elija un área" });
+  if (ticketActual && ticketActual.area_id) elements.areaDestino.value = String(ticketActual.area_id);
 }
 
 /* Punto del recorrido: pide confirmación con un motivo
@@ -977,6 +1053,7 @@ async function init() {
   if (elements.eliminar) elements.eliminar.addEventListener("click", () => eliminarTicket());
   elements.cancelarEdicion.addEventListener("click", () => cancelarEdicion());
   elements.asignar.addEventListener("click", () => guardarAsignacion());
+  if (elements.cambiarArea) elements.cambiarArea.addEventListener("click", () => cambiarAreaTicket());
   const pasos = document.getElementById("pasos-estado");
   if (pasos) {
     pasos.addEventListener("click", (event) => {
@@ -1011,6 +1088,7 @@ async function init() {
   await cargarUsuarios();
   const ticketCargado = await cargarTicket();
   if (ticketCargado) {
+    await cargarAreasDestino();
     await cargarComentarios();
   }
 }

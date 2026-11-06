@@ -4681,3 +4681,11 @@ summary:focus-visible,
     display: none !important;
   }
 }
+
+/* Casilla con su texto al lado (p. ej. «Reasignar al técnico de la nueva
+   área» en el detalle). */
+.campo.campo-casilla {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--espaciado-xs);
+}

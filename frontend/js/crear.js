@@ -23,6 +23,7 @@ function getElements() {
     description: document.getElementById("description"),
     category: document.getElementById("category"),
     priority: document.getElementById("priority"),
+    area: document.getElementById("area"),
     save: document.getElementById("guardar"),
     estado: document.getElementById("estado-carga"),
     adjSubir: document.getElementById("crear-adj-subir"),
@@ -178,14 +179,32 @@ function avisarError(message) {
   if (typeof mostrarAviso === "function") mostrarAviso(message, "error");
 }
 
+/* ¿Hay áreas para elegir? Sin áreas activas el ticket queda «Sin área». */
+let hayAreas = false;
+
 function getPayload() {
   const elements = getElements();
-  return {
+  const payload = {
     title: elements.title.value.trim(),
     description: elements.description.value.trim(),
     category: elements.category.value,
     priority: elements.priority.value,
   };
+  const area = elements.area ? String(elements.area.value || "") : "";
+  if (/^\d+$/.test(area)) payload.area_id = Number(area);
+  return payload;
+}
+
+/* Llena «Área de IT» con las áreas activas (cargarAreas, auth.js). */
+async function iniciarAreas() {
+  const elements = getElements();
+  if (!elements.area || typeof cargarAreas !== "function") return;
+  const areas = await cargarAreas();
+  hayAreas = areas.length > 0;
+  llenarSelectAreas(elements.area, areas, {
+    primera: hayAreas ? "Elija un área" : "No hay áreas: queda «Sin área»",
+  });
+  elements.area.required = hayAreas;
 }
 
 /* Validación en el navegador antes de tocar la API. */
@@ -199,11 +218,16 @@ function validatePayload(payload) {
   if (!payload.description) {
     return "La descripción es obligatoria.";
   }
+  if (hayAreas && !payload.area_id) {
+    return "Elija el área de IT del ticket.";
+  }
   return "";
 }
 
 /* Convierte el detalle de validación de FastAPI (422) en un mensaje legible. */
 function formatValidation(detail) {
+  /* Un motivo en texto («Elija el área de IT del ticket.», área desactivada). */
+  if (detail && typeof detail.detail === "string") return detail.detail;
   if (!detail || !Array.isArray(detail.detail)) {
     return "El servidor rechazó los datos enviados. Revise el formulario.";
   }
@@ -308,6 +332,7 @@ function init() {
   const elements = getElements();
   iniciarPrioridad();
   iniciarAdjuntosCrear();
+  iniciarAreas();
 
   elements.form.addEventListener("submit", (event) => {
     event.preventDefault();

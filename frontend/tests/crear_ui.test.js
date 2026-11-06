@@ -71,8 +71,9 @@ test("el formulario tiene texto de ayuda y botones en lugar de la lista", () => 
   for (const v of ["Baja", "Media", "Alta", "Crítica"]) {
     assert.match(html, new RegExp(`name="opcion-prioridad" value="${v}"`));
   }
-  // Título, descripción, categoría, prioridad y adjuntos.
-  assert.equal((html.match(/class="ayuda-campo"/g) || []).length, 5);
+  // Título, descripción, área de IT, categoría, prioridad y adjuntos.
+  assert.equal((html.match(/class="ayuda-campo"/g) || []).length, 6);
+  assert.match(html, /<select id="area" name="area" required aria-describedby="ayuda-area">/);
 });
 
 // --- Adjuntos al crear el ticket ----------------------------------------------
@@ -315,4 +316,43 @@ test("los nombres se pintan como texto, no como HTML", async () => {
   await f.sandbox.agregarElegidos([pdf("<img src=x onerror=alert(1)>.pdf")]);
   assert.equal(filas(f)[0].children[0].children[0].textContent, "<img src=x onerror=alert(1)>.pdf");
   assert.ok(!crearSource.includes("innerHTML"));
+});
+
+// --- Área de IT ------------------------------------------------------------------
+
+function cargarCrear(valores) {
+  const nodos = {};
+  const el = (id) => (nodos[id] = nodos[id] || { id, value: valores[id] || "", required: false, options: [],
+    replaceChildren() { this.options = []; }, appendChild(o) { this.options.push(o); return o; },
+    addEventListener() {} });
+  const sandbox = {
+    console,
+    document: { getElementById: el, createElement: () => ({}), addEventListener() {} },
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "js", "crear.js"), "utf8"), sandbox);
+  return { sandbox, nodos };
+}
+
+test("crear.js envía el área elegida y la exige cuando hay áreas", async () => {
+  const { sandbox, nodos } = cargarCrear({ title: "VPN caída", description: "No conecta", category: "Red",
+    priority: "Media", area: "3" });
+  assert.deepEqual(JSON.parse(JSON.stringify(sandbox.getPayload())),
+    { title: "VPN caída", description: "No conecta", category: "Red", priority: "Media", area_id: 3 });
+  sandbox.cargarAreas = async () => [{ id: 3, name: "Redes", is_active: true }];
+  sandbox.llenarSelectAreas = (select, areas, opciones) => { select.lista = areas; select.primera = opciones.primera; };
+  await sandbox.iniciarAreas();
+  assert.equal(nodos.area.required, true);
+  assert.equal(nodos.area.primera, "Elija un área");
+  nodos.area.value = "";
+  assert.equal(sandbox.validatePayload(sandbox.getPayload()), "Elija el área de IT del ticket.");
+});
+
+test("sin áreas activas el ticket se crea «Sin área» (no se exige)", async () => {
+  const { sandbox, nodos } = cargarCrear({ title: "VPN caída", description: "No conecta", area: "" });
+  sandbox.cargarAreas = async () => [];
+  sandbox.llenarSelectAreas = (select, areas, opciones) => { select.primera = opciones.primera; };
+  await sandbox.iniciarAreas();
+  assert.equal(nodos.area.required, false);
+  assert.equal(sandbox.validatePayload(sandbox.getPayload()), "");
+  assert.equal(sandbox.formatValidation({ detail: "Elija el área de IT del ticket." }), "Elija el área de IT del ticket.");
 });

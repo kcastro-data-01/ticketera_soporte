@@ -317,3 +317,10 @@ test("respuesta vacía con filtros: avisa que no hay coincidencias", async () =>
   assert.equal(harness.estado().textContent, "No hay tickets que coincidan con los filtros.");
   assert.equal(harness.estado().className, "estado vacio");
 });
+
+test("buildTicketsUrl: «Área de IT» pide area o sin_area", () => {
+  const harness = createHarness(async () => jsonResponse(200, []));
+  assert.equal(harness.sandbox.buildTicketsUrl({ area: "3" }), "/api/tickets?area=3&limit=20");
+  assert.equal(harness.sandbox.buildTicketsUrl({ area: "sin" }), "/api/tickets?sin_area=true&limit=20");
+  assert.equal(harness.sandbox.hayFiltros({ area: "3" }), true);
+});

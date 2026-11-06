@@ -34,6 +34,7 @@
         <p class="menu-titulo" id="menu-administracion">Administración</p>
         <a href="metricas.html" class="menu-enlace" data-permiso="metricas"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Métricas</span></a>
         <a href="usuarios.html" class="menu-enlace activo" aria-current="page" data-permiso="usuarios"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span>Usuarios</span></a>
+        <a href="areas.html" class="menu-enlace" data-permiso="areas"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg><span>Áreas de IT</span></a>
       </div>
       <div class="menu-seccion" role="group" aria-labelledby="menu-soporte">
         <p class="menu-titulo" id="menu-soporte">Soporte</p>
@@ -87,6 +88,15 @@
               <small id="ayuda-rol" class="ayuda-campo">Define qué puede ver y hacer en la ticketera (ver Ayuda › Roles y permisos).</small>
               <small id="error-rol" class="error-campo" role="alert" hidden></small>
             </label>
+            <!-- Área de IT: solo Técnico y Administrador (opcional); el
+                 Solicitante no tiene. usuarios.js la muestra según el rol. -->
+            <label class="campo campo-area">
+              <span>Área de IT</span>
+              <select id="area" name="area" aria-describedby="ayuda-area">
+                <option value="">Sin área</option>
+              </select>
+              <small id="ayuda-area" class="ayuda-campo">El Técnico recibe los tickets de su área. Se administran en «Áreas de IT».</small>
+            </label>
           </div>
 
           <div class="acciones">
@@ -108,6 +118,7 @@
                 <th>Nombre</th>
                 <th>Correo</th>
                 <th>Rol</th>
+                <th>Área de IT</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -151,6 +162,13 @@
               </select>
               <small id="ayuda-editar-rol" class="ayuda-campo">Define qué puede ver y hacer en la ticketera (ver Ayuda › Roles y permisos).</small>
               <small id="error-editar-rol" class="error-campo" role="alert" hidden></small>
+            </label>
+            <label class="campo campo-area">
+              <span>Área de IT</span>
+              <select id="editar-area" name="area" aria-describedby="ayuda-editar-area">
+                <option value="">Sin área</option>
+              </select>
+              <small id="ayuda-editar-area" class="ayuda-campo">Solo Técnico y Administrador. Pasar a Solicitante le quita el área.</small>
             </label>
           </div>
 

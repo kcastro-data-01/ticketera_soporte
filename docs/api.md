@@ -29,7 +29,8 @@ Documentación de los endpoints **realmente implementados** en el código
 | `GET` | `/api/tickets` | Listar, buscar y filtrar tickets |
 | `GET` | `/api/tickets/{ticket_id}` | Consultar un ticket |
 | `PATCH` | `/api/tickets/{ticket_id}` | Editar título/descripción/categoría/prioridad |
-| `PATCH` | `/api/tickets/{ticket_id}/assign` | Asignar o desasignar un usuario |
+| `PATCH` | `/api/tickets/{ticket_id}/assign` | Asignar o desasignar un usuario (solo Técnico o Administrador) |
+| `PATCH` | `/api/tickets/{ticket_id}/area` | Pasar el ticket a otra área de IT (Administrador y Técnico) |
 | `PATCH` | `/api/tickets/{ticket_id}/state` | Cambiar el estado (máquina de estados) |
 | `DELETE` | `/api/tickets/{ticket_id}` | Eliminar un ticket (solo Administrador) |
 | `GET` | `/api/tickets/{ticket_id}/explicacion` | Última explicación de la IA (sin generar) |
@@ -40,6 +41,9 @@ Documentación de los endpoints **realmente implementados** en el código
 | `GET` | `/api/tickets/{ticket_id}/history` | Historial de cambios (solo lectura) |
 | `POST` | `/api/users` | Crear un usuario |
 | `GET` | `/api/users` | Listar usuarios |
+| `GET` | `/api/areas` | Listar áreas de IT (`?todas=true`: también las desactivadas, solo Administrador) |
+| `POST` | `/api/areas` | Crear un área de IT (solo Administrador) |
+| `PATCH` | `/api/areas/{area_id}` | Renombrar, desactivar o reactivar un área (solo Administrador) |
 
 ## Objetos comunes
 
@@ -107,10 +111,15 @@ body.
 | `description` | string | no puede quedar vacía |
 | `category` | enum | uno de los valores de `category` |
 | `priority` | enum | uno de los valores de `priority` |
+| `area_id` | integer | área de IT activa; obligatoria mientras haya áreas activas |
+
+El ticket se asigna al Técnico activo de esa área con menos tickets abiertos
+(si el área no tiene, al de cualquier área con menos abiertos). La respuesta
+trae `area_id` y `area_name` (`null` = «Sin área»).
 
 **Respuestas:** `201` con el ticket creado · `422` si falta un campo, el
-título tiene < 3 o > 200 caracteres, la descripción está vacía o un enum no es
-válido.
+título tiene < 3 o > 200 caracteres, la descripción está vacía, un enum no es
+válido o falta el área (o no existe o está desactivada).
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/tickets \
@@ -212,13 +221,37 @@ Solo el **Administrador** (`403` para los demás).
 
 **Respuestas:** `200` con el ticket actualizado · `404` si no existe el
 ticket (`Ticket N no encontrado`) o el usuario (`Usuario N no encontrado`) ·
-`409` si el ticket está `Cerrado` · `422` si falta el campo.
+`409` si el ticket está `Cerrado` · `422` si falta el campo o si el usuario es
+Solicitante (IT solo recibe).
 
 ```bash
 curl -X PATCH http://127.0.0.1:8000/api/tickets/1/assign \
   -H "Content-Type: application/json" \
   -d '{"assigned_to_id": 1}'
 ```
+
+### `PATCH /api/tickets/{ticket_id}/area`
+
+Pasa el ticket a otra área de IT activa. **Administrador y Técnico** (`403`
+para el Solicitante). Queda en el historial (`action: "area_changed"`,
+`field: "area"`, nombres anterior y nuevo).
+
+| Campo | Tipo | Reglas |
+|-------|------|--------|
+| `area_id` | integer | obligatorio; área existente y activa |
+| `reasignar` | boolean | opcional (`false`); `true` asigna al técnico de la nueva área con menos tickets abiertos |
+
+**Respuestas:** `200` con el ticket · `404` ticket o área inexistente · `409`
+ticket `Cerrado` · `422` área desactivada.
+
+### Áreas de IT: `GET` / `POST /api/areas`, `PATCH /api/areas/{area_id}`
+
+`GET` (todos los roles) devuelve `[{id, name, is_active, tecnicos}]` ordenado
+por nombre; solo las activas, salvo `?todas=true` (solo Administrador; `403`
+para los demás). `POST {"name": "Redes"}` → `201` y `PATCH {"name": …,
+"is_active": …}` → `200` son solo del Administrador; `409` si el nombre ya
+existe (sin distinguir mayúsculas), `422` si no tiene entre 2 y 60
+caracteres, `404` si el área no existe. Las áreas no se borran.
 
 ### `DELETE /api/tickets/{ticket_id}`
 

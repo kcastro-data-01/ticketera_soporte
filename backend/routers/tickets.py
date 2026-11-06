@@ -10,6 +10,7 @@ from backend.database import get_session
 from backend.constants import TicketCategory, TicketDateField, TicketPriority, TicketState
 from backend.schemas import (
     HistoryResponse,
+    TicketAreaUpdate,
     TicketAssignment,
     TicketCreate,
     TicketResponse,
@@ -17,8 +18,10 @@ from backend.schemas import (
     TicketSummary,
     TicketUpdate,
 )
-from backend.services import correo_service, ticket_service
+from backend.services import area_service, correo_service, ticket_service
 from backend.services.ticket_service import (
+    AreaRequiredError,
+    AssigneeNotITError,
     InvalidTransitionError,
     TicketClosedError,
     TicketNotFoundError,
@@ -27,6 +30,7 @@ from backend.services.ticket_service import (
 from backend.models import User
 from backend.routers.auth import (
     ROLES_ADMIN,
+    ROLES_EQUIPO,
     ROLES_TODOS,
     role_required,
 )
@@ -53,8 +57,16 @@ def create_ticket(
         role_required(ROLES_TODOS)
     ),
 ) -> TicketResponse:
-    """Create a ticket with title, description, category and priority (RF1, RF2)."""
-    ticket = ticket_service.create_ticket(session, payload, current_user)
+    """Create a ticket with title, description, category, priority and IT
+    area (RF1, RF2). The area is required while there are active areas
+    (``422`` without it, or with an area that does not exist or is
+    inactive); the ticket goes to the area's technician with fewest open
+    tickets."""
+    try:
+        ticket = ticket_service.create_ticket(session, payload, current_user)
+    except (AreaRequiredError, area_service.AreaNotFoundError,
+            area_service.AreaInactiveError) as error:
+        raise HTTPException(status_code=422, detail=str(error))
     return TicketResponse.model_validate(ticket)
 
 
@@ -99,6 +111,12 @@ def list_tickets(
     sin_asignar: bool = Query(
         False,
         description="Solo los tickets sin asignar (no se combina con assigned_to).",
+    ),
+    area: int | None = Query(
+        None, ge=1, description="Solo los tickets de esa área de IT (filtro «Área»)."
+    ),
+    sin_area: bool = Query(
+        False, description="Solo los tickets «Sin área» (no se combina con area)."
     ),
     fecha_campo: TicketDateField = Query(
         TicketDateField.CREATED,
@@ -146,6 +164,11 @@ def list_tickets(
             status_code=422,
             detail="Elija un usuario o «Sin asignar», no los dos.",
         )
+    if area is not None and sin_area:
+        raise HTTPException(
+            status_code=422,
+            detail="Elija un área o «Sin área», no las dos.",
+        )
     if assigned_to is not None and session.get(User, assigned_to) is None:
         raise HTTPException(
             status_code=422,
@@ -162,6 +185,8 @@ def list_tickets(
         assigned_to_id=current_user.id if mios else None,
         asignado_a=assigned_to,
         sin_asignar=sin_asignar,
+        area_id=area,
+        sin_area=sin_area,
         fecha_campo=fecha_campo,
         desde=desde,
         hasta=hasta,
@@ -314,10 +339,47 @@ def assign_ticket(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Usuario {error.user_id} no encontrado",
         )
+    except AssigneeNotITError as error:
+        raise HTTPException(status_code=422, detail=str(error))
     except TicketClosedError as error:
         raise _cerrado(error)
     # Si el correo falla, la asignación queda guardada igual (error al log).
     correo_service.avisar_asignacion(session, ticket, anterior_id, current_user)
+    return TicketResponse.model_validate(ticket)
+
+
+@router.patch(
+    "/{ticket_id}/area",
+    response_model=TicketResponse,
+    summary="Cambiar el área de IT de un ticket",
+)
+def change_ticket_area(
+    ticket_id: int,
+    payload: TicketAreaUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(role_required(ROLES_EQUIPO)),
+) -> TicketResponse:
+    """Administrador y Técnico pasan el ticket a otra área de IT activa
+    (queda en el historial). Con ``reasignar`` se asigna al técnico de la
+    nueva área con menos tickets abiertos y, con ``AVISAR_ASIGNADO``, se le
+    avisa por correo. ``404`` ticket o área inexistente, ``422`` área
+    desactivada, ``409`` ticket Cerrado."""
+    anterior = ticket_service.get_ticket(session, ticket_id)
+    anterior_id = anterior.assigned_to_id if anterior is not None else None
+    try:
+        ticket = ticket_service.change_ticket_area(
+            session, ticket_id, payload.area_id, payload.reasignar, current_user)
+    except TicketNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Ticket {ticket_id} no encontrado")
+    except area_service.AreaNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error))
+    except area_service.AreaInactiveError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    except TicketClosedError as error:
+        raise _cerrado(error)
+    if ticket.assigned_to_id != anterior_id:
+        correo_service.avisar_asignacion(session, ticket, anterior_id, current_user)
     return TicketResponse.model_validate(ticket)
 
 

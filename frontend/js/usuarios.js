@@ -85,6 +85,7 @@ function getElements() {
     email: document.getElementById("email"),
     password: document.getElementById("password"),
     rol: document.getElementById("rol"),
+    area: document.getElementById("area"),
     crear: document.getElementById("crear"),
     usuariosEstado: document.getElementById("usuarios-estado"),
     tabla: document.getElementById("tabla-usuarios"),
@@ -96,6 +97,7 @@ function getElements() {
     editarEmail: document.getElementById("editar-email"),
     editarPassword: document.getElementById("editar-password"),
     editarRol: document.getElementById("editar-rol"),
+    editarArea: document.getElementById("editar-area"),
     guardarEdicion: document.getElementById("guardar-edicion"),
     cancelarEdicion: document.getElementById("cancelar-edicion"),
     estadoEdicion: document.getElementById("estado-edicion"),
@@ -137,6 +139,7 @@ function mensajeDeError(response, payload) {
     return "Ese correo electrónico ya está registrado.";
   }
   if (response.status === 422) {
+    if (payload && typeof payload.detail === "string") return payload.detail;
     if (payload && Array.isArray(payload.detail)) {
       const messages = payload.detail.map((error) => {
         const field = Array.isArray(error.loc)
@@ -208,6 +211,7 @@ function renderUsers(users) {
     roleBadge.textContent = user.role;
     roleCell.appendChild(roleBadge);
     row.appendChild(roleCell);
+    appendCell(row, textoAreaUsuario(user));
 
     const activo = user.is_active !== false;
     const stateCell = document.createElement("td");
@@ -301,12 +305,57 @@ function ocultarEdicionEstado() {
   elements.estadoEdicion.hidden = true;
 }
 
+/* Área de IT: el Solicitante no tiene («—»); Técnico y Administrador sin
+   área, «Sin área». */
+function textoAreaUsuario(user) {
+  if (!ROLES_IT_USUARIOS.includes(user.role)) return "—";
+  return user.area_name || "Sin área";
+}
+
+const ROLES_IT_USUARIOS = ["Administrador", "Técnico"];
+
+/* El campo «Área de IT» solo se ve para Técnico y Administrador. */
+function mostrarCampoArea(selectRol, selectArea) {
+  if (!selectRol || !selectArea) return;
+  const campo = typeof selectArea.closest === "function" ? selectArea.closest(".campo-area") : null;
+  const esIT = ROLES_IT_USUARIOS.includes(selectRol.value);
+  if (campo) campo.hidden = !esIT;
+  selectArea.disabled = !esIT;
+}
+
+/* area_id para enviar: número, null («Sin área») o undefined (Solicitante:
+   no se envía, el servidor le quita el área). */
+function areaElegida(selectRol, selectArea) {
+  if (!selectArea || !ROLES_IT_USUARIOS.includes(selectRol.value)) return undefined;
+  const valor = String(selectArea.value || "");
+  return /^\d+$/.test(valor) ? Number(valor) : null;
+}
+
+async function iniciarAreasUsuarios() {
+  const elements = getElements();
+  if (typeof cargarAreas !== "function") return;
+  /* Con las desactivadas: un Técnico puede seguir en una. */
+  const areas = await cargarAreas(true);
+  for (const select of [elements.area, elements.editarArea]) {
+    llenarSelectAreas(select, areas, { primera: "Sin área" });
+  }
+  for (const [rol, area] of [[elements.rol, elements.area], [elements.editarRol, elements.editarArea]]) {
+    if (!rol || !area) continue;
+    mostrarCampoArea(rol, area);
+    rol.addEventListener("change", () => mostrarCampoArea(rol, area));
+  }
+}
+
 function editarUsuario(user) {
   const elements = getElements();
   elements.editarId.value = user.id;
   elements.editarNombre.value = user.name;
   elements.editarEmail.value = user.email;
   elements.editarRol.value = user.role;
+  if (elements.editarArea) {
+    elements.editarArea.value = user.area_id ? String(user.area_id) : "";
+    mostrarCampoArea(elements.editarRol, elements.editarArea);
+  }
   limpiarErroresCampo("editar-");
   if (elements.editarPassword) elements.editarPassword.value = "";
   elements.seccionEditar.hidden = false;
@@ -335,6 +384,8 @@ async function guardarEdicion(event) {
   if (nombre) payload.name = nombre;
   if (email) payload.email = email;
   if (rol) payload.role = rol;
+  const areaEdicion = areaElegida(elements.editarRol, elements.editarArea);
+  if (areaEdicion !== undefined) payload.area_id = areaEdicion;
 
   /* La contraseña solo se envía si se escribió una nueva. */
   limpiarErroresCampo("editar-");
@@ -439,6 +490,8 @@ async function crearUsuario(event) {
     role: elements.rol.value,
   };
   if (loginLocal) payload.password = elements.password.value;
+  const areaNueva = areaElegida(elements.rol, elements.area);
+  if (areaNueva) payload.area_id = areaNueva;
 
   ocupado = true;
   elements.crear.disabled = true;
@@ -458,6 +511,10 @@ async function crearUsuario(event) {
     elements.email.value = "";
     if (elements.password) elements.password.value = "";
     elements.rol.value = "Técnico";
+    if (elements.area) {
+      elements.area.value = "";
+      mostrarCampoArea(elements.rol, elements.area);
+    }
     showStatus("Usuario agregado correctamente.", "exito");
     /* El usuario nuevo aparece en la lista sin recargar la página. */
     await cargarUsuarios();
@@ -499,6 +556,7 @@ async function init() {
   });
   elements.formEditar.addEventListener("submit", guardarEdicion);
   elements.cancelarEdicion.addEventListener("click", cancelarEdicion);
+  await iniciarAreasUsuarios();
   await cargarUsuarios();
 }
 

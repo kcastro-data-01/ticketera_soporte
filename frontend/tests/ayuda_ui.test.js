@@ -16,12 +16,13 @@ const TEMAS = [
   ["crear", "Crear un ticket"],
   ["seguimiento", "Seguimiento"],
   ["roles", "Roles y permisos"],
+  ["areas", "Áreas de IT"],
   ["asistente", "Asistente virtual"],
   ["correo", "Tickets por correo"],
   ["faq", "Preguntas frecuentes"],
 ];
 
-test("el índice enlaza los seis temas en orden y cada tema es plegable", () => {
+test("el índice enlaza los siete temas en orden y cada tema es plegable", () => {
   const enlaces = [...html.matchAll(/<li><a href="#([a-z]+)">([^<]+)<\/a><\/li>/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(enlaces, TEMAS);
   const temas = [...html.matchAll(/<details class="ayuda-tema" id="([a-z]+)"[^>]*>\s*<summary>([^<]+)<\/summary>/g)].map((m) => [m[1], m[2]]);

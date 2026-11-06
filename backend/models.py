@@ -52,6 +52,26 @@ def _sql_in(values: tuple[str, ...]) -> str:
     return ", ".join(f"'{value}'" for value in values)
 
 
+class ItArea(Base):
+    """Área de IT (Soporte técnico, Redes...): la administra el Administrador.
+
+    No se borra, se desactiva (``is_active``): un área inactiva no se ofrece
+    al crear tickets ni como destino al cambiar el área, pero los tickets y
+    usuarios que ya la tienen la conservan.
+    """
+
+    __tablename__ = "it_areas"
+    __table_args__ = (
+        CheckConstraint("length(trim(name)) >= 2 AND length(name) <= 60",
+                        name="ck_it_areas_name_length"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
+    is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utc_now)
+
+
 class User(Base):
     """Minimal user record: only needed to assign tickets (no authentication)."""
 
@@ -63,6 +83,17 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(30), nullable=False, default=UserRole.TECHNICIAN.value)
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Área de IT del Técnico (o, opcional, del Administrador). ``None`` =
+    # «Sin área». El Solicitante nunca tiene área.
+    area_id: Mapped[int | None] = mapped_column(
+        ForeignKey("it_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    area: Mapped[ItArea | None] = relationship(foreign_keys=[area_id])
+
+    @property
+    def area_name(self) -> str | None:
+        return self.area.name if self.area is not None else None
 
     tickets: Mapped[list["Ticket"]] = relationship(
         back_populates="assignee", foreign_keys="Ticket.assigned_to_id"
@@ -119,6 +150,11 @@ class Ticket(Base):
         nullable=True,
         index=True,
     )
+    # Área de IT del ticket. ``None`` = «Sin área» (tickets de antes de las
+    # áreas o que llegaron a un buzón sin área).
+    area_id: Mapped[int | None] = mapped_column(
+        ForeignKey("it_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime(),
         nullable=False,
@@ -134,6 +170,12 @@ class Ticket(Base):
     assignee: Mapped[User | None] = relationship(
         back_populates="tickets", foreign_keys=[assigned_to_id]
     )
+    area: Mapped[ItArea | None] = relationship(foreign_keys=[area_id])
+
+    @property
+    def area_name(self) -> str | None:
+        return self.area.name if self.area is not None else None
+
     # Quien creó el ticket (solo lectura): la IA lo nombra al explicarlo.
     creator: Mapped[User | None] = relationship(foreign_keys=[created_by_id], viewonly=True)
     comments: Mapped[list["Comment"]] = relationship(

@@ -89,3 +89,14 @@ LEGACY_SUPERVISOR_ROLE = "Supervisor"
 # of new tickets. The remaining roles never receive a ticket automatically,
 # but they can still be assigned manually through ``PATCH .../assign``.
 AUTO_ASSIGN_ROLES: tuple[str, ...] = (UserRole.TECHNICIAN.value,)
+
+# IT solo recibe: un ticket se asigna únicamente a estos roles (nunca a un
+# Solicitante). Son también los que pueden tener área de IT.
+IT_ROLES: tuple[str, ...] = (UserRole.ADMIN.value, UserRole.TECHNICIAN.value)
+
+# Áreas de ejemplo que la migración carga una sola vez (se cambian desde la
+# pantalla «Áreas de IT» cuando la empresa defina las reales).
+EXAMPLE_IT_AREAS: tuple[str, ...] = ("Soporte técnico", "Redes", "Infraestructura", "Ciberseguridad")
+
+# Texto que se muestra para un ticket o usuario sin área.
+NO_AREA_LABEL = "Sin área"

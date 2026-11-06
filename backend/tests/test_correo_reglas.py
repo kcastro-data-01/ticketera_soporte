@@ -141,19 +141,19 @@ def test_registered_sender_gets_ticket_and_confirmation(modo, entorno, factory, 
 
 @pytest.mark.parametrize("modo", MODOS)
 def test_sent_ticket_prefix_creates_assigned_ticket_and_notice(modo, entorno, factory, session, gente):
-    enviado = crear_enviado(para=(("nueva@data.cr", "Nueva Persona"),), asunto="Ticket: No me funciona la impresora",
+    # IT solo recibe: va a un Técnico (a alguien sin cuenta no se crea ticket).
+    enviado = crear_enviado(para=(("pedro@data.cr", "Pedro Rojas"),), asunto="Ticket: No me funciona la impresora",
                             cuerpo="¿La podés revisar?")
     graph = FakeGraph([], enviados=[enviado])
     revisar(modo, factory, graph, entorno)
 
     ticket = session.scalars(select(Ticket)).one()
-    nueva = usuario(session, "nueva@data.cr")
-    assert nueva is not None and nueva.name == "Nueva Persona"  # para que lo vea al entrar
+    pedro = gente["pedro"]
     assert (ticket.title, ticket.created_by_id, ticket.assigned_to_id) == (
-        "No me funciona la impresora", gente["yo"].id, nueva.id)
+        "No me funciona la impresora", gente["yo"].id, pedro.id)
     [aviso] = graph.correos_nuevos
     mensaje = aviso["message"]
-    assert mensaje["toRecipients"] == [{"emailAddress": {"address": "nueva@data.cr"}}]
+    assert mensaje["toRecipients"] == [{"emailAddress": {"address": "pedro@data.cr"}}]
     assert mensaje["subject"].startswith(f"[Ticket #{ticket.id}] Se le asignó el ticket #{ticket.id}")
     assert f"{APP_URL}/detalle.html?id={ticket.id}" in mensaje["body"]["content"]
     assert {"name": "X-Ticketera", "value": "1"} in mensaje["internetMessageHeaders"]

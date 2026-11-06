@@ -55,8 +55,13 @@ function rangoAnterior(desde, hasta) {
   return { desde: sumarDias(desde, -dias), hasta: sumarDias(desde, -1) };
 }
 
-function urlMetricas(desde, hasta) {
-  const params = new URLSearchParams({ desde, hasta });
+/* ``area``: un id de área, «sin» (Sin área) o vacío (todas). */
+function urlMetricas(desde, hasta, area = "") {
+  const params = new URLSearchParams();
+  if (desde) params.set("desde", desde);
+  if (hasta) params.set("hasta", hasta);
+  if (area === "sin") params.set("sin_area", "true");
+  else if (/^\d+$/.test(String(area || ""))) params.set("area", String(area));
   return `${API_METRICAS_URL}?${params.toString()}`;
 }
 
@@ -83,6 +88,7 @@ function elementos() {
     form: document.getElementById("form-rango"),
     desde: document.getElementById("desde"),
     hasta: document.getElementById("hasta"),
+    area: document.getElementById("m-area"),
     aplicar: document.getElementById("aplicar"),
     estado: document.getElementById("estado-carga"),
   };
@@ -390,9 +396,9 @@ if (typeof document !== "undefined" && typeof document.addEventListener === "fun
 
 /* --- Carga ------------------------------------------------------------- */
 
-async function cargarTarjetasAnteriores({ desde, hasta }) {
+async function cargarTarjetasAnteriores({ desde, hasta }, area = "") {
   try {
-    const response = await fetchWithAuth(urlMetricas(desde, hasta));
+    const response = await fetchWithAuth(urlMetricas(desde, hasta, area));
     if (!response.ok) return null;
     const datos = await response.json();
     return datos && datos.tarjetas ? datos.tarjetas : null;
@@ -403,7 +409,8 @@ async function cargarTarjetasAnteriores({ desde, hasta }) {
 }
 
 async function cargarMetricas() {
-  const { desde, hasta, aplicar } = elementos();
+  const { desde, hasta, aplicar, area } = elementos();
+  const areaElegida = area ? String(area.value || "") : "";
   if (!desde.value || !hasta.value) {
     mostrarEstado("Seleccione las dos fechas.", "error");
     return;
@@ -417,8 +424,8 @@ async function cargarMetricas() {
     /* Las dos consultas salen juntas; si falla la del período anterior,
        la página se muestra igual, sin comparación. */
     const [response, anteriores] = await Promise.all([
-      fetchWithAuth(urlMetricas(desde.value, hasta.value)),
-      cargarTarjetasAnteriores(previo),
+      fetchWithAuth(urlMetricas(desde.value, hasta.value, areaElegida)),
+      cargarTarjetasAnteriores(previo, areaElegida),
     ]);
     const datos = await response.json().catch(() => null);
     if (response.ok && datos) {
@@ -444,8 +451,13 @@ async function cargarMetricas() {
 }
 
 async function iniciarMetricas() {
-  const { form, desde, hasta } = elementos();
+  const { form, desde, hasta, area } = elementos();
   if (!form) return;
+  if (area && typeof cargarAreas === "function") {
+    /* Con las desactivadas: sus tickets siguen contando. */
+    llenarSelectAreas(area, await cargarAreas(true), { primera: "Todas", sinArea: true });
+    area.addEventListener("change", () => cargarMetricas());
+  }
   const rango = rangoPorDefecto();
   desde.value = rango.desde;
   hasta.value = rango.hasta;
