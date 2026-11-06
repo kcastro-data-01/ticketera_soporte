@@ -52,8 +52,10 @@ test("vercel.json manda CSP estricta y las cabeceras de seguridad", () => {
   assert.equal(cabeceras["X-Frame-Options"], "DENY");
   assert.equal(cabeceras["Referrer-Policy"], "same-origin");
   assert.match(cabeceras["Strict-Transport-Security"], /^max-age=\d{8,}/);
-  const csp = cabeceras["Content-Security-Policy"];
-  assert.ok(csp, "falta Content-Security-Policy");
+  // Primero se publica en modo de solo aviso (Report-Only); después pasa a
+  // Content-Security-Policy con el mismo valor.
+  const csp = cabeceras["Content-Security-Policy"] || cabeceras["Content-Security-Policy-Report-Only"];
+  assert.ok(csp, "falta Content-Security-Policy (o su versión Report-Only)");
   assert.doesNotMatch(csp, /unsafe-inline|unsafe-eval|\*/);
   for (const directiva of ["default-src 'self'", "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'", "form-action 'self'"]) {
     assert.ok(csp.includes(directiva), directiva);
