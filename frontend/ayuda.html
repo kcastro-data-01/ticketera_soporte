@@ -53,21 +53,22 @@
 
     <main class="contenido">
     <section class="ayuda-contenido">
-      <!-- Índice: cada enlace abre su tema (ayuda.js). -->
+      <!-- Índice: un botón por tema; al tocarlo baja hasta él y lo abre
+           (ayuda.js). Sin código inline: la CSP no lo permite. -->
       <nav class="ayuda-indice" aria-label="Temas de ayuda">
         <h2>Temas</h2>
-        <ol>
-          <li><a href="#crear">Crear un ticket</a></li>
-          <li><a href="#lista">La lista de tickets</a></li>
-          <li><a href="#seguimiento">Seguimiento</a></li>
-          <li><a href="#areas">Departamentos</a></li>
-          <li><a href="#roles">Roles y permisos</a></li>
-          <li><a href="#adjuntos">Adjuntos</a></li>
-          <li><a href="#correo">Tickets por correo</a></li>
-          <li><a href="#avisos">Avisos por correo</a></li>
-          <li><a href="#asistente">Asistente virtual</a></li>
-          <li><a href="#faq">Preguntas frecuentes</a></li>
-        </ol>
+        <ul class="ayuda-temas">
+          <li><a class="ayuda-tema-boton" href="#crear">Crear un ticket</a></li>
+          <li><a class="ayuda-tema-boton" href="#lista">La lista de tickets</a></li>
+          <li><a class="ayuda-tema-boton" href="#seguimiento">Seguimiento</a></li>
+          <li><a class="ayuda-tema-boton" href="#areas">Departamentos</a></li>
+          <li><a class="ayuda-tema-boton" href="#roles">Roles y permisos</a></li>
+          <li><a class="ayuda-tema-boton" href="#adjuntos">Adjuntos</a></li>
+          <li><a class="ayuda-tema-boton" href="#correo">Tickets por correo</a></li>
+          <li><a class="ayuda-tema-boton" href="#avisos">Avisos por correo</a></li>
+          <li><a class="ayuda-tema-boton" href="#asistente">Asistente virtual</a></li>
+          <li><a class="ayuda-tema-boton" href="#faq">Preguntas frecuentes</a></li>
+        </ul>
       </nav>
 
       <details class="ayuda-tema" id="crear" open>

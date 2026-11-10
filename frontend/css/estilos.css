@@ -4216,21 +4216,71 @@ th[aria-sort="descending"] .orden-columna::after {
   letter-spacing: 0.04em;
 }
 
-.ayuda-indice ol {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 1.25rem;
+/* Los temas: una cuadrícula de botones del mismo tamaño, sin números
+   (5 columnas en escritorio, 3 en tablet y 2 en el celular). Con el estilo
+   de los botones secundarios; los colores salen de las variables, así que
+   sirven igual en modo claro y oscuro. */
+.ayuda-temas {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 0.5rem;
   margin: 0;
-  padding-left: 1.1rem;
+  padding: 0;
+  list-style: none;
 }
 
-.ayuda-indice a {
-  color: var(--color-enlace);
+.ayuda-temas li {
+  display: flex;
+  min-width: 0;
+}
+
+.ayuda-tema-boton {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: var(--alto-control);
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: var(--radio-suave);
+  background: var(--color-superficie-alta);
+  color: var(--color-texto);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
   text-decoration: none;
+  /* En una línea si entra; si no, en dos, cortando solo entre palabras. */
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.ayuda-indice a:hover {
-  text-decoration: underline;
+.ayuda-tema-boton:hover {
+  background: var(--color-primario-tenue);
+  border-color: var(--color-primario-suave);
+  color: var(--color-primario-texto-fuerte);
+}
+
+.ayuda-tema-boton:focus-visible {
+  outline: 2px solid var(--color-primario-oscuro);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .ayuda-temas {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .ayuda-temas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
 }
 
 .ayuda-tema {
