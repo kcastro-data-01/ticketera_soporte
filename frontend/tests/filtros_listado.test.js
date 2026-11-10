@@ -106,7 +106,7 @@ test("index.html: el filtro «Estado» tiene Todos, Abiertos y los cuatro estado
   const select = indexHtml.slice(indexHtml.indexOf('<select id="state"'), indexHtml.indexOf("</select>", indexHtml.indexOf('<select id="state"')));
   const opciones = [...select.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(opciones, [
-    ["", "Todos"], ["abiertos", "Abiertos (Nuevo y En proceso)"], ["Nuevo", "Nuevo"], ["En proceso", "En proceso"],
+    ["", "Todos"], ["abiertos", "Abiertos"], ["Nuevo", "Nuevo"], ["En proceso", "En proceso"],
     ["Resuelto", "Resuelto"], ["Cerrado", "Cerrado"],
   ]);
   assert.doesNotMatch(indexHtml, /Pendientes|Resueltos y cerrados|opt-pendientes|opt-resueltos/);
@@ -137,4 +137,25 @@ test("ayuda.html describe el filtro «Estado» sin los grupos viejos", () => {
   const ayuda = leer("ayuda.html");
   assert.match(ayuda, /El filtro «Estado» ofrece Todos, Abiertos \(Nuevo y En proceso\), Nuevo, En proceso, Resuelto o Cerrado/);
   assert.doesNotMatch(ayuda, /Resueltos y cerrados|«Pendientes»/);
+});
+
+test("filtros en escritorio: solo «Buscar» se estira, Estado ajustado y los botones al final, dentro de la caja", () => {
+  const css = leer("css/estilos.css");
+  const ini = css.indexOf("/* ---------- Filtros del listado (index.html)");
+  const bloque = css.slice(ini, css.indexOf("/* «Nuevo ticket»", ini));
+  const escritorio = bloque.slice(bloque.indexOf("@media (min-width: 769px)"));
+  assert.ok(escritorio.length > 0, "regla de escritorio desde 769 px");
+  // La fila se parte si no entra (nunca nowrap): así nada se sale de la caja.
+  assert.match(escritorio, /#form-filtros \{\s*flex-wrap: wrap;/);
+  assert.doesNotMatch(bloque, /#form-filtros \{[^}]*flex-wrap: nowrap/);
+  // Los campos van a su ancho justo; «Buscar» es el único que crece, con mínimo.
+  assert.match(escritorio, /#form-filtros > \.campo \{\s*flex: none;/);
+  assert.match(escritorio, /#form-filtros > \.campo-busqueda \{\s*flex: 1 1 9rem;\s*min-width: 9rem;/);
+  assert.equal((escritorio.match(/flex: 1 1/g) || []).length, 1, "solo «Buscar» se estira");
+  // Botones al final de la fila (o, si bajan, a la derecha) y sin partirse.
+  assert.match(escritorio, /#form-filtros > \.acciones \{[^}]*flex: none;[^}]*margin-left: auto;/);
+  // Mismo alto en campos y botones.
+  assert.match(bloque, /#form-filtros \.campo :is\(input, select\),\s*#form-filtros \.acciones button \{[^}]*height: var\(--alto-control\);/);
+  // «Estado» corto: su opción más larga ya no es «Abiertos (Nuevo y En proceso)».
+  assert.match(indexHtml, /<option value="abiertos" title="Nuevo y En proceso">Abiertos<\/option>/);
 });

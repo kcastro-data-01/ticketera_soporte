@@ -4703,11 +4703,14 @@ summary:focus-visible,
 }
 
 /* ---------- Filtros del listado (index.html) ----------
-   Todos los campos y botones con el mismo alto. En escritorio, una sola
-   fila: Buscar un poco más ancho y el resto al ancho de su contenido
-   («Asignado a» y «Área de IT» con un tope, porque sus opciones son
-   nombres); los botones van al final, alineados abajo con los campos. En
-   pantallas angostas siguen bajando a varias líneas, como antes. */
+   Todos los campos y botones con el mismo alto. En escritorio (desde
+   769 px), una fila: cada campo al ancho justo de su opción más larga
+   («Asignado a» y «Departamento» con un ancho fijo, porque sus opciones son
+   nombres); «Buscar» es el único que se estira y toma lo que sobra, con un
+   mínimo para que se lea «Título o descripción». Los botones van al final
+   (margin-left: auto). Si no entra todo, la fila se parte: los botones
+   bajan a otra línea, alineados a la derecha; nada se sale de la caja.
+   En el celular (hasta 768 px) todo va en columna. */
 #form-filtros .campo :is(input, select),
 #form-filtros .acciones button {
   box-sizing: border-box;
@@ -4734,12 +4737,10 @@ summary:focus-visible,
   }
 }
 
-/* Una sola fila desde 1340 px: con el menú lateral, el contenido (máximo
-   1100 px) recién ahí tiene el ancho para los 7 campos y los 2 botones. */
-@media (min-width: 1340px) {
+@media (min-width: 769px) {
   #form-filtros {
-    flex-wrap: nowrap;
-    gap: 0.4rem;
+    flex-wrap: wrap;
+    gap: 0.6rem 0.35rem;
   }
 
   #form-filtros .campo :is(input, select),
@@ -4747,9 +4748,11 @@ summary:focus-visible,
     font-size: var(--texto-sm);
   }
 
-  /* Al ancho de su contenido, sin achicarse (no se corta «Todas»). */
+  /* Al ancho de su contenido, sin estirarse ni achicarse (no se corta
+     «Todas»). */
   #form-filtros > .campo {
     flex: none;
+    min-width: 0;
   }
 
   #form-filtros > .campo :is(select, input[type="date"]) {
@@ -4758,30 +4761,36 @@ summary:focus-visible,
     padding-right: 0.35rem;
   }
 
-  #form-filtros > .campo-busqueda input {
-    padding-left: 0.55rem;
-    padding-right: 0.4rem;
-  }
-
-  /* Sus opciones son nombres de personas y de áreas: ancho fijo. */
+  /* Sus opciones son nombres de personas y de departamentos: ancho fijo. */
   #form-filtros #assigned,
   #form-filtros #area {
     width: 6.75rem;
   }
 
-  /* Buscar toma lo que sobra: un poco más ancho que el resto. */
+  /* El único que se estira: toma el espacio que sobra en su línea. El
+     mínimo deja leer completo «Título o descripción». */
   #form-filtros > .campo-busqueda {
-    flex: 1 1 auto;
-    min-width: 8.5rem;
+    flex: 1 1 9rem;
+    min-width: 9rem;
   }
 
+  #form-filtros > .campo-busqueda input {
+    width: 100%;
+    padding-left: 0.55rem;
+    padding-right: 0.4rem;
+  }
+
+  /* Al final de la fila; si no entran, bajan juntos a la línea siguiente
+     y quedan a la derecha. */
   #form-filtros > .acciones {
     flex: none;
     flex-wrap: nowrap;
     gap: 0.4rem;
+    margin-left: auto;
   }
 
   #form-filtros > .acciones button {
+    flex: none;
     white-space: nowrap;
     padding-left: 0.7rem;
     padding-right: 0.7rem;
