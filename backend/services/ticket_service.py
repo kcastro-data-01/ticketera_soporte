@@ -85,6 +85,18 @@ class AssigneeNotITError(Exception):
             "o Administradores.")
 
 
+MENSAJE_DEPARTAMENTO_SOLO_NUEVO = "El departamento solo se puede cambiar mientras el ticket está en Nuevo"
+
+
+class AreaChangeNotNewError(Exception):
+    """Cambiar el departamento de un ticket que no está en Nuevo (HTTP 409),
+    para todos los roles, también el Administrador."""
+
+    def __init__(self, ticket_id: int):
+        self.ticket_id = ticket_id
+        super().__init__(MENSAJE_DEPARTAMENTO_SOLO_NUEVO)
+
+
 class TicketNotFoundError(Exception):
     """Raised when the target ticket of an operation does not exist."""
 
@@ -807,20 +819,23 @@ def change_ticket_area(
     reasignar: bool,
     current_user: User | None = None,
 ) -> Ticket:
-    """Pasa el ticket a otra área de IT activa (Administrador y Técnico).
+    """Pasa el ticket a otra área de IT activa (Administrador y Técnico),
+    solo mientras está en Nuevo (:class:`AreaChangeNotNewError` en los demás
+    estados, también Cerrado).
 
     Queda en el historial (``area_changed``: nombre anterior → nuevo). Con
     ``reasignar`` se asigna al técnico de la nueva área con menos tickets
     abiertos (:func:`pick_next_assignee`, con su propio registro
     ``assigned``); si no hay ninguno, la asignación no cambia.
 
-    Raises ``TicketNotFoundError``, ``TicketClosedError`` y los de
+    Raises ``TicketNotFoundError``, ``AreaChangeNotNewError`` y los de
     ``area_service.get_active_area``.
     """
     ticket = session.get(Ticket, ticket_id)
     if ticket is None:
         raise TicketNotFoundError(ticket_id)
-    _ensure_open(ticket)
+    if ticket.state != TicketState.NEW.value:
+        raise AreaChangeNotNewError(ticket_id)
     area = area_service.get_active_area(session, area_id)
 
     author_name, author_id = _audit_author(current_user)

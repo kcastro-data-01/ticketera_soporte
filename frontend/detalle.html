@@ -316,10 +316,11 @@
               No hay usuarios disponibles. Puede crear uno desde
               <a href="usuarios.html">Usuarios</a>.
             </p>
-            <p class="ayuda-campo">Solo Técnicos y Administradores: IT solo recibe tickets.</p>
           </section>
 
-          <!-- Pasar el ticket a otro departamento (Técnico y Administrador). -->
+          <!-- Pasar el ticket a otro departamento (Técnico y Administrador).
+               Solo se muestra mientras está en Nuevo; en los demás estados
+               el departamento se ve en «Detalles» (detalle.js). -->
           <section id="seccion-area" class="seccion" aria-label="Departamento del ticket" data-permiso="cambiar_area">
             <h2>Cambiar departamento</h2>
             <div class="filtros formulario">
@@ -329,7 +330,7 @@
                   <option value="">Cargando departamentos…</option>
                 </select>
               </label>
-              <label class="campo campo-casilla">
+              <label class="casilla">
                 <input type="checkbox" id="area-reasignar" checked>
                 <span>Reasignar al técnico del nuevo departamento con menos tickets abiertos</span>
               </label>

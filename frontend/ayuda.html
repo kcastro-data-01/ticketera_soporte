@@ -117,7 +117,7 @@
         <summary>Seguimiento</summary>
         <div class="ayuda-cuerpo">
           <h3>El detalle del ticket</h3>
-          <p>Al abrir un ticket se ven sus datos (categoría, departamento, asignado, solicitante y fechas), el recorrido de estados, los comentarios, los adjuntos y el historial. Según el rol, también aparecen «Editar», «Asignación», «Cambiar departamento», «Explicar con IA», «Imprimir» y «Eliminar». Los comentarios quedan firmados con el nombre de quien los escribe.</p>
+          <p>Al abrir un ticket se ven sus datos (categoría, departamento, asignado, solicitante y fechas), el recorrido de estados, los comentarios, los adjuntos y el historial. Según el rol, también aparecen «Editar», «Asignación», «Cambiar departamento» (solo en Nuevo), «Explicar con IA», «Imprimir» y «Eliminar». Los comentarios quedan firmados con el nombre de quien los escribe.</p>
 
           <h3>Estados de los tickets</h3>
           <p>Los tickets siguen el orden <code>Nuevo → En proceso → Resuelto → Cerrado</code>:</p>
@@ -174,7 +174,7 @@
           <ul>
             <li><strong>Al crear un ticket</strong> se elige el «Departamento» (obligatorio). El ticket se asigna solo al Técnico activo de ese departamento con <strong>menos tickets abiertos</strong> (Nuevo o En proceso). Si el departamento no tiene técnicos, va al Técnico con menos tickets abiertos de cualquier departamento; si no hay ninguno, queda sin asignar.</li>
             <li><strong>Si un ticket llega sin departamento</strong> (por ejemplo, un correo al buzón de soporte), se toma de la categoría: Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad. Programación solo se elige a mano.</li>
-            <li><strong>Cambiar el departamento</strong>: el Técnico y el Administrador, en el detalle del ticket, con «Cambiar departamento». Si marcan «Reasignar al técnico del nuevo departamento», el ticket pasa al de ese departamento con menos tickets abiertos. El cambio queda en el historial.</li>
+            <li><strong>Cambiar el departamento</strong>: el Técnico y el Administrador, en el detalle del ticket, con «Cambiar departamento», <strong>solo mientras el ticket está en Nuevo</strong>. En los demás estados esa sección no aparece; el departamento se ve en «Detalles». Si marcan «Reasignar al técnico del nuevo departamento», el ticket pasa al de ese departamento con menos tickets abiertos. El cambio queda en el historial.</li>
             <li><strong>El departamento de cada Técnico</strong> lo elige el Administrador en «Usuarios». El Administrador también puede tener uno (opcional).</li>
             <li><strong>Pantalla «Departamentos»</strong> (solo el Administrador, en el menú debajo de «Métricas»): una fila por departamento y otra «Sin departamento», con el total de tickets, los abiertos, cada estado y los técnicos activos (sus nombres aparecen debajo de la cantidad). Arriba, el total de abiertos de la ticketera y el departamento con más abiertos. Al tocar un número se abre la lista de tickets de ese departamento y ese estado.</li>
             <li><strong>«Sin departamento»</strong>: tickets de antes de los departamentos. Se pueden filtrar en la lista y en las métricas, y pasar a un departamento.</li>
@@ -214,7 +214,7 @@
                 <tr><td>Editar ticket</td><td>Todos, salvo los Cerrados</td><td>Los que creó, mientras están en Nuevo</td><td>Los que creó, mientras están en Nuevo</td></tr>
                 <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>No</td></tr>
                 <tr><td>Asignar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
-                <tr><td>Cambiar departamento</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+                <tr><td>Cambiar departamento</td><td>Mientras está en Nuevo</td><td>Mientras está en Nuevo</td><td>No</td></tr>
                 <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>No</td></tr>
                 <tr><td>Métricas</td><td>Sí</td><td>No</td><td>No</td></tr>
                 <tr><td>Ver departamentos</td><td>Sí</td><td>No</td><td>No</td></tr>

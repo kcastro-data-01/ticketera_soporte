@@ -601,7 +601,10 @@ Reglas:
    respuestas, comentarios y avisos de IT al solicitante funcionan igual.
 6. **«Asignar a»** solo muestra Técnicos y Administradores. El Técnico y el
    Administrador pueden **cambiar el departamento** de un ticket desde el
-   detalle («Cambiar departamento»), y con «Reasignar al técnico del nuevo
+   detalle («Cambiar departamento»), **solo mientras el ticket está en Nuevo**
+   (para todos los roles, también el Administrador; en los demás estados esa
+   sección no aparece y el departamento se ve en «Detalles»), y con
+   «Reasignar al técnico del nuevo
    departamento» pasa al de ese departamento con menos tickets abiertos (con
    aviso por correo, si está activo).
 7. **Filtro «Departamento»** en la lista (también «Sin departamento») y en las
@@ -623,7 +626,7 @@ API:
 | `GET /api/areas` | Todos | Los 4 departamentos (con `tecnicos`: Técnicos activos en cada uno). |
 | `GET /api/areas/{id}` | Todos | Un departamento. |
 | `POST`, `PUT`, `PATCH`, `DELETE` en `/api/areas` o `/api/areas/{id}` | Nadie | `405 Method Not Allowed` (son fijos), también para el Administrador. |
-| `PATCH /api/tickets/{id}/area` | Administrador, Técnico | `{"area_id": 3, "reasignar": true}`. `404` departamento o ticket inexistente, `409` ticket Cerrado. |
+| `PATCH /api/tickets/{id}/area` | Administrador, Técnico | `{"area_id": 3, "reasignar": true}`. `404` departamento o ticket inexistente, `409` si el ticket no está en Nuevo («El departamento solo se puede cambiar mientras el ticket está en Nuevo»). |
 | `GET /api/tickets?area=ID` / `?sin_area=true` | Todos | Filtro de la lista. |
 | `GET /api/departamentos/resumen` | Administrador | Lo de la pantalla «Departamentos»: `total_abiertos`, `mas_abiertos` y `departamentos` (por cada uno: `total`, `abiertos`, `por_estado` y `tecnicos`). `403` para los demás roles. |
 

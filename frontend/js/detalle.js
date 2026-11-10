@@ -322,8 +322,7 @@ function aplicarReglasTicket(ticket) {
   if (elements.eliminar) elements.eliminar.hidden = cerrado || !puede("eliminar");
   const asignacion = document.getElementById("seccion-asignacion");
   if (asignacion) asignacion.hidden = cerrado || !puede("asignar");
-  const area = document.getElementById("seccion-area");
-  if (area) area.hidden = cerrado || !puede("cambiar_area");
+  pintarSeccionArea(ticket);
   if (elements.formComentario) elements.formComentario.hidden = cerrado;
 }
 
@@ -616,12 +615,31 @@ async function guardarAsignacion() {
   }
 }
 
-/* «Cambiar área»: pasa el ticket a otra área de IT activa y, con la
+/* El departamento solo se cambia mientras el ticket está en Nuevo (para
+   todos los roles; el servidor responde 409 si no). En los demás estados la
+   sección no se muestra: el departamento ya aparece en «Detalles». */
+const NOTA_AREA_SOLO_NUEVO = "El departamento solo se puede cambiar mientras el ticket está en Nuevo";
+
+function areaCambiable(ticket) {
+  return Boolean(ticket) && ticket.state === "Nuevo";
+}
+
+function pintarSeccionArea(ticket) {
+  const seccion = document.getElementById("seccion-area");
+  if (!seccion) return;
+  seccion.hidden = !puede("cambiar_area") || !areaCambiable(ticket);
+}
+
+/* «Cambiar departamento»: pasa el ticket a otro departamento y, con la
    casilla marcada, lo reasigna al técnico de esa área con menos tickets
    abiertos (PATCH .../area). */
 async function cambiarAreaTicket() {
   if (ocupado || ticketId === null) return;
   const elements = getElements();
+  if (ticketActual && !areaCambiable(ticketActual)) {
+    avisar(`${NOTA_AREA_SOLO_NUEVO}.`, "error");
+    return;
+  }
   const valor = elements.areaDestino ? String(elements.areaDestino.value || "") : "";
   if (!/^\d+$/.test(valor)) {
     avisar("Elija el departamento al que pasa el ticket.", "error");

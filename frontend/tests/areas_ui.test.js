@@ -90,6 +90,7 @@ test("el historial muestra el cambio de departamento", () => {
 // --- Detalle -------------------------------------------------------------------
 
 const IDS_DETALLE = ["usuario", "usuarios-nota", "area-destino", "area-reasignar", "cambiar-area", "estado-carga",
+  "seccion-area",
   "guardar", "editar", "cancelar-edicion", "asignar", "comentar", "historial"];
 
 function detalle(rol, fetchImpl) {
@@ -195,4 +196,46 @@ test("ninguna pantalla muestra «Área»: se llama «Departamento»", () => {
     const conArea = textos.filter((t) => /\b[Áá]reas?\b|Sin área/.test(t));
     assert.deepEqual(conArea, [], archivo);
   }
+});
+
+// --- El departamento solo se cambia en Nuevo --------------------------------------
+
+const SOLO_NUEVO = "El departamento solo se puede cambiar mientras el ticket está en Nuevo";
+
+test("la sección «Departamento» solo se ve en Nuevo; en los demás estados no aparece", () => {
+  for (const rol of ["Administrador", "Técnico"]) {
+    const { sandbox, nodos } = detalle(rol, async () => respuesta(200, {}));
+    sandbox.pintarSeccionArea({ state: "Nuevo", area_name: "Soporte" });
+    assert.equal(nodos.get("seccion-area").hidden, false, rol);
+    for (const estado of ["En proceso", "Resuelto", "Cerrado"]) {
+      sandbox.pintarSeccionArea({ state: estado, area_name: "Programación" });
+      assert.equal(nodos.get("seccion-area").hidden, true, `${rol} ${estado}`);
+    }
+    sandbox.pintarSeccionArea({ state: "Nuevo", area_name: null });
+    assert.equal(nodos.get("seccion-area").hidden, false, `${rol} vuelve a Nuevo`);
+  }
+  const { sandbox, nodos } = detalle("Solicitante", async () => respuesta(200, {}));
+  for (const estado of ["Nuevo", "En proceso", "Resuelto", "Cerrado"]) {
+    sandbox.pintarSeccionArea({ state: estado, area_name: "Soporte" });
+    assert.equal(nodos.get("seccion-area").hidden, true, `el Solicitante no cambia el departamento (${estado})`);
+  }
+});
+
+test("fuera de Nuevo «Cambiar departamento» no llama a la API", async () => {
+  const { sandbox, nodos, llamadas } = detalle("Administrador", async () => respuesta(200, {}));
+  vm.runInNewContext('ticketActual = { id: 7, state: "En proceso" };', sandbox);
+  nodos.get("area-destino").value = "2";
+  await sandbox.cambiarAreaTicket();
+  assert.equal(llamadas.length, 0);
+});
+
+test("detalle.html: sin «Departamento actual» repetido, la casilla normal a la izquierda y sin la nota técnica de Asignación", () => {
+  const html = leer("detalle.html");
+  assert.doesNotMatch(html, /area-solo-nuevo|area-actual|Departamento actual/);
+  assert.doesNotMatch(html, new RegExp(`<p class="nota">${SOLO_NUEVO}</p>`));
+  assert.match(html, /<label class="casilla">\s*<input type="checkbox" id="area-reasignar" checked>\s*<span>Reasignar al técnico del nuevo departamento con menos tickets abiertos<\/span>/);
+  assert.doesNotMatch(html, /IT solo recibe tickets/);
+  const css = leer("css/estilos.css");
+  assert.match(css, /\.casilla \{\s*display: flex;\s*align-items: flex-start;/);
+  assert.match(css, /\.casilla input\[type="checkbox"\] \{[^}]*width: 17px;\s*height: 17px;/);
 });

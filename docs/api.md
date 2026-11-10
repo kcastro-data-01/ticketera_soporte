@@ -242,7 +242,8 @@ para el Solicitante). Queda en el historial (`action: "area_changed"`,
 | `reasignar` | boolean | opcional (`false`); `true` asigna al técnico del nuevo departamento con menos tickets abiertos |
 
 **Respuestas:** `200` con el ticket · `404` ticket o departamento inexistente · `409`
-ticket `Cerrado`.
+si el ticket no está en `Nuevo` («El departamento solo se puede cambiar mientras el
+ticket está en Nuevo»), también para el Administrador.
 
 ### Departamentos: `GET /api/areas` y `GET /api/areas/{area_id}`
 

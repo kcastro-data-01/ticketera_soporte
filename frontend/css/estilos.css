@@ -4702,14 +4702,6 @@ summary:focus-visible,
   }
 }
 
-/* Casilla con su texto al lado (p. ej. «Reasignar al técnico de la nueva
-   área» en el detalle). */
-.campo.campo-casilla {
-  flex-direction: row;
-  align-items: center;
-  gap: var(--espaciado-xs);
-}
-
 /* ---------- Filtros del listado (index.html) ----------
    Todos los campos y botones con el mismo alto. En escritorio, una sola
    fila: Buscar un poco más ancho y el resto al ancho de su contenido
@@ -4942,4 +4934,26 @@ summary:focus-visible,
     flex-basis: 100%;
     text-align: right;
   }
+}
+
+/* Casilla con su texto: tamaño normal (17 px), a la izquierda y en la misma
+   línea (las reglas de .campo input no la agrandan: no va dentro de .campo). */
+.casilla {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: var(--texto-md);
+  color: var(--color-texto);
+  cursor: pointer;
+}
+
+.casilla input[type="checkbox"] {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  min-height: 0;
+  margin: 0.1rem 0 0;
+  padding: 0;
+  accent-color: var(--color-primario);
+  cursor: pointer;
 }

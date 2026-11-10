@@ -462,7 +462,8 @@ def test_people_see_departamento_not_area():
     for texto in textos:
         limpio = texto.replace("área de TI", "")
         assert not re.search(r"\b[Áá]reas?\b", limpio), limpio[:120]
-    assert ("Cambiar departamento", "cambiar el departamento de un ticket", ("Sí", "Sí", "No")) in asis.TABLA_PERMISOS
+    assert ("Cambiar departamento", "cambiar el departamento de un ticket",
+            ("Mientras está en Nuevo", "Mientras está en Nuevo", "No")) in asis.TABLA_PERMISOS
 
 
 def test_api_messages_say_departamento(auth_client, session, areas):
@@ -496,3 +497,44 @@ def test_help_and_chat_say_the_same():
     assert "asignados a él" not in ayuda
     for _, _, valores in asis.TABLA_PERMISOS:
         assert "asignados" not in valores[2]
+
+
+# --- El departamento solo se cambia en Nuevo -------------------------------------
+
+SOLO_NUEVO = "El departamento solo se puede cambiar mientras el ticket está en Nuevo"
+
+
+def test_in_nuevo_the_department_can_be_changed(auth_client, session, areas):
+    pedro = tecnico(session, "Pedro", areas[RED])
+    ticket = ticket_abierto(session, pedro, area=areas[RED])
+    resp = auth_client.patch(f"/api/tickets/{ticket.id}/area", json={"area_id": areas[SOP].id})
+    assert (resp.status_code, resp.json()["area_name"]) == (200, SOP)
+
+
+@pytest.mark.parametrize("estado", ["En proceso", "Resuelto", "Cerrado"])
+@pytest.mark.parametrize("rol", ["Administrador", "Técnico"])
+def test_outside_nuevo_changing_the_department_is_409_for_everyone(client, session, areas, estado, rol):
+    pedro = tecnico(session, "Pedro", areas[RED])
+    ticket = ticket_abierto(session, pedro, estado=estado, area=areas[RED])
+    _, h = headers_de(client, session, rol, "quien@data.cr", "Quien")
+    resp = client.patch(f"/api/tickets/{ticket.id}/area",
+                        json={"area_id": areas[SOP].id, "reasignar": True}, headers=h)
+    assert resp.status_code == 409, resp.text
+    assert resp.json()["detail"] == SOLO_NUEVO
+    session.expire_all()
+    guardado = session.get(Ticket, ticket.id)
+    assert (guardado.area_id, guardado.assigned_to_id) == (areas[RED].id, pedro.id), "no cambia nada"
+    assert session.scalars(select(History).where(History.action == "area_changed")).all() == []
+
+
+def test_the_help_and_the_chat_say_it_only_changes_in_nuevo():
+    from pathlib import Path
+
+    from backend.services import asistente_service as asis
+
+    ayuda = (Path(__file__).resolve().parents[2] / "frontend" / "ayuda.html").read_text(encoding="utf-8")
+    assert "solo mientras el ticket está en Nuevo" in ayuda
+    assert "En los demás estados esa sección no aparece; el departamento se ve en «Detalles»." in ayuda
+    assert "Departamento actual" not in ayuda
+    assert "solo mientras el ticket está en Nuevo" in asis.REGLA_AREAS
+    assert "cambiar el departamento de un ticket (mientras está en Nuevo)" in asis.PERMISOS_POR_ROL["Técnico"]

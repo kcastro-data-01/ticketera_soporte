@@ -116,7 +116,8 @@ TABLA_PERMISOS = [
     ("Editar ticket", "editar tickets", (_TODOS_MENOS_CERRADOS, _CREADOS_NUEVOS, _CREADOS_NUEVOS)),
     ("Cambiar estado", "cambiar el estado", ("Sí", "Sí", "No")),
     ("Asignar ticket", "asignar tickets", ("Sí", "No", "No")),
-    ("Cambiar departamento", "cambiar el departamento de un ticket", ("Sí", "Sí", "No")),
+    ("Cambiar departamento", "cambiar el departamento de un ticket",
+     ("Mientras está en Nuevo", "Mientras está en Nuevo", "No")),
     ("Historial global", "ver el historial global", ("Sí", "Sí", "No")),
     ("Métricas", "ver las métricas", ("Sí", "No", "No")),
     ("Ver departamentos", "ver la pantalla «Departamentos»", ("Sí", "No", "No")),
@@ -196,7 +197,8 @@ El Solicitante ve «Mis solicitudes»: sus tickets, con búsqueda, estado y fech
 - Detalle de un ticket: datos, comentarios (firmados con el nombre de quien los \
 escribe) e historial de cambios; a la derecha, el departamento, asignación y \
 cambio de estado según el rol. El Técnico y el Administrador pueden pasar el \
-ticket a otro departamento («Cambiar departamento»), y al hacerlo reasignarlo al técnico de ese departamento.
+ticket a otro departamento («Cambiar departamento»), solo mientras está en Nuevo, y al \
+hacerlo reasignarlo al técnico de ese departamento.
 - Adjuntos: al crear el ticket («Nuevo ticket») o después, en la sección \
 «Adjuntos» del detalle, con «Adjuntar archivos» (y «Sacar foto» en el celular). \
 Se aceptan jpg, png, pdf, docx, xlsx y txt, hasta 4 MB cada uno y 10 por ticket; \
@@ -1562,7 +1564,8 @@ REGLA_REPARTO = (
     "(Nuevo o En proceso); si hay empate, al que se registró primero. Si el departamento no tiene "
     "técnicos, va al Técnico activo con menos tickets abiertos de cualquier departamento; si no "
     "hay ningún Técnico activo, queda sin asignar. Después, un Administrador puede "
-    "reasignarlo manualmente, y el Técnico o el Administrador pueden pasarlo a otro departamento. "
+    "reasignarlo manualmente, y el Técnico o el Administrador pueden pasarlo a otro departamento "
+    "mientras está en Nuevo. "
     "Los tickets que llegan por correo al buzón de soporte se asignan al dueño del buzón y "
     "su departamento sale de la categoría (Hardware y Software → Soporte, Red → Redes e "
     "Infraestructura, Accesos → Ciberseguridad)."
@@ -1596,7 +1599,8 @@ REGLA_AREAS = (
     "buzón general), el departamento sale de la categoría: Hardware y Software → Soporte, Red → "
     "Redes e Infraestructura, Accesos → Ciberseguridad; Programación solo se elige a mano. El "
     "Técnico y el Administrador pueden cambiar el departamento de un ticket desde su detalle "
-    "(«Cambiar departamento») y, al hacerlo, reasignarlo al técnico del nuevo departamento; el cambio queda "
+    "(«Cambiar departamento») solo mientras el ticket está en Nuevo (después ya no se cambia, "
+    "tampoco el Administrador) y, al hacerlo, reasignarlo al técnico del nuevo departamento; el cambio queda "
     "en el historial. Solo el Administrador ve la pantalla «Departamentos» (en el menú, debajo "
     "de «Métricas»): por cada departamento y «Sin departamento», el total de tickets, los "
     "abiertos, cada estado y sus técnicos activos, con el total de abiertos y el departamento "

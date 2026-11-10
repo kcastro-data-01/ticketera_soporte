@@ -20,6 +20,7 @@ from backend.schemas import (
 )
 from backend.services import area_service, correo_service, ticket_service
 from backend.services.ticket_service import (
+    AreaChangeNotNewError,
     AssigneeNotITError,
     InvalidTransitionError,
     TicketClosedError,
@@ -357,11 +358,12 @@ def change_ticket_area(
     session: Session = Depends(get_session),
     current_user: User = Depends(role_required(ROLES_EQUIPO)),
 ) -> TicketResponse:
-    """Administrador y Técnico pasan el ticket a otra área de IT activa
-    (queda en el historial). Con ``reasignar`` se asigna al técnico de la
+    """Administrador y Técnico pasan el ticket a otro departamento, solo
+    mientras está en Nuevo (``409`` en los demás estados, también Cerrado;
+    queda en el historial). Con ``reasignar`` se asigna al técnico de la
     nueva área con menos tickets abiertos y, con ``AVISAR_ASIGNADO``, se le
     avisa por correo. ``404`` ticket o área inexistente, ``422`` área
-    desactivada, ``409`` ticket Cerrado."""
+    desactivada."""
     anterior = ticket_service.get_ticket(session, ticket_id)
     anterior_id = anterior.assigned_to_id if anterior is not None else None
     try:
@@ -374,6 +376,8 @@ def change_ticket_area(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error))
     except area_service.AreaInactiveError as error:
         raise HTTPException(status_code=422, detail=str(error))
+    except AreaChangeNotNewError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error))
     except TicketClosedError as error:
         raise _cerrado(error)
     if ticket.assigned_to_id != anterior_id:
