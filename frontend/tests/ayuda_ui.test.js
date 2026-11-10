@@ -55,7 +55,7 @@ test("lo que ya no existe no aparece", () => {
 });
 
 test("lo que funciona hoy está explicado", () => {
-  assert.match(tema("areas"), /Soporte<\/strong>: computadoras, impresoras, programas/);
+  assert.match(tema("areas"), /Soporte IT<\/strong>: computadoras, impresoras, programas/);
   assert.match(tema("areas"), /Redes e Infraestructura<\/strong>: internet, wifi, servidores, VPN/);
   assert.match(tema("areas"), /Ciberseguridad<\/strong>: accesos, contraseñas, cuentas, incidentes de seguridad/);
   assert.match(tema("areas"), /Programación<\/strong>: sistemas internos, Odoo, desarrollos y reportes/);

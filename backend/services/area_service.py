@@ -60,7 +60,7 @@ def get_active_area(session, area_id: int) -> ItArea:
 
 def area_for_category(session, category: str) -> ItArea | None:
     """Área de un ticket que no la trae, según su categoría (Hardware y
-    Software → Soporte, Red → Redes e Infraestructura, Accesos →
+    Software → Soporte IT, Red → Redes e Infraestructura, Accesos →
     Ciberseguridad). ``None`` si esa área no existe en la base."""
     nombre = CATEGORY_IT_AREA.get(category)
     if nombre is None:

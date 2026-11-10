@@ -55,7 +55,7 @@ def test_admin_gets_the_numbers_per_department(auth_client, session, areas):
     datos = resp.json()
     assert datos["total_abiertos"] == 3 + 3 + 0 + 0 + 1
     assert datos["mas_abiertos"] == {"area_id": areas[SOP].id, "nombre": SOP, "abiertos": 3}, \
-        "empate 3 a 3: gana el primero (Soporte)"
+        "empate 3 a 3: gana el primero (Soporte IT)"
     filas = {f["nombre"]: f for f in datos["departamentos"]}
     assert [f["nombre"] for f in datos["departamentos"]] == [*IT_AREAS, "Sin departamento"]
     assert filas[SOP]["total"] == 5 and filas[SOP]["abiertos"] == 3

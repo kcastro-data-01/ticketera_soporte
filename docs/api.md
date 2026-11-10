@@ -111,7 +111,7 @@ body.
 | `description` | string | no puede quedar vacía |
 | `category` | enum | uno de los valores de `category` |
 | `priority` | enum | uno de los valores de `priority` |
-| `area_id` | integer | opcional; uno de los departamentos fijos. Sin él, sale de la categoría (Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad) |
+| `area_id` | integer | opcional; uno de los departamentos fijos. Sin él, sale de la categoría (Hardware y Software → Soporte IT, Red → Redes e Infraestructura, Accesos → Ciberseguridad) |
 
 El ticket se asigna al Técnico activo de ese departamento con menos tickets
 abiertos (si no tiene, al de cualquier departamento con menos abiertos). La
@@ -247,7 +247,7 @@ ticket está en Nuevo»), también para el Administrador.
 
 ### Departamentos: `GET /api/areas` y `GET /api/areas/{area_id}`
 
-Los departamentos (en el código, «áreas») son fijos: Soporte, Redes e Infraestructura, Ciberseguridad y
+Los departamentos (en el código, «áreas») son fijos: Soporte IT, Redes e Infraestructura, Ciberseguridad y
 Programación. `GET /api/areas` (todos los roles) devuelve
 `[{id, name, is_active, tecnicos}]` en ese orden; `GET /api/areas/{id}`, uno
 (`404` si no existe). Cualquier otro método (`POST`, `PUT`, `PATCH`, `DELETE`)

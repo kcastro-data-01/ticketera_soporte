@@ -149,7 +149,7 @@
                 <tr><td>Editó el ticket</td><td>Se cambia el título, la descripción, la categoría o la prioridad (una fila por cada dato).</td><td>Prioridad: «Media» → «Alta»</td></tr>
                 <tr><td>Asignó el ticket</td><td>Se cambia la persona responsable.</td><td>José Solano → Carlos Rojas</td></tr>
                 <tr><td>Quitó la asignación</td><td>El ticket queda sin responsable.</td><td>Carlos Rojas → Sin asignar</td></tr>
-                <tr><td>Cambió el departamento</td><td>Un Técnico o un Administrador pasa el ticket a otro departamento.</td><td>Soporte → Programación</td></tr>
+                <tr><td>Cambió el departamento</td><td>Un Técnico o un Administrador pasa el ticket a otro departamento.</td><td>Soporte IT → Programación</td></tr>
                 <tr><td>Cambió el estado</td><td>El ticket avanza, salta pasos o vuelve de Resuelto a En proceso.</td><td>Nuevo → Cerrado</td></tr>
                 <tr><td>Comentó</td><td>Alguien agrega un comentario.</td><td>«Ya revisé el cable de red»</td></tr>
                 <tr><td>Adjuntó un archivo</td><td>Alguien sube un archivo, o llegó en un correo.</td><td>«captura.png» (por correo)</td></tr>
@@ -167,14 +167,14 @@
         <div class="ayuda-cuerpo">
           <p>IT se organiza en cuatro departamentos fijos. Nadie los crea, renombra, desactiva ni borra, tampoco el Administrador.</p>
           <ul>
-            <li><strong>Soporte</strong>: computadoras, impresoras, programas.</li>
+            <li><strong>Soporte IT</strong>: computadoras, impresoras, programas.</li>
             <li><strong>Redes e Infraestructura</strong>: internet, wifi, servidores, VPN.</li>
             <li><strong>Ciberseguridad</strong>: accesos, contraseñas, cuentas, incidentes de seguridad.</li>
             <li><strong>Programación</strong>: sistemas internos, Odoo, desarrollos y reportes.</li>
           </ul>
           <ul>
             <li><strong>Al crear un ticket</strong> se elige el «Departamento» (obligatorio). El ticket se asigna solo al Técnico activo de ese departamento con <strong>menos tickets abiertos</strong> (Nuevo o En proceso). Si el departamento no tiene técnicos, va al Técnico con menos tickets abiertos de cualquier departamento; si no hay ninguno, queda sin asignar.</li>
-            <li><strong>Si un ticket llega sin departamento</strong> (por ejemplo, un correo al buzón de soporte), se toma de la categoría: Hardware y Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad. Programación solo se elige a mano.</li>
+            <li><strong>Si un ticket llega sin departamento</strong> (por ejemplo, un correo al buzón de soporte), se toma de la categoría: Hardware y Software → Soporte IT, Red → Redes e Infraestructura, Accesos → Ciberseguridad. Programación solo se elige a mano.</li>
             <li><strong>Cambiar el departamento</strong>: el Técnico y el Administrador, en el detalle del ticket, con «Cambiar departamento», <strong>solo mientras el ticket está en Nuevo</strong>. En los demás estados esa sección no aparece; el departamento se ve en «Detalles». Si marcan «Reasignar al técnico del nuevo departamento», el ticket pasa al de ese departamento con menos tickets abiertos. El cambio queda en el historial.</li>
             <li><strong>El departamento de cada Técnico</strong> lo elige el Administrador en «Usuarios». El Administrador también puede tener uno (opcional).</li>
             <li><strong>Pantalla «Departamentos»</strong> (solo el Administrador, en el menú debajo de «Métricas»): una fila por departamento y otra «Sin departamento», con el total de tickets, los abiertos, cada estado y los técnicos activos (sus nombres aparecen debajo de la cantidad). Arriba, el total de abiertos de la ticketera y el departamento con más abiertos. Al tocar un número se abre la lista de tickets de ese departamento y ese estado.</li>
@@ -314,7 +314,7 @@
             <dt>¿Puedo cambiar mi contraseña?</dt>
             <dd>Se entra con la cuenta de Microsoft de la empresa, así que la contraseña es la de Microsoft: se cambia allí o con el área de TI. La ticketera no guarda contraseñas.</dd>
             <dt>¿Qué departamento elijo?</dt>
-            <dd>El que atiende su pedido: Soporte (computadoras, impresoras, programas), Redes e Infraestructura (internet, wifi, servidores, VPN), Ciberseguridad (accesos, contraseñas, cuentas, incidentes de seguridad) o Programación (sistemas internos, Odoo, desarrollos y reportes). Si se equivoca, IT lo pasa al correcto.</dd>
+            <dd>El que atiende su pedido: Soporte IT (computadoras, impresoras, programas), Redes e Infraestructura (internet, wifi, servidores, VPN), Ciberseguridad (accesos, contraseñas, cuentas, incidentes de seguridad) o Programación (sistemas internos, Odoo, desarrollos y reportes). Si se equivoca, IT lo pasa al correcto.</dd>
             <dt>¿Cómo sé quién atiende mi ticket?</dt>
             <dd>En la lista, la columna «Atendido por» (o «Asignado a») muestra la persona responsable; en el detalle aparece en «Asignado a».</dd>
             <dt>¿Puedo reabrir un ticket Cerrado?</dt>

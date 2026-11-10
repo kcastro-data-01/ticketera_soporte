@@ -30,7 +30,7 @@ const RESUMEN = {
   total_abiertos: 5,
   mas_abiertos: { area_id: 2, nombre: "Redes e Infraestructura", abiertos: 3 },
   departamentos: [
-    { area_id: 1, nombre: "Soporte", total: 4, abiertos: 2,
+    { area_id: 1, nombre: "Soporte IT", total: 4, abiertos: 2,
       por_estado: { Nuevo: 1, "En proceso": 1, Resuelto: 1, Cerrado: 1 },
       tecnicos: [{ id: 7, name: "Ana Mora" }, { id: 8, name: "Luis Solís" }] },
     { area_id: 2, nombre: "Redes e Infraestructura", total: 3, abiertos: 3,
@@ -98,7 +98,7 @@ test("pinta el resumen y una fila por departamento con enlaces a la lista filtra
   const filas = nodos.get("cuerpo-departamentos").children;
   assert.equal(filas.length, 3);
   const soporte = filas[0].children;
-  assert.equal(soporte[0].textContent, "Soporte");
+  assert.equal(soporte[0].textContent, "Soporte IT");
   const enlaces = soporte.slice(1, 7).map((td) => [td.children[0].textContent, td.children[0].href]);
   assert.deepEqual(enlaces, [
     ["4", "index.html?area=1"],

@@ -6,13 +6,13 @@ Corre en cada arranque (``init_db``), en SQLite (local, Docker) y en Postgres
 * crea ``it_areas`` si no existe y agrega ``users.area_id`` y
   ``tickets.area_id`` si faltan (lo que ya había queda «Sin área»);
 * deja **exactamente** las áreas fijas de ``backend.constants.IT_AREAS``
-  (Soporte, Redes e Infraestructura, Ciberseguridad, Programación):
+  (Soporte IT, Redes e Infraestructura, Ciberseguridad, Programación):
 
   - el mismo nombre sin tildes o con otras mayúsculas («Programacion») es
     esa área fija y se corrige;
   - los nombres de antes (``LEGACY_IT_AREA_NAMES``) pasan al área fija que
-    corresponde: «Soporte técnico» → «Soporte»; «Redes» e «Infraestructura»
-    → «Redes e Infraestructura» (si había varias filas para la misma área,
+    corresponde: «Soporte» y «Soporte técnico» → «Soporte IT»; «Redes» e
+    «Infraestructura» → «Redes e Infraestructura» (si había varias filas para la misma área,
     sus tickets y técnicos pasan a una sola y las otras se borran);
   - cualquier otra área se borra y sus tickets y técnicos quedan «Sin área»;
   - las que falten se crean, todas activas.

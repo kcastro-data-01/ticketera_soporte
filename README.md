@@ -47,7 +47,7 @@ filtrarlos, y consultar su historial de cambios.
   `node:test` (52 pruebas en cuatro ficheros) y documentación en
   [docs/api.md](docs/api.md).
 
-- **Departamentos fijos** (la ticketera es de IT): Soporte, Redes e
+- **Departamentos fijos** (la ticketera es de IT): Soporte IT, Redes e
   Infraestructura, Ciberseguridad y Programación. Cada Técnico pertenece a un
   departamento; al crear un ticket se elige el departamento y se asigna al
   técnico de ese departamento con menos tickets abiertos; sin departamento,
@@ -471,9 +471,10 @@ La migración de los departamentos (en el código y en la base, «áreas»:
 `backend/migrate_add_it_areas.py`, en cada arranque,
 en SQLite y en Postgres) crea `it_areas`, agrega `users.area_id` y
 `tickets.area_id` (los técnicos y tickets que ya había quedan «Sin departamento») y deja
-**exactamente** los 4 departamentos fijos: «Soporte técnico» pasa a «Soporte», «Redes» e
-«Infraestructura» se unen en «Redes e Infraestructura» (con sus tickets y
-técnicos), cualquier otra se borra (lo suyo queda «Sin departamento») y los que
+**exactamente** los 4 departamentos fijos: «Soporte» y «Soporte técnico»
+pasan a «Soporte IT» (con el mismo id: sus tickets y técnicos no se
+mueven), «Redes» e «Infraestructura» se unen en «Redes e Infraestructura»
+(con sus tickets y técnicos), cualquier otra se borra (lo suyo queda «Sin departamento») y los que
 falten se crean. En una base nueva (Neon) solo crea las 4. Cada cambio queda en
 el log.
 
@@ -574,7 +575,7 @@ el Administrador:
 
 | Departamento | Atiende |
 |---|---|
-| Soporte | computadoras, impresoras, programas |
+| Soporte IT | computadoras, impresoras, programas |
 | Redes e Infraestructura | internet, wifi, servidores, VPN |
 | Ciberseguridad | accesos, contraseñas, cuentas, incidentes de seguridad |
 | Programación | sistemas internos, Odoo, desarrollos y reportes |
@@ -589,7 +590,7 @@ Reglas:
    abiertos de cualquier departamento; si no hay ninguno, queda sin asignar.
 3. **Ticket sin departamento** (por ejemplo, un correo al buzón general, o la
    API sin `area_id`): sale de la categoría (`CATEGORY_IT_AREA`): Hardware y
-   Software → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad.
+   Software → Soporte IT, Red → Redes e Infraestructura, Accesos → Ciberseguridad.
    Programación solo se elige a mano.
 4. **Tickets por correo**: al buzón general → asignado al dueño del buzón, con
    el departamento de la categoría. El dueño le escribe a un técnico (Elementos
@@ -609,7 +610,7 @@ Reglas:
    aviso por correo, si está activo).
 7. **Filtro «Departamento»** en la lista (también «Sin departamento») y en las
    métricas. El departamento se ve en el detalle y su cambio queda en el
-   historial («Cambió el departamento: Soporte → Programación»).
+   historial («Cambió el departamento: Soporte IT → Programación»).
 8. **Pantalla «Departamentos»** (`departamentos.html`, solo Administrador:
    permiso «Ver departamentos»; en el menú debajo de «Métricas»): una fila por
    departamento y otra «Sin departamento» con el total de tickets, los

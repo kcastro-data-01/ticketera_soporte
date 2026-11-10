@@ -178,7 +178,7 @@ Administrador), Ayuda y Mi cuenta.
 pertenece a un departamento de IT y el Solicitante es cualquier persona de la empresa, sin \
 departamento. IT solo recibe: un ticket nunca se asigna a un Solicitante.
 - Los departamentos son fijos (nadie los crea, renombra ni borra, tampoco el \
-Administrador): Soporte (computadoras, impresoras, programas), Redes e \
+Administrador): Soporte IT (computadoras, impresoras, programas), Redes e \
 Infraestructura (internet, wifi, servidores, VPN), Ciberseguridad (accesos, \
 contraseñas, cuentas, incidentes de seguridad) y Programación (sistemas internos, \
 Odoo, desarrollos y reportes).
@@ -195,10 +195,11 @@ departamento») y Fecha de creación, con «Buscar» y «Limpiar filtros». Se v
 los tickets que cumplen los filtros, sin páginas, con el total arriba de la lista. \
 El Solicitante ve «Mis solicitudes»: sus tickets, con búsqueda, estado y fecha.
 - Detalle de un ticket: datos, comentarios (firmados con el nombre de quien los \
-escribe) e historial de cambios; a la derecha, el departamento, asignación y \
-cambio de estado según el rol. El Técnico y el Administrador pueden pasar el \
-ticket a otro departamento («Cambiar departamento»), solo mientras está en Nuevo, y al \
-hacerlo reasignarlo al técnico de ese departamento.
+escribe) e historial de cambios; el departamento se ve en «Detalles». A la \
+derecha, asignación y cambio de estado según el rol; el Técnico y el \
+Administrador ven además «Cambiar departamento» solo mientras el ticket está en \
+Nuevo (en los demás estados esa sección no aparece) y al pasarlo a otro \
+departamento pueden reasignarlo al técnico de ese departamento.
 - Adjuntos: al crear el ticket («Nuevo ticket») o después, en la sección \
 «Adjuntos» del detalle, con «Adjuntar archivos» (y «Sacar foto» en el celular). \
 Se aceptan jpg, png, pdf, docx, xlsx y txt, hasta 4 MB cada uno y 10 por ticket; \
@@ -1567,7 +1568,7 @@ REGLA_REPARTO = (
     "reasignarlo manualmente, y el Técnico o el Administrador pueden pasarlo a otro departamento "
     "mientras está en Nuevo. "
     "Los tickets que llegan por correo al buzón de soporte se asignan al dueño del buzón y "
-    "su departamento sale de la categoría (Hardware y Software → Soporte, Red → Redes e "
+    "su departamento sale de la categoría (Hardware y Software → Soporte IT, Red → Redes e "
     "Infraestructura, Accesos → Ciberseguridad)."
 )
 REGLA_QUIEN_CAMBIA_ESTADO = (
@@ -1588,7 +1589,7 @@ REGLA_CERRADO = NOTA_CERRADO + (
     "responde una sola vez que envíe un correo nuevo para crear otro ticket."
 )
 REGLA_AREAS = (
-    "La ticketera es de IT y tiene 4 departamentos fijos: Soporte (computadoras, impresoras, "
+    "La ticketera es de IT y tiene 4 departamentos fijos: Soporte IT (computadoras, impresoras, "
     "programas), Redes e Infraestructura (internet, wifi, servidores, VPN), Ciberseguridad "
     "(accesos, contraseñas, cuentas, incidentes de seguridad) y Programación (sistemas "
     "internos, Odoo, desarrollos y reportes). Nadie los crea, renombra, desactiva ni borra, "
@@ -1596,7 +1597,7 @@ REGLA_AREAS = (
     "Técnico en «Usuarios» (el Administrador también puede tener departamento; el Solicitante no). "
     "Al crear un ticket se elige el departamento (obligatorio) y se asigna al Técnico de ese departamento "
     "con menos tickets abiertos. Si un ticket llega sin departamento (por ejemplo, un correo al "
-    "buzón general), el departamento sale de la categoría: Hardware y Software → Soporte, Red → "
+    "buzón general), el departamento sale de la categoría: Hardware y Software → Soporte IT, Red → "
     "Redes e Infraestructura, Accesos → Ciberseguridad; Programación solo se elige a mano. El "
     "Técnico y el Administrador pueden cambiar el departamento de un ticket desde su detalle "
     "(«Cambiar departamento») solo mientras el ticket está en Nuevo (después ya no se cambia, "

@@ -238,7 +238,7 @@ def create_ticket(
     2. con ``area_del_asignado`` (un correo de IT a un técnico), el área del
        asignado, si tiene;
     3. si no, según la categoría (``CATEGORY_IT_AREA``: Hardware y Software
-       → Soporte, Red → Redes e Infraestructura, Accesos → Ciberseguridad;
+       → Soporte IT, Red → Redes e Infraestructura, Accesos → Ciberseguridad;
        Programación solo se elige a mano).
 
     Sin asignado, el ticket va al técnico de esa área con menos tickets

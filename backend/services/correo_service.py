@@ -1197,7 +1197,7 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
         return "frenado", None
 
     # Quien escribe es el solicitante; quien recibe (el dueño del buzón), el
-    # asignado. El área sale de la categoría (Hardware y Software → Soporte,
+    # asignado. El área sale de la categoría (Hardware y Software → Soporte IT,
     # Red → Redes e Infraestructura, Accesos → Ciberseguridad). IT solo recibe:
     # si el dueño del buzón no es de IT, va al técnico con menos tickets
     # abiertos (o sin asignar si no hay técnicos).

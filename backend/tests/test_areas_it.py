@@ -1,4 +1,4 @@
-"""Áreas de IT fijas (Soporte, Redes e Infraestructura, Ciberseguridad,
+"""Áreas de IT fijas (Soporte IT, Redes e Infraestructura, Ciberseguridad,
 Programación): nadie las crea, renombra, desactiva ni borra (405), la
 migración deja exactamente esas, un ticket sin área la toma de la categoría,
 reparto al técnico del área con menos tickets abiertos, «IT solo recibe»
@@ -88,6 +88,8 @@ def test_migration_on_a_base_without_areas_creates_exactly_the_four(tmp_path):
     engine = _vieja(tmp_path)
     init_db(engine)
     assert _areas_de(engine) == list(IT_AREAS)
+    assert _areas_de(engine)[0] == "Soporte IT", "en Neon se crea directo así"
+    assert "Soporte" not in _areas_de(engine)
     with engine.connect() as conn:
         assert conn.execute(text("SELECT area_id FROM users")).scalars().all() == [None, None]
         # El ticket viejo asignado a un Solicitante queda como estaba, «Sin área».
@@ -98,7 +100,7 @@ def test_migration_on_a_base_without_areas_creates_exactly_the_four(tmp_path):
 
 
 def test_migration_turns_the_old_areas_into_the_fixed_ones(tmp_path, caplog):
-    """La base local: «Soporte técnico» → «Soporte», «Redes» e
+    """Una base vieja: «Soporte técnico» → «Soporte IT», «Redes» e
     «Infraestructura» → «Redes e Infraestructura», «Ciberseguridad» igual y
     cualquier otra («Samuel Mendez», las de prueba) se borra: sus tickets y
     técnicos quedan «Sin área»."""
@@ -133,7 +135,37 @@ def test_migration_turns_the_old_areas_into_the_fixed_ones(tmp_path, caplog):
     esperado = [SOP, RED, RED, CIB, None, None, PROG]
     assert areas_tickets == esperado
     assert areas_usuarios == esperado
-    assert "«Samuel Mendez»" in caplog.text and "«Soporte técnico» pasa a «Soporte»" in caplog.text
+    assert "«Samuel Mendez»" in caplog.text and "«Soporte técnico» pasa a «Soporte IT»" in caplog.text
+    caplog.clear()
+    init_db(engine)
+    assert "Departamentos (áreas de IT)" not in caplog.text, "ya al día: no hace nada"
+    engine.dispose()
+
+
+def test_migration_renames_soporte_to_soporte_it(tmp_path, caplog):
+    """La base local de hoy: «Soporte» pasa a «Soporte IT» con el mismo id, así
+    sus tickets y técnicos no se mueven; los demás quedan como estaban."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'local.db'}")
+    init_db(engine)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM it_areas"))
+        for n, nombre in enumerate(["Soporte", "Redes e Infraestructura", "Ciberseguridad", "Programación"],
+                                   start=1):
+            conn.execute(text("INSERT INTO it_areas (id, name, is_active, created_at) "
+                              "VALUES (:i, :n, 1, CURRENT_TIMESTAMP)"), {"i": n, "n": nombre})
+        conn.execute(text("INSERT INTO users (id, name, email, role, is_active, area_id) "
+                          "VALUES (1, 'Ana', 'ana@data.cr', 'Técnico', 1, 1)"))
+        conn.execute(text("INSERT INTO tickets (id, title, description, category, priority, state, "
+                          "area_id, created_at, updated_at) VALUES (1, 'Ticket viejo', 'D', 'Hardware', "
+                          "'Media', 'Nuevo', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"))
+    with caplog.at_level("WARNING"):
+        init_db(engine)
+    assert "«Soporte» pasa a «Soporte IT»" in caplog.text
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT id, name FROM it_areas ORDER BY id")).all() == [
+            (1, "Soporte IT"), (2, "Redes e Infraestructura"), (3, "Ciberseguridad"), (4, "Programación")]
+        assert conn.execute(text("SELECT area_id FROM users")).scalar_one() == 1
+        assert conn.execute(text("SELECT area_id FROM tickets")).scalar_one() == 1
     caplog.clear()
     init_db(engine)
     assert "Departamentos (áreas de IT)" not in caplog.text, "ya al día: no hace nada"
@@ -444,7 +476,7 @@ def test_chat_rules_and_permissions_talk_about_areas():
         assert "administrar las áreas" not in PERMISOS_POR_ROL[rol], rol
     for area in IT_AREAS:
         assert area in REGLA_AREAS
-    assert "Hardware y Software → Soporte" in REGLA_AREAS
+    assert "Hardware y Software → Soporte IT" in REGLA_AREAS
     assert "cambiar el departamento de un ticket" in PERMISOS_POR_ROL["Solicitante"].split("No puede")[1]
     assert "No puede" not in PERMISOS_POR_ROL["Administrador"]
 
@@ -538,3 +570,32 @@ def test_the_help_and_the_chat_say_it_only_changes_in_nuevo():
     assert "Departamento actual" not in ayuda
     assert "solo mientras el ticket está en Nuevo" in asis.REGLA_AREAS
     assert "cambiar el departamento de un ticket (mientras está en Nuevo)" in asis.PERMISOS_POR_ROL["Técnico"]
+    guia = " ".join(asis.GUIA_APP.split())
+    assert "el departamento se ve en «Detalles»" in guia
+    assert "en los demás estados esa sección no aparece" in guia
+    assert "a la derecha, el departamento" not in guia
+
+
+def test_the_support_department_is_called_soporte_it_everywhere():
+    """El departamento fijo es «Soporte IT» en la ayuda, el chat, «Nuevo
+    ticket», «Usuarios», el README y docs/api.md (el menú «Soporte» y el buzón
+    de soporte no son el departamento)."""
+    import re
+    from pathlib import Path
+
+    from backend.constants import CATEGORY_IT_AREA, IT_AREA_SCOPE, IT_AREA_SUPPORT
+    from backend.services import asistente_service as asis
+
+    assert IT_AREA_SUPPORT == "Soporte IT" and IT_AREAS[0] == "Soporte IT"
+    assert CATEGORY_IT_AREA["Hardware"] == CATEGORY_IT_AREA["Software"] == "Soporte IT"
+    assert "Soporte IT" in IT_AREA_SCOPE
+    raiz = Path(__file__).resolve().parents[2]
+    textos = {nombre: (raiz / nombre).read_text(encoding="utf-8") for nombre in (
+        "frontend/ayuda.html", "frontend/crear.html", "frontend/usuarios.html", "README.md", "docs/api.md")}
+    textos["chat"] = asis.GUIA_APP + asis.REGLA_AREAS + asis.REGLAS_PARA_IA
+    viejo = re.compile(r"→ Soporte(?! IT)|Soporte \(|<strong>Soporte</strong>|fijos: Soporte,|"
+                       r"Soporte → |\| Soporte \|")
+    for nombre, texto in textos.items():
+        assert not viejo.search(texto), nombre
+    for nombre in ("frontend/ayuda.html", "frontend/crear.html", "chat"):
+        assert "Soporte IT" in textos[nombre], nombre

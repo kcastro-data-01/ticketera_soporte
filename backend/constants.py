@@ -97,7 +97,7 @@ IT_ROLES: tuple[str, ...] = (UserRole.ADMIN.value, UserRole.TECHNICIAN.value)
 # Áreas de IT fijas (no se crean, renombran ni desactivan desde la app). La
 # migración ``backend.migrate_add_it_areas`` deja exactamente estas, en este
 # orden, que es también el orden en que se muestran.
-IT_AREA_SUPPORT = "Soporte"
+IT_AREA_SUPPORT = "Soporte IT"
 IT_AREA_NETWORK = "Redes e Infraestructura"
 IT_AREA_SECURITY = "Ciberseguridad"
 IT_AREA_PROGRAMMING = "Programación"
@@ -124,6 +124,7 @@ CATEGORY_IT_AREA: dict[str, str] = {
 # técnicos pasan a esa área). Cualquier otra área se borra: lo suyo queda
 # «Sin área».
 LEGACY_IT_AREA_NAMES: dict[str, str] = {
+    "Soporte": IT_AREA_SUPPORT,
     "Soporte técnico": IT_AREA_SUPPORT,
     "Redes": IT_AREA_NETWORK,
     "Infraestructura": IT_AREA_NETWORK,

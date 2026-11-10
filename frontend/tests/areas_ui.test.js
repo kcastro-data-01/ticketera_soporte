@@ -63,16 +63,16 @@ test("permisos: nadie administra áreas (son fijas); cambiar el área, Administr
 test("llenarSelectAreas: «Todos», «Sin departamento» y los departamentos fijos", () => {
   const { sandbox } = sandboxCon("Administrador", async () => respuesta(200, []));
   const select = nodo("area");
-  sandbox.llenarSelectAreas(select, [{ id: 1, name: "Soporte" }, { id: 2, name: "Redes e Infraestructura" }],
+  sandbox.llenarSelectAreas(select, [{ id: 1, name: "Soporte IT" }, { id: 2, name: "Redes e Infraestructura" }],
     { primera: "Todos", sinArea: true });
   assert.deepEqual(select.children.map((o) => [o.value, o.textContent]),
-    [["", "Todos"], ["sin", "Sin departamento"], ["1", "Soporte"], ["2", "Redes e Infraestructura"]]);
+    [["", "Todos"], ["sin", "Sin departamento"], ["1", "Soporte IT"], ["2", "Redes e Infraestructura"]]);
 });
 
 test("cargarAreas pide las áreas fijas y devuelve [] si falla", async () => {
   let falla = false;
   const { sandbox, llamadas } = sandboxCon("Administrador", async () =>
-    (falla ? respuesta(500, {}) : respuesta(200, [{ id: 1, name: "Soporte" }])));
+    (falla ? respuesta(500, {}) : respuesta(200, [{ id: 1, name: "Soporte IT" }])));
   assert.equal((await sandbox.cargarAreas()).length, 1);
   falla = true;
   assert.deepEqual(JSON.parse(JSON.stringify(await sandbox.cargarAreas())), []);
@@ -81,8 +81,8 @@ test("cargarAreas pide las áreas fijas y devuelve [] si falla", async () => {
 
 test("el historial muestra el cambio de departamento", () => {
   const { sandbox } = sandboxCon("Técnico", async () => respuesta(200, []));
-  assert.deepEqual({ ...sandbox.describirHistorial({ action: "area_changed", old_value: "Soporte", new_value: "Programación" }) },
-    { accion: "Cambió el departamento", detalle: "Soporte → Programación" });
+  assert.deepEqual({ ...sandbox.describirHistorial({ action: "area_changed", old_value: "Soporte IT", new_value: "Programación" }) },
+    { accion: "Cambió el departamento", detalle: "Soporte IT → Programación" });
   assert.equal(sandbox.describirHistorial({ action: "area_changed", old_value: null, new_value: "Redes" }).detalle,
     "Sin departamento → Redes");
 });
@@ -146,7 +146,7 @@ test("detalle.html: «Departamento» en los datos y la sección «Cambiar depart
   assert.match(html, /id="cambiar-area">Cambiar departamento<\/button>/);
   assert.match(html, /Reasignar al técnico del nuevo departamento con menos tickets abiertos/);
   assert.doesNotMatch(html.replace(/<!--[\s\S]*?-->/g, ""), /[ÁáA]rea/);
-  assert.match(html, /<section id="seccion-area"[^>]*data-permiso="cambiar_area">/);
+  assert.match(html, /<section id="seccion-area"[^>]*data-permiso="cambiar_area" hidden>/, "oculta hasta saber si el ticket está en Nuevo");
   assert.match(html, /<input type="checkbox" id="area-reasignar" checked>/);
 });
 
@@ -165,7 +165,7 @@ test("«Nuevo ticket»: debajo de «Departamento», qué atiende cada uno", () =
   const bloque = html.slice(html.indexOf('<select id="area"'), html.indexOf("</ul>", html.indexOf('id="ayuda-area"')));
   const items = [...bloque.matchAll(/<li><strong>([^<]+)<\/strong>: ([^<]+)<\/li>/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(items, [
-    ["Soporte", "computadoras, impresoras, programas."],
+    ["Soporte IT", "computadoras, impresoras, programas."],
     ["Redes e Infraestructura", "internet, wifi, servidores, VPN."],
     ["Ciberseguridad", "accesos, contraseñas, cuentas, incidentes de seguridad."],
     ["Programación", "sistemas internos, Odoo, desarrollos y reportes."],
@@ -205,7 +205,7 @@ const SOLO_NUEVO = "El departamento solo se puede cambiar mientras el ticket est
 test("la sección «Departamento» solo se ve en Nuevo; en los demás estados no aparece", () => {
   for (const rol of ["Administrador", "Técnico"]) {
     const { sandbox, nodos } = detalle(rol, async () => respuesta(200, {}));
-    sandbox.pintarSeccionArea({ state: "Nuevo", area_name: "Soporte" });
+    sandbox.pintarSeccionArea({ state: "Nuevo", area_name: "Soporte IT" });
     assert.equal(nodos.get("seccion-area").hidden, false, rol);
     for (const estado of ["En proceso", "Resuelto", "Cerrado"]) {
       sandbox.pintarSeccionArea({ state: estado, area_name: "Programación" });
@@ -216,7 +216,7 @@ test("la sección «Departamento» solo se ve en Nuevo; en los demás estados no
   }
   const { sandbox, nodos } = detalle("Solicitante", async () => respuesta(200, {}));
   for (const estado of ["Nuevo", "En proceso", "Resuelto", "Cerrado"]) {
-    sandbox.pintarSeccionArea({ state: estado, area_name: "Soporte" });
+    sandbox.pintarSeccionArea({ state: estado, area_name: "Soporte IT" });
     assert.equal(nodos.get("seccion-area").hidden, true, `el Solicitante no cambia el departamento (${estado})`);
   }
 });
