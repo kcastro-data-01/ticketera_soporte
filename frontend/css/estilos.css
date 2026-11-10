@@ -4195,7 +4195,7 @@ th[aria-sort="descending"] .orden-columna::after {
   }
 }
 
-/* ===== Ayuda: índice y temas plegables ===== */
+/* ===== Ayuda: «Temas» como pestañas y el tema elegido debajo ===== */
 .ayuda-indice {
   margin-bottom: var(--espaciado-md);
   padding: 0.85rem 1rem;
@@ -4212,10 +4212,11 @@ th[aria-sort="descending"] .orden-columna::after {
   letter-spacing: 0.04em;
 }
 
-/* Los temas: una cuadrícula de botones del mismo tamaño, sin números
+/* Los temas: una cuadrícula de pestañas del mismo tamaño, sin números
    (5 columnas en escritorio, 3 en tablet y 2 en el celular). Con el estilo
-   de los botones secundarios; los colores salen de las variables, así que
-   sirven igual en modo claro y oscuro. */
+   de los botones secundarios; la elegida, como la selección del resto de
+   la app («Tabla / Tablero»): fondo del color principal y letra blanca.
+   Los colores salen de las variables: sirven en modo claro y oscuro. */
 .ayuda-temas {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -4226,14 +4227,9 @@ th[aria-sort="descending"] .orden-columna::after {
   list-style: none;
 }
 
-.ayuda-temas li {
-  display: flex;
-  min-width: 0;
-}
-
 .ayuda-tema-boton {
   display: flex;
-  flex: 1;
+  min-width: 0;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
@@ -4255,10 +4251,19 @@ th[aria-sort="descending"] .orden-columna::after {
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.ayuda-tema-boton:hover {
+.ayuda-tema-boton:hover,
+.ayuda-tema-boton:active {
   background: var(--color-primario-tenue);
   border-color: var(--color-primario-suave);
   color: var(--color-primario-texto-fuerte);
+}
+
+.ayuda-tema-boton[aria-selected="true"],
+.ayuda-tema-boton[aria-selected="true"]:hover,
+.ayuda-tema-boton[aria-selected="true"]:active {
+  background: var(--color-primario);
+  border-color: var(--color-primario);
+  color: var(--color-texto-inverso);
 }
 
 .ayuda-tema-boton:focus-visible {
@@ -4272,59 +4277,32 @@ th[aria-sort="descending"] .orden-columna::after {
   }
 }
 
-@media (max-width: 480px) {
+/* En el celular: las pestañas en 2 columnas arriba y el tema debajo. */
+@media (max-width: 600px) {
   .ayuda-temas {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.4rem;
   }
 }
 
+/* El tema elegido (tabpanel): el contenido directo, sin abrir ni cerrar. */
 .ayuda-tema {
-  margin-bottom: 0.6rem;
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-suave);
   background: var(--color-superficie-alta);
-  scroll-margin-top: 1rem;
 }
 
-.ayuda-tema > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  color: var(--color-titulo);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  list-style: none;
-}
-
-.ayuda-tema > summary::-webkit-details-marker {
+.ayuda-tema[hidden] {
   display: none;
 }
 
-/* Flecha de línea que gira al abrir el tema. */
-.ayuda-tema > summary::after {
-  content: "";
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  background: var(--color-tenue);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-.ayuda-tema[open] > summary {
-  border-bottom: 1px solid var(--color-borde);
-}
-
-.ayuda-tema[open] > summary::after {
-  transform: rotate(180deg);
+.ayuda-tema:focus-visible {
+  outline: 2px solid var(--color-primario-oscuro);
+  outline-offset: 2px;
 }
 
 .ayuda-cuerpo {
-  padding: 0.25rem 1rem 1rem;
+  padding: 0.25rem 1.1rem 1.1rem;
   line-height: 1.6;
 }
 
@@ -4410,10 +4388,6 @@ summary:focus-visible,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-  }
-
-  .ayuda-tema > summary {
-    min-height: 44px;
   }
 }
 

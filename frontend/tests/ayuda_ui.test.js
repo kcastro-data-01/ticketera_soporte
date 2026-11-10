@@ -1,4 +1,5 @@
-/* Ayuda (ayuda.html + ayuda.js): índice arriba y temas plegables.
+/* Ayuda (ayuda.html + ayuda.js): «Temas» como pestañas y solo el tema
+   elegido debajo, sin títulos desplegables.
    Ejecutar con: node --test frontend/tests/ayuda_ui.test.js */
 
 "use strict";
@@ -25,16 +26,32 @@ const TEMAS = [
   ["faq", "Preguntas frecuentes"],
 ];
 
-const tema = (id) => html.slice(html.indexOf(`id="${id}"`), html.indexOf("</details>", html.indexOf(`id="${id}"`)));
+const tema = (id) => html.slice(html.indexOf(`<section class="ayuda-tema" id="tema-${id}"`), html.indexOf("</section>", html.indexOf(`<section class="ayuda-tema" id="tema-${id}"`)));
 // Lo que se ve (sin comentarios ni etiquetas).
 const visible = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]+>/g, " ");
 
-test("el índice enlaza los diez temas en orden y cada tema es plegable", () => {
-  const enlaces = [...html.matchAll(/<li><a class="ayuda-tema-boton" href="#([a-z]+)">([^<]+)<\/a><\/li>/g)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(enlaces, TEMAS);
-  const temas = [...html.matchAll(/<details class="ayuda-tema" id="([a-z]+)"[^>]*>\s*<summary>([^<]+)<\/summary>/g)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(temas, TEMAS);
-  assert.match(html, /<details class="ayuda-tema" id="crear" open>/, "el primero empieza abierto");
+test("«Temas» son diez pestañas en orden, cada una con su panel; sin títulos desplegables", () => {
+  const indice = html.slice(html.indexOf('<nav class="ayuda-indice"'), html.indexOf("</nav>", html.indexOf('<nav class="ayuda-indice"')));
+  assert.match(indice, /<h2 id="ayuda-temas-titulo">Temas<\/h2>\s*<div class="ayuda-temas" role="tablist" aria-labelledby="ayuda-temas-titulo">/);
+  const pestanas = [...indice.matchAll(/<button type="button" role="tab" class="ayuda-tema-boton" id="pestana-([a-z]+)" data-tema="([a-z]+)" aria-controls="tema-([a-z]+)" aria-selected="(true|false)"( tabindex="-1")?>([^<]+)<\/button>/g)]
+    .map((m) => [m[1], m[2], m[3], m[4], m[5], m[6]]);
+  assert.deepEqual(pestanas.map((m) => [m[0], m[5]]), TEMAS);
+  pestanas.forEach((m) => assert.ok(m[0] === m[1] && m[1] === m[2], "cada pestaña controla su tema"));
+  assert.deepEqual(pestanas.map((m) => m[3]), TEMAS.map(([id]) => String(id === "crear")), "al entrar: «Crear un ticket»");
+  assert.deepEqual(pestanas.map((m) => Boolean(m[4])), TEMAS.map(([id]) => id !== "crear"), "solo la elegida en el orden de tabulación");
+  for (const [id] of TEMAS) {
+    assert.doesNotMatch(html, new RegExp(`id="${id}"`), `ningún elemento se llama «${id}»: #${id} no hace saltar la página`);
+  }
+  assert.doesNotMatch(indice, /<li\b|<a\b|<ol\b/, "botones directos dentro del tablist");
+
+  const paneles = [...html.matchAll(/<section class="ayuda-tema" id="tema-([a-z]+)" role="tabpanel" aria-labelledby="pestana-\1" tabindex="0"( hidden)?>\s*<div class="ayuda-cuerpo">/g)];
+  assert.deepEqual(paneles.map((m) => m[1]), TEMAS.map(([id]) => id));
+  assert.deepEqual(paneles.map((m) => Boolean(m[2])), TEMAS.map(([id]) => id !== "crear"), "los demás empiezan ocultos");
+  assert.doesNotMatch(html, /<details\b|<summary\b/, "sin títulos desplegables");
+  const contenido = html.slice(html.indexOf('<section class="ayuda-contenido">'), html.indexOf("</main>"));
+  for (const [, titulo] of TEMAS) {
+    assert.equal(contenido.split(`>${titulo}<`).length - 1, 1, `«${titulo}» una sola vez (en su pestaña)`);
+  }
 });
 
 test("cada tema tiene lo suyo", () => {
@@ -80,39 +97,28 @@ test("lo que funciona hoy está explicado", () => {
   }
 });
 
-test("un enlace del índice abre su tema", () => {
-  const temas = {};
-  const doc = {
-    getElementById: (id) => temas[id] || null,
-    querySelectorAll: () => [],
-  };
-  for (const [id] of TEMAS) {
-    temas[id] = { open: false, classList: { contains: (c) => c === "ayuda-tema" }, scrollIntoView() { this.visto = true; } };
-  }
-  const sandbox = { window: { location: { hash: "" } }, document: doc };
-  vm.runInNewContext(leer("js/ayuda.js"), sandbox);
-  sandbox.abrirTema("correo", doc);
-  assert.equal(temas.correo.open, true);
-  assert.equal(temas.correo.visto, true);
-  assert.equal(sandbox.abrirTema("no-existe", doc), null);
-});
-
-test("«Temas» es una cuadrícula de botones sin números: 5, 3 y 2 columnas", () => {
+test("«Temas» es una cuadrícula de pestañas sin números: 5, 3 y 2 columnas (celular)", () => {
   const indice = html.slice(html.indexOf('<nav class="ayuda-indice"'), html.indexOf("</nav>", html.indexOf('<nav class="ayuda-indice"')));
-  assert.match(indice, /<ul class="ayuda-temas">/);
   assert.doesNotMatch(indice, /<ol\b/, "sin lista numerada");
   assert.equal((indice.match(/class="ayuda-tema-boton"/g) || []).length, 10);
   const css = leer("css/estilos.css");
   assert.match(css, /\.ayuda-temas \{[^}]*display: grid;[^}]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);[^}]*grid-auto-rows: 1fr;[^}]*list-style: none;/);
   assert.match(css, /@media \(max-width: 900px\) \{\s*\.ayuda-temas \{\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
-  assert.match(css, /@media \(max-width: 480px\) \{\s*\.ayuda-temas \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(css, /@media \(max-width: 600px\) \{\s*\.ayuda-temas \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   // Como los botones secundarios: borde suave, fondo claro y se marca al pasar.
   const boton = css.slice(css.indexOf(".ayuda-tema-boton {"), css.indexOf("}", css.indexOf(".ayuda-tema-boton {")));
   assert.match(boton, /border: 1px solid var\(--color-borde-fuerte\);/);
   assert.match(boton, /background: var\(--color-superficie-alta\);/);
   assert.match(boton, /text-align: center;/);
   assert.match(boton, /overflow-wrap: normal;\s*word-break: normal;/, "corta solo entre palabras");
-  assert.match(css, /\.ayuda-tema-boton:hover \{\s*background: var\(--color-primario-tenue\);\s*border-color: var\(--color-primario-suave\);/);
+  assert.match(css, /\.ayuda-tema-boton:hover,\n\.ayuda-tema-boton:active \{\s*background: var\(--color-primario-tenue\);\s*border-color: var\(--color-primario-suave\);/);
+  // La elegida, como la selección del resto de la app («Tabla / Tablero»).
+  assert.match(css, /\.vista-tabs \.vista-tab\.activa \{\s*background: var\(--color-primario\);\s*color: var\(--color-texto-inverso\);/);
+  assert.match(css, /\.ayuda-tema-boton\[aria-selected="true"\],\n\.ayuda-tema-boton\[aria-selected="true"\]:hover,\n\.ayuda-tema-boton\[aria-selected="true"\]:active \{\s*background: var\(--color-primario\);\s*border-color: var\(--color-primario\);\s*color: var\(--color-texto-inverso\);/);
+  // El tema: directo, sin flecha ni título que se abra o cierre.
+  assert.match(css, /\.ayuda-tema\[hidden\] \{\s*display: none;/);
+  assert.match(css, /\.ayuda-tema:focus-visible \{/);
+  assert.doesNotMatch(css, /\.ayuda-tema(\[open\])? > summary|\.ayuda-temas li/);
   assert.match(css, /\.ayuda-tema-boton:focus-visible \{/);
   assert.doesNotMatch(css, /\.ayuda-indice ol/);
 });
@@ -129,30 +135,110 @@ test("ayuda.html sin código inline (CSP)", () => {
   assert.doesNotMatch(sinComentarios, /href="javascript:/);
 });
 
-test("tocar un tema baja hasta él y lo abre si está cerrado", () => {
-  const temas = {};
-  const doc = { getElementById: (id) => temas[id] || null, querySelectorAll: () => [] };
-  for (const [id] of TEMAS) {
-    temas[id] = { open: id === "crear", classList: { contains: (c) => c === "ayuda-tema" },
-      scrollIntoView(opciones) { this.visto = opciones; } };
-  }
+// --- ayuda.js con un DOM de mentira ------------------------------------------------
+
+function montar(hash = "") {
+  const paneles = {};
+  const oyentes = {};
+  let enfocada = null;
+  const pestanas = TEMAS.map(([id]) => {
+    const atributos = { "data-tema": id, "aria-controls": `tema-${id}`, "aria-selected": String(id === "crear") };
+    const eventos = {};
+    return {
+      atributos, eventos, tabIndex: id === "crear" ? 0 : -1,
+      getAttribute: (nombre) => atributos[nombre],
+      setAttribute(nombre, valor) { atributos[nombre] = valor; },
+      addEventListener(tipo, fn) { eventos[tipo] = fn; },
+      focus() { enfocada = this; },
+    };
+  });
+  for (const [id] of TEMAS) paneles[id] = { hidden: id !== "crear" };
+  const doc = {
+    querySelectorAll: (sel) => (sel === '.ayuda-temas [role="tab"]' ? pestanas : []),
+    getElementById: (id) => (id.startsWith("tema-") ? paneles[id.slice(5)] : null) || null,
+  };
   const reemplazos = [];
-  const sandbox = { window: { location: { hash: "" }, history: { replaceState: (_e, _t, url) => reemplazos.push(url) } }, document: doc };
+  const window = {
+    location: { hash },
+    history: { replaceState: (_e, _t, url) => { reemplazos.push(url); } },
+    addEventListener: (tipo, fn) => { oyentes[tipo] = fn; },
+  };
+  const sandbox = { window, document: doc };
   vm.runInNewContext(leer("js/ayuda.js"), sandbox);
-  const enlace = (id) => ({ getAttribute: () => `#${id}` });
-  let prevenido = 0;
-  const evento = { preventDefault: () => { prevenido += 1; } };
+  const abierto = () => TEMAS.map(([id]) => id).filter((id) => !paneles[id].hidden);
+  const elegida = () => pestanas.filter((p) => p.atributos["aria-selected"] === "true").map((p) => p.atributos["data-tema"]);
+  const pestana = (id) => pestanas.find((p) => p.atributos["data-tema"] === id);
+  return { sandbox, doc, window, paneles, pestanas, pestana, reemplazos, oyentes, abierto, elegida, enfocada: () => enfocada };
+}
 
-  sandbox.irATema(evento, enlace("faq"), doc);
-  assert.equal(temas.faq.open, true, "se abre");
-  assert.equal(temas.faq.visto.block, "start", "baja hasta él");
-  assert.equal(prevenido, 1);
-  assert.deepEqual(reemplazos, ["#faq"]);
+test("al entrar se ve «Crear un ticket»; con #tema en la dirección, ese tema", () => {
+  const sin = montar("");
+  sin.sandbox.iniciarAyuda(sin.doc);
+  assert.deepEqual(sin.abierto(), ["crear"]);
+  assert.deepEqual(sin.elegida(), ["crear"]);
+  assert.deepEqual(sin.reemplazos, [], "entrar no cambia la dirección");
 
-  sandbox.irATema(evento, enlace("crear"), doc);
-  assert.equal(temas.crear.open, true, "uno abierto sigue abierto");
-  assert.ok(temas.crear.visto);
+  const correo = montar("#correo");
+  correo.sandbox.iniciarAyuda(correo.doc);
+  assert.deepEqual(correo.abierto(), ["correo"]);
+  assert.deepEqual(correo.elegida(), ["correo"]);
+  assert.equal(correo.pestana("correo").tabIndex, 0);
+  assert.equal(correo.pestana("crear").tabIndex, -1);
 
-  assert.equal(sandbox.irATema(evento, enlace("no-existe"), doc), null);
-  assert.equal(prevenido, 2, "un enlace que no es un tema no se toca");
+  const raro = montar("#no-existe");
+  raro.sandbox.iniciarAyuda(raro.doc);
+  assert.deepEqual(raro.abierto(), ["crear"], "un tema que no existe abre el inicial");
+});
+
+test("tocar una pestaña muestra solo ese tema, la marca y actualiza la dirección", () => {
+  const m = montar("");
+  m.sandbox.iniciarAyuda(m.doc);
+  m.pestana("faq").eventos.click();
+  assert.deepEqual(m.abierto(), ["faq"], "se ocultan los demás");
+  assert.deepEqual(m.elegida(), ["faq"]);
+  assert.equal(m.pestana("faq").tabIndex, 0);
+  assert.ok(m.pestanas.filter((p) => p !== m.pestana("faq")).every((p) => p.tabIndex === -1));
+  m.pestana("roles").eventos.click();
+  assert.deepEqual(m.abierto(), ["roles"]);
+  assert.deepEqual(m.reemplazos, ["#faq", "#roles"]);
+});
+
+test("un enlace a otro tema estando en la ayuda (hashchange) lo abre", () => {
+  const m = montar("");
+  m.sandbox.iniciarAyuda(m.doc);
+  m.window.location.hash = "#adjuntos";
+  m.oyentes.hashchange();
+  assert.deepEqual(m.abierto(), ["adjuntos"]);
+  assert.deepEqual(m.reemplazos, [], "no vuelve a escribir la dirección");
+});
+
+test("teclado: flechas pasan a la vecina (en círculo), Inicio y Fin a los extremos", () => {
+  const m = montar("");
+  m.sandbox.iniciarAyuda(m.doc);
+  let prevenidas = 0;
+  const tecla = (id, key) => m.pestana(id).eventos.keydown({ key, preventDefault: () => { prevenidas += 1; } });
+  tecla("crear", "ArrowRight");
+  assert.deepEqual(m.abierto(), ["lista"]);
+  assert.equal(m.enfocada(), m.pestana("lista"), "el foco pasa a la pestaña");
+  tecla("lista", "ArrowDown");
+  assert.deepEqual(m.abierto(), ["seguimiento"]);
+  tecla("seguimiento", "ArrowUp");
+  tecla("lista", "ArrowLeft");
+  assert.deepEqual(m.abierto(), ["crear"]);
+  tecla("crear", "ArrowLeft");
+  assert.deepEqual(m.abierto(), ["faq"], "de la primera a la última");
+  tecla("faq", "Home");
+  assert.deepEqual(m.abierto(), ["crear"]);
+  tecla("crear", "End");
+  assert.deepEqual(m.abierto(), ["faq"]);
+  assert.equal(prevenidas, 7);
+  assert.equal(tecla("faq", "a"), null, "otras teclas no hacen nada");
+  assert.equal(prevenidas, 7);
+  assert.equal(m.reemplazos.at(-1), "#faq");
+});
+
+test("sin pestañas (otra página) no hace nada", () => {
+  const sandbox = { window: { location: { hash: "" } }, document: { querySelectorAll: () => [], getElementById: () => null } };
+  vm.runInNewContext(leer("js/ayuda.js"), sandbox);
+  assert.equal(sandbox.mostrarTema("crear", sandbox.document), null);
 });

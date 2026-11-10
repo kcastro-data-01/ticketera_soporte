@@ -53,26 +53,28 @@
 
     <main class="contenido">
     <section class="ayuda-contenido">
-      <!-- Índice: un botón por tema; al tocarlo baja hasta él y lo abre
-           (ayuda.js). Sin código inline: la CSP no lo permite. -->
-      <nav class="ayuda-indice" aria-label="Temas de ayuda">
-        <h2>Temas</h2>
-        <ul class="ayuda-temas">
-          <li><a class="ayuda-tema-boton" href="#crear">Crear un ticket</a></li>
-          <li><a class="ayuda-tema-boton" href="#lista">La lista de tickets</a></li>
-          <li><a class="ayuda-tema-boton" href="#seguimiento">Seguimiento</a></li>
-          <li><a class="ayuda-tema-boton" href="#areas">Departamentos</a></li>
-          <li><a class="ayuda-tema-boton" href="#roles">Roles y permisos</a></li>
-          <li><a class="ayuda-tema-boton" href="#adjuntos">Adjuntos</a></li>
-          <li><a class="ayuda-tema-boton" href="#correo">Tickets por correo</a></li>
-          <li><a class="ayuda-tema-boton" href="#avisos">Avisos por correo</a></li>
-          <li><a class="ayuda-tema-boton" href="#asistente">Asistente virtual</a></li>
-          <li><a class="ayuda-tema-boton" href="#faq">Preguntas frecuentes</a></li>
-        </ul>
+      <!-- Temas como pestañas: al tocar un botón se muestra solo ese tema
+           (ayuda.js); la dirección (#correo) dice cuál está abierto. Los
+           paneles se llaman «tema-…» para que el navegador no salte hasta
+           ellos y las pestañas queden a la vista. Sin código inline: la CSP
+           no lo permite. -->
+      <nav class="ayuda-indice" aria-labelledby="ayuda-temas-titulo">
+        <h2 id="ayuda-temas-titulo">Temas</h2>
+        <div class="ayuda-temas" role="tablist" aria-labelledby="ayuda-temas-titulo">
+          <button type="button" role="tab" class="ayuda-tema-boton" id="pestana-crear" data-tema="crear" aria-controls="tema-crear" aria-selected="true">Crear un ticket</button>
+          <button type="button" role="tab" class="ayuda-tema-boton" id="pestana-lista" data-tema="lista" aria-controls="tema-lista" aria-selected="false" tabindex="-1">La lista de tickets</button>
+          <button type="button" role="tab" class="ayuda-tema-boton" id="pestana-seguimiento" data-tema="seguimiento" aria-controls="tema-seguimiento" aria-selected="false" tabindex="-1">Seguimiento</button>
+          <button type="button" role="tab" class="ayuda-tema-boton" id="pestana-areas" data-tema="areas" aria-controls="tema-areas" aria-selected="false" tabindex="-1">Departamentos</button>
+          <button type="button" role="tab" class="ayuda-tema-boton" id="pestana-roles" data-tema="roles" aria-controls="tema-roles" aria-selected="false" tabindex="-1">Roles y permisos</button>
+          <button type="button" role="tab" class="ayuda-tema-boton" id="pestana-adjuntos" data-tema="adjuntos" aria-controls="tema-adjuntos" aria-selected="false" tabindex="-1">Adjuntos</button>
+          <button type="button" role="tab" class="ayuda-tema-boton" id="pestana-correo" data-tema="correo" aria-controls="tema-correo" aria-selected="false" tabindex="-1">Tickets por correo</button>
+          <button type="button" role="tab" class="ayuda-tema-boton" id="pestana-avisos" data-tema="avisos" aria-controls="tema-avisos" aria-selected="false" tabindex="-1">Avisos por correo</button>
+          <button type="button" role="tab" class="ayuda-tema-boton" id="pestana-asistente" data-tema="asistente" aria-controls="tema-asistente" aria-selected="false" tabindex="-1">Asistente virtual</button>
+          <button type="button" role="tab" class="ayuda-tema-boton" id="pestana-faq" data-tema="faq" aria-controls="tema-faq" aria-selected="false" tabindex="-1">Preguntas frecuentes</button>
+        </div>
       </nav>
 
-      <details class="ayuda-tema" id="crear" open>
-        <summary>Crear un ticket</summary>
+      <section class="ayuda-tema" id="tema-crear" role="tabpanel" aria-labelledby="pestana-crear" tabindex="0">
         <div class="ayuda-cuerpo">
           <h3>¿Qué es la ticketera?</h3>
           <p>Es el sistema de IT de American Data Networks para pedir soporte y darle seguimiento: cualquier persona de la empresa crea un ticket y el equipo de IT lo atiende hasta cerrarlo.</p>
@@ -87,10 +89,9 @@
           </ol>
           <p>También se puede crear un ticket escribiendo al buzón de soporte (ver «Tickets por correo»).</p>
         </div>
-      </details>
+      </section>
 
-      <details class="ayuda-tema" id="lista">
-        <summary>La lista de tickets</summary>
+      <section class="ayuda-tema" id="tema-lista" role="tabpanel" aria-labelledby="pestana-lista" tabindex="0" hidden>
         <div class="ayuda-cuerpo">
           <p>En «Tickets» se ven <strong>todos los tickets que cumplen los filtros, sin páginas</strong>. El total («23 tickets») aparece arriba de la lista.</p>
           <h3>Barra de arriba</h3>
@@ -112,10 +113,9 @@
           <p>Los filtros se combinan entre sí y con «Mis tickets», en la tabla y en el tablero. «Limpiar filtros» los borra todos. Las columnas ID, Título, Prioridad, Estado y Fecha de creación se ordenan con un clic en su título.</p>
           <p>El Solicitante ve «Mis solicitudes»: los tickets que creó, con la búsqueda, el estado y la fecha.</p>
         </div>
-      </details>
+      </section>
 
-      <details class="ayuda-tema" id="seguimiento">
-        <summary>Seguimiento</summary>
+      <section class="ayuda-tema" id="tema-seguimiento" role="tabpanel" aria-labelledby="pestana-seguimiento" tabindex="0" hidden>
         <div class="ayuda-cuerpo">
           <h3>El detalle del ticket</h3>
           <p>Al abrir un ticket se ven sus datos (categoría, departamento, asignado, solicitante y fechas), el recorrido de estados, los comentarios, los adjuntos y el historial. Según el rol, también aparecen «Editar», «Asignación», «Cambiar departamento» (solo en Nuevo), «Explicar con IA», «Imprimir» y «Eliminar». Los comentarios quedan firmados con el nombre de quien los escribe.</p>
@@ -160,10 +160,9 @@
           </div>
           <p>«Sistema» en la columna Quién indica registros antiguos, guardados antes de que se identificara a cada usuario. El Técnico y el Administrador también tienen «Historial» en el menú, con los cambios de todos los tickets.</p>
         </div>
-      </details>
+      </section>
 
-      <details class="ayuda-tema" id="areas">
-        <summary>Departamentos</summary>
+      <section class="ayuda-tema" id="tema-areas" role="tabpanel" aria-labelledby="pestana-areas" tabindex="0" hidden>
         <div class="ayuda-cuerpo">
           <p>IT se organiza en cuatro departamentos fijos. Nadie los crea, renombra, desactiva ni borra, tampoco el Administrador.</p>
           <ul>
@@ -181,10 +180,9 @@
             <li><strong>«Sin departamento»</strong>: tickets de antes de los departamentos. Se pueden filtrar en la lista y en las métricas, y pasar a un departamento.</li>
           </ul>
         </div>
-      </details>
+      </section>
 
-      <details class="ayuda-tema" id="roles">
-        <summary>Roles y permisos</summary>
+      <section class="ayuda-tema" id="tema-roles" role="tabpanel" aria-labelledby="pestana-roles" tabindex="0" hidden>
         <div class="ayuda-cuerpo">
           <h3>Roles del sistema</h3>
           <p>El sistema cuenta con 3 roles de usuario:</p>
@@ -229,10 +227,9 @@
           <p id="nota-cerrado"><strong>Un ticket Cerrado es de solo lectura para todos, también para el Administrador</strong>: no se edita, no se reasigna, no se comenta, no se elimina, no cambia de estado y no se le agregan ni quitan adjuntos (sí se descargan). En su detalle se ve la nota «Este ticket está Cerrado y no admite cambios.»</p>
           <p id="nota-asignados">Si a un Solicitante le quedó asignado un ticket de antes, lo sigue viendo y puede comentarlo y cambiarle el estado hasta que un Administrador lo reasigne a alguien de IT.</p>
         </div>
-      </details>
+      </section>
 
-      <details class="ayuda-tema" id="adjuntos">
-        <summary>Adjuntos</summary>
+      <section class="ayuda-tema" id="tema-adjuntos" role="tabpanel" aria-labelledby="pestana-adjuntos" tabindex="0" hidden>
         <div class="ayuda-cuerpo">
           <p>Un ticket puede llevar archivos: una captura del error, una foto del equipo, un PDF o una planilla.</p>
           <ul>
@@ -244,10 +241,9 @@
             <li>Los archivos solo se abren con la sesión iniciada. Subir y eliminar quedan en el historial.</li>
           </ul>
         </div>
-      </details>
+      </section>
 
-      <details class="ayuda-tema" id="correo">
-        <summary>Tickets por correo</summary>
+      <section class="ayuda-tema" id="tema-correo" role="tabpanel" aria-labelledby="pestana-correo" tabindex="0" hidden>
         <div class="ayuda-cuerpo">
           <p>Si el buzón de soporte está activo, la ticketera revisa los correos nuevos y crea un ticket con cada correo que pide ayuda. Regla general: <strong>quien escribe el correo es el solicitante y quien lo recibe, el asignado</strong>.</p>
           <h3>Correos que llegan al buzón</h3>
@@ -277,10 +273,9 @@
             <li>Si alguno no se guarda, el ticket o el comentario se crea igual, queda en el historial y la respuesta automática dice cuáles no se guardaron, con el enlace para subirlos desde la ticketera. En un ticket <code>Cerrado</code> no se guardan.</li>
           </ul>
         </div>
-      </details>
+      </section>
 
-      <details class="ayuda-tema" id="avisos">
-        <summary>Avisos por correo</summary>
+      <section class="ayuda-tema" id="tema-avisos" role="tabpanel" aria-labelledby="pestana-avisos" tabindex="0" hidden>
         <div class="ayuda-cuerpo">
           <p>La ticketera envía estos correos. Quien hace el cambio nunca recibe su propio aviso. Los avisos de asignación, comentarios y cambios de estado se envían si están activados en la configuración de la ticketera.</p>
           <ul>
@@ -290,10 +285,9 @@
             <li><strong>Cambios de estado</strong>: el solicitante y el asignado reciben «El ticket #N pasó a «Estado»», con el estado anterior y el nuevo, quién lo cambió y el motivo, si lo escribió. Si pasó a Cerrado, el correo avisa que ya no admite cambios.</li>
           </ul>
         </div>
-      </details>
+      </section>
 
-      <details class="ayuda-tema" id="asistente">
-        <summary>Asistente virtual</summary>
+      <section class="ayuda-tema" id="tema-asistente" role="tabpanel" aria-labelledby="pestana-asistente" tabindex="0" hidden>
         <div class="ayuda-cuerpo">
           <p>El botón del asistente está abajo a la derecha en todas las pantallas. Responde preguntas sobre la ticketera y sobre los tickets que su rol puede ver: por ejemplo, cuántos tickets hay pendientes o en qué estado está uno.</p>
           <ul>
@@ -303,10 +297,9 @@
             <li>Las respuestas automáticas pueden contener errores: verifique la información importante en el detalle del ticket.</li>
           </ul>
         </div>
-      </details>
+      </section>
 
-      <details class="ayuda-tema" id="faq">
-        <summary>Preguntas frecuentes</summary>
+      <section class="ayuda-tema" id="tema-faq" role="tabpanel" aria-labelledby="pestana-faq" tabindex="0" hidden>
         <div class="ayuda-cuerpo">
           <dl class="ayuda-preguntas">
             <dt>¿Por qué no veo algunas opciones del menú, como Métricas o Usuarios?</dt>
@@ -327,7 +320,7 @@
             <dd>En el detalle del ticket, use el botón «Imprimir»: la hoja sale sin menú ni botones.</dd>
           </dl>
         </div>
-      </details>
+      </section>
     </section>
     </main>
 
