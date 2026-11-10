@@ -51,14 +51,6 @@
   --color-marca: #0041ff;
   --color-menu-texto: #c4cff5;
   --color-menu-tenue: #8fa3e8;
-  /* Títulos de sección del menú: más tenues (4,9:1 sobre el marino). */
-  --color-menu-titulo: #7488cf;
-  /* Fondos translúcidos del menú: al pasar el mouse, la página actual
-     (píldora) y la tarjeta del usuario. Sirven en claro y en oscuro. */
-  --color-menu-hover: rgba(255, 255, 255, 0.06);
-  --color-menu-activo: rgba(125, 155, 255, 0.18);
-  --color-menu-tarjeta: rgba(255, 255, 255, 0.05);
-  --radio-menu: 8px;
 
   /* Bordes */
   --color-borde: #dde3ee;
@@ -1458,46 +1450,43 @@ body.app {
   flex-shrink: 0;
   width: 248px;
   height: 100vh;
-  padding: 1rem 0.75rem;
+  padding: 1.25rem 0.9rem;
   background: var(--color-marino);
   color: var(--color-texto-inverso);
   overflow-y: auto;
 }
 
-/* Encabezado compacto: logo, nombre y (a la derecha, .boton-plegar) el
-   botón de contraer en una fila; «Sistema de tickets» debajo, más chico. */
 .marca {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  min-height: 30px;
-  padding: 0 calc(24px + 0.4rem) 0 0.25rem;
-  margin-bottom: 1.5rem;
+  gap: 0.75rem;
+  padding: 0 0.4rem 1.1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--color-texto-inverso);
   text-decoration: none;
 }
 
 .marca-logo {
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .marca-nombre {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.92rem;
   font-weight: 600;
   line-height: 1.2;
-  white-space: nowrap;
 }
 
 .marca-sub {
   display: block;
-  margin-top: 0.1rem;
-  font-size: 0.62rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
+  margin-top: 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-menu-tenue);
 }
@@ -1505,20 +1494,22 @@ body.app {
 .menu {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.2rem;
   flex: 1;
 }
 
-/* Secciones del menú (Gestión, Administración, Soporte): título chico y
-   tenue en mayúsculas; entre secciones, solo espacio (sin líneas). */
+/* Secciones del menú (Gestión, Administración, Soporte): título chico en
+   mayúsculas y una línea fina entre secciones. */
 .menu-seccion {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.2rem;
 }
 
 .menu-seccion + .menu-seccion {
-  margin-top: 1.35rem;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* Si el rol no ve ningún enlace de la sección, tampoco se ve su título. */
@@ -1527,97 +1518,90 @@ body.app {
 }
 
 .menu-titulo {
-  margin: 0 0 0.3rem;
-  padding: 0 0.75rem;
-  font-size: 0.625rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  margin: 0 0 0.2rem;
+  padding: 0 0.8rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   line-height: 1.4;
   text-transform: uppercase;
   white-space: nowrap;
-  color: var(--color-menu-titulo);
+  color: var(--color-menu-tenue);
 }
 
 .menu-enlace {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.75rem;
   min-height: 40px;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radio-menu);
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--radio-suave);
   color: var(--color-menu-texto);
   font-size: 0.92rem;
   font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
-  transition: background-color 0.18s ease, color 0.18s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-/* Todos los íconos del mismo tamaño, alineados; más tenues que el texto
-   y blancos al pasar el mouse o en la página actual. */
 .menu-enlace .icono {
   width: 20px;
   height: 20px;
-  stroke-width: 1.7;
-  color: var(--color-menu-tenue);
-  transition: color 0.18s ease;
 }
 
 .menu-enlace:hover {
-  background: var(--color-menu-hover);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--color-texto-inverso);
 }
 
-.menu-enlace:hover .icono,
-.menu-enlace.activo .icono {
-  color: var(--color-texto-inverso);
-}
-
-/* Página actual: píldora de fondo suave (sin barra a la izquierda). */
+/* Página actual: fondo suave y barra de color a la izquierda. */
 .menu-enlace.activo {
-  background: var(--color-menu-activo);
+  background: rgba(255, 255, 255, 0.1);
   color: var(--color-texto-inverso);
   font-weight: 600;
 }
 
-/* Contador junto a «Tickets» (auth.js): pastilla chica y discreta,
-   empujada a la derecha del enlace. */
+.menu-enlace.activo::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-primario-claro);
+}
+
+/* Contador junto a «Tickets» (auth.js): etiqueta chica con el color
+   principal, empujada a la derecha del enlace. */
 .menu-enlace .menu-contador {
   display: inline-grid;
   place-items: center;
-  min-width: 18px;
-  height: 18px;
+  min-width: 20px;
+  height: 20px;
   margin-left: auto;
-  padding: 0 0.35rem;
+  padding: 0 0.4rem;
   border-radius: var(--radio-pill);
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--color-menu-texto);
-  font-size: 0.66rem;
+  background: var(--color-primario);
+  color: var(--color-texto-inverso);
+  font-size: 0.72rem;
   font-weight: 600;
   line-height: 1;
 }
 
-.menu-enlace.activo .menu-contador {
-  background: rgba(255, 255, 255, 0.16);
-  color: var(--color-texto-inverso);
-}
-
-/* Botón para achicar el menú (solo íconos): arriba a la derecha, en la
-   fila de la marca. */
+/* Botón para achicar el menú (solo íconos). */
 .boton-plegar {
-  position: absolute;
-  top: calc(1rem + 3px);
-  right: 0.75rem;
   min-height: 0;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  margin: 0;
+  align-self: flex-end;
+  width: 28px;
+  height: 28px;
+  margin: -0.35rem 0.2rem 0.6rem 0;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radio-menu);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radio-suave);
   background: transparent;
   color: var(--color-menu-tenue);
   cursor: pointer;
@@ -1635,8 +1619,8 @@ body.app {
 }
 
 .boton-plegar .icono {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
 
 @media (min-width: 901px) {
@@ -1647,21 +1631,14 @@ body.app {
 
   body.menu-plegado .barra-lateral {
     width: 76px;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
   }
 
-  /* Plegado: el logo arriba y el botón debajo, centrados. */
   body.menu-plegado .marca {
     justify-content: center;
-    min-height: 0;
-    margin-bottom: 0.6rem;
-    padding: 0;
-  }
-
-  body.menu-plegado .marca-logo {
-    width: 34px;
-    height: 34px;
+    padding-left: 0;
+    padding-right: 0;
   }
 
   body.menu-plegado .marca-texto,
@@ -1671,9 +1648,8 @@ body.app {
   }
 
   body.menu-plegado .boton-plegar {
-    position: static;
     align-self: center;
-    margin: 0 0 1.25rem;
+    margin-right: 0;
     transform: rotate(180deg);
   }
 
@@ -1687,20 +1663,19 @@ body.app {
   body.menu-plegado .menu-enlace .menu-contador {
     display: inline-grid;
     position: absolute;
-    top: 3px;
-    right: 5px;
-    min-width: 15px;
-    height: 15px;
-    padding: 0 0.2rem;
-    background: var(--color-primario);
-    color: var(--color-texto-inverso);
-    font-size: 0.6rem;
+    top: 2px;
+    right: 6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 0.25rem;
+    font-size: 0.65rem;
   }
 
   /* Plegado: solo el círculo de iniciales; el menú se abre igual. */
   body.menu-plegado .menu-usuario-boton {
     justify-content: center;
-    padding: 0.4rem 0;
+    padding-left: 0;
+    padding-right: 0;
   }
 
   body.menu-plegado .menu-usuario-datos,
@@ -2021,23 +1996,34 @@ body.app {
     flex: 1;
     padding: 0;
     margin: 0;
+    border: 0;
   }
 
   .marca-logo {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
   }
 
   /* El menú lateral va arriba: el usuario queda junto a la marca, sin
      línea de separación, y su menú se abre hacia abajo a la derecha. */
   .barra-lateral .menu-usuario {
     margin: 0;
+    padding: 0;
+    border: 0;
   }
 
-  /* Arriba, junto a la marca, sin el fondo de tarjeta. */
   .barra-lateral .menu-usuario-boton {
     width: auto;
-    background: transparent;
+  }
+
+  .menu-usuario-boton.activo::before {
+    top: auto;
+    bottom: 0;
+    left: 22%;
+    right: 22%;
+    width: auto;
+    height: 3px;
+    border-radius: var(--radio-etiqueta) var(--radio-etiqueta) 0 0;
   }
 
   .barra-lateral .menu-usuario-lista {
@@ -2051,12 +2037,10 @@ body.app {
     order: 3;
     flex: 1 0 100%;
     flex-direction: row;
-    gap: 0.3rem;
-    padding-top: 0.25rem;
     overflow-x: auto;
   }
 
-  /* Arriba, en una fila: los enlaces seguidos, sin títulos. */
+  /* Arriba, en una fila: los enlaces seguidos, sin títulos ni líneas. */
   .menu-seccion {
     display: contents;
   }
@@ -2074,6 +2058,15 @@ body.app {
     display: none;
   }
 
+  .menu-enlace.activo::before {
+    top: auto;
+    bottom: 0;
+    left: 22%;
+    right: 22%;
+    width: auto;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+  }
 
   .app .cabecera,
   .app .contenido,
@@ -3574,12 +3567,13 @@ td.con-avatar {
 }
 
 /* ===== Usuario abajo del menú lateral =====
-   Tarjeta redondeada, con fondo apenas más claro que el menú y sin línea
-   arriba: iniciales, nombre y rol; su menú («Mi cuenta», «Cerrar
-   sesión») se abre hacia arriba. */
+   Botón con iniciales, nombre y rol en claro sobre el azul; su menú
+   («Mi cuenta», «Cerrar sesión») se abre hacia arriba. */
 .menu-usuario {
   position: relative;
-  margin-top: var(--espaciado-lg);
+  margin-top: var(--espaciado-md);
+  padding-top: var(--espaciado-md);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .menu-usuario-boton {
@@ -3588,10 +3582,10 @@ td.con-avatar {
   gap: 0.6rem;
   width: 100%;
   min-height: 40px;
-  padding: 0.5rem 0.6rem;
+  padding: 0.35rem 0.5rem;
   border: 1px solid transparent;
-  border-radius: 10px;
-  background: var(--color-menu-tarjeta);
+  border-radius: var(--radio-suave);
+  background: transparent;
   color: var(--color-texto-inverso);
   font-weight: 400;
   line-height: inherit;
@@ -3602,14 +3596,24 @@ td.con-avatar {
 .menu-usuario-boton:active,
 .menu-usuario-boton[aria-expanded="true"] {
   border-color: transparent;
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.08);
 }
 
-/* En «Mi cuenta»: resaltado como página actual, con la misma píldora que
-   los enlaces. */
+/* En «Mi cuenta»: resaltado como página actual, igual que los enlaces. */
 .menu-usuario-boton.activo {
   position: relative;
-  background: var(--color-menu-activo);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.menu-usuario-boton.activo::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 0 var(--radio-etiqueta) var(--radio-etiqueta) 0;
+  background: var(--color-primario-claro);
 }
 
 .menu-usuario-boton:focus-visible {

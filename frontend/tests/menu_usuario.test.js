@@ -129,8 +129,7 @@ test("«Mi cuenta» no está en la lista del menú lateral, solo en el menú del
     const nav = leer(pagina).match(/<nav class="menu"[\s\S]*?<\/nav>/)[0];
     assert.doesNotMatch(nav, /cuenta\.html|Mi cuenta/, pagina);
   }
-  assert.match(css, /\n\.menu-usuario-boton\.activo \{[^}]*background: var\(--color-menu-activo\);/, "la misma píldora que los enlaces");
-  assert.doesNotMatch(css, /\.menu-usuario-boton\.activo::before/, "sin barra de color");
+  assert.match(css, /\.menu-usuario-boton\.activo::before \{[^}]*background: var\(--color-primario-claro\);/, "barra de color como los enlaces");
 });
 
 test("sin sesión o sin menú lateral (login) no se agrega", () => {
