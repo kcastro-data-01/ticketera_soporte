@@ -123,6 +123,14 @@ test("«Temas» es una cuadrícula de pestañas sin números: 5, 3 y 2 columnas 
   assert.doesNotMatch(css, /\.ayuda-indice ol/);
 });
 
+test("ayuda.js con ?v= (sin copias viejas en el navegador), diferido y después de auth.js", () => {
+  const scripts = [...html.replace(/<!--[\s\S]*?-->/g, "").matchAll(/<script src="([^"]+)"( defer)?><\/script>/g)].map((m) => [m[1], Boolean(m[2])]);
+  const ayuda = scripts.findIndex(([src]) => src.startsWith("js/ayuda.js"));
+  assert.match(scripts[ayuda][0], /^js\/ayuda\.js\?v=[\w-]+$/);
+  assert.equal(scripts[ayuda][1], true, "defer");
+  assert.ok(scripts.findIndex(([src]) => src === "js/auth.js") < ayuda, "auth.js antes");
+});
+
 test("ayuda.html sin código inline (CSP)", () => {
   const sinComentarios = html.replace(/<!--[\s\S]*?-->/g, "");
   for (const script of sinComentarios.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {

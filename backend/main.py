@@ -76,5 +76,19 @@ app.include_router(cron_router)
 # keeps its priority over this catch-all mount. On Vercel the CDN serves the
 # frontend (vercel.json) and the folder is not inside the function.
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+
+
+class FrontendSinCopiasViejas(StaticFiles):
+    """El frontend con ``Cache-Control: no-cache``: el navegador guarda la
+    copia pero la revalida en cada visita (con el ETag, 304 si no cambió).
+    Sin este encabezado el navegador puede seguir usando un ``.js`` viejo
+    con el HTML nuevo (pasó con ayuda.js: los botones no hacían nada)."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers.setdefault("Cache-Control", "no-cache")
+        return response
+
+
 if FRONTEND_DIR.is_dir():
-    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+    app.mount("/", FrontendSinCopiasViejas(directory=str(FRONTEND_DIR), html=True), name="frontend")
