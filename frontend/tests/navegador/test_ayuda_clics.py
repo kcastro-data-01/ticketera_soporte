@@ -101,8 +101,8 @@ def test_ayuda_js_se_carga_diferido_con_version_y_sin_errores(pagina):
     assert re.fullmatch(r"js/ayuda\.js\?v=[\w-]+", src), src
     assert pagina.evaluate("document.querySelector('script[src*=\"js/ayuda.js\"]').defer") is True
     assert pagina.scripts.get(src.split("js/")[1]) == 200
-    orden = pagina.evaluate("[...document.scripts].map(s => s.getAttribute('src'))")
-    assert orden.index("js/auth.js") < orden.index(src), "auth.js antes que ayuda.js"
+    orden = pagina.evaluate("[...document.scripts].map(s => (s.getAttribute('src') || '').split('?')[0])")
+    assert orden.index("js/auth.js") < orden.index("js/ayuda.js"), "auth.js antes que ayuda.js"
     assert pagina.evaluate("typeof iniciarAyuda") == "function"
     assert pagina.errores == []
 

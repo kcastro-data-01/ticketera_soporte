@@ -12,7 +12,7 @@ const vm = require("node:vm");
 const raiz = path.join(__dirname, "..");
 const authSource = fs.readFileSync(path.join(raiz, "js", "auth.js"), "utf8");
 const adjSource = fs.readFileSync(path.join(raiz, "js", "adjuntos.js"), "utf8");
-const detalleHtml = fs.readFileSync(path.join(raiz, "detalle.html"), "utf8");
+const detalleHtml = fs.readFileSync(path.join(raiz, "detalle.html"), "utf8").replace(/\?v=[\w-]+"/g, '"');
 const detalleJs = fs.readFileSync(path.join(raiz, "js", "detalle.js"), "utf8");
 
 let enfocado = null;

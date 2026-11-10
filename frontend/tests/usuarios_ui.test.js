@@ -662,3 +662,13 @@ test("tablet y celular: cada usuario es una tarjeta con la etiqueta de cada dato
   assert.match(bloque, /\.listado\.tabla-usuarios tbody td:not\(\.celda-nombre\)::before \{\s*content: attr\(data-label\);/);
   assert.doesNotMatch(bloque, /celda-nombre::before/, "no tapa las iniciales");
 });
+
+test("cada id que busca usuarios.js existe en usuarios.html (ninguno desapareció)", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "usuarios.html"), "utf8");
+  const ids = [...usuariosSource.matchAll(/getElementById\("([a-z-]+)"\)/g)].map((m) => m[1]);
+  assert.ok(ids.length >= 20, ids.join(", "));
+  for (const id of ids) {
+    assert.match(html, new RegExp(`id="${id}"`), id);
+  }
+  assert.doesNotMatch(usuariosSource, /seccion-editar|seccionEditar|limpiar-usuario/, "nada de la página vieja");
+});

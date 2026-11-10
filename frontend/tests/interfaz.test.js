@@ -151,7 +151,7 @@ test("tema: si la cabecera no tiene zona de acciones, se crea", () => {
 test("todas las páginas aplican el tema guardado en el <head>", () => {
   const dir = path.join(__dirname, "..");
   for (const f of fs.readdirSync(dir).filter((n) => n.endsWith(".html"))) {
-    const html = fs.readFileSync(path.join(dir, f), "utf8");
+    const html = fs.readFileSync(path.join(dir, f), "utf8").replace(/\?v=[\w-]+"/g, '"');
     const cabeza = html.slice(0, html.indexOf("</head>"));
     // Sin defer: tiene que correr antes de pintar.
     assert.match(cabeza, /<script src="js\/tema\.js"><\/script>/, f);

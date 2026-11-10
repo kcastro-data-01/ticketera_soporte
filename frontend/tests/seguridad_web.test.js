@@ -25,7 +25,7 @@ function publicados(dir = FRONTEND) {
 
 test("ninguna página tiene scripts, estilos ni manejadores inline", () => {
   for (const pagina of paginas) {
-    const html = fs.readFileSync(path.join(FRONTEND, pagina), "utf8");
+    const html = fs.readFileSync(path.join(FRONTEND, pagina), "utf8").replace(/\?v=[\w-]+"/g, '"');
     assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/, `${pagina}: <script> inline`);
     assert.doesNotMatch(html, /<style[\s>]/, `${pagina}: <style>`);
     assert.doesNotMatch(html, /\sstyle="/, `${pagina}: atributo style`);
@@ -36,7 +36,7 @@ test("ninguna página tiene scripts, estilos ni manejadores inline", () => {
 
 test("los scripts externos usan versión fija y hash de integridad", () => {
   for (const pagina of paginas) {
-    const html = fs.readFileSync(path.join(FRONTEND, pagina), "utf8");
+    const html = fs.readFileSync(path.join(FRONTEND, pagina), "utf8").replace(/\?v=[\w-]+"/g, '"');
     for (const [etiqueta] of html.matchAll(/<script[^>]*src="https?:[^>]*>/g)) {
       assert.match(etiqueta, /integrity="sha384-[^"]+"/, `${pagina}: ${etiqueta}`);
       assert.match(etiqueta, /crossorigin="anonymous"/, `${pagina}: ${etiqueta}`);
@@ -125,7 +125,7 @@ test("cada página carga sus guardas con guardia.js, sin defer", () => {
     "cuenta.html": [""], "detalle.html": [""], "ayuda.html": [""],
   };
   for (const [pagina, permisos] of Object.entries(esperadas)) {
-    const html = fs.readFileSync(path.join(FRONTEND, pagina), "utf8");
+    const html = fs.readFileSync(path.join(FRONTEND, pagina), "utf8").replace(/\?v=[\w-]+"/g, '"');
     const guardas = [...html.matchAll(/<script src="js\/guardia\.js"(?: data-permiso="([a-z_]+)")?><\/script>/g)];
     assert.deepEqual(guardas.map((m) => m[1] || ""), permisos, pagina);
   }

@@ -10,7 +10,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const carpeta = path.join(__dirname, "..");
-const leer = (archivo) => fs.readFileSync(path.join(carpeta, archivo), "utf8");
+const leer = (archivo) => fs.readFileSync(path.join(carpeta, archivo), "utf8").replace(/\?v=[\w-]+"/g, '"');
 const PAGINAS = fs.readdirSync(carpeta).filter((f) => f.endsWith(".html"));
 const FUENTE = '"Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif';
 

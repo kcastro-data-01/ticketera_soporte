@@ -14,7 +14,7 @@ const vm = require("node:vm");
 const authSource = fs.readFileSync(path.join(__dirname, "..", "js", "auth.js"), "utf8");
 const crearSource = fs.readFileSync(path.join(__dirname, "..", "js", "crear.js"), "utf8");
 const adjSource = fs.readFileSync(path.join(__dirname, "..", "js", "adjuntos.js"), "utf8");
-const crearHtml = fs.readFileSync(path.join(__dirname, "..", "crear.html"), "utf8");
+const crearHtml = fs.readFileSync(path.join(__dirname, "..", "crear.html"), "utf8").replace(/\?v=[\w-]+"/g, '"');
 
 function nodo(extra = {}) {
   return {

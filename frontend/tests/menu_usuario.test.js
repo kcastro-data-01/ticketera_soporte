@@ -11,7 +11,7 @@ const test = require("node:test");
 const vm = require("node:vm");
 
 const authSource = fs.readFileSync(path.join(__dirname, "..", "js", "auth.js"), "utf8");
-const leer = (archivo) => fs.readFileSync(path.join(__dirname, "..", archivo), "utf8");
+const leer = (archivo) => fs.readFileSync(path.join(__dirname, "..", archivo), "utf8").replace(/\?v=[\w-]+"/g, '"');
 const css = leer("css/estilos.css");
 const PAGINAS_CON_MENU = fs.readdirSync(path.join(__dirname, ".."))
   .filter((f) => f.endsWith(".html") && leer(f).includes('<aside class="barra-lateral">'));

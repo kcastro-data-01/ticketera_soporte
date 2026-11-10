@@ -12,7 +12,7 @@ const test = require("node:test");
 const vm = require("node:vm");
 
 const carpeta = path.join(__dirname, "..");
-const leer = (archivo) => fs.readFileSync(path.join(carpeta, archivo), "utf8");
+const leer = (archivo) => fs.readFileSync(path.join(carpeta, archivo), "utf8").replace(/\?v=[\w-]+"/g, '"');
 
 function nodo(tag = "") {
   return {
