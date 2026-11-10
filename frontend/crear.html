@@ -61,92 +61,95 @@
     </header>
 
     <main class="contenido">
-      <form id="form-crear" class="filtros formulario formulario-crear" novalidate>
-        <label class="campo">
-          <span>Título *</span>
-          <input
-            type="text"
-            id="title"
-            name="title"
-            required
-            maxlength="200"
-            placeholder="Resumen breve del ticket"
-            aria-describedby="ayuda-titulo"
-          >
-          <small id="ayuda-titulo" class="ayuda-campo">Un resumen corto, por ejemplo: «La impresora del 2.º piso no imprime».</small>
-        </label>
+      <!-- Dos columnas en escritorio: a la izquierda qué pasa (título y
+           descripción); a la derecha cómo se clasifica (departamento,
+           categoría, prioridad) y los adjuntos. En tablet y celular, una sola
+           columna. Los ejemplos van en el placeholder. -->
+      <form id="form-crear" class="filtros formulario formulario-crear formulario-ticket" novalidate>
+        <div class="crear-columnas">
+          <div class="crear-columna crear-principal">
+            <label class="campo">
+              <span>Título *</span>
+              <input
+                type="text"
+                id="title"
+                name="title"
+                required
+                maxlength="200"
+                placeholder="Ej.: La impresora del 2.º piso no imprime"
+              >
+            </label>
 
-        <label class="campo">
-          <span>Descripción *</span>
-          <textarea
-            id="description"
-            name="description"
-            required
-            placeholder="Detalle del problema o de la solicitud"
-            aria-describedby="ayuda-descripcion"
-          ></textarea>
-          <small id="ayuda-descripcion" class="ayuda-campo">Indique qué sucede, desde cuándo, qué mensaje aparece y qué acciones realizó.</small>
-        </label>
-
-        <!-- Departamento (obligatorio; en el código «área»): crear.js lo llena con los 4 fijos;
-             debajo, qué atiende cada una. -->
-        <div class="campo">
-          <label for="area"><span>Departamento *</span></label>
-          <select id="area" name="area" required aria-describedby="ayuda-area">
-            <option value="">Cargando departamentos…</option>
-          </select>
-          <ul id="ayuda-area" class="ayuda-campo ayuda-areas">
-            <li><strong>Soporte IT</strong>: computadoras, impresoras, programas.</li>
-            <li><strong>Redes e Infraestructura</strong>: internet, wifi, servidores, VPN.</li>
-            <li><strong>Ciberseguridad</strong>: accesos, contraseñas, cuentas, incidentes de seguridad.</li>
-            <li><strong>Programación</strong>: sistemas internos, Odoo, desarrollos y reportes.</li>
-          </ul>
-        </div>
-
-        <div class="campos-fila">
-          <label class="campo">
-            <span>Categoría</span>
-            <select id="category" name="category" aria-describedby="ayuda-categoria">
-              <option value="Hardware">Hardware</option>
-              <option value="Software">Software</option>
-              <option value="Red">Red</option>
-              <option value="Accesos">Accesos</option>
-            </select>
-            <small id="ayuda-categoria" class="ayuda-campo">Hardware: equipos · Software: programas · Red: internet y VPN · Accesos: usuarios y contraseñas.</small>
-          </label>
-
-          <!-- Prioridad como botones de colores; el valor va en #priority. -->
-          <fieldset class="campo campo-prioridad" aria-describedby="ayuda-prioridad">
-            <legend>Prioridad</legend>
-            <div class="opciones-prioridad">
-              <label class="opcion-prioridad prioridad-baja"><input type="radio" name="opcion-prioridad" value="Baja"><span>Baja</span></label>
-              <label class="opcion-prioridad prioridad-media"><input type="radio" name="opcion-prioridad" value="Media" checked><span>Media</span></label>
-              <label class="opcion-prioridad prioridad-alta"><input type="radio" name="opcion-prioridad" value="Alta"><span>Alta</span></label>
-              <label class="opcion-prioridad prioridad-critica"><input type="radio" name="opcion-prioridad" value="Crítica"><span>Crítica</span></label>
-            </div>
-            <input type="hidden" id="priority" name="priority" value="Media">
-            <small id="ayuda-prioridad" class="ayuda-campo">Crítica solo si nadie puede trabajar o el servicio está caído.</small>
-          </fieldset>
-        </div>
-
-        <!-- Adjuntos (opcional): se suben uno por uno después de crear el
-             ticket (js/crear.js con las funciones de js/adjuntos.js).
-             «Sacar foto» solo aparece en pantallas táctiles. -->
-        <div class="campo campo-adjuntos" role="group" aria-labelledby="crear-adj-titulo">
-          <span id="crear-adj-titulo">Adjuntos (opcional)</span>
-          <div class="acciones">
-            <button type="button" id="crear-adj-subir" class="secundario" aria-describedby="ayuda-adjuntos">Adjuntar archivos</button>
-            <button type="button" id="crear-adj-foto" class="secundario" hidden>Sacar foto</button>
-            <input type="file" id="crear-adj-archivos" multiple hidden
-                   accept=".jpg,.jpeg,.png,.pdf,.docx,.xlsx,.txt,image/jpeg,image/png,application/pdf,text/plain">
-            <input type="file" id="crear-adj-camara" accept="image/*" capture="environment" hidden>
+            <label class="campo campo-descripcion">
+              <span>Descripción *</span>
+              <textarea
+                id="description"
+                name="description"
+                required
+                placeholder="Qué sucede, desde cuándo, qué mensaje aparece y qué intentó."
+              ></textarea>
+            </label>
           </div>
-          <small id="ayuda-adjuntos" class="ayuda-campo">jpg, png, pdf, docx, xlsx o txt; hasta 4 MB cada uno y 10 por ticket. Las fotos grandes se achican solas.</small>
-          <p id="crear-adj-estado" class="estado" role="status" aria-live="polite" hidden></p>
-          <ul id="crear-adj-lista" class="adjuntos-lista adjuntos-elegidos" aria-label="Archivos elegidos" hidden></ul>
+
+          <div class="crear-columna crear-lateral">
+            <!-- Departamento (obligatorio; en el código «área»): crear.js lo
+                 llena con los 4 fijos; debajo, qué atiende cada uno. -->
+            <div class="campo">
+              <label for="area"><span>Departamento *</span></label>
+              <select id="area" name="area" required aria-describedby="ayuda-area">
+                <option value="">Cargando departamentos…</option>
+              </select>
+              <ul id="ayuda-area" class="ayuda-campo ayuda-areas">
+                <li><strong>Soporte IT</strong>: computadoras, impresoras, programas.</li>
+                <li><strong>Redes e Infraestructura</strong>: internet, wifi, servidores, VPN.</li>
+                <li><strong>Ciberseguridad</strong>: accesos, contraseñas, cuentas, incidentes de seguridad.</li>
+                <li><strong>Programación</strong>: sistemas internos, Odoo, desarrollos y reportes.</li>
+              </ul>
+            </div>
+
+            <label class="campo">
+              <span>Categoría</span>
+              <select id="category" name="category">
+                <option value="Hardware">Hardware</option>
+                <option value="Software">Software</option>
+                <option value="Red">Red</option>
+                <option value="Accesos">Accesos</option>
+              </select>
+            </label>
+
+            <!-- Prioridad como botones de colores; el valor va en #priority. -->
+            <fieldset class="campo campo-prioridad" aria-describedby="ayuda-prioridad">
+              <legend>Prioridad</legend>
+              <div class="opciones-prioridad">
+                <label class="opcion-prioridad prioridad-baja"><input type="radio" name="opcion-prioridad" value="Baja"><span>Baja</span></label>
+                <label class="opcion-prioridad prioridad-media"><input type="radio" name="opcion-prioridad" value="Media" checked><span>Media</span></label>
+                <label class="opcion-prioridad prioridad-alta"><input type="radio" name="opcion-prioridad" value="Alta"><span>Alta</span></label>
+                <label class="opcion-prioridad prioridad-critica"><input type="radio" name="opcion-prioridad" value="Crítica"><span>Crítica</span></label>
+              </div>
+              <input type="hidden" id="priority" name="priority" value="Media">
+              <small id="ayuda-prioridad" class="ayuda-campo">Crítica: nadie puede trabajar o el servicio está caído.</small>
+            </fieldset>
+
+            <!-- Adjuntos (opcional): se suben uno por uno después de crear el
+                 ticket (js/crear.js con las funciones de js/adjuntos.js).
+                 «Sacar foto» solo aparece en pantallas táctiles. -->
+            <div class="campo campo-adjuntos" role="group" aria-labelledby="crear-adj-titulo">
+              <span id="crear-adj-titulo">Adjuntos (opcional)</span>
+              <div class="acciones">
+                <button type="button" id="crear-adj-subir" class="secundario" aria-describedby="ayuda-adjuntos">Adjuntar archivos</button>
+                <button type="button" id="crear-adj-foto" class="secundario" hidden>Sacar foto</button>
+                <input type="file" id="crear-adj-archivos" multiple hidden
+                       accept=".jpg,.jpeg,.png,.pdf,.docx,.xlsx,.txt,image/jpeg,image/png,application/pdf,text/plain">
+                <input type="file" id="crear-adj-camara" accept="image/*" capture="environment" hidden>
+              </div>
+              <small id="ayuda-adjuntos" class="ayuda-campo">Hasta 4 MB cada uno y 10 por ticket.</small>
+              <p id="crear-adj-estado" class="estado" role="status" aria-live="polite" hidden></p>
+              <ul id="crear-adj-lista" class="adjuntos-lista adjuntos-elegidos" aria-label="Archivos elegidos" hidden></ul>
+            </div>
+          </div>
         </div>
 
-        <div class="acciones">
+        <div class="acciones acciones-crear">
           <button type="submit" id="guardar">Crear ticket</button>
         </div>
       </form>

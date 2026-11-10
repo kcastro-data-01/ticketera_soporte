@@ -88,9 +88,14 @@ function getElements() {
     area: document.getElementById("area"),
     crear: document.getElementById("crear"),
     usuariosEstado: document.getElementById("usuarios-estado"),
+    estadoPagina: document.getElementById("estado-pagina"),
+    dialogo: document.getElementById("dialogo-usuario"),
+    dialogoTitulo: document.getElementById("dialogo-usuario-titulo"),
+    abrirAgregar: document.getElementById("abrir-agregar-usuario"),
+    cancelarUsuario: document.getElementById("cancelar-usuario"),
+    cerrarDialogo: document.getElementById("cerrar-dialogo-usuario"),
     tabla: document.getElementById("tabla-usuarios"),
     cuerpo: document.getElementById("cuerpo-usuarios"),
-    seccionEditar: document.getElementById("seccion-editar"),
     formEditar: document.getElementById("form-editar-usuario"),
     editarId: document.getElementById("editar-id"),
     editarNombre: document.getElementById("editar-nombre"),
@@ -104,11 +109,68 @@ function getElements() {
   };
 }
 
+/* Aviso dentro de la ventana «Agregar usuario» (errores al agregar). */
 function showStatus(message, type) {
   const elements = getElements();
   elements.estadoUsuario.textContent = message;
   elements.estadoUsuario.className = type ? `estado ${type}` : "estado";
   elements.estadoUsuario.hidden = false;
+}
+
+/* Aviso de la página, arriba de la tabla: usuario agregado, actualizado,
+   desactivado o reactivado (y los errores de esas acciones). */
+function avisarPagina(message, type) {
+  const elements = getElements();
+  if (!elements.estadoPagina) return;
+  elements.estadoPagina.textContent = message;
+  elements.estadoPagina.className = type ? `estado ${type}` : "estado";
+  elements.estadoPagina.hidden = false;
+}
+
+/* --- Ventana de agregar / editar ------------------------------------------
+   Un solo <dialog>: en modo «agregar» se ve #form-usuario y en «editar»
+   #form-editar-usuario; el título cambia. showModal() deja el foco adentro
+   y Escape la cierra. */
+const TITULOS_DIALOGO = { agregar: "Agregar usuario", editar: "Editar usuario" };
+
+function abrirDialogoUsuario(modo) {
+  const elements = getElements();
+  const dialogo = elements.dialogo;
+  if (!dialogo) return;
+  const editar = modo === "editar";
+  if (elements.dialogoTitulo) elements.dialogoTitulo.textContent = TITULOS_DIALOGO[editar ? "editar" : "agregar"];
+  elements.formUsuario.hidden = editar;
+  elements.formEditar.hidden = !editar;
+  if (!dialogo.open) {
+    if (typeof dialogo.showModal === "function") dialogo.showModal();
+    else dialogo.open = true;
+  }
+  const primero = editar ? elements.editarNombre : elements.nombre;
+  if (primero && typeof primero.focus === "function") primero.focus();
+}
+
+function cerrarDialogoUsuario() {
+  const dialogo = getElements().dialogo;
+  if (!dialogo || !dialogo.open) return;
+  if (typeof dialogo.close === "function") dialogo.close();
+  else dialogo.open = false;
+}
+
+/* «Agregar usuario» (arriba a la derecha): la ventana con el formulario
+   vacío. */
+function abrirAgregarUsuario() {
+  const elements = getElements();
+  elements.nombre.value = "";
+  elements.email.value = "";
+  if (elements.password) elements.password.value = "";
+  elements.rol.value = "Técnico";
+  if (elements.area) {
+    elements.area.value = "";
+    mostrarCampoArea(elements.rol, elements.area);
+  }
+  limpiarErroresCampo();
+  elements.estadoUsuario.hidden = true;
+  abrirDialogoUsuario("agregar");
 }
 
 /* Validación en el cliente antes de hacer la petición. */
@@ -170,10 +232,14 @@ function ocultarUsuariosEstado() {
   elements.usuariosEstado.hidden = true;
 }
 
-function appendCell(row, text) {
+/* data-label: en tablet y celular cada fila es una tarjeta y la etiqueta
+   de la columna va al lado del dato (estilos.css, .tabla-usuarios). */
+function appendCell(row, text, etiqueta) {
   const cell = document.createElement("td");
   cell.textContent = text;
+  if (etiqueta) cell.dataset.label = etiqueta;
   row.appendChild(cell);
+  return cell;
 }
 
 /* Color de la etiqueta de cada rol. */
@@ -202,19 +268,22 @@ function renderUsers(users) {
     const row = document.createElement("tr");
     /* Nombre con el círculo de iniciales y el rol como etiqueta. */
     const nameCell = document.createElement("td");
+    nameCell.className = "celda-nombre";
     pintarPersona(nameCell, user.name);
     row.appendChild(nameCell);
-    appendCell(row, user.email);
+    appendCell(row, user.email, "Correo");
     const roleCell = document.createElement("td");
+    roleCell.dataset.label = "Rol";
     const roleBadge = document.createElement("span");
     roleBadge.className = `badge ${claseRol(user.role)}`;
     roleBadge.textContent = user.role;
     roleCell.appendChild(roleBadge);
     row.appendChild(roleCell);
-    appendCell(row, textoAreaUsuario(user));
+    appendCell(row, textoAreaUsuario(user), "Departamento");
 
     const activo = user.is_active !== false;
     const stateCell = document.createElement("td");
+    stateCell.dataset.label = "Estado";
     const badge = document.createElement("span");
     badge.className = activo ? "badge badge-activo" : "badge badge-inactivo";
     badge.textContent = activo ? "Activo" : "Inactivo";
@@ -272,10 +341,10 @@ async function cambiarActivo(user, activar) {
     });
     const body = response.ok ? null : await response.json().catch(() => null);
     if (!response.ok) {
-      showStatus(mensajeDeError(response, body), "error");
+      avisarPagina(mensajeDeError(response, body), "error");
       return;
     }
-    showStatus(
+    avisarPagina(
       activar ? `${user.name} fue reactivado.` : `${user.name} fue desactivado.`,
       "exito"
     );
@@ -283,7 +352,7 @@ async function cambiarActivo(user, activar) {
     await cargarUsuarios();
   } catch (error) {
     console.error("PATCH /api/users (is_active):", error);
-    showStatus(
+    avisarPagina(
       "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );
@@ -357,15 +426,13 @@ function editarUsuario(user) {
   }
   limpiarErroresCampo("editar-");
   if (elements.editarPassword) elements.editarPassword.value = "";
-  elements.seccionEditar.hidden = false;
   ocultarEdicionEstado();
-  elements.seccionEditar.scrollIntoView({ behavior: "smooth" });
+  abrirDialogoUsuario("editar");
 }
 
 function cancelarEdicion() {
-  const elements = getElements();
-  elements.seccionEditar.hidden = true;
   ocultarEdicionEstado();
+  cerrarDialogoUsuario();
 }
 
 async function guardarEdicion(event) {
@@ -417,9 +484,9 @@ async function guardarEdicion(event) {
       return;
     }
 
-    elements.seccionEditar.hidden = true;
     ocultarEdicionEstado();
-    mostrarEdicionEstado("Usuario actualizado correctamente.", "exito");
+    cerrarDialogoUsuario();
+    avisarPagina("Usuario actualizado correctamente.", "exito");
     await cargarUsuarios();
   } catch (error) {
     console.error("PATCH /api/users:", error);
@@ -514,7 +581,9 @@ async function crearUsuario(event) {
       elements.area.value = "";
       mostrarCampoArea(elements.rol, elements.area);
     }
-    showStatus("Usuario agregado correctamente.", "exito");
+    elements.estadoUsuario.hidden = true;
+    cerrarDialogoUsuario();
+    avisarPagina("Usuario agregado correctamente.", "exito");
     /* El usuario nuevo aparece en la lista sin recargar la página. */
     await cargarUsuarios();
   } catch (error) {
@@ -548,13 +617,11 @@ async function init() {
   const elements = getElements();
   await leerLoginLocal();
   elements.formUsuario.addEventListener("submit", crearUsuario);
-  /* «Limpiar» vacía el formulario y quita los errores. */
-  elements.formUsuario.addEventListener("reset", () => {
-    limpiarErroresCampo();
-    elements.estadoUsuario.hidden = true;
-  });
   elements.formEditar.addEventListener("submit", guardarEdicion);
   elements.cancelarEdicion.addEventListener("click", cancelarEdicion);
+  if (elements.abrirAgregar) elements.abrirAgregar.addEventListener("click", abrirAgregarUsuario);
+  if (elements.cancelarUsuario) elements.cancelarUsuario.addEventListener("click", cerrarDialogoUsuario);
+  if (elements.cerrarDialogo) elements.cerrarDialogo.addEventListener("click", cerrarDialogoUsuario);
   await iniciarAreasUsuarios();
   await cargarUsuarios();
 }

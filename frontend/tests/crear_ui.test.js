@@ -64,16 +64,21 @@ test("la prioridad empieza en Media y cambia con los botones", async () => {
   assert.equal(f.enviados[0].title, "Impresora");
 });
 
-test("el formulario tiene texto de ayuda y botones en lugar de la lista", () => {
+test("el formulario: ejemplos en el placeholder, ayuda solo donde hace falta y botones de prioridad", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "crear.html"), "utf8");
   assert.doesNotMatch(html, /<select id="priority"/);
   assert.match(html, /<input type="hidden" id="priority" name="priority" value="Media">/);
   for (const v of ["Baja", "Media", "Alta", "Crítica"]) {
     assert.match(html, new RegExp(`name="opcion-prioridad" value="${v}"`));
   }
-  // Título, descripción, categoría, prioridad y adjuntos; el área de IT
-  // lleva su lista de qué atiende cada una.
-  assert.equal((html.match(/class="ayuda-campo"/g) || []).length, 5);
+  // Debajo, solo lo imprescindible: prioridad y adjuntos; el departamento
+  // lleva su guía de qué atiende cada uno. Los ejemplos, en el placeholder.
+  assert.equal((html.match(/class="ayuda-campo"/g) || []).length, 2);
+  assert.match(html, /<small id="ayuda-prioridad" class="ayuda-campo">Crítica: nadie puede trabajar o el servicio está caído\.<\/small>/);
+  assert.match(html, /<small id="ayuda-adjuntos" class="ayuda-campo">Hasta 4 MB cada uno y 10 por ticket\.<\/small>/);
+  assert.match(html, /id="title"[\s\S]*?placeholder="Ej\.: La impresora del 2\.º piso no imprime"/);
+  assert.match(html, /id="description"[\s\S]*?placeholder="Qué sucede, desde cuándo, qué mensaje aparece y qué intentó\."/);
+  assert.doesNotMatch(html, /ayuda-titulo|ayuda-descripcion|ayuda-categoria/);
   assert.match(html, /<ul id="ayuda-area" class="ayuda-campo ayuda-areas">/);
   assert.match(html, /<select id="area" name="area" required aria-describedby="ayuda-area">/);
 });
@@ -169,7 +174,7 @@ test("crear.html tiene «Adjuntar archivos», «Sacar foto», la lista y el resu
   assert.match(crearHtml, /id="crear-adj-archivos" multiple hidden\s+accept="\.jpg,\.jpeg,\.png,\.pdf,\.docx,\.xlsx,\.txt/);
   assert.match(crearHtml, /id="crear-adj-camara" accept="image\/\*" capture="environment" hidden/);
   assert.match(crearHtml, /<ul id="crear-adj-lista" class="adjuntos-lista adjuntos-elegidos" aria-label="Archivos elegidos" hidden><\/ul>/);
-  assert.match(crearHtml, /hasta 4 MB cada uno y 10 por ticket/);
+  assert.match(crearHtml, /Hasta 4 MB cada uno y 10 por ticket/);
   assert.match(crearHtml, /<section id="crear-resultado"[^>]*hidden>/);
   assert.match(crearHtml, /id="crear-resultado-detalle"[^>]*>Ir al ticket y reintentar<\/a>/);
   assert.ok(crearHtml.indexOf('src="js/adjuntos.js"') < crearHtml.indexOf('src="js/crear.js"'));
@@ -357,4 +362,33 @@ test("sin áreas activas el ticket se crea «Sin área» (no se exige)", async (
   assert.equal(nodos.area.required, false);
   assert.equal(sandbox.validatePayload(sandbox.getPayload()), "");
   assert.equal(sandbox.formatValidation({ detail: "Elija el área de IT del ticket." }), "Elija el área de IT del ticket.");
+});
+
+// --- Dos columnas que usan todo el ancho ---------------------------------------
+
+test("crear.html: a la izquierda título y descripción; a la derecha departamento, categoría, prioridad y adjuntos", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "crear.html"), "utf8");
+  assert.match(html, /<form id="form-crear" class="filtros formulario formulario-crear formulario-ticket" novalidate>/);
+  const izquierda = html.slice(html.indexOf('<div class="crear-columna crear-principal">'), html.indexOf('<div class="crear-columna crear-lateral">'));
+  const derecha = html.slice(html.indexOf('<div class="crear-columna crear-lateral">'), html.indexOf('<div class="acciones acciones-crear">'));
+  assert.ok(izquierda && derecha);
+  assert.match(izquierda, /id="title"[\s\S]*<label class="campo campo-descripcion">[\s\S]*id="description"/);
+  const orden = ['id="area"', 'id="category"', 'campo-prioridad', 'campo-adjuntos'].map((t) => derecha.indexOf(t));
+  assert.ok(orden.every((i) => i >= 0), "todo a la derecha");
+  assert.deepEqual([...orden].sort((a, b) => a - b), orden, "en ese orden");
+  // «Crear ticket» después de las dos columnas, abajo a la derecha.
+  assert.match(html, /<div class="acciones acciones-crear">\s*<button type="submit" id="guardar">Crear ticket<\/button>\s*<\/div>\s*<\/form>/);
+  // El departamento se llama «Soporte IT», también en la guía.
+  assert.match(derecha, /<li><strong>Soporte IT<\/strong>: computadoras, impresoras, programas\.<\/li>/);
+  assert.doesNotMatch(html.replace(/<p class="menu-titulo" id="menu-soporte">Soporte<\/p>/, ""), /\bSoporte\b(?! IT| de la empresa)/);
+});
+
+test("CSS: dos columnas a todo el ancho; una en tablet y celular; guía compacta", () => {
+  const css = fs.readFileSync(path.join(__dirname, "..", "css", "estilos.css"), "utf8");
+  assert.match(css, /\.formulario-ticket \{\s*max-width: none;/);
+  assert.match(css, /\.crear-columnas \{\s*display: grid;\s*grid-template-columns: minmax\(0, 3fr\) minmax\(0, 2fr\);/);
+  assert.match(css, /\.campo-descripcion textarea \{\s*flex: 1;\s*min-height: 300px;/, "descripción más alta");
+  assert.match(css, /\.acciones-crear \{\s*justify-content: flex-end;/, "botón a la derecha");
+  assert.match(css, /@media \(max-width: 900px\) \{\s*\.crear-columnas \{\s*grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(css, /\.ayuda-campo\.ayuda-areas \{[^}]*background: var\(--color-fondo-neutro\);[^}]*font-size: 0\.78rem;/);
 });

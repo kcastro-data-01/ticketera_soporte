@@ -52,7 +52,12 @@ const ELEMENT_IDS = [
   "usuarios-estado",
   "tabla-usuarios",
   "cuerpo-usuarios",
-  "seccion-editar",
+  "estado-pagina",
+  "dialogo-usuario",
+  "dialogo-usuario-titulo",
+  "abrir-agregar-usuario",
+  "cancelar-usuario",
+  "cerrar-dialogo-usuario",
   "form-editar-usuario",
   "editar-id",
   "editar-nombre",
@@ -409,11 +414,13 @@ test("crear usuario envía los datos, recarga la lista y limpia el formulario", 
   assert.equal(harness.node("email").value, "");
   assert.equal(harness.node("password").value, "", "no deja la contraseña escrita");
   assert.equal(harness.node("rol").value, "Técnico");
+  /* La ventana se cierra y el aviso queda en la página, arriba de la tabla. */
   assert.equal(
-    harness.node("estado-usuario").textContent,
+    harness.node("estado-pagina").textContent,
     "Usuario agregado correctamente."
   );
-  assert.equal(harness.node("estado-usuario").className, "estado exito");
+  assert.equal(harness.node("estado-pagina").className, "estado exito");
+  assert.ok(!harness.node("dialogo-usuario").open, "la ventana queda cerrada");
   assert.equal(harness.node("crear").disabled, false);
 });
 
@@ -536,4 +543,122 @@ test("usuarios.html tiene «Departamento» en agregar y editar, y la columna en 
   assert.match(html, /<select id="area" name="area"/);
   assert.match(html, /<select id="editar-area" name="area"/);
   assert.match(html, /<th>Rol<\/th>\s*<th>Departamento<\/th>/);
+});
+
+/* ---------------------------------------------------------------------------
+   Ventana para agregar y editar
+   --------------------------------------------------------------------------- */
+
+function dialogoDePrueba(harness) {
+  const dialogo = harness.node("dialogo-usuario");
+  dialogo.open = false;
+  dialogo.showModal = function () { this.open = true; this.modal = true; };
+  dialogo.close = function () { this.open = false; };
+  for (const id of ["nombre", "editar-nombre"]) {
+    harness.node(id).focus = function () { this.enfocado = true; };
+  }
+  return dialogo;
+}
+
+test("«Agregar usuario» abre la ventana vacía en modo agregar; Cancelar y ✕ la cierran", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  const dialogo = dialogoDePrueba(harness);
+  harness.node("nombre").value = "Quedó escrito";
+  harness.node("estado-usuario").hidden = false;
+
+  harness.node("abrir-agregar-usuario").listeners.click[0]();
+  assert.equal(dialogo.open, true);
+  assert.equal(dialogo.modal, true, "con showModal()");
+  assert.equal(harness.node("dialogo-usuario-titulo").textContent, "Agregar usuario");
+  assert.equal(harness.node("form-usuario").hidden, false);
+  assert.equal(harness.node("form-editar-usuario").hidden, true);
+  assert.equal(harness.node("nombre").value, "", "empieza vacío");
+  assert.equal(harness.node("rol").value, "Técnico");
+  assert.equal(harness.node("estado-usuario").hidden, true);
+  assert.equal(harness.node("nombre").enfocado, true, "el foco en Nombre");
+
+  harness.node("cancelar-usuario").listeners.click[0]();
+  assert.equal(dialogo.open, false);
+  harness.node("abrir-agregar-usuario").listeners.click[0]();
+  harness.node("cerrar-dialogo-usuario").listeners.click[0]();
+  assert.equal(dialogo.open, false);
+});
+
+test("un error al agregar queda dentro de la ventana, que sigue abierta", async () => {
+  const harness = createHarness(makeFetch({ create: jsonResponse(500, {}) }));
+  await harness.init();
+  const dialogo = dialogoDePrueba(harness);
+  harness.node("abrir-agregar-usuario").listeners.click[0]();
+  harness.node("nombre").value = "Ana Pérez";
+  harness.node("email").value = "ana@data.cr";
+  await harness.crear();
+  assert.equal(dialogo.open, true);
+  assert.equal(harness.node("estado-usuario").className, "estado error");
+  assert.equal(harness.node("estado-pagina").textContent, "", "en la página no aparece nada");
+});
+
+test("«Editar» usa la misma ventana con los datos del usuario; al guardar se cierra y avisa en la página", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  const dialogo = dialogoDePrueba(harness);
+  harness.call("editarUsuario", { ...USER_A, area_id: null });
+  assert.equal(dialogo.open, true);
+  assert.equal(harness.node("dialogo-usuario-titulo").textContent, "Editar usuario");
+  assert.equal(harness.node("form-usuario").hidden, true);
+  assert.equal(harness.node("form-editar-usuario").hidden, false);
+  assert.equal(harness.node("editar-nombre").value, "Ana Pérez");
+  assert.equal(harness.node("editar-email").value, "ana@soporte.local");
+  assert.equal(harness.node("editar-nombre").enfocado, true);
+  harness.call("cancelarEdicion");
+  assert.equal(dialogo.open, false);
+});
+
+test("usuarios.html: la tabla primero, el botón arriba a la derecha y una sola ventana en dos columnas", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "usuarios.html"), "utf8");
+  const cabecera = html.slice(html.indexOf('<header class="cabecera">'), html.indexOf("</header>"));
+  assert.match(cabecera, /<div class="cabecera-acciones">\s*<button type="button" id="abrir-agregar-usuario" aria-haspopup="dialog">Agregar usuario<\/button>/);
+  const main = html.slice(html.indexOf('<main class="contenido">'), html.indexOf("</main>"));
+  assert.match(main, /^<main class="contenido">\s*<section class="seccion" aria-labelledby="titulo-usuarios">\s*<h2 id="titulo-usuarios">Usuarios registrados<\/h2>/);
+  assert.doesNotMatch(main, /<form\b/, "el formulario ya no está en la página");
+  const dialogo = html.slice(html.indexOf('<dialog id="dialogo-usuario"'), html.indexOf("</dialog>"));
+  assert.match(dialogo, /^<dialog id="dialogo-usuario" class="ventana-usuario" aria-labelledby="dialogo-usuario-titulo">/);
+  assert.equal((dialogo.match(/<form id="form-(usuario|editar-usuario)" class="formulario-usuario" novalidate( hidden)?>/g) || []).length, 2);
+  assert.equal((dialogo.match(/<div class="campos-dos">/g) || []).length, 2, "campos en dos columnas");
+  for (const prefijo of ["", "editar-"]) {
+    const orden = ["nombre", "email", "rol", "area"].map((c) => dialogo.indexOf(`id="${prefijo}${c}"`));
+    assert.ok(orden.every((i) => i >= 0));
+    assert.deepEqual([...orden].sort((a, b) => a - b), orden, `${prefijo}: Nombre, Correo, Rol y Departamento`);
+  }
+  assert.equal((html.match(/placeholder="nombre@data\.cr"/g) || []).length, 2);
+  assert.doesNotMatch(html, /soporte\.local/);
+  assert.doesNotMatch(html, /class="ayuda-campo"/, "sin textos de ayuda largos");
+  assert.match(dialogo, /<button type="button" id="cerrar-dialogo-usuario" class="ventana-cerrar" aria-label="Cerrar">/);
+});
+
+test("CSS: ventana con fondo oscuro, campos en dos columnas y una en el celular", () => {
+  const css = fs.readFileSync(path.join(__dirname, "..", "css", "estilos.css"), "utf8");
+  const ventana = css.slice(css.indexOf(".ventana-usuario {"), css.indexOf("}", css.indexOf(".ventana-usuario {")));
+  assert.match(ventana, /width: min\(640px, calc\(100vw - 2rem\)\);/);
+  assert.match(ventana, /background: var\(--color-superficie-alta\);/);
+  assert.doesNotMatch(ventana, /display:/, "cerrada, la oculta el navegador");
+  assert.match(css, /\.ventana-usuario::backdrop \{/);
+  assert.match(css, /\.campos-dos \{\s*display: grid;\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(css, /@media \(max-width: 600px\) \{\s*\.campos-dos \{\s*grid-template-columns: minmax\(0, 1fr\);/);
+});
+
+test("tablet y celular: cada usuario es una tarjeta con la etiqueta de cada dato (sin scroll de costado)", async () => {
+  const harness = createHarness(makeFetch({ users: jsonResponse(200, [{ ...USER_A, area_name: "Soporte IT" }]) }));
+  await harness.init();
+  const celdas = harness.node("cuerpo-usuarios").children[0].children;
+  assert.deepEqual(celdas.map((td) => td.dataset.label), [undefined, "Correo", "Rol", "Departamento", "Estado", undefined]);
+  assert.match(celdas[0].className, /^celda-nombre con-avatar/, "el nombre conserva el avatar");
+  assert.equal(celdas[5].className, "celda-acciones");
+  const html = fs.readFileSync(path.join(__dirname, "..", "usuarios.html"), "utf8");
+  assert.match(html, /<table id="tabla-usuarios" class="listado tabla-usuarios" hidden>/);
+  const css = fs.readFileSync(path.join(__dirname, "..", "css", "estilos.css"), "utf8");
+  const bloque = css.slice(css.indexOf("/* ===== Usuarios: en tablet y celular"), css.indexOf("/* ===== Usuarios: rol como etiqueta"));
+  assert.match(bloque, /@media \(max-width: 900px\) \{\s*\.tabla-usuarios thead \{\s*display: none;/);
+  assert.match(bloque, /\.listado\.tabla-usuarios tbody td:not\(\.celda-nombre\)::before \{\s*content: attr\(data-label\);/);
+  assert.doesNotMatch(bloque, /celda-nombre::before/, "no tapa las iniciales");
 });

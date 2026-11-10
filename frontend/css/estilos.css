@@ -2664,6 +2664,59 @@ body.app {
   gap: 1.1rem;
 }
 
+/* Nuevo ticket a todo el ancho, en dos columnas: a la izquierda título y
+   descripción (más alta); a la derecha departamento, categoría, prioridad
+   y adjuntos. «Crear ticket», abajo a la derecha. */
+.formulario-ticket {
+  max-width: none;
+}
+
+.crear-columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1.1rem 1.75rem;
+  align-items: stretch;
+}
+
+.crear-columna {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  min-width: 0;
+}
+
+.campo-descripcion {
+  flex: 1;
+}
+
+.campo-descripcion textarea {
+  flex: 1;
+  min-height: 300px;
+}
+
+.acciones-crear {
+  justify-content: flex-end;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--color-borde);
+}
+
+/* Tablet y celular: una sola columna; el botón a lo ancho. */
+@media (max-width: 900px) {
+  .crear-columnas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .campo-descripcion textarea {
+    min-height: 180px;
+  }
+}
+
+@media (max-width: 600px) {
+  .acciones-crear button {
+    width: 100%;
+  }
+}
+
 .ayuda-campo {
   display: block;
   margin-top: 0.3rem;
@@ -3787,6 +3840,150 @@ td.con-avatar {
   color: var(--color-error-fondo);
 }
 
+/* ===== Usuarios: ventana para agregar y editar =====
+   <dialog> con showModal(): mismo aspecto que la ventana de confirmación,
+   más ancha, con los campos en dos columnas (una en el celular). No se le
+   pone display: cerrada, el navegador la oculta. */
+.ventana-usuario {
+  width: min(640px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  padding: 0;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: var(--radio-ventana);
+  background: var(--color-superficie-alta);
+  color: var(--color-texto);
+  box-shadow: 0 8px 24px rgba(26, 34, 51, 0.16);
+}
+
+.ventana-usuario::backdrop {
+  background: rgba(11, 24, 77, 0.35);
+}
+
+.ventana-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.ventana-cabecera h2 {
+  margin: 0;
+  font-size: var(--texto-lg);
+  color: var(--color-titulo);
+}
+
+.ventana-usuario .ventana-cerrar {
+  min-height: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-tenue-fuerte);
+}
+
+.ventana-usuario .ventana-cerrar:hover,
+.ventana-usuario .ventana-cerrar:active {
+  border-color: var(--color-borde);
+  background: var(--color-fondo-neutro);
+  color: var(--color-texto);
+}
+
+.formulario-usuario {
+  padding: 1rem 1.25rem 1.1rem;
+}
+
+.campos-dos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+}
+
+.formulario-usuario .estado {
+  margin: 0.9rem 0 0;
+}
+
+.ventana-acciones {
+  justify-content: flex-end;
+  margin-top: 1.1rem;
+}
+
+@media (max-width: 600px) {
+  .campos-dos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ventana-acciones button {
+    flex: 1;
+  }
+}
+
+/* ===== Usuarios: en tablet y celular, una tarjeta por usuario =====
+   Sin la tabla ancha ni scroll de costado: el nombre arriba, cada dato con
+   su etiqueta al lado (data-label, usuarios.js) y los botones abajo. */
+@media (max-width: 900px) {
+  .tabla-usuarios thead {
+    display: none;
+  }
+
+  .tabla-usuarios,
+  .tabla-usuarios tbody,
+  .tabla-usuarios tr {
+    display: block;
+    width: 100%;
+  }
+
+  .listado.tabla-usuarios tbody tr {
+    padding: 0.5rem 0.85rem 0.7rem;
+    border-bottom: 1px solid var(--color-borde);
+  }
+
+  .listado.tabla-usuarios tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .listado.tabla-usuarios tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+    padding: 0.2rem 0;
+    border: none;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  /* La celda del nombre usa ::before para las iniciales (avatar). */
+  .listado.tabla-usuarios tbody td:not(.celda-nombre)::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: var(--color-tenue);
+    font-size: var(--texto-sm);
+    text-align: left;
+  }
+
+  .listado.tabla-usuarios tbody td.celda-nombre {
+    justify-content: flex-start;
+    padding: 0.3rem 0 0.35rem;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .listado.tabla-usuarios tbody td.celda-acciones::before {
+    content: none;
+  }
+
+  .listado.tabla-usuarios tbody td.celda-acciones {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding-top: 0.45rem;
+  }
+}
+
 /* ===== Usuarios: rol como etiqueta ===== */
 .rol-administrador {
   background: var(--etiqueta-violeta-fondo);
@@ -4821,15 +5018,20 @@ summary:focus-visible,
   }
 }
 
-/* «Nuevo ticket»: qué atiende cada área de IT, debajo del selector. */
+/* «Nuevo ticket»: qué atiende cada departamento, debajo del selector, en
+   una caja chica y compacta. */
 .ayuda-campo.ayuda-areas {
-  margin: 0.3rem 0 0;
-  padding: 0;
+  margin: 0.4rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radio-suave);
+  background: var(--color-fondo-neutro);
+  font-size: 0.78rem;
+  line-height: 1.35;
   list-style: none;
 }
 
 .ayuda-campo.ayuda-areas li + li {
-  margin-top: 0.1rem;
+  margin-top: 0.15rem;
 }
 
 .ayuda-campo.ayuda-areas strong {

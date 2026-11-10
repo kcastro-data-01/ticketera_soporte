@@ -58,12 +58,12 @@ test("el error se muestra debajo del campo y se limpia", () => {
   assert.equal(nodo("email").atributos["aria-invalid"], undefined);
 });
 
-test("los dos formularios tienen ayuda gris, error por campo y botón secundario", () => {
+test("los dos formularios: error debajo de cada campo y Cancelar como botón secundario", () => {
   for (const id of ["nombre", "email", "password", "rol", "editar-nombre", "editar-email", "editar-password", "editar-rol"]) {
-    assert.match(html, new RegExp(`<small id="ayuda-${id}" class="ayuda-campo">`), id);
     assert.match(html, new RegExp(`<small id="error-${id}" class="error-campo" role="alert" hidden></small>`), id);
-    assert.match(html, new RegExp(`id="${id}"[^>]*aria-describedby="ayuda-${id} error-${id}"`), id);
+    assert.match(html, new RegExp(`id="${id}"[^>]*aria-describedby="error-${id}"`), id);
   }
-  assert.match(html, /<button type="reset" id="limpiar-usuario" class="secundario">Limpiar<\/button>/);
-  assert.equal((html.match(/class="filtros formulario formulario-crear"/g) || []).length, 2);
+  assert.match(html, /<button type="button" id="cancelar-usuario" class="secundario">Cancelar<\/button>/);
+  assert.match(html, /<button type="button" id="cancelar-edicion" class="secundario">Cancelar<\/button>/);
+  assert.equal((html.match(/class="formulario-usuario"/g) || []).length, 2);
 });

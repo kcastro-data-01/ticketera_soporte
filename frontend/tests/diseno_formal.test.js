@@ -40,7 +40,7 @@ test("tablas: filas alternadas con el fondo neutro y encabezados formales", () =
 test("las tres tablas (listado, historial y usuarios) usan .listado", () => {
   for (const pagina of ["index.html", "historial.html", "usuarios.html"]) {
     const html = fs.readFileSync(path.join(__dirname, "..", pagina), "utf8");
-    assert.match(html, /<table[^>]*class="listado"/, pagina);
+    assert.match(html, /<table[^>]*class="listado( [a-z-]+)*"/, pagina);
   }
 });
 
