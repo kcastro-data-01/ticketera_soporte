@@ -78,8 +78,8 @@ test("Solicitante, cantidad 0 o error de la API: no se muestra", async () => {
   assert.equal((await montar("Administrador", {})).etiqueta, null);
 });
 
-test("CSS: etiqueta con el color principal y visible con el menú plegado", () => {
-  assert.match(css, /\.menu-enlace \.menu-contador \{[^}]*background: var\(--color-primario\);[^}]*color: var\(--color-texto-inverso\);/);
-  assert.match(css, /body\.menu-plegado \.menu-enlace \.menu-contador \{\s*display: inline-grid;\s*position: absolute;/);
+test("CSS: pastilla chica y discreta; plegada, con el color principal sobre el ícono", () => {
+  assert.match(css, /\n\.menu-enlace \.menu-contador \{[^}]*min-width: 18px;\s*height: 18px;[^}]*background: rgba\(255, 255, 255, 0\.12\);[^}]*color: var\(--color-menu-texto\);[^}]*font-size: 0\.66rem;/);
+  assert.match(css, /body\.menu-plegado \.menu-enlace \.menu-contador \{\s*display: inline-grid;\s*position: absolute;[^}]*background: var\(--color-primario\);[^}]*color: var\(--color-texto-inverso\);/);
   assert.doesNotMatch(css.slice(css.indexOf(".menu-enlace .menu-contador {"), css.indexOf("/* Botón para achicar")), /gradient/);
 });

@@ -40,12 +40,15 @@ test("cada página con menú tiene las tres secciones con sus enlaces", () => {
   }
 });
 
-test("CSS: título chico en mayúsculas y gris claro, línea entre secciones", () => {
+test("CSS: título chico, tenue y en mayúsculas; entre secciones solo espacio", () => {
   const titulo = regla(".menu-titulo");
-  assert.match(titulo, /font-size: 0\.68rem;/);
+  assert.match(titulo, /font-size: 0\.625rem;/);
+  assert.match(titulo, /font-weight: 500;/);
   assert.match(titulo, /text-transform: uppercase;/);
-  assert.match(titulo, /color: var\(--color-menu-tenue\);/);
-  assert.match(regla(".menu-seccion + .menu-seccion"), /border-top: 1px solid rgba\(255, 255, 255, 0\.12\);/);
+  assert.match(titulo, /color: var\(--color-menu-titulo\);/);
+  const entre = regla(".menu-seccion + .menu-seccion");
+  assert.match(entre, /margin-top: 1\.35rem;/);
+  assert.doesNotMatch(entre, /border/);
 });
 
 test("CSS: sin enlaces visibles para el rol, la sección (y su título) no se ve", () => {
