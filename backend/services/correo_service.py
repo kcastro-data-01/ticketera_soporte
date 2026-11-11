@@ -2082,10 +2082,25 @@ _detener = threading.Event()
 _hilo: threading.Thread | None = None
 
 
+FILTROS_LOG = {"todos": "todos", "ia": "los que la IA clasifica como solicitud"}
+
+
+def _filtro_log(config: ConfigCorreo) -> str:
+    return FILTROS_LOG.get(config.filtro, "solo los que piden ayuda")
+
+
+def linea_mailpit(config: ConfigCorreo) -> str:
+    """Línea del log al arrancar el lector de Mailpit («leyendo Mailpit cada
+    30 s para kcastro@data.cr …»): dice de un vistazo que está corriendo."""
+    return (f"leyendo Mailpit cada {config.intervalo} s para {config.usuario} "
+            f"({config.mailpit_api}; salen por {config.smtp_host}:{config.smtp_puerto}; "
+            f"CORREO_FILTRO={config.filtro}: {_filtro_log(config)})")
+
+
 def _bucle(session_factory, config: ConfigCorreo, cliente: ClienteGraph) -> None:
-    logger.info("leyendo el buzón %s cada %s s (correos: %s)", config.usuario, config.intervalo,
-                {"todos": "todos", "ia": "los que la IA clasifica como solicitud"}.get(
-                    config.filtro, "solo los que piden ayuda"))
+    if config.proveedor != "mailpit":  # con Mailpit ya lo dijo iniciar_lector
+        logger.info("leyendo el buzón %s cada %s s (correos: %s)", config.usuario,
+                    config.intervalo, _filtro_log(config))
     conectado = False
     avisados: set = set()
     while not _detener.is_set():
@@ -2105,16 +2120,15 @@ def _bucle(session_factory, config: ConfigCorreo, cliente: ClienteGraph) -> None
 
 
 def iniciar_lector(session_factory=None) -> bool:
-    """Arranca el hilo que revisa el buzón si ``CORREO_ACTIVO`` está encendido."""
+    """Arranca el hilo que revisa el buzón: con Mailpit siempre (no hace falta
+    ``CORREO_ACTIVO``), con Graph si ``CORREO_ACTIVO`` está encendido."""
     global _hilo
     config = config_desde_entorno()
     if config is None:
         logger.info("lectura del buzón apagada (CORREO_ACTIVO no está en 1)")
         return False
     if config.proveedor == "mailpit":
-        logger.info("CORREO_PROVEEDOR=mailpit: los correos salen por Mailpit (%s:%s) y se leen los "
-                    "que llegan a %s (%s) cada %s s", config.smtp_host, config.smtp_puerto,
-                    config.usuario, config.mailpit_api, config.intervalo)
+        logger.info(linea_mailpit(config))
     elif config.modo == "cron":
         logger.info("lectura del buzón por cron (CORREO_MODO=cron): POST /api/cron/correo")
         return False

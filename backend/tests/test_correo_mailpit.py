@@ -238,6 +238,45 @@ def test_mailpit_el_lector_lee_mailpit_y_no_graph(entorno_mailpit, factory):  # 
     assert [type(c) for c in arrancado] == [cs.ClienteMailpit]
 
 
+@pytest.mark.parametrize("activo", ["0", None])
+def test_mailpit_el_lector_arranca_sin_correo_activo_y_lo_dice(entorno_mailpit, factory, caplog,
+                                                               activo):  # noqa: F811
+    """Como el .env local: CORREO_ACTIVO=0 (o sin poner), CORREO_INTERVALO=60."""
+    if activo is not None:
+        entorno_mailpit.setenv("CORREO_ACTIVO", activo)
+    entorno_mailpit.setenv("CORREO_FILTRO", "ia")
+    entorno_mailpit.setenv("CORREO_INTERVALO", "60")
+    entorno_mailpit.setattr(cs, "_bucle", lambda *_a: None)
+    entorno_mailpit.setattr(cs, "_hilo", None)
+    with caplog.at_level("INFO", logger=cs.logger.name):
+        assert cs.iniciar_lector(factory) is True
+    cs._hilo.join(2)
+    assert f"leyendo Mailpit cada 30 s para {YO} (" in caplog.text
+    assert "CORREO_FILTRO=ia" in caplog.text
+    assert "apagada" not in caplog.text
+
+
+def test_mailpit_la_linea_de_arranque_sale_una_sola_vez(entorno_mailpit, factory, caplog):  # noqa: F811
+    """El bucle no repite la línea con «leyendo el buzón» (eso es para Graph)."""
+    entorno_mailpit.setattr(cs, "_hilo", None)
+    entorno_mailpit.setattr(cs, "revisar_buzon", lambda *_a, **_k: cs._detener.set())
+    with caplog.at_level("INFO", logger=cs.logger.name):
+        assert cs.iniciar_lector(factory) is True
+        cs._hilo.join(5)
+    assert caplog.text.count("leyendo Mailpit") == 1
+    assert "leyendo el buzón" not in caplog.text
+    assert "conexión con el buzón correcta" in caplog.text
+
+
+def test_linea_mailpit():
+    config = cs.ConfigCorreo(usuario=YO, filtro="auto", intervalo=30, proveedor="mailpit",
+                             smtp_host="mailpit", smtp_puerto=1025,
+                             mailpit_api="http://mailpit:8025")
+    assert cs.linea_mailpit(config) == (
+        f"leyendo Mailpit cada 30 s para {YO} (http://mailpit:8025; salen por mailpit:1025; "
+        "CORREO_FILTRO=auto: solo los que piden ayuda)")
+
+
 def test_mailpit_el_cron_lee_mailpit(entorno_mailpit, factory):  # noqa: F811
     entorno_mailpit.setenv("CORREO_ACTIVO", "1")
     leidos = []

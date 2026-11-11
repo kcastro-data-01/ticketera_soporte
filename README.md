@@ -1432,6 +1432,13 @@ Con `CORREO_PROVEEDOR=mailpit`:
   ponerle esa etiqueta; los que no piden ayuda quedan sin leer. Los correos
   que manda `CORREO_USUARIO` cuentan como sus Elementos enviados.
   `POST /api/cron/correo` también hace una revisión.
+- Al arrancar deja en `docker compose logs ticketera` la línea
+  `CORREO: leyendo Mailpit cada 30 s para <CORREO_USUARIO> (…; CORREO_FILTRO=…)`.
+  Si no aparece ninguna línea `CORREO:`, revise `docker compose ps -a`: el
+  contenedor `ticketera` no se reinicia solo (por ejemplo, después de
+  reiniciar Docker o WSL) y Mailpit sí, así que puede quedar Mailpit
+  recibiendo correos sin nadie que los lea. Se levanta con
+  `docker compose up -d --no-deps ticketera`.
 - Los correos que llegaron **antes** de que la app empezara a leer el buzón
   por primera vez no se tocan (igual que con Graph).
 - El remitente es `CORREO_USUARIO` (o `soporte@ticketera.local` si no está).
