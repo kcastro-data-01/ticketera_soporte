@@ -6,13 +6,13 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Ayuda · American Data Networks</title>
   <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
-  <script src="js/tema.js?v=20261111-1"></script>
+  <script src="js/tema.js?v=20261111-2"></script>
   <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="css/estilos.css?v=20261111-1">
+  <link rel="stylesheet" href="css/estilos.css?v=20261111-2">
 </head>
 <body class="app">
   <aside class="barra-lateral">
@@ -135,6 +135,16 @@
             <li><strong>Hacia atrás</strong> solo se puede volver de <code>Resuelto</code> a <code>En proceso</code>. Nunca se vuelve a <code>Nuevo</code>.</li>
             <li><code>Cerrado</code> es un estado <strong>final</strong>: no se reabre ni admite cambios. Si el problema vuelve a aparecer, cree un ticket nuevo y mencione el número del anterior.</li>
             <li>El estado lo cambian el Técnico y el Administrador.</li>
+          </ul>
+
+          <h3>Cierre automático</h3>
+          <p>Cuando la mesa de ayuda tiene activo el cierre automático, un ticket en <code>Resuelto</code> pasa solo a <code>Cerrado</code> si el solicitante no responde en <strong>3 días</strong>:</p>
+          <ul>
+            <li>Cuentan los días de lunes a sábado; el domingo no cuenta. Por ejemplo, un ticket resuelto el viernes a las 4:00 p. m. se cierra el martes a las 4:00 p. m.</li>
+            <li>En el detalle de un ticket Resuelto se indica: «Se cerrará automáticamente el … si no hay respuesta». El correo que avisa el paso a Resuelto también lo explica.</li>
+            <li>Si el solicitante <strong>comenta en la ticketera o responde el correo</strong> mientras el ticket está en Resuelto, el ticket vuelve a <code>En proceso</code> y queda en el historial como «Reabierto por respuesta del solicitante». Los comentarios de IT no lo reabren.</li>
+            <li>Si se vuelve a resolver, los 3 días empiezan a contar de nuevo.</li>
+            <li>Al cerrarse, el historial muestra «Cerrado automáticamente por falta de respuesta», hecho por «Sistema», y el solicitante y el asignado reciben un correo. Si el problema continúa, envíe un correo nuevo para crear otro ticket.</li>
           </ul>
 
           <h3>Cómo leer el historial</h3>
@@ -310,6 +320,8 @@
             <dd>Mientras usa la ticketera, la sesión se renueva sola. Si pasan 30 minutos sin actividad (sin mover el mouse, escribir, hacer clic ni tocar la pantalla en ninguna pestaña de la ticketera), aparece la ventana «¿Sigue ahí?» con una cuenta regresiva de 2 minutos: pulse «Seguir conectado» para continuar o «Cerrar sesión» para salir. Si la cuenta llega a cero, la sesión se cierra en todas las pestañas y el inicio de sesión muestra «Su sesión se cerró por inactividad». Además, una sesión dura como máximo 10 horas desde que inició sesión; después hay que volver a entrar.</dd>
             <dt>¿Tengo que volver a iniciar sesión si salgo a otra página?</dt>
             <dd>No. Si vuelve y la sesión venció, pero su cuenta de Microsoft sigue conectada en el navegador, la ticketera vuelve a entrar sola y lo lleva a la misma pantalla. Solo pide pulsar «Iniciar sesión con Microsoft» si la sesión se cerró por inactividad, si pasaron 10 horas desde que inició sesión, si usted cerró la sesión o si la cuenta de Microsoft ya no está conectada. «Cerrar sesión» la cierra en todas las pestañas.</dd>
+            <dt>¿Por qué se cerró mi ticket si nadie lo cerró?</dt>
+            <dd>Cuando el cierre automático está activo, un ticket en Resuelto se cierra solo si el solicitante no responde en 3 días (de lunes a sábado). En el historial aparece «Cerrado automáticamente por falta de respuesta», hecho por «Sistema». Si el problema continúa, cree un ticket nuevo o envíe un correo nuevo. Vea «Cierre automático» en «Seguimiento».</dd>
             <dt>¿Qué departamento elijo?</dt>
             <dd>El que atiende su pedido: Soporte IT (computadoras, impresoras, programas), Redes e Infraestructura (internet, wifi, servidores, VPN), Ciberseguridad (accesos, contraseñas, cuentas, incidentes de seguridad) o Programación (sistemas internos, Odoo, desarrollos y reportes). Si se equivoca, IT lo pasa al correcto.</dd>
             <dt>¿Cómo sé quién atiende mi ticket?</dt>
@@ -331,10 +343,10 @@
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
-  <script src="js/auth.js?v=20261111-1" defer></script>
-  <script src="js/sesion.js?v=20261111-1" defer></script>
-  <script src="js/asistente.js?v=20261111-1" defer></script>
-  <script src="js/ayuda.js?v=20261111-1" defer></script>
-  <script src="js/guardia.js?v=20261111-1"></script>
+  <script src="js/auth.js?v=20261111-2" defer></script>
+  <script src="js/sesion.js?v=20261111-2" defer></script>
+  <script src="js/asistente.js?v=20261111-2" defer></script>
+  <script src="js/ayuda.js?v=20261111-2" defer></script>
+  <script src="js/guardia.js?v=20261111-2"></script>
 </body>
 </html>

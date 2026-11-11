@@ -32,6 +32,7 @@ TICKET_RESPONSE_KEYS = {
     "created_by_id",
     "created_at",
     "updated_at",
+    "cierre_automatico_en",
 }
 
 

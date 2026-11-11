@@ -1,8 +1,10 @@
 """Tareas programadas desde afuera (cron-job.org) para la versión de Vercel,
 donde no hay hilos en segundo plano.
 
-``POST /api/cron/correo`` hace un ciclo de lectura del buzón (Elementos
-enviados y bandeja de entrada). Lo protege ``CRON_SECRET``: hay que mandar
+``POST /api/cron/correo`` primero cierra los tickets Resuelto vencidos
+(``CIERRE_AUTOMATICO``, con un tope de tiempo y de cierres, aunque el correo
+esté apagado) y después hace un ciclo de lectura del buzón (Elementos
+enviados y bandeja de entrada) con el tiempo que queda. Lo protege ``CRON_SECRET``: hay que mandar
 ``Authorization: Bearer <CRON_SECRET>``. Sin ``CRON_SECRET`` configurado la
 ruta no existe (404).
 """
@@ -10,13 +12,14 @@ ruta no existe (404).
 import hmac
 import logging
 import os
+import time
 from contextlib import contextmanager
 
 from fastapi import APIRouter, Header, HTTPException, status
 from sqlalchemy import text
 
 from backend import database
-from backend.services import correo_service
+from backend.services import cierre_service, correo_service
 from backend.services.correo_auth import SinSesionError
 
 logger = logging.getLogger(__name__)
@@ -25,6 +28,8 @@ router = APIRouter(prefix="/api/cron", tags=["Cron"])
 
 # Número fijo del candado de Postgres (pg_try_advisory_lock) del buzón.
 CANDADO_CORREO = 4_270_001
+# Y el del cierre automático (dos llamadas no cierran el mismo ticket).
+CANDADO_CIERRE = 4_270_002
 
 
 def secreto_cron() -> str:
@@ -67,11 +72,22 @@ def revisar_correo(authorization: str | None = Header(default=None)) -> dict:
     cuántos correos terminaron en cada resultado (``pendientes``: los que
     quedan para la próxima llamada)."""
     verificar_secreto(authorization)
+    inicio = time.monotonic()
+    cerrados = 0
+    if cierre_service.activo():
+        with candado(CANDADO_CIERRE) as obtenido:
+            if obtenido:
+                try:
+                    cerrados = len(cierre_service.revisar(limite=cierre_service.LIMITE_CRON))
+                except Exception:  # noqa: BLE001 — el correo se revisa igual
+                    logger.exception("error al revisar el cierre automático")
+    # El correo usa lo que queda de los 25 s (cron-job.org corta a los 30).
+    limite = max(5.0, correo_service.LIMITE_CRON - (time.monotonic() - inicio))
     with candado(CANDADO_CORREO) as obtenido:
         if not obtenido:
-            return {"estado": "ocupado", "conteo": {}}
+            return {"estado": "ocupado", "conteo": {}, "cierre": cerrados}
         try:
-            conteo = correo_service.revisar_una_vez()
+            conteo = correo_service.revisar_una_vez(limite=limite)
         except correo_service.CorreoApagado as error:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error))
         except SinSesionError as error:
@@ -79,4 +95,4 @@ def revisar_correo(authorization: str | None = Header(default=None)) -> dict:
                          "python -m backend.correo_login con DATABASE_URL de esta base", error)
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                                 detail="La sesión del buzón no está iniciada o venció")
-    return {"estado": "ok", "conteo": conteo}
+    return {"estado": "ok", "conteo": conteo, "cierre": cerrados}

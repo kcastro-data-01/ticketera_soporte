@@ -740,7 +740,8 @@ def _aviso_comentario(destinatario, autor, ticket, comentario, config) -> Respue
     )
 
 
-def _aviso_estado(destinatario, autor, ticket, anterior, nuevo, motivo, config) -> Respuesta:
+def _aviso_estado(destinatario, autor, ticket, anterior, nuevo, motivo, config,
+                  cierre_dias: str | None = None) -> Respuesta:
     """Aviso de un cambio de estado hecho desde la app (``AVISAR_ESTADOS``),
     con el motivo si lo escribió. Si pasó a Cerrado, avisa que ya no admite
     cambios (una respuesta no se agrega como comentario)."""
@@ -759,6 +760,11 @@ def _aviso_estado(destinatario, autor, ticket, anterior, nuevo, motivo, config) 
     if not cerrado:
         partes.append(f"Si responde a este correo sin cambiar el asunto (debe mantener «[Ticket #{ticket.id}]»), "
                       "su respuesta se agrega como comentario del ticket.")
+    if (cierre_dias and nuevo == TicketState.RESOLVED.value
+            and destinatario.id == ticket.created_by_id):
+        # Cierre automático (CIERRE_AUTOMATICO): solo al solicitante.
+        partes.append("Si el problema continúa, responda este correo. Si no recibimos respuesta "
+                      f"en {cierre_dias}, el ticket se cerrará automáticamente.")
     partes.append("Mesa de ayuda")
     return Respuesta(
         para=destinatario.email,
@@ -1841,9 +1847,47 @@ def avisar_estado(session, ticket: Ticket, anterior: str, autor: User, motivo: s
     if config is None or not config.avisar_estados or anterior == ticket.state:
         return []
     motivo = (motivo or "").strip() or None
-    avisos = [_aviso_estado(usuario, autor, ticket, anterior, ticket.state, motivo, config)
+    from backend.services import cierre_service
+
+    cierre_dias = cierre_service.texto_dias(env) if cierre_service.activo(env) else None
+    avisos = [_aviso_estado(usuario, autor, ticket, anterior, ticket.state, motivo, config, cierre_dias)
               for usuario in _a_quienes_avisar(autor, ticket.creator, ticket.assignee).values()]
     return _enviar_avisos(session, config, avisos, "el cambio de estado", ticket.id, crear)
+
+
+def _aviso_cierre_automatico(destinatario, ticket, config) -> Respuesta:
+    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    partes = [
+        _saludo(destinatario.name),
+        f"El ticket #{ticket.id} se cerró automáticamente por falta de respuesta. Si el problema "
+        "continúa, envíe un nuevo correo para crear otro ticket.",
+        f"Título: {ticket.title}",
+        f"Puede verlo aquí: {enlace}",
+        "Mesa de ayuda",
+    ]
+    return Respuesta(
+        para=destinatario.email,
+        asunto=f"[Ticket #{ticket.id}] El ticket #{ticket.id} se cerró automáticamente",
+        texto="\n\n".join(partes),
+        ticket_id=ticket.id,
+    )
+
+
+def avisar_cierre_automatico(session, ticket: Ticket, env=None, crear=None) -> list[str]:
+    """Avisa el cierre automático (``CIERRE_AUTOMATICO``) al solicitante y al
+    asignado (uno solo si son la misma persona). Lo cerró «Sistema», así que
+    nadie queda afuera por ser el autor. Nunca lanza."""
+    from backend.services import cierre_service
+
+    config = config_desde_entorno(env)
+    if config is None or ticket is None or not cierre_service.activo(env):
+        return []
+    from types import SimpleNamespace
+
+    sistema = SimpleNamespace(id=None, name=cierre_service.AUTOR)  # no es una persona
+    avisos = [_aviso_cierre_automatico(usuario, ticket, config)
+              for usuario in _a_quienes_avisar(sistema, ticket.creator, ticket.assignee).values()]
+    return _enviar_avisos(session, config, avisos, "el cierre automático", ticket.id, crear)
 
 
 def avisar_asignacion(session, ticket: Ticket, anterior_id: int | None, autor: User, env=None,

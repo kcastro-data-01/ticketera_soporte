@@ -152,7 +152,7 @@ def test_cron_mode_does_not_start_the_thread(monkeypatch):
 ])
 def test_cron_requires_the_secret(client, monkeypatch, secreto, cabecera, estado):
     llamado = []
-    monkeypatch.setattr(cs, "revisar_una_vez", lambda: llamado.append(1) or {})
+    monkeypatch.setattr(cs, "revisar_una_vez", lambda **_: llamado.append(1) or {})
     monkeypatch.setenv("CRON_SECRET", secreto)
     headers = {"Authorization": cabecera} if cabecera else {}
     assert client.post("/api/cron/correo", headers=headers).status_code == estado
@@ -161,10 +161,11 @@ def test_cron_requires_the_secret(client, monkeypatch, secreto, cabecera, estado
 
 def test_cron_runs_one_cycle(client, monkeypatch):
     monkeypatch.setenv("CRON_SECRET", "s3creto-largo")
-    monkeypatch.setattr(cs, "revisar_una_vez", lambda: {"ticket": 2})
+    monkeypatch.setattr(cs, "revisar_una_vez", lambda **_: {"ticket": 2})
     resp = client.post("/api/cron/correo", headers={"Authorization": "Bearer s3creto-largo"})
     assert resp.status_code == 200
-    assert resp.json() == {"estado": "ok", "conteo": {"ticket": 2}}
+    # «cierre»: los tickets que cerró el cierre automático (apagado: 0).
+    assert resp.json() == {"estado": "ok", "conteo": {"ticket": 2}, "cierre": 0}
 
 
 @pytest.mark.parametrize("error, detalle", [
@@ -174,7 +175,7 @@ def test_cron_runs_one_cycle(client, monkeypatch):
 def test_cron_errors_are_503(client, monkeypatch, error, detalle):
     monkeypatch.setenv("CRON_SECRET", "s3creto-largo")
 
-    def falla():
+    def falla(**_):
         raise error
 
     monkeypatch.setattr(cs, "revisar_una_vez", falla)

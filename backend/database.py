@@ -138,6 +138,9 @@ def init_db(target_engine=None) -> None:
     from backend.migrate_add_it_areas import migrate_it_areas
 
     migrate_it_areas(db_engine)
+    from backend.migrate_add_ticket_resuelto_en import migrate_add_ticket_resuelto_en
+
+    migrate_add_ticket_resuelto_en(db_engine)
     if not es_sqlite(db_engine):
         # Una sola vez, en producción (Neon): #16 → #6 tras los borrados.
         from backend.migrate_renumber_tickets import migrate_renumber_tickets

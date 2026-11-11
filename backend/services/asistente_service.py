@@ -216,6 +216,11 @@ sesión»; si llega a cero, se cierra «por inactividad». Dura como máximo 10 
 desde que se inició sesión. Si vence pero la cuenta de Microsoft sigue conectada, \
 vuelve a entrar sola (salvo si se cerró por inactividad, por las 10 horas o a \
 mano). «Cerrar sesión» cierra todas las pestañas.
+- Cierre automático (si está activo): un ticket Resuelto se cierra solo si el \
+solicitante no responde en 3 días de lunes a sábado (el domingo no cuenta). Si \
+el solicitante comenta o responde el correo, vuelve a En proceso; los \
+comentarios de IT no lo reabren. Al cerrarse queda «Cerrado automáticamente por \
+falta de respuesta», hecho por «Sistema».
 - Mi cuenta: ver el nombre, el correo y el rol.
 - Contraseña olvidada: es la de Microsoft; la restablece el área de TI de la \
 empresa (la ticketera no la guarda).
@@ -1874,6 +1879,27 @@ def _app_sesion(user: User) -> str:
     )
 
 
+def _app_cierre_automatico(user: User) -> str:
+    from backend.services import cierre_service
+
+    if not cierre_service.activo():
+        return ("En esta ticketera el cierre automático no está activo: un ticket Resuelto pasa a "
+                "Cerrado solo cuando lo cierra un Técnico o un Administrador.")
+    dias = cierre_service.texto_dias()
+    return (
+        f"Un ticket en Resuelto se cierra solo si el solicitante no responde en {dias}.\n"
+        "- **Qué días cuentan**: de lunes a sábado; el domingo no cuenta. Por ejemplo, un ticket "
+        "resuelto el viernes a las 4:00 p. m. se cierra el martes a la misma hora.\n"
+        "- **Cuándo**: el detalle de un ticket Resuelto indica «Se cerrará automáticamente el … si "
+        "no hay respuesta».\n"
+        "- **Cómo evitarlo**: si el problema continúa, el solicitante comenta en el ticket o "
+        "responde el correo; el ticket vuelve a En proceso. Los comentarios de IT no lo reabren.\n"
+        "- **Al cerrarse**: el historial muestra «Cerrado automáticamente por falta de respuesta», "
+        "hecho por «Sistema», y el solicitante y el asignado reciben un correo. Si el problema "
+        "vuelve, cree un ticket nuevo."
+    )
+
+
 def _app_cerrar_sesion(user: User) -> str:
     return "En el menú lateral, pulse su nombre y elija «Cerrar sesión»."
 
@@ -1963,6 +1989,14 @@ PREGUNTAS_APP = [
      or re.search(r"\b(me (pide|saca|bota)|vuelve a pedir)\b.*\b(sesion|entrar|login|iniciar)\b", t)
      or re.search(r"\bsigue ahi\b|\bseguir conectad\w*", t),
      _app_sesion),
+    # «¿Cuándo se cierra un ticket resuelto?», «¿por qué se cerró mi ticket
+    # solo?», «cierre automático» (no «¿cómo cierro un ticket?»).
+    (lambda t: re.search(r"\bcierre automatic\w*|\bcerr\w* (solos?|solas?|automatic\w*)\b"
+                         r"|\bse (cierran?|cerro|cerraron|cerraran?) (solos?|solas?|automatic\w*)\b", t)
+     or (re.search(r"\b(por que|porque|xq|cuando|cuanto)\b", t)
+         and re.search(r"\b(se cierra|se cerro|se cerrara|cerrarse|cierra|cerro)\b", t)
+         and re.search(rf"\b({_TICKET}|resueltos?)\b", t)),
+     _app_cierre_automatico),
     (lambda t: re.search(r"\b(cerr\w*|cierr\w*|salir|termin\w*) (la |mi )?sesion\b|\b(log ?out|desloguear\w*)\b", t),
      _app_cerrar_sesion),
     (lambda t: re.search(r"\b(inici\w*|abr\w*|empez\w*) (la |mi )?sesion\b|\b(login|loguear\w*)\b"
@@ -2014,10 +2048,12 @@ def respuesta_app(user: User, pregunta: str) -> str | None:
                                 r"|\b(puedo|se pueden|puede) (adjuntar|subir|mandar|enviar)\b", t)
     # «¿cuánto dura la sesión?» tampoco.
     sesion = re.search(r"\bsesion\b", t)
+    cierre = re.search(r"\b(cierr\w*|cerr\w*)\b", t)
     for coincide, responder_a in PREGUNTAS_APP:
         if cuenta and responder_a is not _app_tiempo and not (
                 limite_adjuntos and responder_a is _app_adjuntos) and not (
-                sesion and responder_a is _app_sesion):
+                sesion and responder_a is _app_sesion) and not (
+                cierre and responder_a is _app_cierre_automatico):
             continue
         if coincide(t):
             texto = responder_a(user)

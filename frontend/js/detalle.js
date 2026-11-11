@@ -257,6 +257,27 @@ function pintarContenidoPaso(paso, tocable) {
   paso.replaceChildren(boton);
 }
 
+/* «martes 17 de noviembre a las 4:00 p. m.», en la hora de Costa Rica. */
+function fechaCierreAutomatico(valor) {
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return "";
+  const zona = { timeZone: "America/Costa_Rica" };
+  const dia = new Intl.DateTimeFormat("es-CR", { ...zona, weekday: "long", day: "numeric", month: "long" }).format(fecha);
+  const hora = new Intl.DateTimeFormat("es-CR", { ...zona, hour: "numeric", minute: "2-digit", hour12: true }).format(fecha);
+  return `${dia} a las ${hora}`;
+}
+
+/* En Resuelto con cierre automático: «Se cerrará automáticamente el … si no
+   hay respuesta». En los demás estados (o sin la función) no se muestra. */
+function pintarCierreAutomatico(ticket) {
+  const nota = document.getElementById("cierre-automatico");
+  if (!nota) return;
+  const cuando = ticket && ticket.state === "Resuelto" && ticket.cierre_automatico_en
+    ? fechaCierreAutomatico(ticket.cierre_automatico_en) : "";
+  nota.textContent = cuando ? `Se cerrará automáticamente el ${cuando} si no hay respuesta.` : "";
+  nota.hidden = !cuando;
+}
+
 function renderTicket(ticket) {
   const elements = getElements();
   ticketActual = ticket;
@@ -269,6 +290,7 @@ function renderTicket(ticket) {
   elements.ver.state.textContent = ticket.state;
   elements.ver.state.className = claseBadge(ticket.state);
   pintarPasos(ticket.state);
+  pintarCierreAutomatico(ticket);
   aplicarReglasTicket(ticket);
   /* Adjuntos (js/adjuntos.js): si cambió el estado, vuelve a pedir sus permisos. */
   if (typeof adjuntosTicketActualizado === "function") adjuntosTicketActualizado(ticket);

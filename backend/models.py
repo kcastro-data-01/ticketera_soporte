@@ -166,10 +166,22 @@ class Ticket(Base):
         default=utc_now,
         onupdate=utc_now,
     )
+    # Cuándo pasó a «Resuelto» por última vez (cierre automático, ver
+    # cierre_service). ``None`` fuera de Resuelto: al volver a resolverse, el
+    # contador empieza de nuevo.
+    resuelto_en: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
     assignee: Mapped[User | None] = relationship(
         back_populates="tickets", foreign_keys=[assigned_to_id]
     )
+
+    @property
+    def cierre_automatico_en(self) -> datetime | None:
+        """Cuándo se cerrará solo si sigue en Resuelto sin respuesta del
+        solicitante (``None`` si no está en Resuelto o la función está apagada)."""
+        from backend.services import cierre_service
+
+        return cierre_service.cierre_programado(self)
     area: Mapped[ItArea | None] = relationship(foreign_keys=[area_id])
 
     @property

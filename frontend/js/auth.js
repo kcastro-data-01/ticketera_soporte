@@ -594,6 +594,11 @@ function describirHistorial(entry) {
       };
     case "area_changed":
       return { accion: "Cambió el departamento", detalle: `${antes || SIN_AREA} → ${despues || SIN_AREA}` };
+    /* Cierre automático (backend/services/cierre_service.py). */
+    case "Cierre automático":
+      return { accion: "Cerrado automáticamente por falta de respuesta", detalle: `${antes ?? "Resuelto"} → ${despues ?? "Cerrado"}` };
+    case "Reabierto por respuesta":
+      return { accion: "Reabierto por respuesta del solicitante", detalle: `${antes ?? "Resuelto"} → ${despues ?? "En proceso"}` };
     case "Cambio de estado":
     case "state_changed":
       return { accion: "Cambió el estado", detalle: `${antes ?? "—"} → ${despues ?? "—"}` };

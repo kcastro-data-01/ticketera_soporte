@@ -46,6 +46,11 @@ services:
       AVISAR_ASIGNADO: ${AVISAR_ASIGNADO:-false}
       # Avisar por correo al solicitante y al asignado los cambios de estado.
       AVISAR_ESTADOS: ${AVISAR_ESTADOS:-false}
+      # Cierre automático de tickets Resuelto sin respuesta del solicitante
+      # (toda la función; apagado por defecto) y cuántos días de lunes a
+      # sábado esperar (acepta decimales para probar: 0.002 ≈ 3 minutos).
+      CIERRE_AUTOMATICO: ${CIERRE_AUTOMATICO:-false}
+      CIERRE_DIAS: ${CIERRE_DIAS:-3}
       # Dirección con la que los demás abren la app (va en los correos).
       APP_URL: ${APP_URL:-http://localhost:8000}
       # Avisar por correo los comentarios hechos en la app (en Docker,

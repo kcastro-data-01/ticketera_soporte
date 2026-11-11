@@ -126,6 +126,7 @@ def test_allowed_transition_returns_the_updated_ticket_shape(auth_client):
         "created_by_id",
         "created_at",
         "updated_at",
+        "cierre_automatico_en",
     }
     assert data["state"] == TicketState.IN_PROGRESS.value
 

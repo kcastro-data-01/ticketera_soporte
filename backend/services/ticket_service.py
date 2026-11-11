@@ -16,7 +16,7 @@ from backend.constants import (
     TicketState,
     UserRole,
 )
-from backend.models import Comment, History, ProcessedEmail, Ticket, User
+from backend.models import Comment, History, ProcessedEmail, Ticket, User, utc_now
 from backend.schemas import CommentCreate, TicketCreate, TicketUpdate
 from backend.services import area_service
 from backend.services.user_service import get_auto_assignable_users
@@ -702,6 +702,8 @@ def change_ticket_state(
         raise InvalidTransitionError(current_state.value, new_state.value)
 
     ticket.state = new_state.value  # ``updated_at`` refreshed by ``onupdate``
+    # Cierre automático: el contador empieza cada vez que pasa a Resuelto.
+    ticket.resuelto_en = utc_now() if new_state == TicketState.RESOLVED else None
     author_name, author_id = _audit_author(current_user)
     session.add(
         History(
@@ -739,9 +741,29 @@ def create_comment(
     _ensure_open(ticket)
 
     comment = _add_comment(session, ticket_id, payload.content, current_user)
+    _reabrir_si_responde_el_solicitante(session, ticket, current_user)
     session.commit()
     session.refresh(comment)
     return comment
+
+
+def _reabrir_si_responde_el_solicitante(session, ticket: Ticket, current_user: User | None) -> bool:
+    """Cierre automático: si el solicitante comenta (en la app o respondiendo
+    el correo) un ticket Resuelto, vuelve a En proceso, con su entrada de
+    historial. Los comentarios de IT (o del solicitante que también es el
+    asignado) no lo reabren. Sin ``CIERRE_AUTOMATICO``, nada."""
+    from backend.services import cierre_service
+
+    if (ticket.state != TicketState.RESOLVED.value or not cierre_service.activo()
+            or not cierre_service.es_solicitante(ticket, current_user)):
+        return False
+    ticket.state = TicketState.IN_PROGRESS.value
+    ticket.resuelto_en = None
+    session.add(History(ticket_id=ticket.id, action=cierre_service.ACCION_REAPERTURA, field="state",
+                        old_value=TicketState.RESOLVED.value, new_value=TicketState.IN_PROGRESS.value,
+                        author=current_user.name, author_id=current_user.id))
+    logger.info("Ticket #%s reabierto: respondió el solicitante %s", ticket.id, current_user.email)
+    return True
 
 
 def _add_comment(session, ticket_id: int, content: str, current_user: User | None) -> Comment:

@@ -129,6 +129,9 @@ class TicketResponse(BaseModel):
     area_name: str | None = None
     created_at: datetime
     updated_at: datetime
+    # Ticket Resuelto con CIERRE_AUTOMATICO: cuándo se cerrará solo si no hay
+    # respuesta del solicitante (``null`` en los demás casos).
+    cierre_automatico_en: datetime | None = None
 
 
 class UserCreate(BaseModel):

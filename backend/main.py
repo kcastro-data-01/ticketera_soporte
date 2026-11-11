@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
 from backend.entorno import en_vercel
-from backend.services import asistente_service, correo_service
+from backend.services import asistente_service, cierre_service, correo_service
 from backend.routers.adjuntos import router as adjuntos_router
 from backend.routers.areas import router as areas_router
 from backend.routers.departamentos import router as departamentos_router
@@ -35,8 +35,12 @@ async def lifespan(application: FastAPI):
     # tickets con los correos que llegan (en modo cron no hay hilo: lo hace
     # POST /api/cron/correo).
     correo_service.iniciar_lector()
+    # Cierre automático de tickets Resuelto (CIERRE_AUTOMATICO): en Docker,
+    # un hilo; en Vercel lo hace POST /api/cron/correo.
+    cierre_service.iniciar_hilo()
     yield
     correo_service.detener_lector()
+    cierre_service.detener_hilo()
 
 
 app = FastAPI(

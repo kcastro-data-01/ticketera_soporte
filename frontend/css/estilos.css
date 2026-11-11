@@ -3840,6 +3840,17 @@ td.con-avatar {
   color: var(--color-error-fondo);
 }
 
+/* ===== Cierre automático (detalle de un ticket Resuelto) =====
+   Nota bajo el recorrido de estados, con el tono de advertencia de la app
+   (claro y oscuro por las variables). */
+.cierre-automatico {
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--color-vacio);
+  border-radius: var(--radio-suave);
+  background: var(--color-vacio-fondo);
+  color: var(--color-texto);
+}
+
 /* ===== Aviso de inactividad («¿Sigue ahí?», sesion.js) =====
    Misma ventana que la de confirmación (claro y oscuro por las variables),
    por encima de cualquier otra ventana abierta. */

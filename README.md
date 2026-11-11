@@ -1358,6 +1358,49 @@ El asignado ve el ticket en su lista aunque sea **Solicitante**, lo comenta y
 le cambia el estado (solo en los tickets asignados a él); no lo edita,
 reasigna ni borra.
 
+### Cierre automático de tickets Resuelto
+
+Con **`CIERRE_AUTOMATICO=true`** (apagado por defecto; enciende toda la
+función, ver `backend/services/cierre_service.py`):
+
+- Un ticket en **Resuelto** pasa solo a **Cerrado** cuando pasan
+  `CIERRE_DIAS` días (3 por defecto) sin respuesta del solicitante (quien
+  creó el ticket). Son días de **24 horas de lunes a sábado**, con la hora de
+  Costa Rica (UTC−6, la misma de las métricas): el domingo no cuenta.
+
+  | Resuelto | Se cierra |
+  |---|---|
+  | lunes 10:00 | jueves 10:00 |
+  | viernes 16:00 | martes 16:00 |
+  | sábado 15:00 | miércoles 15:00 |
+  | domingo 11:00 | jueves 00:00 (empieza a contar el lunes) |
+
+  `CIERRE_DIAS` acepta decimales para probar en local (`0.002` ≈ 3 minutos).
+  Los días que cuentan están en `DIAS_QUE_CUENTAN`.
+- Con `AVISAR_ESTADOS=true`, el correo «pasó a Resuelto» al solicitante
+  agrega: «Si el problema continúa, responda este correo. Si no recibimos
+  respuesta en 3 días, el ticket se cerrará automáticamente.»
+- Si el **solicitante** comenta en la app o responde el correo mientras el
+  ticket está en Resuelto, vuelve a **En proceso** (historial: «Reabierto por
+  respuesta del solicitante»). Los comentarios de IT no lo reabren (tampoco
+  los del solicitante si él mismo es el asignado). La fecha de Resuelto
+  (`tickets.resuelto_en`) se vacía al salir de Resuelto, así que el contador
+  empieza de nuevo la próxima vez que se resuelva.
+- Al cerrarse: historial «Cerrado automáticamente por falta de respuesta»
+  (Resuelto → Cerrado), hecho por «Sistema», y un correo al solicitante y al
+  asignado (uno solo si son la misma persona): «El ticket #N se cerró
+  automáticamente por falta de respuesta. Si el problema continúa, envíe un
+  nuevo correo para crear otro ticket.»
+- El detalle de un ticket Resuelto muestra «Se cerrará automáticamente el
+  … si no hay respuesta» (`cierre_automatico_en` en la API).
+- **Quién revisa:** en Vercel, `POST /api/cron/correo` (el cron de cada
+  minuto) cierra primero, con un tope de 5 s y 10 cierres por llamada y su
+  propio candado de Postgres, aunque el correo esté apagado; el buzón usa el
+  resto de los 25 s. En Docker, un hilo cada 60 s.
+- **Tickets que ya estaban en Resuelto:** la migración
+  `migrate_add_ticket_resuelto_en` les pone como fecha el primer arranque de
+  esta versión, así no se cierran todos de golpe.
+
 ### Requisitos en Microsoft Entra ID (Azure)
 
 App registrada con:
@@ -1573,6 +1616,7 @@ se ve, sin «Volver a explicar»).
    | `AVISAR_ASIGNADO` | `true` (avisa las asignaciones y reasignaciones; ya hay un enlace público) |
    | `AVISAR_COMENTARIOS` | `true` (ya es el valor por defecto en Vercel; queda explícito) |
    | `AVISAR_ESTADOS` | `true` (avisa los cambios de estado) |
+   | `CIERRE_AUTOMATICO` | `true` (cierra solos los tickets Resuelto sin respuesta en 3 días de lunes a sábado; `CIERRE_DIAS` opcional, 3 por defecto) |
    | `APP_URL` | `https://tickets-americandata.vercel.app` |
    | `ASISTENTE_PROVEEDOR` | `groq` (sin ella la IA queda apagada) |
    | `GROQ_API_KEY` | la clave de <https://console.groq.com/keys> (secreta) |
