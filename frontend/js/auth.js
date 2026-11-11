@@ -4,13 +4,36 @@
 
 const TOKEN_KEY = "access_token";
 const USER_KEY = "user";
+/* Sesión (ver sesion.js): por qué se cerró la última («vencida»,
+   «inactividad», «maxima» o «manual»), cuándo empezó (ms; el máximo de
+   horas cuenta desde ahí) y la última actividad en cualquier pestaña (ms). */
+const SESION_CIERRE_KEY = "sesion_cierre";
+const SESION_INICIO_KEY = "sesion_inicio";
+const SESION_ACTIVIDAD_KEY = "sesion_actividad";
+
+function leerAlmacen(clave) {
+  try {
+    return localStorage.getItem(clave);
+  } catch {
+    return null;
+  }
+}
+
+function guardarAlmacen(clave, valor) {
+  try {
+    if (valor === null || valor === undefined) localStorage.removeItem(clave);
+    else localStorage.setItem(clave, String(valor));
+  } catch {
+    /* Sin almacenamiento la sesión dura lo que la página. */
+  }
+}
 
 function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return leerAlmacen(TOKEN_KEY);
 }
 
 function getUser() {
-  const raw = localStorage.getItem(USER_KEY);
+  const raw = leerAlmacen(USER_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw);
@@ -19,14 +42,55 @@ function getUser() {
   }
 }
 
+/* Datos del token de la app (exp, ini, max en segundos), o null si no se
+   puede leer. Solo para saber cuándo vence: el servidor es quien valida. */
+function datosToken(token = getToken()) {
+  if (!token || typeof token !== "string") return null;
+  const partes = token.split(".");
+  if (partes.length !== 3) return null;
+  try {
+    const base = partes[1].replace(/-/g, "+").replace(/_/g, "/");
+    const relleno = base + "=".repeat((4 - (base.length % 4)) % 4);
+    const texto = typeof atob === "function" ? atob(relleno) : Buffer.from(relleno, "base64").toString("binary");
+    const datos = JSON.parse(decodeURIComponent(escape(texto)));
+    return datos && typeof datos === "object" ? datos : null;
+  } catch {
+    return null;
+  }
+}
+
+/* «vencida» si el token ya no sirve, «maxima» si además pasó el máximo de
+   horas desde el inicio de sesión, null si sigue vigente o no se puede leer. */
+function estadoToken(token = getToken(), ahora = Date.now()) {
+  const datos = datosToken(token);
+  if (!datos) return null;
+  if (Number.isFinite(datos.max) && ahora >= datos.max * 1000) return "maxima";
+  if (Number.isFinite(datos.exp) && ahora >= datos.exp * 1000) return "vencida";
+  return null;
+}
+
 function saveSession(token, user) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  guardarAlmacen(TOKEN_KEY, token);
+  if (user !== undefined) guardarAlmacen(USER_KEY, JSON.stringify(user));
+  recordarInicio(token);
+  guardarAlmacen(SESION_CIERRE_KEY, null);
+}
+
+/* Cuándo empezó la sesión (claim ini; los tokens de antes no lo traen y se
+   usa iat), para que el login sepa si todavía puede entrar en silencio. */
+function recordarInicio(token = getToken()) {
+  const datos = datosToken(token);
+  const inicio = datos && (Number.isFinite(datos.ini) ? datos.ini : datos.iat);
+  if (Number.isFinite(inicio)) guardarAlmacen(SESION_INICIO_KEY, inicio * 1000);
 }
 
 function clearSession() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  } catch {
+    /* Nada guardado. */
+  }
   try {
     sessionStorage.removeItem("asistente_chat");
   } catch {
@@ -38,23 +102,54 @@ function isAuthenticated() {
   return getToken() !== null;
 }
 
-/* Redirige a login.html si no hay token. Devuelve true si hay sesión. */
+/* La página actual («detalle.html?id=5»), para volver a ella después de
+   entrar de nuevo. */
+function paginaActual() {
+  const loc = typeof window !== "undefined" && window.location ? window.location : null;
+  if (!loc || typeof loc.pathname !== "string") return "";
+  const archivo = loc.pathname.split("/").pop() || "index.html";
+  return `${archivo}${loc.search || ""}`;
+}
+
+/* Cierra la sesión en todas las pestañas (las demás lo ven en localStorage)
+   y va al login. ``motivo``: «manual», «inactividad», «maxima» o «vencida».
+   Solo con «vencida» el login intenta volver a entrar en silencio con
+   Microsoft y regresar a esta página. */
+function cerrarSesion(motivo = "manual") {
+  clearSession();
+  guardarAlmacen(SESION_CIERRE_KEY, motivo);
+  if (motivo !== "vencida") {
+    guardarAlmacen(SESION_INICIO_KEY, null);
+    guardarAlmacen(SESION_ACTIVIDAD_KEY, null);
+  }
+  const volver = motivo === "vencida" ? paginaActual() : "";
+  if (typeof window !== "undefined" && window.location) {
+    window.location.href = volver ? `login.html?volver=${encodeURIComponent(volver)}` : "login.html";
+  }
+}
+
+/* Redirige a login.html si no hay token (o ya venció). Devuelve true si hay sesión. */
 function requireAuth() {
   if (!isAuthenticated()) {
     window.location.href = "login.html";
     return false;
   }
+  const estado = estadoToken();
+  if (estado) {
+    cerrarSesion(estado);
+    return false;
+  }
   return true;
 }
 
-/* Cierra sesión: limpia localStorage y redirige a login. */
+/* Cierra sesión: limpia la sesión en todas las pestañas y redirige a login. */
 function logout() {
-  clearSession();
-  window.location.href = "login.html";
+  cerrarSesion("manual");
 }
 
 /* Fetch con Authorization header incluido automáticamente.
-   Si la API responde 401, limpia la sesión y redirige a login. */
+   Si la API responde 401, la sesión venció: va al login, que intenta volver
+   a entrar en silencio con Microsoft. */
 async function fetchWithAuth(url, options = {}) {
   const token = getToken();
   const headers = { ...options.headers };
@@ -70,8 +165,7 @@ async function fetchWithAuth(url, options = {}) {
   const response = await fetch(url, { ...options, headers });
 
   if (response.status === 401 && token) {
-    clearSession();
-    window.location.href = "login.html";
+    cerrarSesion(estadoToken(token) === "maxima" ? "maxima" : "vencida");
     throw new Error("La sesión expiró. Inicie sesión nuevamente.");
   }
 

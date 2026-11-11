@@ -29,6 +29,8 @@ services:
       # Inicio de sesión con Microsoft (misma app): ver README.
       ADMIN_INICIAL: ${ADMIN_INICIAL:-}
       LOGIN_LOCAL: ${LOGIN_LOCAL:-false}
+      # Máximo de horas de una sesión desde que se inicia (0.1 = 6 min, para probar).
+      SESION_MAXIMA_HORAS: ${SESION_MAXIMA_HORAS:-10}
       DOMINIO_EMPRESA: ${DOMINIO_EMPRESA:-}
       # Caché de tokens dentro del volumen: la sesión sobrevive reinicios.
       CORREO_M365_CACHE: /data/msal_cache.json

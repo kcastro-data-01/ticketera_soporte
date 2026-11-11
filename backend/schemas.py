@@ -504,6 +504,10 @@ class MicrosoftLoginRequest(BaseModel):
     that MSAL.js got from Microsoft."""
 
     id_token: str = Field(min_length=1)
+    # Al volver a entrar en silencio (sesión vencida, cuenta de Microsoft
+    # conectada): cuándo empezó la sesión anterior, en segundos Unix, para
+    # que el máximo de horas siga contando desde ahí.
+    inicio: int | None = None
 
 
 class LoginConfigResponse(BaseModel):
@@ -512,6 +516,9 @@ class LoginConfigResponse(BaseModel):
     tenant: str
     client_id: str
     login_local: bool
+    # Máximo de horas de una sesión (SESION_MAXIMA_HORAS): pasado ese tiempo
+    # el login no vuelve a entrar en silencio.
+    sesion_maxima_horas: float = 10.0
 
 
 class TokenResponse(BaseModel):

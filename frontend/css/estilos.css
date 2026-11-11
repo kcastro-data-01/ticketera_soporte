@@ -3840,6 +3840,23 @@ td.con-avatar {
   color: var(--color-error-fondo);
 }
 
+/* ===== Aviso de inactividad («¿Sigue ahí?», sesion.js) =====
+   Misma ventana que la de confirmación (claro y oscuro por las variables),
+   por encima de cualquier otra ventana abierta. */
+.dialogo-sesion {
+  z-index: 1400;
+}
+
+.dialogo-cuenta {
+  margin: 0.75rem 0 0;
+  color: var(--color-tenue-fuerte);
+}
+
+.dialogo-cuenta-tiempo {
+  color: var(--color-titulo);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ===== Usuarios: ventana para agregar y editar =====
    <dialog> con showModal(): mismo aspecto que la ventana de confirmación,
    más ancha, con los campos en dos columnas (una en el celular). No se le

@@ -46,7 +46,8 @@ test("los scripts externos usan versión fija y hash de integridad", () => {
 
 test("vercel.json manda CSP estricta y las cabeceras de seguridad", () => {
   const config = JSON.parse(fs.readFileSync(path.join(FRONTEND, "..", "vercel.json"), "utf8"));
-  const bloque = config.headers.find((h) => h.source === "/(.*)");
+  // Todas las rutas menos msal/silencioso.html (la del iframe de MSAL, abajo).
+  const bloque = config.headers.find((h) => h.source === "/((?!msal/silencioso\\.html).*)");
   const cabeceras = Object.fromEntries(bloque.headers.map((h) => [h.key, h.value]));
   assert.equal(cabeceras["X-Content-Type-Options"], "nosniff");
   assert.equal(cabeceras["X-Frame-Options"], "DENY");
@@ -70,6 +71,25 @@ test("vercel.json manda CSP estricta y las cabeceras de seguridad", () => {
   }
   assert.match(csp, /img-src [^;]*blob:/);
   assert.match(csp, /connect-src [^;]*https:\/\/login\.microsoftonline\.com/);
+  // Solo el iframe oculto de MSAL (ssoSilent): Microsoft y la vuelta a la
+  // página vacía propia.
+  assert.equal(csp.match(/frame-src ([^;]+)/)[1], "'self' https://login.microsoftonline.com");
+});
+
+test("msal/silencioso.html: vacía, sin scripts, y solo la puede enmarcar la misma ticketera", () => {
+  const config = JSON.parse(fs.readFileSync(path.join(FRONTEND, "..", "vercel.json"), "utf8"));
+  const reglas = config.headers.map((h) => new RegExp(`^${h.source}$`));
+  assert.equal(reglas.filter((r) => r.test("/msal/silencioso.html")).length, 1, "una sola regla");
+  assert.equal(reglas.filter((r) => r.test("/login.html")).length, 1);
+  assert.equal(reglas.filter((r) => r.test("/index.html")).length, 1);
+  const bloque = config.headers.find((h) => h.source === "/msal/silencioso.html");
+  const cabeceras = Object.fromEntries(bloque.headers.map((h) => [h.key, h.value]));
+  assert.equal(cabeceras["X-Frame-Options"], "SAMEORIGIN");
+  assert.equal(cabeceras["X-Content-Type-Options"], "nosniff");
+  assert.match(cabeceras["Content-Security-Policy"], /default-src 'none'/);
+  assert.match(cabeceras["Content-Security-Policy"], /frame-ancestors 'self'/);
+  const html = fs.readFileSync(path.join(FRONTEND, "msal", "silencioso.html"), "utf8");
+  assert.doesNotMatch(html, /<script|<link|<img|<style/);
 });
 
 test("ningún archivo publicado contiene secretos", () => {

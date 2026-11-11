@@ -1,13 +1,22 @@
 """Authentication endpoints: Microsoft login, local login (development
 only, ``LOGIN_LOCAL``) and current user."""
 
+from datetime import datetime, timezone
+
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend import auth as auth_config
 from backend.auth import (
+    bearer_scheme,
     create_access_token,
+    decode_access_token,
     get_current_user,
+    inicio_de_sesion,
+    inicio_valido,
     login_local_activo,
     verify_password,
 )
@@ -118,9 +127,35 @@ def _get_user_by_email(session: Session, email: str) -> User | None:
     )
 
 
-def _token_de(user: User) -> TokenResponse:
-    token, expires_in = create_access_token(user.id, user.role)
+def _token_de(user: User, inicio: datetime | None = None) -> TokenResponse:
+    token, expires_in = create_access_token(user.id, user.role, inicio)
     return TokenResponse(access_token=token, token_type="bearer", expires_in=expires_in)
+
+
+@router.post(
+    "/renovar",
+    response_model=TokenResponse,
+    summary="Renovar la sesión",
+)
+def renovar_sesion(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    current_user: User | None = Depends(get_current_user),
+) -> TokenResponse:
+    """Sesión deslizante: con el token vigente entrega uno nuevo, con el mismo
+    inicio de sesión. Nunca pasa del máximo (``SESION_MAXIMA_HORAS`` desde el
+    inicio): después responde 401 y hay que volver a entrar. Con el token
+    vencido, inválido o el usuario desactivado, 401."""
+    if current_user is None or credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
+    try:
+        payload = decode_access_token(credentials.credentials)
+    except jwt.InvalidTokenError:  # pragma: no cover — get_current_user ya lo validó
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
+    maximo = payload.get("max")
+    if maximo is not None and datetime.now(timezone.utc).timestamp() >= int(maximo):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="La sesión llegó al máximo de horas")
+    return _token_de(current_user, inicio_de_sesion(payload))
 
 
 @router.get(
@@ -135,6 +170,7 @@ def login_config() -> LoginConfigResponse:
         tenant=login_microsoft.tenant(),
         client_id=login_microsoft.client_id(),
         login_local=login_local_activo(),
+        sesion_maxima_horas=auth_config.SESION_MAXIMA_HORAS,
     )
 
 
@@ -168,7 +204,7 @@ def login_with_microsoft(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="El usuario está desactivado",
         )
-    return _token_de(user)
+    return _token_de(user, inicio_valido(payload.inicio))
 
 
 @router.post(

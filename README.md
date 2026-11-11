@@ -1109,10 +1109,43 @@ misma app registrada del correo (`CORREO_M365_TENANT` y
    correo de Microsoft. Quien ya existe mantiene su rol (lo cambia un
    Administrador en Usuarios). Una cuenta desactivada no entra.
 
+### Sesión: renovación, inactividad y máximo de horas
+
+- **Sesión deslizante.** El token de la app dura `JWT_EXPIRATION_MINUTES` (60)
+  y lleva cuándo empezó la sesión (`ini`) y su límite (`max`). Mientras la
+  persona usa la app, `frontend/js/sesion.js` lo renueva solo con
+  `POST /api/auth/renovar` (token vigente → token nuevo con el mismo `ini`),
+  como mucho cada 5 minutos y solo si hubo actividad. Nunca pasa de
+  `SESION_MAXIMA_HORAS` (10) desde el inicio: después responde 401 y hay que
+  volver a entrar.
+- **Inactividad.** Actividad es mover el mouse, escribir, hacer clic, tocar la
+  pantalla o usar la rueda, en **cualquier pestaña** de la ticketera (se anota
+  en `localStorage`). Con 30 minutos sin actividad aparece «¿Sigue ahí?» con
+  2 minutos de cuenta regresiva: «Seguir conectado» renueva y cierra el aviso
+  en todas las pestañas; «Cerrar sesión» o llegar a cero cierra la sesión en
+  todas («Su sesión se cerró por inactividad» en el login). Los tiempos están
+  en `SESION_TIEMPOS`, al principio de `sesion.js`.
+- **Al volver a la pestaña o desde otra página.** Si la sesión venció (y no se
+  cerró a mano, por inactividad ni por el máximo), `login.html` vuelve a
+  entrar en silencio con MSAL: primero `acquireTokenSilent` con la caché de
+  MSAL (en `localStorage`, la cifra MSAL), y si no hay, `ssoSilent` con un
+  iframe oculto que vuelve a `msal/silencioso.html` (página vacía; es la única
+  que se puede enmarcar, y solo desde la misma ticketera). Manda el `ini`
+  anterior, así el máximo sigue contando desde el primer inicio de sesión, y
+  regresa a la misma página (`?volver=`, solo páginas propias). Si falla,
+  queda el botón de siempre.
+- **Probar en local sin esperar.** Abra
+  <http://localhost:8000/index.html?sesion_rapida=1>: 2 minutos de inactividad
+  y 30 segundos de aviso (renueva cada 20 s), recordado en ese navegador y
+  **solo en localhost**. `?sesion_rapida=0` vuelve a lo normal. Para probar el
+  máximo, `SESION_MAXIMA_HORAS=0.1` (6 minutos) en el `.env` y
+  `docker compose up -d --no-deps ticketera`.
+
 ### Requisitos en Microsoft Entra ID
 
-En la app registrada: plataforma **Aplicación de página única** con la URI de
-redirección `http://localhost:8000/login.html` (o `APP_URL/login.html`) y el
+En la app registrada: plataforma **Aplicación de página única** con las URI de
+redirección `http://localhost:8000/login.html` y
+`http://localhost:8000/msal/silencioso.html` (o las mismas con `APP_URL`) y el
 permiso `User.Read` con consentimiento de administrador. No hace falta secreto.
 
 ### Configuración
@@ -1588,8 +1621,10 @@ se ve, sin «Volver a explicar»).
    iniciada o venció» (contraseña cambiada, sesión revocada, ~90 días sin uso).
 8. **Microsoft Entra ID.** *App registrations →* la app de la ticketera *→
    Authentication →* en la plataforma **Single-page application** agregar la
-   URI `https://tickets-americandata.vercel.app/login.html` (dejar la de
-   `http://localhost:8000/login.html` para Docker) y guardar. En *Overview*,
+   URI `https://tickets-americandata.vercel.app/login.html` y
+   `https://tickets-americandata.vercel.app/msal/silencioso.html` (para volver
+   a entrar en silencio; dejar las de `http://localhost:8000` para Docker) y
+   guardar. En *Overview*,
    *Supported account types* tiene que ser «Accounts in this organizational
    directory only». El backend además rechaza invitados (otro `idp`) y
    correos que no sean `@data.cr`.

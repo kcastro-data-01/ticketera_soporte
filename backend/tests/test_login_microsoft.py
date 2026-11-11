@@ -137,6 +137,7 @@ def test_without_configuration_the_login_is_unavailable(client, monkeypatch):
 def test_public_config_for_the_login_page(client):
     assert client.get("/api/auth/config").json() == {
         "tenant": "data.cr", "client_id": CLIENT_ID, "login_local": True,
+        "sesion_maxima_horas": 10.0,
     }
 
 

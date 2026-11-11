@@ -95,7 +95,8 @@ test("las pantallas con menú lateral no tienen otro «Cerrar sesión» ni el bl
   assert.ok(PAGINAS_CON_MENU.length >= 8, PAGINAS_CON_MENU.join(", "));
   for (const pagina of PAGINAS_CON_MENU) {
     const html = leer(pagina);
-    assert.doesNotMatch(html, /btn-logout|barra-salir|barra-usuario|Cerrar sesión/, pagina);
+    // Ningún botón o enlace «Cerrar sesión» (la ayuda sí lo nombra en el texto).
+    assert.doesNotMatch(html, /btn-logout|barra-salir|barra-usuario|>\s*Cerrar sesión\s*</, pagina);
     assert.match(html, /<script src="js\/auth\.js" defer><\/script>/, `${pagina}: carga auth.js, que crea el menú`);
   }
 });

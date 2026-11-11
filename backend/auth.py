@@ -22,6 +22,21 @@ if en_vercel() and JWT_SECRET_KEY == "dev-secret-key-change-in-production":
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", "60"))
 
+
+def _sesion_maxima_horas() -> float:
+    """``SESION_MAXIMA_HORAS`` (10 por defecto): pasado ese tiempo desde el
+    inicio de sesión, ninguna renovación la alarga y hay que volver a entrar.
+    Acepta decimales (``0.1`` = 6 minutos, para probar en local)."""
+    valor = (os.environ.get("SESION_MAXIMA_HORAS") or "").strip().replace(",", ".")
+    try:
+        horas = float(valor) if valor else 10.0
+    except ValueError:
+        horas = 10.0
+    return horas if horas > 0 else 10.0
+
+
+SESION_MAXIMA_HORAS = _sesion_maxima_horas()
+
 # Security scheme for extracting Bearer token from Authorization header
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -50,24 +65,56 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(password_bytes, hashed_bytes)
 
 
-def create_access_token(user_id: int, role: str) -> tuple[str, int]:
+def create_access_token(user_id: int, role: str, inicio: datetime | None = None) -> tuple[str, int]:
     """Create a JWT access token.
+
+    ``inicio`` es cuándo se inició la sesión (por defecto, ahora): la
+    renovación lo conserva. El token dura ``JWT_EXPIRATION_MINUTES`` pero
+    nunca pasa de ``inicio`` + ``SESION_MAXIMA_HORAS`` (claims ``ini`` y
+    ``max``, en segundos Unix, para que el navegador sepa cuándo termina).
 
     Returns a tuple of (token, expires_in_seconds).
     """
-    expires_delta = timedelta(minutes=JWT_EXPIRATION_MINUTES)
-    expire = datetime.now(timezone.utc) + expires_delta
+    ahora = datetime.now(timezone.utc)
+    inicio = inicio or ahora
+    maximo = inicio + timedelta(hours=SESION_MAXIMA_HORAS)
+    expire = min(ahora + timedelta(minutes=JWT_EXPIRATION_MINUTES), maximo)
 
     payload = {
         "sub": str(user_id),
         "role": role,
         "exp": expire,
-        "iat": datetime.now(timezone.utc),
+        "iat": ahora,
+        "ini": int(inicio.timestamp()),
+        "max": int(maximo.timestamp()),
     }
 
     token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-    expires_in = int(expires_delta.total_seconds())
+    expires_in = max(0, int((expire - ahora).total_seconds()))
     return token, expires_in
+
+
+def inicio_de_sesion(payload: dict) -> datetime:
+    """Cuándo empezó la sesión de un token (``ini``; los tokens de antes de
+    la sesión deslizante no lo traen y se usa ``iat``)."""
+    valor = payload.get("ini", payload.get("iat", 0))
+    return datetime.fromtimestamp(int(valor), tz=timezone.utc)
+
+
+def inicio_valido(valor: int | float | None) -> datetime | None:
+    """Un inicio de sesión que manda el navegador al volver a entrar en
+    silencio: sirve solo si está en el pasado y dentro del máximo (si no,
+    ``None`` y la sesión empieza ahora). Solo puede acortar la sesión."""
+    if valor is None:
+        return None
+    try:
+        inicio = datetime.fromtimestamp(float(valor), tz=timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        return None
+    ahora = datetime.now(timezone.utc)
+    if inicio > ahora or ahora - inicio >= timedelta(hours=SESION_MAXIMA_HORAS):
+        return None
+    return inicio
 
 
 def decode_access_token(token: str) -> dict:

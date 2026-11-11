@@ -209,6 +209,13 @@ subió o el Administrador. En un ticket Cerrado no se agregan ni se eliminan.
 - Inicio de sesión: solo con la cuenta de Microsoft de la empresa (botón \
 «Iniciar sesión con Microsoft»); no hay registro ni contraseña propia de la \
 ticketera. La primera vez la cuenta se crea sola como Solicitante.
+- Sesión: se renueva sola mientras se usa la app. Con 30 minutos sin actividad \
+(mouse, teclado, clics o toques, en cualquier pestaña) aparece «¿Sigue ahí?» con \
+una cuenta regresiva de 2 minutos y los botones «Seguir conectado» y «Cerrar \
+sesión»; si llega a cero, se cierra «por inactividad». Dura como máximo 10 horas \
+desde que se inició sesión. Si vence pero la cuenta de Microsoft sigue conectada, \
+vuelve a entrar sola (salvo si se cerró por inactividad, por las 10 horas o a \
+mano). «Cerrar sesión» cierra todas las pestañas.
 - Mi cuenta: ver el nombre, el correo y el rol.
 - Contraseña olvidada: es la de Microsoft; la restablece el área de TI de la \
 empresa (la ticketera no la guarda).
@@ -1852,6 +1859,21 @@ def _app_iniciar_sesion(user: User) -> str:
             "se crea sola como Solicitante.")
 
 
+def _app_sesion(user: User) -> str:
+    return (
+        "Mientras usa la ticketera, la sesión se renueva sola.\n"
+        "- **Inactividad**: si pasan 30 minutos sin mover el mouse, escribir, hacer clic ni tocar "
+        "la pantalla en ninguna pestaña de la ticketera, aparece «¿Sigue ahí?» con una cuenta "
+        "regresiva de 2 minutos. Pulse «Seguir conectado» para continuar; si la cuenta llega a "
+        "cero, la sesión se cierra por inactividad.\n"
+        "- **Máximo**: una sesión dura como máximo 10 horas desde que inició sesión; después hay "
+        "que volver a entrar con «Iniciar sesión con Microsoft».\n"
+        "- **Al volver de otra página**: si la sesión venció pero su cuenta de Microsoft sigue "
+        "conectada, la ticketera vuelve a entrar sola, salvo que se haya cerrado por inactividad, "
+        "por las 10 horas o con «Cerrar sesión»."
+    )
+
+
 def _app_cerrar_sesion(user: User) -> str:
     return "En el menú lateral, pulse su nombre y elija «Cerrar sesión»."
 
@@ -1932,6 +1954,15 @@ def _app_cambiar_estado_solicitante(user: User) -> str | None:
 # (cómo se reconoce en la pregunta normalizada, respuesta según el usuario), en orden.
 PREGUNTAS_APP = [
     (lambda t: _PIDE_GENERAL.search(t), _app_general),
+    # «¿Por qué se cerró mi sesión?», «¿cuánto dura la sesión?»: antes que
+    # «cerrar sesión» (que también calza con «se cerró mi sesión»).
+    (lambda t: re.search(r"\binactiv\w*", t)
+     or re.search(r"\b(por que|porque|xq|cuanto|cuando)\b.*\bsesion\b", t)
+     or re.search(r"\b(se (me )?(cerro|cierra|cayo|venc\w*|expir\w*|termin\w*))\b.*\bsesion\b", t)
+     or re.search(r"\bsesion\b.*\b(venc\w*|expir\w*|dura\w*|caduc\w*)\b", t)
+     or re.search(r"\b(me (pide|saca|bota)|vuelve a pedir)\b.*\b(sesion|entrar|login|iniciar)\b", t)
+     or re.search(r"\bsigue ahi\b|\bseguir conectad\w*", t),
+     _app_sesion),
     (lambda t: re.search(r"\b(cerr\w*|cierr\w*|salir|termin\w*) (la |mi )?sesion\b|\b(log ?out|desloguear\w*)\b", t),
      _app_cerrar_sesion),
     (lambda t: re.search(r"\b(inici\w*|abr\w*|empez\w*) (la |mi )?sesion\b|\b(login|loguear\w*)\b"
@@ -1981,9 +2012,12 @@ def respuesta_app(user: User, pregunta: str) -> str | None:
     # tampoco cuentan tickets.
     limite_adjuntos = re.search(r"\b(pesa\w*|peso|tamano|mb|megas?)\b"
                                 r"|\b(puedo|se pueden|puede) (adjuntar|subir|mandar|enviar)\b", t)
+    # «¿cuánto dura la sesión?» tampoco.
+    sesion = re.search(r"\bsesion\b", t)
     for coincide, responder_a in PREGUNTAS_APP:
         if cuenta and responder_a is not _app_tiempo and not (
-                limite_adjuntos and responder_a is _app_adjuntos):
+                limite_adjuntos and responder_a is _app_adjuntos) and not (
+                sesion and responder_a is _app_sesion):
             continue
         if coincide(t):
             texto = responder_a(user)

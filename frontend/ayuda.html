@@ -6,13 +6,13 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Ayuda · American Data Networks</title>
   <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
-  <script src="js/tema.js?v=20261110-2"></script>
+  <script src="js/tema.js?v=20261111-1"></script>
   <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="css/estilos.css?v=20261110-2">
+  <link rel="stylesheet" href="css/estilos.css?v=20261111-1">
 </head>
 <body class="app">
   <aside class="barra-lateral">
@@ -306,6 +306,10 @@
             <dd>Cada rol ve solo las pantallas que puede usar. Consulte la tabla «Permisos por rol» en «Roles y permisos».</dd>
             <dt>¿Puedo cambiar mi contraseña?</dt>
             <dd>Se entra con la cuenta de Microsoft de la empresa, así que la contraseña es la de Microsoft: se cambia allí o con el área de TI. La ticketera no guarda contraseñas.</dd>
+            <dt>¿Por qué se cerró mi sesión?</dt>
+            <dd>Mientras usa la ticketera, la sesión se renueva sola. Si pasan 30 minutos sin actividad (sin mover el mouse, escribir, hacer clic ni tocar la pantalla en ninguna pestaña de la ticketera), aparece la ventana «¿Sigue ahí?» con una cuenta regresiva de 2 minutos: pulse «Seguir conectado» para continuar o «Cerrar sesión» para salir. Si la cuenta llega a cero, la sesión se cierra en todas las pestañas y el inicio de sesión muestra «Su sesión se cerró por inactividad». Además, una sesión dura como máximo 10 horas desde que inició sesión; después hay que volver a entrar.</dd>
+            <dt>¿Tengo que volver a iniciar sesión si salgo a otra página?</dt>
+            <dd>No. Si vuelve y la sesión venció, pero su cuenta de Microsoft sigue conectada en el navegador, la ticketera vuelve a entrar sola y lo lleva a la misma pantalla. Solo pide pulsar «Iniciar sesión con Microsoft» si la sesión se cerró por inactividad, si pasaron 10 horas desde que inició sesión, si usted cerró la sesión o si la cuenta de Microsoft ya no está conectada. «Cerrar sesión» la cierra en todas las pestañas.</dd>
             <dt>¿Qué departamento elijo?</dt>
             <dd>El que atiende su pedido: Soporte IT (computadoras, impresoras, programas), Redes e Infraestructura (internet, wifi, servidores, VPN), Ciberseguridad (accesos, contraseñas, cuentas, incidentes de seguridad) o Programación (sistemas internos, Odoo, desarrollos y reportes). Si se equivoca, IT lo pasa al correcto.</dd>
             <dt>¿Cómo sé quién atiende mi ticket?</dt>
@@ -327,9 +331,10 @@
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
-  <script src="js/auth.js?v=20261110-2" defer></script>
-  <script src="js/asistente.js?v=20261110-2" defer></script>
-  <script src="js/ayuda.js?v=20261110-2" defer></script>
-  <script src="js/guardia.js?v=20261110-2"></script>
+  <script src="js/auth.js?v=20261111-1" defer></script>
+  <script src="js/sesion.js?v=20261111-1" defer></script>
+  <script src="js/asistente.js?v=20261111-1" defer></script>
+  <script src="js/ayuda.js?v=20261111-1" defer></script>
+  <script src="js/guardia.js?v=20261111-1"></script>
 </body>
 </html>
