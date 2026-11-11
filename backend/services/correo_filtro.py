@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import threading
 import time
@@ -26,6 +27,8 @@ from dataclasses import dataclass
 logger = logging.getLogger("backend.services.correo_service")
 
 MAX_TEXTO_IA = 800
+# Segundos que se espera a la IA; se cambia con CORREO_TIMEOUT_IA (en local,
+# Ollama con CPU necesita más: por ejemplo 90).
 TIMEOUT_IA = 8.0
 PAUSA_TRAS_FALLA = 60.0
 
@@ -208,6 +211,23 @@ def ia_disponible() -> bool:
     return asistente_service.ia_activa()
 
 
+def timeout_ia(env=None) -> float:
+    """``CORREO_TIMEOUT_IA`` en segundos, o :data:`TIMEOUT_IA` si no está o
+    no es un número mayor que 0."""
+    env = os.environ if env is None else env
+    valor = (env.get("CORREO_TIMEOUT_IA") or "").strip()
+    if not valor:
+        return TIMEOUT_IA
+    try:
+        segundos = float(valor.replace(",", "."))
+    except ValueError:
+        segundos = 0.0
+    if segundos <= 0:
+        logger.warning("CORREO_TIMEOUT_IA=%s no es válido: se usan %s s", valor, TIMEOUT_IA)
+        return TIMEOUT_IA
+    return segundos
+
+
 def _respaldo(asunto: str, cuerpo: str, por: str) -> Decision:
     es, motivo = es_solicitud_estricta(asunto, cuerpo)
     logger.warning("Filtro de correo: se usó el filtro de respaldo (IA: %s)", por)
@@ -221,7 +241,7 @@ def clasificar(asunto: str, cuerpo: str) -> Decision:
         return _respaldo(asunto, cuerpo, "en pausa tras una falla reciente")
     try:
         texto = _crear_proveedor().generar_json(mensajes(asunto, cuerpo), ESQUEMA, 0.0,
-                                                 timeout=TIMEOUT_IA)
+                                                 timeout=timeout_ia())
         es, motivo = leer_respuesta(texto)
     except ValueError as error:
         return _respaldo(asunto, cuerpo, f"JSON inválido: {error}")

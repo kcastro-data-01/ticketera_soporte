@@ -36,6 +36,9 @@ services:
       # «auto»: solo correos que piden ayuda; «todos»: buzón solo de soporte.
       CORREO_FILTRO: ${CORREO_FILTRO:-auto}
       CORREO_INTERVALO: ${CORREO_INTERVALO:-60}
+      # Segundos que el filtro de correos espera a la IA (8 por defecto, como
+      # en producción; con Ollama en CPU conviene 90 en el .env).
+      CORREO_TIMEOUT_IA: ${CORREO_TIMEOUT_IA:-8}
       # Avisar por correo al nuevo asignado y al solicitante al asignar o
       # reasignar desde la app (y al asignado de un ticket creado desde un enviado).
       AVISAR_ASIGNADO: ${AVISAR_ASIGNADO:-false}
@@ -59,6 +62,9 @@ services:
       - ticketera-data:/data
     depends_on:
       - ollama
+    # Se levanta sola después de reiniciar Docker o WSL (si no, Mailpit sigue
+    # recibiendo correos y nadie los lee).
+    restart: unless-stopped
 
   # Servidor local de modelos abiertos; ejecuta Qwen3 sin costo por consulta.
   ollama:

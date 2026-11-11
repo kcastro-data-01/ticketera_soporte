@@ -503,3 +503,40 @@ def test_strict_fallback_accepts_security_problems(asunto, cuerpo):
 ])
 def test_strict_fallback_still_rejects_legal_notices_and_security_mentions(asunto, cuerpo):
     assert not cf.es_solicitud_estricta(asunto, cuerpo)[0]
+
+
+# --- Tiempo límite de la IA (CORREO_TIMEOUT_IA) ------------------------------------
+
+
+@pytest.mark.parametrize("valor,esperado", [
+    (None, 8.0), ("", 8.0), ("90", 90.0), (" 12.5 ", 12.5), ("2,5", 2.5),
+    ("abc", 8.0), ("0", 8.0), ("-3", 8.0),
+])
+def test_timeout_ia_desde_el_entorno(valor, esperado):
+    env = {} if valor is None else {"CORREO_TIMEOUT_IA": valor}
+    assert cf.timeout_ia(env) == esperado
+
+
+def test_por_defecto_8_segundos_como_produccion():
+    assert cf.TIMEOUT_IA == 8.0
+
+
+@pytest.mark.parametrize("valor,esperado", [(None, 8.0), ("90", 90.0)])
+def test_la_ia_recibe_el_timeout_configurado(monkeypatch, valor, esperado):
+    cf.reiniciar()
+    recibidos = []
+
+    class IA:
+        def generar_json(self, messages, esquema, temperature=0.1, timeout=None, num_ctx=None):
+            recibidos.append(timeout)
+            return json.dumps({"es_solicitud": True, "motivo": "pide ayuda"})
+
+    monkeypatch.setattr(cf, "_crear_proveedor", lambda: IA())
+    if valor is None:
+        monkeypatch.delenv("CORREO_TIMEOUT_IA", raising=False)
+    else:
+        monkeypatch.setenv("CORREO_TIMEOUT_IA", valor)
+    decision = cf.clasificar("No enciende la impresora", "No enciende desde hoy")
+    cf.reiniciar()
+    assert decision.fuente == "ia"
+    assert recibidos == [esperado]

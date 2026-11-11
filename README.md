@@ -1350,6 +1350,8 @@ APP_URL=http://IP-O-NOMBRE-DEL-EQUIPO:8000
 Opcionales: `CORREO_CARPETA_PROCESADOS` (por defecto `Tickets-Procesados`),
 `CORREO_FILTRO` (`ia`, `auto` o `todos`; si no está, `ia` cuando hay IA y si
 no `auto`), `CORREO_INTERVALO` (segundos, 60),
+`CORREO_TIMEOUT_IA` (segundos que el filtro espera a la IA, `8`; en local con
+Ollama en CPU conviene `90`, si no casi siempre decide el filtro de respaldo),
 `AVISAR_ASIGNADO` (`false`; `true` avisa por correo las asignaciones y
 reasignaciones hechas en la app y al asignado de un ticket creado desde un
 correo enviado), `AVISAR_ESTADOS` (`false`; `true` avisa los cambios de
@@ -1434,10 +1436,10 @@ Con `CORREO_PROVEEDOR=mailpit`:
   `POST /api/cron/correo` también hace una revisión.
 - Al arrancar deja en `docker compose logs ticketera` la línea
   `CORREO: leyendo Mailpit cada 30 s para <CORREO_USUARIO> (…; CORREO_FILTRO=…)`.
-  Si no aparece ninguna línea `CORREO:`, revise `docker compose ps -a`: el
-  contenedor `ticketera` no se reinicia solo (por ejemplo, después de
-  reiniciar Docker o WSL) y Mailpit sí, así que puede quedar Mailpit
-  recibiendo correos sin nadie que los lea. Se levanta con
+  Si no aparece ninguna línea `CORREO:`, revise `docker compose ps -a`: si
+  `ticketera` está detenido, Mailpit recibe correos sin nadie que los lea.
+  Tiene `restart: unless-stopped` (se levanta sola al reiniciar Docker o
+  WSL), salvo que se haya detenido a mano; se levanta con
   `docker compose up -d --no-deps ticketera`.
 - Los correos que llegaron **antes** de que la app empezara a leer el buzón
   por primera vez no se tocan (igual que con Graph).
