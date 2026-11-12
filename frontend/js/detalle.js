@@ -859,10 +859,11 @@ function ajustarAltoComentario() {
 }
 
 /* Comentarios como conversación (del más antiguo al más reciente):
-   - los de quien está viendo el ticket a la derecha y los demás a la
-     izquierda, en burbujas;
-   - arriba de cada burbuja, iniciales y nombre, «IT» si es Técnico o
-     Administrador, la hora y «por correo» si llegó respondiendo un aviso;
+   - todos a la izquierda, uno debajo del otro y a todo el ancho, con una
+     línea fina a la izquierda: azul si es de IT (Técnico o
+     Administrador), gris si no;
+   - arriba, iniciales y nombre, «IT», «por correo» si llegó respondiendo
+     un aviso y la hora; abajo, el texto;
    - varios seguidos de la misma persona (menos de 10 minutos) se agrupan
      sin repetir nombre ni iniciales;
    - el motivo de un cambio de estado va centrado, chico y gris, como aviso
@@ -878,23 +879,13 @@ function nodoComentario(tag, clase, texto) {
   return el;
 }
 
-/* ¿Lo escribió quien está viendo el ticket? Por id; los comentarios viejos
-   sin autor guardado, por el nombre. */
-function esComentarioPropio(comment, usuario) {
-  if (!usuario) return false;
-  if (comment.author_id !== null && comment.author_id !== undefined) {
-    return usuario.id !== undefined && Number(comment.author_id) === Number(usuario.id);
-  }
-  return Boolean(usuario.name) && comment.author === usuario.name;
-}
-
 function claveAutor(comment) {
   return comment.author_id !== null && comment.author_id !== undefined
     ? `id:${comment.author_id}`
     : `nombre:${comment.author || "Anónimo"}`;
 }
 
-/* ¿Va pegado al anterior? Misma persona, burbuja (no aviso del sistema) y
+/* ¿Va pegado al anterior? Misma persona, comentario (no aviso del sistema) y
    menos de 10 minutos entre uno y otro. */
 function agruparConAnterior(anterior, comment) {
   if (!anterior || anterior.origen === "estado" || comment.origen === "estado") return false;
@@ -913,9 +904,9 @@ function comentarioDelSistema(comment) {
   return linea;
 }
 
-function burbujaComentario(comment, { propio, seguido }) {
+function tarjetaComentario(comment, { seguido }) {
   const card = nodoComentario("article",
-    `comentario ${propio ? "propio" : "ajeno"}${seguido ? " seguido" : ""}`);
+    `comentario ${comment.author_es_it ? "de-it" : "de-otro"}${seguido ? " seguido" : ""}`);
   const header = nodoComentario("div", "comentario-cabecera");
   const author = nodoComentario("span", "comentario-autor");
   if (seguido) {
@@ -932,8 +923,8 @@ function burbujaComentario(comment, { propio, seguido }) {
     it.title = "Técnico o Administrador";
     header.appendChild(it);
   }
-  header.appendChild(nodoComentario("span", "comentario-fecha", formatearFechaHora(comment.created_at)));
   if (comment.origen === "correo") header.appendChild(nodoComentario("span", "comentario-correo", "por correo"));
+  header.appendChild(nodoComentario("span", "comentario-fecha", formatearFechaHora(comment.created_at)));
   card.appendChild(header);
   card.appendChild(nodoComentario("p", "comentario-contenido", comment.content));
   return card;
@@ -950,15 +941,11 @@ function renderComentarios(comments) {
     );
     return;
   }
-  const usuario = typeof getUser === "function" ? getUser() : null;
   let anterior = null;
   comments.forEach((comment) => {
     const nodo = comment.origen === "estado"
       ? comentarioDelSistema(comment)
-      : burbujaComentario(comment, {
-        propio: esComentarioPropio(comment, usuario),
-        seguido: agruparConAnterior(anterior, comment),
-      });
+      : tarjetaComentario(comment, { seguido: agruparConAnterior(anterior, comment) });
     elements.listaComentarios.appendChild(nodo);
     anterior = comment;
   });

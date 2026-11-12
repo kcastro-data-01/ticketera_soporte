@@ -1,7 +1,8 @@
 /* Comentarios del detalle como conversación (detalle.js, renderComentarios):
-   propios a la derecha y ajenos a la izquierda, cabecera con iniciales,
-   nombre, «IT», hora y «por correo»; seguidos agrupados (< 10 minutos); el
-   motivo de un cambio de estado como aviso del sistema centrado.
+   todos a la izquierda y a todo el ancho, con una línea azul (IT) o gris a
+   la izquierda; cabecera con iniciales, nombre, «IT», «por correo» y la
+   hora; seguidos agrupados (< 10 minutos); el motivo de un cambio de
+   estado como aviso del sistema centrado.
    Ejecutar con: node --test frontend/tests/comentarios_conversacion.test.js */
 
 "use strict";
@@ -55,26 +56,20 @@ function comentario(extra) {
   };
 }
 
-test("los propios van a la derecha y los de los demás a la izquierda", () => {
+test("todos iguales, sin lado propio o ajeno: de IT o de los demás", () => {
   const { lista } = render([
     comentario({ id: 1 }),
     comentario({ id: 2, author: "Ana Mora", author_id: 7, author_es_it: false, created_at: "2026-11-11T17:20:00Z" }),
   ]);
-  assert.deepEqual(lista.children.map((c) => c.className), ["comentario propio", "comentario ajeno"]);
+  assert.deepEqual(lista.children.map((c) => c.className), ["comentario de-it", "comentario de-otro"]);
   assert.equal(lista.children[0].tag, "article");
+  // Lo mismo sin importar quién está viendo el ticket.
+  const { lista: comoAna } = render([comentario({ id: 1 })], { id: 7, name: "Ana Mora", role: "Solicitante" });
+  assert.equal(comoAna.children[0].className, "comentario de-it");
+  assert.doesNotMatch(leer("js/detalle.js"), /propio|ajeno|esComentarioPropio/);
 });
 
-test("los comentarios viejos sin autor guardado se reconocen por el nombre", () => {
-  const { lista } = render([
-    comentario({ author_id: null }),
-    comentario({ id: 2, author: "Otra Persona", author_id: null, created_at: "2026-11-11T18:00:00Z" }),
-  ]);
-  assert.deepEqual(lista.children.map((c) => clases(c)[1]), ["propio", "ajeno"]);
-  const { lista: sinUsuario } = render([comentario()], null);
-  assert.equal(clases(sinUsuario.children[0])[1], "ajeno");
-});
-
-test("cabecera: iniciales y nombre, «IT», la hora en 12 horas y «por correo»", () => {
+test("cabecera: iniciales y nombre, «IT», «por correo» y la hora en 12 horas; abajo el texto", () => {
   const { lista } = render([
     comentario({ author: "Ana Mora", author_id: 7, author_es_it: false, origen: "correo" }),
     comentario({ id: 2, created_at: "2026-11-11T18:00:00Z" }),
@@ -89,6 +84,9 @@ test("cabecera: iniciales y nombre, «IT», la hora en 12 horas y «por correo»
   assert.equal(hijo(ana, "comentario-correo").textContent, "por correo");
   assert.equal(hijo(karla, "comentario-it").textContent, "IT");
   assert.equal(hijo(karla, "comentario-correo"), undefined);
+  assert.deepEqual(ana.children.map((h) => clases(h)[0]), ["comentario-autor", "comentario-correo", "comentario-fecha"]);
+  assert.deepEqual(karla.children.map((h) => clases(h)[0]), ["comentario-autor", "comentario-it", "comentario-fecha"]);
+  assert.deepEqual(lista.children[0].children.map((h) => h.className), ["comentario-cabecera", "comentario-contenido"]);
   assert.equal(hijo(lista.children[0], "comentario-contenido").textContent, "Hola");
 });
 
@@ -158,35 +156,31 @@ function regla(bloque, selector) {
   return bloque.slice(i, bloque.indexOf("}", i));
 }
 
-test("CSS: burbujas sobrias de 8 px, 75 % del ancho (90 % en el celular), sin sombras", () => {
+test("CSS: a todo el ancho, fondo de tarjeta, borde suave y la línea azul (IT) o gris a la izquierda", () => {
   const bloque = bloqueCss();
   assert.ok(bloque.length > 100);
-  const burbuja = regla(bloque, ".comentario");
-  assert.match(burbuja, /max-width: 75%;/);
-  assert.match(burbuja, /border-radius: var\(--radio-ventana\);/);
-  assert.match(css, /--radio-ventana: 8px;/);
-  assert.match(burbuja, /background: var\(--burbuja-otra-fondo\);/);
-  assert.match(burbuja, /align-self: flex-start;/);
-  const propia = regla(bloque, ".comentario.propio");
-  assert.match(propia, /align-self: flex-end;/);
-  assert.match(propia, /background: var\(--burbuja-propia-fondo\);/);
-  assert.doesNotMatch(bloque, /box-shadow/);
-  assert.match(bloque, /@media \(max-width: 600px\) \{\s*\.comentario \{\s*max-width: 90%;/);
+  const tarjeta = regla(bloque, ".comentario");
+  assert.match(tarjeta, /border: 1px solid var\(--color-borde\);/);
+  assert.match(tarjeta, /border-left: 3px solid var\(--color-borde-fuerte\);/);
+  assert.match(tarjeta, /background: var\(--color-superficie-alta\);/);
+  assert.doesNotMatch(tarjeta, /max-width|align-self/, "sin burbujas a los costados");
+  assert.match(regla(bloque, ".comentario.de-it"), /border-left-color: var\(--color-primario\);/);
+  assert.doesNotMatch(bloque, /\.propio|\.ajeno|box-shadow|max-width: 75%/);
+  assert.match(regla(bloque, ".comentarios"), /flex-direction: column;/);
   assert.match(regla(bloque, ".comentarios"), /overflow-x: hidden;/, "sin scroll horizontal");
   assert.match(regla(bloque, ".comentario-contenido"), /overflow-wrap: anywhere;/);
+  assert.match(regla(bloque, ".comentario-autor"), /overflow-wrap: anywhere;/);
   assert.match(regla(bloque, ".comentario-sistema"), /justify-content: center;[\s\S]*color: var\(--color-tenue\);/);
-  // Claro y oscuro: colores solo por variables, definidas en los dos temas.
+  // Claro y oscuro: solo variables de la app (sin colores fijos ni tokens de burbujas).
   assert.doesNotMatch(bloque, /#[0-9a-fA-F]{3,6}\b|rgba?\(/);
-  for (const v of ["--burbuja-propia-fondo", "--burbuja-propia-borde", "--burbuja-otra-fondo", "--burbuja-otra-borde"]) {
-    assert.equal((css.match(new RegExp(`${v}:`, "g")) || []).length, 2, v);
-  }
+  assert.doesNotMatch(css, /--burbuja-/);
 });
 
-test("CSS: al imprimir es una lista simple, a lo ancho y con el nombre en cada uno", () => {
+test("CSS: al imprimir es una lista simple, con el nombre en cada uno", () => {
   const bloque = bloqueCss();
   const impresion = bloque.slice(bloque.indexOf("@media print {"));
   assert.match(impresion, /\.comentarios \{\s*max-height: none;\s*overflow: visible;/);
-  assert.match(impresion, /\.comentario,\s*\.comentario\.propio \{\s*align-self: stretch;\s*max-width: none;/);
+  assert.match(impresion, /\.comentario \{\s*margin-top: 0;/);
   assert.match(impresion, /\.comentario \.solo-lector \{\s*position: static !important;/);
   assert.match(impresion, /\.comentario-sistema \{\s*justify-content: flex-start;/);
 });

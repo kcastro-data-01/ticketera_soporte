@@ -29,11 +29,6 @@
   --color-superficie: #ffffff;
   --color-superficie-alta: #ffffff;
   --color-fondo-neutro: #eef2f9;
-  /* Burbujas de los comentarios: las propias en azul muy claro, las demás en gris. */
-  --burbuja-propia-fondo: #edf2fe;
-  --burbuja-propia-borde: #d6e0fb;
-  --burbuja-otra-fondo: #f4f5f7;
-  --burbuja-otra-borde: #e3e6eb;
 
   /* Texto */
   --color-texto: #1a2233;
@@ -148,10 +143,6 @@
   --color-superficie: #171d2b;
   --color-superficie-alta: #1c2333;
   --color-fondo-neutro: #232b3c;
-  --burbuja-propia-fondo: #1c2644;
-  --burbuja-propia-borde: #2b3a66;
-  --burbuja-otra-fondo: #20283a;
-  --burbuja-otra-borde: #2c3547;
 
   --color-texto: #e6e9f0;
   --color-tenue: #9aa4b8;
@@ -944,12 +935,13 @@ button.peligro:disabled:hover {
    Solo componentes nuevos construidos con los tokens existentes:
    no cambia la paleta ni la identidad de la Tarea 20.1. */
 
-/* Comentarios como conversación (detalle.js, renderComentarios): los
-   propios a la derecha en azul muy claro, los de los demás a la izquierda
-   en gris muy claro; bordes de 8 px, sin sombras. Los seguidos de la misma
-   persona van pegados y sin repetir el nombre. El motivo de un cambio de
-   estado, centrado y en gris chico. La lista tiene alto máximo y muestra
-   el último al abrir. Claro y oscuro por las variables --burbuja-*. */
+/* Comentarios como conversación (detalle.js, renderComentarios): todos a
+   la izquierda, uno debajo del otro y a todo el ancho; fondo de tarjeta,
+   borde suave y una línea fina a la izquierda, azul si es de IT y gris si
+   no. Los seguidos de la misma persona van pegados y sin repetir el
+   nombre. El motivo de un cambio de estado, centrado y en gris chico. La
+   lista tiene alto máximo y muestra el último al abrir. Claro y oscuro por
+   las variables de siempre. */
 .comentarios {
   display: flex;
   flex-direction: column;
@@ -969,19 +961,16 @@ button.peligro:disabled:hover {
 }
 
 .comentario {
-  align-self: flex-start;
   min-width: 0;
-  max-width: 75%;
-  padding: 0.55rem 0.8rem 0.6rem;
-  border: 1px solid var(--burbuja-otra-borde);
-  border-radius: var(--radio-ventana);
-  background: var(--burbuja-otra-fondo);
+  padding: 0.6rem 0.9rem 0.65rem;
+  border: 1px solid var(--color-borde);
+  border-left: 3px solid var(--color-borde-fuerte);
+  border-radius: var(--radio-suave);
+  background: var(--color-superficie-alta);
 }
 
-.comentario.propio {
-  align-self: flex-end;
-  border-color: var(--burbuja-propia-borde);
-  background: var(--burbuja-propia-fondo);
+.comentario.de-it {
+  border-left-color: var(--color-primario);
 }
 
 /* Varios seguidos de la misma persona: más juntos. */
@@ -997,10 +986,6 @@ button.peligro:disabled:hover {
   margin: 0;
   font-size: 0.8rem;
   color: var(--color-tenue);
-}
-
-.comentario.propio .comentario-cabecera {
-  justify-content: flex-end;
 }
 
 .comentario-autor {
@@ -1081,14 +1066,7 @@ button.peligro:disabled:hover {
   border: 0;
 }
 
-@media (max-width: 600px) {
-  .comentario {
-    max-width: 90%;
-  }
-}
-
-/* En la hoja impresa: lista simple, todos a lo ancho y con el nombre en
-   cada comentario. */
+/* En la hoja impresa: lista simple, con el nombre en cada comentario. */
 @media print {
   .comentarios {
     max-height: none;
@@ -1097,15 +1075,8 @@ button.peligro:disabled:hover {
     gap: 0.5rem;
   }
 
-  .comentario,
-  .comentario.propio {
-    align-self: stretch;
-    max-width: none;
+  .comentario {
     margin-top: 0;
-  }
-
-  .comentario.propio .comentario-cabecera {
-    justify-content: flex-start;
   }
 
   .comentario .solo-lector {
