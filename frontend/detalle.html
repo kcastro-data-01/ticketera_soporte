@@ -6,13 +6,13 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Detalle del ticket · American Data Networks</title>
   <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
-  <script src="js/tema.js?v=20261112-2"></script>
+  <script src="js/tema.js?v=20261112-3"></script>
   <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="css/estilos.css?v=20261112-2">
+  <link rel="stylesheet" href="css/estilos.css?v=20261112-3">
 </head>
 <body class="app">
   <aside class="barra-lateral">
@@ -82,75 +82,51 @@
       </section>
 
       <div class="detalle-layout" id="detalle-layout">
-        <div class="acciones acciones-principales">
-          <!-- Solo para quien puede editar este ticket (detalle.js, puedeEditarTicket):
-               quien lo creó mientras está «Nuevo» o el Administrador salvo en Cerrado. -->
-          <button type="button" id="editar" hidden>Editar ticket</button>
-          <!-- Versión formal en papel o PDF: sin menú ni botones. -->
-          <button type="button" id="imprimir" class="secundario">Imprimir</button>
-          <!-- Solo Administrador y nunca en un ticket Cerrado: borra el ticket con
-               sus comentarios e historial. Va aparte, a la derecha de la barra. -->
-          <button type="button" id="eliminar" class="peligro accion-aparte" data-permiso="eliminar">Eliminar</button>
-        </div>
-
-        <!-- Encabezado del ticket, a todo el ancho: número y título; las
-             etiquetas (estado, prioridad, departamento y asignado); los avisos
-             del ticket; solicitante y fechas; y el recorrido de estados. -->
-        <section id="encabezado-ticket" class="encabezado-ticket" aria-label="Resumen del ticket">
-          <div class="encabezado-ticket-titulos">
-            <span class="encabezado-ticket-id">#<span id="ver-id">—</span></span>
-            <h2 id="ver-title" class="encabezado-ticket-titulo">—</h2>
+        <div class="detalle-principal">
+  
+          <div class="acciones acciones-principales">
+            <!-- Solo para quien puede editar este ticket (detalle.js, puedeEditarTicket):
+                 quien lo creó mientras está «Nuevo» o el Administrador salvo en Cerrado. -->
+            <button type="button" id="editar" hidden>Editar ticket</button>
+            <!-- Versión formal en papel o PDF: sin menú ni botones. -->
+            <button type="button" id="imprimir" class="secundario">Imprimir</button>
+            <!-- Solo Administrador y nunca en un ticket Cerrado: borra el ticket con
+                 sus comentarios e historial. Va aparte, a la derecha de la barra. -->
+            <button type="button" id="eliminar" class="peligro accion-aparte" data-permiso="eliminar">Eliminar</button>
           </div>
-          <ul class="encabezado-ticket-etiquetas" aria-label="Estado, prioridad, departamento y asignado">
-            <li><span id="ver-state">—</span></li>
-            <li><span id="ver-priority">—</span></li>
-            <li>
-              <span class="etiqueta-dato"><span class="etiqueta-dato-nombre">Departamento</span><span id="ver-area" class="etiqueta-dato-valor">—</span></span>
-            </li>
-            <li>
-              <span class="etiqueta-dato"><span class="etiqueta-dato-nombre">Asignado</span><span id="ver-assigned" class="etiqueta-dato-valor">—</span></span>
-            </li>
-          </ul>
-          <!-- Avisos del ticket (detalle.js muestra los que correspondan; sin
-               ninguno visible, el recuadro no ocupa lugar). -->
-          <div id="encabezado-avisos" class="encabezado-ticket-avisos">
-            <!-- En Cerrado, para todos (solo lectura: sin Editar, Asignación,
-                 Eliminar ni comentarios). -->
+  
+          <!-- Tarjeta del ticket: título grande con estado y prioridad arriba
+               y la descripción en un recuadro (los datos van en el panel derecho). -->
+          <section id="panel-ticket" class="tarjeta-ticket" aria-label="Datos del ticket">
+            <div class="tarjeta-ticket-cabecera">
+              <div class="tarjeta-ticket-titulos">
+                <span class="tarjeta-ticket-id">#<span id="ver-id">—</span></span>
+                <h2 id="ver-title" class="tarjeta-ticket-titulo">—</h2>
+              </div>
+              <div class="tarjeta-ticket-etiquetas">
+                <span id="ver-state">—</span>
+                <span id="ver-priority">—</span>
+              </div>
+            </div>
+            <!-- Avance del estado: los pasos ya hechos, el actual y los que faltan.
+                 Quien puede cambiar el estado toca un paso para pasar a él
+                 (detalle.js convierte los destinos permitidos en botones). -->
+            <ol id="pasos-estado" class="pasos-estado" aria-label="Avance del ticket" tabindex="-1">
+              <li data-paso="Nuevo"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Nuevo</span></li>
+              <li data-paso="En proceso"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">En proceso</span></li>
+              <li data-paso="Resuelto"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Resuelto</span></li>
+              <li data-paso="Cerrado"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Cerrado</span></li>
+            </ol>
+            <!-- detalle.js muestra una u otra: la primera solo a quien puede
+                 cambiar el estado (y no en Cerrado); la segunda, a todos en Cerrado
+                 (solo lectura: sin Editar, Asignación, Eliminar ni comentarios). -->
+            <p id="pasos-nota" class="pasos-nota" hidden>Toque un estado para cambiarlo.</p>
             <p id="estado-final" class="pasos-nota" hidden>
               Este ticket está <b>Cerrado</b> y no admite cambios.
             </p>
             <!-- Cierre automático (CIERRE_AUTOMATICO): en Resuelto, cuándo se
-                 cerrará solo si el solicitante no responde. -->
+                 cerrará solo si el solicitante no responde (detalle.js). -->
             <p id="cierre-automatico" class="pasos-nota cierre-automatico" hidden></p>
-          </div>
-          <p class="encabezado-ticket-meta">
-            <span>Solicitante: <b id="ver-creator">—</b></span>
-            <span>Creado: <b id="ver-created">—</b></span>
-            <span>Actualizado: <b id="ver-updated">—</b></span>
-          </p>
-          <!-- Avance del estado: los pasos ya hechos, el actual y los que faltan.
-               Quien puede cambiar el estado toca un paso para pasar a él
-               (detalle.js convierte los destinos permitidos en botones). -->
-          <ol id="pasos-estado" class="pasos-estado" aria-label="Avance del ticket" tabindex="-1">
-            <li data-paso="Nuevo"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Nuevo</span></li>
-            <li data-paso="En proceso"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">En proceso</span></li>
-            <li data-paso="Resuelto"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Resuelto</span></li>
-            <li data-paso="Cerrado"><span class="paso-marca" aria-hidden="true"></span><span class="paso-nombre">Cerrado</span></li>
-          </ol>
-          <!-- Solo a quien puede cambiar el estado (y no en Cerrado). -->
-          <p id="pasos-nota" class="pasos-nota" hidden>Toque un estado para cambiarlo.</p>
-        </section>
-
-        <div class="detalle-principal">
-          <!-- Tarjeta del ticket: la categoría (lo único que no está en el
-               encabezado) y la descripción en un recuadro. -->
-          <section id="panel-ticket" class="tarjeta-ticket" aria-label="Descripción del ticket">
-            <dl class="detalle-datos-lista tarjeta-ticket-datos">
-              <div class="dato">
-                <dt>Categoría</dt>
-                <dd id="ver-category">—</dd>
-              </div>
-            </dl>
             <h3 class="tarjeta-ticket-subtitulo">Descripción</h3>
             <p id="ver-description" class="tarjeta-ticket-descripcion">—</p>
           </section>
@@ -295,7 +271,38 @@
           </div>
         </div>
 
-        <aside class="detalle-lateral" aria-label="Acciones del ticket">
+        <aside class="detalle-lateral" aria-label="Datos y acciones del ticket">
+          <!-- Datos del ticket, uno debajo del otro: etiqueta gris y valor. -->
+          <section id="panel-datos" class="seccion detalle-datos" aria-label="Detalles del ticket">
+            <h2>Detalles</h2>
+            <dl class="detalle-datos-lista">
+              <div class="dato">
+                <dt>Categoría</dt>
+                <dd id="ver-category">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Departamento</dt>
+                <dd id="ver-area">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Asignado a</dt>
+                <dd id="ver-assigned">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Solicitante</dt>
+                <dd id="ver-creator">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Fecha de creación</dt>
+                <dd id="ver-created">—</dd>
+              </div>
+              <div class="dato">
+                <dt>Fecha de actualización</dt>
+                <dd id="ver-updated">—</dd>
+              </div>
+            </dl>
+          </section>
+
           <section id="seccion-asignacion" class="seccion" aria-label="Asignación del ticket" data-permiso="asignar">
             <h2>Asignación</h2>
             <div class="filtros formulario">
@@ -317,7 +324,7 @@
 
           <!-- Pasar el ticket a otro departamento (Técnico y Administrador).
                Solo se muestra mientras está en Nuevo; en los demás estados
-               el departamento se ve en el encabezado (detalle.js). -->
+               el departamento se ve en «Detalles» (detalle.js). -->
           <section id="seccion-area" class="seccion" aria-label="Departamento del ticket" data-permiso="cambiar_area" hidden>
             <h2>Cambiar departamento</h2>
             <div class="filtros formulario">
@@ -343,12 +350,12 @@
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
-  <script src="js/auth.js?v=20261112-2" defer></script>
-  <script src="js/sesion.js?v=20261112-2" defer></script>
-  <script src="js/asistente.js?v=20261112-2" defer></script>
-  <script src="js/detalle.js?v=20261112-2" defer></script>
-  <script src="js/adjuntos.js?v=20261112-2" defer></script>
-  <script src="js/explicacion.js?v=20261112-2" defer></script>
-  <script src="js/guardia.js?v=20261112-2"></script>
+  <script src="js/auth.js?v=20261112-3" defer></script>
+  <script src="js/sesion.js?v=20261112-3" defer></script>
+  <script src="js/asistente.js?v=20261112-3" defer></script>
+  <script src="js/detalle.js?v=20261112-3" defer></script>
+  <script src="js/adjuntos.js?v=20261112-3" defer></script>
+  <script src="js/explicacion.js?v=20261112-3" defer></script>
+  <script src="js/guardia.js?v=20261112-3"></script>
 </body>
 </html>

@@ -150,13 +150,12 @@ test("debajo del recorrido: «Toque un estado…» solo para quien puede, y el a
   assert.deepEqual(sol.visibles(), ["estado-final"]);
 });
 
-test("detalle.html: «Toque un estado» debajo del recorrido, el aviso de Cerrado en el encabezado y sin «Cambio de estado»", () => {
+test("detalle.html: notas debajo del recorrido y sin el recuadro «Cambio de estado»", () => {
   const html = leer("detalle.html");
   assert.match(html, /id="pasos-estado"[^>]*tabindex="-1"/);
   const despues = html.slice(html.indexOf("</ol>", html.indexOf('id="pasos-estado"')));
   assert.match(despues, /^<\/ol>[\s\S]*?<p id="pasos-nota" class="pasos-nota" hidden>Toque un estado para cambiarlo\.<\/p>/);
-  const avisos = html.slice(html.indexOf('id="encabezado-avisos"'), html.indexOf("</div>", html.indexOf('id="encabezado-avisos"')));
-  assert.match(avisos, /<p id="estado-final" class="pasos-nota" hidden>\s*Este ticket está <b>Cerrado<\/b> y no admite cambios\.\s*<\/p>/);
+  assert.match(despues, /<p id="estado-final" class="pasos-nota" hidden>\s*Este ticket está <b>Cerrado<\/b> y no admite cambios\.\s*<\/p>/);
   for (const viejo of ["seccion-estado", "estado-destino", "cambiar-estado", "Pasar a", "estado-actual"]) {
     assert.ok(!html.includes(viejo), viejo);
   }

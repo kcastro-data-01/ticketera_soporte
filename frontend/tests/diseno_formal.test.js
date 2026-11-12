@@ -86,23 +86,21 @@ test("detalle: la descripción con título y en un recuadro neutro de lectura c�
   assert.match(recuadro, /min-height: 3rem;/, "una descripción corta igual se ve");
 });
 
-test("detalle: el panel derecho solo tiene acciones, fijo al bajar y debajo en pantallas angostas", () => {
+test("detalle: «Detalles» arriba del panel derecho, fijo al bajar y debajo en pantallas angostas", () => {
   const inicio = detalleHtml.indexOf('<aside class="detalle-lateral"');
   const lateral = detalleHtml.slice(inicio, detalleHtml.indexOf("</aside>", inicio));
   const secciones = [...lateral.matchAll(/<section[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(secciones, ["Asignación del ticket", "Departamento del ticket"]);
-  assert.doesNotMatch(lateral, /<dl|id="ver-/, "los datos ya no se repiten a la derecha");
-  assert.ok(!detalleHtml.includes("panel-datos"), "sin la sección «Detalles»");
-  /* Lo único que no está en el encabezado, la categoría, va con la descripción. */
+  assert.deepEqual(secciones, ["Detalles del ticket", "Asignación del ticket", "Departamento del ticket"]);
+  const datos = [...lateral.matchAll(/<dt>([^<]+)<\/dt>\s*<dd id="(ver-[a-z]+)">/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(datos, [
+    ["Categoría", "ver-category"], ["Departamento", "ver-area"], ["Asignado a", "ver-assigned"], ["Solicitante", "ver-creator"],
+    ["Fecha de creación", "ver-created"], ["Fecha de actualización", "ver-updated"],
+  ]);
   const tarjeta = detalleHtml.slice(detalleHtml.indexOf('id="panel-ticket"'), detalleHtml.indexOf("</section>", detalleHtml.indexOf('id="panel-ticket"')));
-  const datos = [...tarjeta.matchAll(/<dt>([^<]+)<\/dt>\s*<dd id="(ver-[a-z]+)">/g)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(datos, [["Categoría", "ver-category"]]);
-  assert.ok(tarjeta.indexOf('id="ver-category"') < tarjeta.indexOf('id="ver-description"'));
+  assert.doesNotMatch(tarjeta, /<dl/, "la grilla ya no está en la tarjeta");
+  assert.match(regla(".detalle-datos-lista"), /flex-direction: column;/);
   assert.match(regla(".detalle-lateral"), /position: sticky;/);
   assert.match(css, /@media \(max-width: 1100px\) \{\s*\.detalle-layout \{\s*grid-template-columns: minmax\(0, 1fr\);/);
-  assert.match(css, /\.detalle-layout:not\(:has\(\.detalle-lateral > \.seccion:not\(\[hidden\]\)\)\) \{\s*grid-template-columns: minmax\(0, 1fr\);/,
-    "sin acciones a la derecha, la descripción usa todo el ancho");
   const impresion = css.slice(css.indexOf("@media print"));
-  assert.match(impresion, /\.detalle-lateral,\n/, "al imprimir no salen las acciones");
-  assert.match(impresion, /\.encabezado-ticket \{\s*order: 1;/, "al imprimir el encabezado va primero");
+  assert.match(impresion, /\.detalle-lateral > \.seccion:not\(#panel-datos\),/, "al imprimir se ven los datos, no las acciones");
 });
