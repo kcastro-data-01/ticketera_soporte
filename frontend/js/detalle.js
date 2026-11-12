@@ -114,15 +114,6 @@ function bloquearBotones(bloqueado) {
   if (elements.eliminar) elements.eliminar.disabled = bloqueado;
 }
 
-function formatFecha(value) {
-  /* Hora local de Costa Rica (America/Costa_Rica, UTC-6), sin importar
-     la zona horaria del navegador: la API envía marcas de tiempo en UTC
-     con desplazamiento explícito. */
-  return new Date(value).toLocaleString("es-ES", {
-    timeZone: "America/Costa_Rica",
-  });
-}
-
 function nombreAsignado(ticket) {
   if (ticket.assigned_to_id === null || ticket.assigned_to_id === undefined) {
     return "—";
@@ -194,7 +185,7 @@ let temaAntesDeImprimir = null;
 
 function prepararImpresion() {
   const fecha = document.getElementById("impresion-fecha");
-  if (fecha) fecha.textContent = `Impreso el ${formatFecha(new Date().toISOString())}`;
+  if (fecha) fecha.textContent = `Impreso el ${formatearFechaHora(new Date().toISOString())}`;
   const raiz = document.documentElement;
   if (!raiz) return;
   temaAntesDeImprimir = raiz.getAttribute("data-tema");
@@ -263,7 +254,7 @@ function fechaCierreAutomatico(valor) {
   if (Number.isNaN(fecha.getTime())) return "";
   const zona = { timeZone: "America/Costa_Rica" };
   const dia = new Intl.DateTimeFormat("es-CR", { ...zona, weekday: "long", day: "numeric", month: "long" }).format(fecha);
-  const hora = new Intl.DateTimeFormat("es-CR", { ...zona, hour: "numeric", minute: "2-digit", hour12: true }).format(fecha);
+  const hora = formatearFechaHora(fecha, { parte: "hora" });
   return `${dia} a las ${hora}`;
 }
 
@@ -297,8 +288,8 @@ function renderTicket(ticket) {
   pintarPersona(elements.ver.assigned, nombreAsignado(ticket));
   if (elements.ver.area) elements.ver.area.textContent = ticket.area_name || SIN_AREA;
   pintarPersona(elements.ver.creator, nombreSolicitante(ticket));
-  elements.ver.created.textContent = formatFecha(ticket.created_at);
-  elements.ver.updated.textContent = formatFecha(ticket.updated_at);
+  elements.ver.created.textContent = formatearFechaHora(ticket.created_at);
+  elements.ver.updated.textContent = formatearFechaHora(ticket.updated_at);
 
   rellenarFormularioEdicion(ticket);
 
@@ -886,7 +877,7 @@ function renderComentarios(comments) {
     pintarPersona(author, comment.author || "Anónimo");
     const fecha = document.createElement("span");
     fecha.className = "comentario-fecha";
-    fecha.textContent = formatFecha(comment.created_at);
+    fecha.textContent = formatearFechaHora(comment.created_at);
     header.appendChild(author);
     header.appendChild(fecha);
 
@@ -988,7 +979,7 @@ function renderHistorial(entries) {
   }
   entries.forEach((entry) => {
     const row = document.createElement("tr");
-    appendCeldaHistorial(row, formatFecha(entry.created_at));
+    appendCeldaHistorial(row, formatearFechaHora(entry.created_at));
     /* Registros antiguos sin usuario autenticado (vacíos o "Anónimo")
        se muestran como "Sistema". */
     appendCeldaHistorial(row, formatAutorHistorial(entry));

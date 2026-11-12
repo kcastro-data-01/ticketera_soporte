@@ -215,12 +215,11 @@ function filaAsistente() {
   return { fila, contenido };
 }
 
-/* Hora del mensaje (HH:MM) o null si no se guardó (saludo, chats viejos). */
+/* Hora del mensaje («3:40 p. m.», hora de Costa Rica) o null si no se guardó
+   (saludo, chats viejos). */
 function horaDeMensaje(mensaje) {
-  const fecha = mensaje.hora ? new Date(mensaje.hora) : null;
-  if (!fecha || Number.isNaN(fecha.getTime())) return null;
-  const dos = (n) => String(n).padStart(2, "0");
-  return `${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
+  const hora = mensaje.hora ? formatearFechaHora(mensaje.hora, { parte: "hora" }) : "—";
+  return hora === "—" ? null : hora;
 }
 
 /* La respuesta sin el formato: sin «**» y con los enlaces como su texto. */
@@ -296,13 +295,12 @@ function burbuja(mensaje) {
 function separadorDeFecha(mensajes) {
   const primera = mensajes.find((m) => m.hora);
   const fecha = primera ? new Date(primera.hora) : new Date();
-  const hoy = new Date();
-  const ayer = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1);
-  const mismoDia = (a, b) => a.toDateString() === b.toDateString();
-  const dos = (n) => String(n).padStart(2, "0");
-  let texto = `${dos(fecha.getDate())}/${dos(fecha.getMonth() + 1)}/${fecha.getFullYear()}`;
-  if (Number.isNaN(fecha.getTime()) || mismoDia(fecha, hoy)) texto = "Hoy";
-  else if (mismoDia(fecha, ayer)) texto = "Ayer";
+  /* Días en hora de Costa Rica, con la misma función de fecha de la app. */
+  const dia = (d) => formatearFechaHora(d, { parte: "fecha" });
+  const ahora = new Date();
+  let texto = dia(fecha);
+  if (texto === "—" || texto === dia(ahora)) texto = "Hoy";
+  else if (texto === dia(new Date(ahora.getTime() - 86400000))) texto = "Ayer";
   const separador = crearElemento("div", "chat-separador");
   separador.setAttribute("role", "separator");
   separador.setAttribute("aria-label", texto);

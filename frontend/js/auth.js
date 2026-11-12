@@ -306,6 +306,34 @@ function tonoAvatar(nombre) {
 /* Escribe el nombre en el elemento y le agrega el círculo con las
    iniciales (lo dibuja el CSS con data-iniciales). Sin persona real
    («—», «Usuario #5») queda solo el texto. */
+/* Única función de fecha y hora de toda la app (listado, detalle, historial,
+   comentarios, adjuntos, explicación con IA, chat e impresión): hora de
+   Costa Rica en 12 horas, sin segundos, sea cual sea la zona del navegador.
+     formatearFechaHora(v)                    → «11/11/2026, 3:40 p. m.»
+     formatearFechaHora(v, { parte: "fecha" }) → «11/11/2026»
+     formatearFechaHora(v, { parte: "hora" })  → «3:40 p. m.»
+   Sin fecha válida devuelve «—». Se arma a mano (no con el «a. m.» del
+   navegador) para que el texto sea idéntico en todos. */
+const ZONA_HORARIA_APP = "America/Costa_Rica";
+const PARTES_FECHA_HORA = new Intl.DateTimeFormat("en-US", {
+  timeZone: ZONA_HORARIA_APP, year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "numeric", minute: "2-digit", hourCycle: "h23",
+});
+
+function formatearFechaHora(valor, { parte = "" } = {}) {
+  if (valor === null || valor === undefined || valor === "") return "—";
+  const fecha = valor instanceof Date ? valor : new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return "—";
+  const p = {};
+  PARTES_FECHA_HORA.formatToParts(fecha).forEach(({ type, value }) => { p[type] = value; });
+  const h24 = Number(p.hour) % 24;
+  const textoFecha = `${p.day}/${p.month}/${p.year}`;
+  const textoHora = `${h24 % 12 || 12}:${p.minute} ${h24 < 12 ? "a. m." : "p. m."}`;
+  if (parte === "fecha") return textoFecha;
+  if (parte === "hora") return textoHora;
+  return `${textoFecha}, ${textoHora}`;
+}
+
 function pintarPersona(el, nombre) {
   if (!el) return;
   const texto = nombre || "—";

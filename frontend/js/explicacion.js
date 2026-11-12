@@ -55,15 +55,8 @@ function iaLista(items, ordenada = false) {
 }
 
 function iaFecha(valor) {
-  const fecha = new Date(valor);
-  if (Number.isNaN(fecha.getTime())) return "";
-  return fecha.toLocaleString("es-CR", {
-    timeZone: "America/Costa_Rica",
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const texto = formatearFechaHora(valor);
+  return texto === "—" ? "" : texto;
 }
 
 /* Un solo botón a la vista: «Explicar con IA» sin explicación y «Volver a

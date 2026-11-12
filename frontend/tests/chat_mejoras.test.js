@@ -214,7 +214,7 @@ function ndjson(eventos) {
 
 const conversar = (respuesta) => ({ fetch: async () => ndjson(respuesta), TextDecoder });
 
-test("hora: HH:MM debajo de la burbuja, de la pregunta y de la respuesta", async () => {
+test("hora: «3:40 p. m.» (Costa Rica) debajo de la burbuja, de la pregunta y de la respuesta", async () => {
   const chat = montar({ extra: conversar([{ t: "Listo." }, { fin: true, fuente: "ia" }]) });
   clic(chat.boton);
   await chat.sandbox.enviarPregunta("hola");
@@ -224,9 +224,9 @@ test("hora: HH:MM debajo de la burbuja, de la pregunta y de la respuesta", async
 
   const horas = todos(chat.lista, "chat-hora");
   assert.equal(horas.length, 2);
-  const esperado = (iso) => { const f = new Date(iso); return `${String(f.getHours()).padStart(2, "0")}:${String(f.getMinutes()).padStart(2, "0")}`; };
+  const esperado = (iso) => chat.sandbox.formatearFechaHora(iso, { parte: "hora" });
   assert.deepEqual(horas.map((h) => h.textContent), guardado.map((m) => esperado(m.hora)));
-  assert.match(horas[0].textContent, /^\d{2}:\d{2}$/);
+  assert.match(horas[0].textContent, /^\d{1,2}:\d{2} [ap]\. m\.$/, "12 horas, sin segundos");
   assert.equal(horas[0].tag, "time");
 
   const [filaUsuario] = todos(chat.lista, "usuario").filter((n) => n.className.includes("chat-fila"));

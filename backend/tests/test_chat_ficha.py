@@ -62,7 +62,7 @@ def ficha_esperada(ticket, reporta, asignado, cierre):
         "- Categoría: Hardware",
         f"- Reporta: {reporta}",
         f"- Asignado a: {asignado}",
-        "- Creado: 20 de octubre de 2026, 9:05 a. m.",  # hora de Costa Rica
+        "- Creado: 20/10/2026, 9:05 a. m.",  # hora de Costa Rica (backend/fechas.py)
         f"- Descripción: {LARGA[:199]}…",
         "",
         cierre.format(id=ticket.id),

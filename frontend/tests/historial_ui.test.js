@@ -150,7 +150,7 @@ test("con sesión válida pinta fecha, ticket, quién, acción y detalle en espa
   assert.equal(rows[0].children.length, 5);
 
   const [fecha, ticket, quien, accion, detalle] = rows[0].children;
-  assert.match(fecha.textContent, /12:27:20/); // 18:27Z son las 12:27 de Costa Rica
+  assert.equal(fecha.textContent, "13/10/2026, 12:27 p. m."); // 18:27Z son las 12:27 p. m. de Costa Rica
   assert.equal(ticket.children[0].href, "detalle.html?id=7");
   assert.equal(ticket.children[0].textContent, "#7");
   assert.equal(ticket.children[1].textContent, "Impresora sin conexión");

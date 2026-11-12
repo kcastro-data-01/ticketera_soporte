@@ -225,17 +225,16 @@ function createHarness(fetchImpl, { confirmar = true, usuario = null } = {}) {
   };
 }
 
-/* Hora de Costa Rica: 16:00Z son las 10:00 de Costa Rica (UTC-6). */
-test("formatFecha del detalle muestra la hora de Costa Rica", () => {
+/* Hora de Costa Rica: 16:00Z son las 10:00 a. m. de Costa Rica (UTC-6). */
+test("el detalle usa formatearFechaHora (auth.js): 12 horas, sin segundos, hora de Costa Rica", () => {
   const harness = createHarness(makeFetch());
 
-  const formatted = harness.call("formatFecha", "2026-10-08T16:00:00Z");
-
-  assert.match(formatted, /10:00:00/);
-  assert.ok(!formatted.includes("16:00"), "no debe mostrar la hora UTC");
+  assert.equal(harness.call("formatearFechaHora", "2026-10-08T16:00:00Z"), "08/10/2026, 10:00 a. m.");
+  assert.equal(harness.call("formatearFechaHora", "2026-10-08T21:40:09Z"), "08/10/2026, 3:40 p. m.");
+  assert.doesNotMatch(detalleSource, /function formatFecha|toLocaleString\(/, "sin un formato propio");
 });
 
-test("formatFecha del listado muestra la hora de Costa Rica", () => {
+test("el listado muestra la fecha con formatearFechaHora (Costa Rica, 12 horas)", () => {
   const sandbox = {
     document: {
       getElementById: () => undefined,
@@ -252,13 +251,9 @@ test("formatFecha del listado muestra la hora de Costa Rica", () => {
   vm.runInNewContext(authSource, sandbox, { filename: "auth.js" });
   vm.runInNewContext(appSource, sandbox, { filename: "app.js" });
 
-  const formatted = sandbox.formatFecha("2026-10-08T16:00:00Z");
-
-  /* Formato corto en el listado: 08/10/26, 10:00 (sin segundos). */
-  assert.match(formatted, /08\/10\/26/);
-  assert.match(formatted, /10:00/);
-  assert.ok(!formatted.includes("10:00:00"), "sin segundos");
-  assert.ok(!formatted.includes("16:00"), "no debe mostrar la hora UTC");
+  /* El listado usa la misma función que el resto de la app. */
+  assert.equal(sandbox.formatearFechaHora("2026-10-08T16:00:00Z"), "08/10/2026, 10:00 a. m.");
+  assert.doesNotMatch(appSource, /function formatFecha|toLocaleString\(/, "sin un formato propio");
 });
 
 test("init carga usuarios, ticket y comentarios con una petición por recurso", async () => {
@@ -322,7 +317,7 @@ test("init pinta los comentarios en orden cronológico", async () => {
   assert.equal(cards[1].children[1].textContent, "Segundo comentario.");
   assert.equal(cards[0].children[0].children[0].textContent, "Anónimo");
   assert.equal(cards[1].children[0].children[0].textContent, "Soporte");
-  assert.equal(cards[0].children[0].children[1].textContent.includes("10:05:00"), true);
+  assert.equal(cards[0].children[0].children[1].textContent, "08/10/2026, 10:05 a. m.");
   assert.equal(harness.node("comentarios-estado").hidden, true);
   assert.equal(harness.node("lista-comentarios").hidden, false);
 });

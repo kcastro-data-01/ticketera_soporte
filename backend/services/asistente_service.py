@@ -37,6 +37,7 @@ from sqlalchemy import func, or_, select
 
 from backend.constants import TICKET_CATEGORIES, TICKET_PRIORITIES, TicketPriority, TicketState, UserRole
 from backend.entorno import en_vercel
+from backend.fechas import ZONA_COSTA_RICA as _ZONA_FECHAS, formatear_fecha_hora
 from backend.models import Ticket, User
 from backend.services import metricas_service, ticket_service
 
@@ -412,7 +413,7 @@ def _detalle_ticket(session, user: User, ticket_id: int) -> list[str]:
     if comentarios:
         lines.append(f"  Últimos comentarios ({len(comentarios)} de {len(ticket.comments)}):")
         lines.extend(
-            f"  · {c.created_at:%d/%m %H:%M} {c.author}: {_recortar(c.content, DETALLE_MAX_COMENTARIO)}"
+            f"  · {formatear_fecha_hora(c.created_at)} {c.author}: {_recortar(c.content, DETALLE_MAX_COMENTARIO)}"
             for c in comentarios
         )
     else:
@@ -2156,11 +2157,8 @@ def puede_explicar_ia(user: User) -> bool:
 
 
 def _fecha_creacion(fecha: datetime) -> str:
-    """«20 de octubre de 2026, 9:15 a. m.» en hora de Costa Rica."""
-    if fecha.tzinfo is None:
-        fecha = fecha.replace(tzinfo=timezone.utc)
-    local = fecha.astimezone(ZONA_COSTA_RICA)
-    return f"{local.day} de {_MESES[local.month - 1]} de {local.year}, {_texto_hora(local)}"
+    """«20/10/2026, 9:15 a. m.» en hora de Costa Rica (backend/fechas.py)."""
+    return formatear_fecha_hora(fecha)
 
 
 def linea_mas_informacion(ticket: Ticket, user: User) -> str:
@@ -2221,7 +2219,7 @@ def respuesta_saludo(user: User, pregunta: str) -> str | None:
 # Costa Rica está en UTC-6 todo el año (sin horario de verano), así que no
 # hace falta la base de zonas horarias, que la imagen slim no trae.
 
-ZONA_COSTA_RICA = timezone(timedelta(hours=-6), "America/Costa_Rica")
+ZONA_COSTA_RICA = _ZONA_FECHAS  # la misma de backend/fechas.py
 _DIAS_SEMANA = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
           "septiembre", "octubre", "noviembre", "diciembre")
@@ -2267,10 +2265,8 @@ def _texto_fecha(ahora: datetime) -> str:
 
 
 def _texto_hora(ahora: datetime) -> str:
-    """«3:50 p. m.» / «1:05 a. m.»."""
-    hora = ahora.hour % 12 or 12
-    sufijo = "a. m." if ahora.hour < 12 else "p. m."
-    return f"{hora}:{ahora.minute:02d} {sufijo}"
+    """«3:50 p. m.» / «1:05 a. m.» (backend/fechas.py)."""
+    return formatear_fecha_hora(ahora, parte="hora")
 
 
 def _son_las(ahora: datetime) -> str:

@@ -28,14 +28,6 @@ function clearRows() {
   elements.tbody.replaceChildren();
 }
 
-function formatFecha(value) {
-  /* Hora local de Costa Rica (America/Costa_Rica, UTC-6), sin importar
-     la zona horaria del navegador. */
-  return new Date(value).toLocaleString("es-ES", {
-    timeZone: "America/Costa_Rica",
-  });
-}
-
 function appendCell(row, text) {
   const cell = document.createElement("td");
   cell.textContent = text;
@@ -80,7 +72,7 @@ function renderHistorial(entries) {
   entries.forEach((entry) => {
     const row = document.createElement("tr");
     const { accion, detalle } = describirHistorial(entry);
-    appendCell(row, formatFecha(entry.created_at));
+    appendCell(row, formatearFechaHora(entry.created_at));
     appendTicketCell(row, entry.ticket_id, entry.ticket_title);
     appendCell(row, formatAutor(entry));
     appendCell(row, accion);

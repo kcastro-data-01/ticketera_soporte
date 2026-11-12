@@ -69,9 +69,8 @@ function formatoTamano(bytes) {
 }
 
 function adjFecha(valor) {
-  const fecha = new Date(valor);
-  if (Number.isNaN(fecha.getTime())) return "";
-  return fecha.toLocaleString("es-CR", { timeZone: "America/Costa_Rica", dateStyle: "short", timeStyle: "short" });
+  const texto = formatearFechaHora(valor);
+  return texto === "—" ? "" : texto;
 }
 
 function extensionDe(nombre) {
