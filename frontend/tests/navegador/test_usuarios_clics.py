@@ -135,7 +135,7 @@ def test_agregar_abre_guarda_y_cierra(pagina):
     pagina.wait_for_function("!document.getElementById('dialogo-usuario').open")
     assert ("POST", "users", {"name": "Carla Nueva", "email": "carla@data.cr", "role": "Técnico", "area_id": 2}) in pagina.api.pedidos
     sync_api.expect(fila(pagina, "Carla Nueva")).to_have_count(1)
-    assert pagina.inner_text("#estado-pagina") == "Usuario agregado correctamente."
+    sync_api.expect(pagina.locator("#avisos .aviso.exito .aviso-texto")).to_have_text("Usuario agregado correctamente.")
 
 
 def test_agregar_con_error_queda_abierta_y_lo_muestra(pagina):
@@ -178,17 +178,17 @@ def test_editar_abre_con_los_datos_guarda_y_cierra(pagina):
     pagina.wait_for_function("!document.getElementById('dialogo-usuario').open")
     assert ("PATCH", "users/2", {"name": "Beto Técnico Mora", "email": "beto@data.cr", "role": "Técnico", "area_id": 1}) in pagina.api.pedidos
     sync_api.expect(fila(pagina, "Beto Técnico Mora")).to_contain_text("Soporte IT")
-    assert pagina.inner_text("#estado-pagina") == "Usuario actualizado correctamente."
+    sync_api.expect(pagina.locator("#avisos .aviso.exito .aviso-texto")).to_have_text("Usuario actualizado correctamente.")
 
 
 def test_desactivar_con_confirmacion_y_reactivar(pagina):
     fila(pagina, "Beto Técnico").get_by_role("button", name="Desactivar").click()
     pagina.locator(".dialogo").get_by_role("button", name="Desactivar").click()
-    pagina.wait_for_function("document.getElementById('estado-pagina').textContent.includes('desactivado')")
+    sync_api.expect(pagina.locator("#avisos .aviso-texto").last).to_have_text("Beto Técnico fue desactivado.")
     assert ("PATCH", "users/2", {"is_active": False}) in pagina.api.pedidos
     sync_api.expect(fila(pagina, "Beto Técnico")).to_contain_text("Inactivo")
     fila(pagina, "Beto Técnico").get_by_role("button", name="Reactivar").click()
-    pagina.wait_for_function("document.getElementById('estado-pagina').textContent.includes('reactivado')")
+    sync_api.expect(pagina.locator("#avisos .aviso-texto").last).to_have_text("Beto Técnico fue reactivado.")
     assert ("PATCH", "users/2", {"is_active": True}) in pagina.api.pedidos
     sync_api.expect(fila(pagina, "Beto Técnico").locator(".badge-activo")).to_have_text("Activo")
 

@@ -83,9 +83,12 @@ function crear({ rol = "Técnico", fetchImpl }) {
     URLSearchParams, AbortController, setTimeout, clearTimeout, Date, Number,
   };
   vm.createContext(sandbox);
+  /* avisar() es de js/avisos.js: acá se anotan los avisos. */
+  const avisos = [];
+  sandbox.avisar = (texto, tipo = "exito") => avisos.push({ texto, tipo });
   vm.runInContext(authSource, sandbox);
   vm.runInContext(iaSource, sandbox);
-  return { sandbox, ids, llamadas };
+  return { sandbox, ids, llamadas, avisos };
 }
 
 const click = (n) => n.listeners.click[0]();
@@ -136,6 +139,7 @@ test("Explicar con IA: indicador de carga, botones bloqueados y resultado", asyn
   assert.equal(ia.ids["ia-estado"].hidden, true);
   assert.equal(ia.llamadas.at(-1).url, "/api/tickets/7/explicacion");
   assert.equal(ia.llamadas.at(-1).method, "POST");
+  assert.deepEqual(ia.avisos, [{ texto: "Explicación generada correctamente.", tipo: "exito" }]);
 });
 
 test("Volver a explicar pide una nueva con regenerar=true", async () => {
@@ -143,6 +147,7 @@ test("Volver a explicar pide una nueva con regenerar=true", async () => {
   await ia.sandbox.iniciarExplicacion();
   await click(ia.ids["ia-regenerar"]);
   assert.deepEqual(ia.llamadas.at(-1), { url: "/api/tickets/7/explicacion?regenerar=true", method: "POST" });
+  assert.deepEqual(ia.avisos, [{ texto: "Explicación regenerada correctamente.", tipo: "exito" }]);
 });
 
 test("errores: IA caída, JSON inválido y rol sin permiso", async () => {
@@ -156,8 +161,11 @@ test("errores: IA caída, JSON inválido y rol sin permiso", async () => {
     });
     await ia.sandbox.iniciarExplicacion();
     await click(ia.ids["ia-explicar"]);
-    assert.match(ia.ids["ia-estado"].textContent, esperado);
-    assert.equal(ia.ids["ia-estado"].className, "estado error");
+    // El error va en un aviso rojo; el «Analizando…» se quita.
+    assert.equal(ia.avisos.length, 1);
+    assert.match(ia.avisos[0].texto, esperado);
+    assert.equal(ia.avisos[0].tipo, "error");
+    assert.equal(ia.ids["ia-estado"].hidden, true);
     assert.equal(ia.ids["ia-explicar"].disabled, false);
   }
 });

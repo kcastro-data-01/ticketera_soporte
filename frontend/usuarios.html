@@ -6,13 +6,13 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Usuarios · American Data Networks</title>
   <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
-  <script src="js/tema.js?v=20261112-7"></script>
+  <script src="js/tema.js?v=20261112-8"></script>
   <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="css/estilos.css?v=20261112-7">
+  <link rel="stylesheet" href="css/estilos.css?v=20261112-8">
 </head>
 <body class="app">
   <aside class="barra-lateral">
@@ -57,8 +57,7 @@
     <main class="contenido">
       <section class="seccion" aria-labelledby="titulo-usuarios">
         <h2 id="titulo-usuarios">Usuarios registrados</h2>
-        <!-- Avisos de la página: usuario agregado, actualizado, desactivado. -->
-        <p id="estado-pagina" class="estado" role="status" aria-live="polite" hidden></p>
+        <!-- Cargando, sin usuarios o error al cargar la lista. Lo que pasa al agregar, editar, desactivar o reactivar va en un aviso flotante (js/avisos.js). -->
         <p id="usuarios-estado" class="estado" role="status" aria-live="polite" hidden></p>
         <div class="tabla-scroll">
           <table id="tabla-usuarios" class="listado tabla-usuarios" hidden>
@@ -125,7 +124,6 @@
             <small id="error-password" class="error-campo" role="alert" hidden></small>
           </label>
         </div>
-        <p id="estado-usuario" class="estado" role="status" aria-live="polite" hidden></p>
         <div class="acciones ventana-acciones">
           <button type="button" id="cancelar-usuario" class="secundario">Cancelar</button>
           <button type="submit" id="crear">Agregar usuario</button>
@@ -166,7 +164,6 @@
             <small id="error-editar-password" class="error-campo" role="alert" hidden></small>
           </label>
         </div>
-        <p id="estado-edicion" class="estado" role="status" aria-live="polite" hidden></p>
         <div class="acciones ventana-acciones">
           <button type="button" id="cancelar-edicion" class="secundario">Cancelar</button>
           <button type="submit" id="guardar-edicion">Guardar cambios</button>
@@ -177,11 +174,12 @@
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
-  <script src="js/guardia.js?v=20261112-7" data-permiso="usuarios"></script>
-  <script src="js/auth.js?v=20261112-7" defer></script>
-  <script src="js/sesion.js?v=20261112-7" defer></script>
-  <script src="js/asistente.js?v=20261112-7" defer></script>
-  <script src="js/usuarios.js?v=20261112-7" defer></script>
-  <script src="js/guardia.js?v=20261112-7"></script>
+  <script src="js/guardia.js?v=20261112-8" data-permiso="usuarios"></script>
+  <script src="js/avisos.js?v=20261112-8" defer></script>
+  <script src="js/auth.js?v=20261112-8" defer></script>
+  <script src="js/sesion.js?v=20261112-8" defer></script>
+  <script src="js/asistente.js?v=20261112-8" defer></script>
+  <script src="js/usuarios.js?v=20261112-8" defer></script>
+  <script src="js/guardia.js?v=20261112-8"></script>
 </body>
 </html>

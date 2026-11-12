@@ -79,7 +79,6 @@ function mostrarErrorCampo(mensaje, prefijo = "") {
 
 function getElements() {
   return {
-    estadoUsuario: document.getElementById("estado-usuario"),
     formUsuario: document.getElementById("form-usuario"),
     nombre: document.getElementById("nombre"),
     email: document.getElementById("email"),
@@ -88,7 +87,6 @@ function getElements() {
     area: document.getElementById("area"),
     crear: document.getElementById("crear"),
     usuariosEstado: document.getElementById("usuarios-estado"),
-    estadoPagina: document.getElementById("estado-pagina"),
     dialogo: document.getElementById("dialogo-usuario"),
     dialogoTitulo: document.getElementById("dialogo-usuario-titulo"),
     abrirAgregar: document.getElementById("abrir-agregar-usuario"),
@@ -105,27 +103,12 @@ function getElements() {
     editarArea: document.getElementById("editar-area"),
     guardarEdicion: document.getElementById("guardar-edicion"),
     cancelarEdicion: document.getElementById("cancelar-edicion"),
-    estadoEdicion: document.getElementById("estado-edicion"),
   };
 }
 
 /* Aviso dentro de la ventana «Agregar usuario» (errores al agregar). */
-function showStatus(message, type) {
-  const elements = getElements();
-  elements.estadoUsuario.textContent = message;
-  elements.estadoUsuario.className = type ? `estado ${type}` : "estado";
-  elements.estadoUsuario.hidden = false;
-}
-
-/* Aviso de la página, arriba de la tabla: usuario agregado, actualizado,
-   desactivado o reactivado (y los errores de esas acciones). */
-function avisarPagina(message, type) {
-  const elements = getElements();
-  if (!elements.estadoPagina) return;
-  elements.estadoPagina.textContent = message;
-  elements.estadoPagina.className = type ? `estado ${type}` : "estado";
-  elements.estadoPagina.hidden = false;
-}
+/* Agregado, actualizado, desactivado o reactivado (y los errores de esas
+   acciones): aviso flotante con avisar() de js/avisos.js. */
 
 /* --- Ventana de agregar / editar ------------------------------------------
    Un solo <dialog>: en modo «agregar» se ve #form-usuario y en «editar»
@@ -169,7 +152,6 @@ function abrirAgregarUsuario() {
     mostrarCampoArea(elements.rol, elements.area);
   }
   limpiarErroresCampo();
-  elements.estadoUsuario.hidden = true;
   abrirDialogoUsuario("agregar");
 }
 
@@ -341,10 +323,10 @@ async function cambiarActivo(user, activar) {
     });
     const body = response.ok ? null : await response.json().catch(() => null);
     if (!response.ok) {
-      avisarPagina(mensajeDeError(response, body), "error");
+      avisar(mensajeDeError(response, body), "error");
       return;
     }
-    avisarPagina(
+    avisar(
       activar ? `${user.name} fue reactivado.` : `${user.name} fue desactivado.`,
       "exito"
     );
@@ -352,7 +334,7 @@ async function cambiarActivo(user, activar) {
     await cargarUsuarios();
   } catch (error) {
     console.error("PATCH /api/users (is_active):", error);
-    avisarPagina(
+    avisar(
       "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );
@@ -361,21 +343,6 @@ async function cambiarActivo(user, activar) {
   }
 }
 
-function mostrarEdicionEstado(message, type) {
-  const elements = getElements();
-  elements.estadoEdicion.textContent = message;
-  elements.estadoEdicion.className = type ? `estado ${type}` : "estado";
-  elements.estadoEdicion.hidden = false;
-}
-
-function ocultarEdicionEstado() {
-  const elements = getElements();
-  elements.estadoEdicion.textContent = "";
-  elements.estadoEdicion.hidden = true;
-}
-
-/* Área de IT: el Solicitante no tiene («—»); Técnico y Administrador sin
-   área, «Sin área». */
 function textoAreaUsuario(user) {
   if (!ROLES_IT_USUARIOS.includes(user.role)) return "—";
   return user.area_name || "Sin departamento";
@@ -426,12 +393,10 @@ function editarUsuario(user) {
   }
   limpiarErroresCampo("editar-");
   if (elements.editarPassword) elements.editarPassword.value = "";
-  ocultarEdicionEstado();
   abrirDialogoUsuario("editar");
 }
 
 function cancelarEdicion() {
-  ocultarEdicionEstado();
   cerrarDialogoUsuario();
 }
 
@@ -466,7 +431,7 @@ async function guardarEdicion(event) {
   }
 
   if (Object.keys(payload).length === 0) {
-    mostrarEdicionEstado("No hay cambios para guardar.", "error");
+    avisar("No hay cambios para guardar.", "error");
     return;
   }
 
@@ -484,13 +449,12 @@ async function guardarEdicion(event) {
       return;
     }
 
-    ocultarEdicionEstado();
-    cerrarDialogoUsuario();
-    avisarPagina("Usuario actualizado correctamente.", "exito");
+      cerrarDialogoUsuario();
+    avisar("Usuario actualizado correctamente.", "exito");
     await cargarUsuarios();
   } catch (error) {
     console.error("PATCH /api/users:", error);
-    mostrarEdicionEstado(
+    avisar(
       "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );
@@ -526,16 +490,14 @@ async function cargarUsuarios() {
   }
 }
 
-/* Error al agregar: debajo del campo si corresponde a uno (el aviso
-   general queda con el mismo texto, oculto); si no, el aviso general. */
+/* Error al agregar o editar: debajo del campo si corresponde a uno; si
+   no, en un aviso flotante rojo. */
 function avisarErrorCrear(mensaje) {
-  showStatus(mensaje, "error");
-  if (mostrarErrorCampo(mensaje)) getElements().estadoUsuario.hidden = true;
+  if (!mostrarErrorCampo(mensaje)) avisar(mensaje, "error");
 }
 
 function avisarErrorEdicion(mensaje) {
-  mostrarEdicionEstado(mensaje, "error");
-  if (mostrarErrorCampo(mensaje, "editar-")) getElements().estadoEdicion.hidden = true;
+  if (!mostrarErrorCampo(mensaje, "editar-")) avisar(mensaje, "error");
 }
 
 async function crearUsuario(event) {
@@ -581,14 +543,13 @@ async function crearUsuario(event) {
       elements.area.value = "";
       mostrarCampoArea(elements.rol, elements.area);
     }
-    elements.estadoUsuario.hidden = true;
-    cerrarDialogoUsuario();
-    avisarPagina("Usuario agregado correctamente.", "exito");
+      cerrarDialogoUsuario();
+    avisar("Usuario agregado correctamente.", "exito");
     /* El usuario nuevo aparece en la lista sin recargar la página. */
     await cargarUsuarios();
   } catch (error) {
     console.error("POST /api/users:", error);
-    showStatus(
+    avisar(
       "No se pudo conectar con el servidor. Verifique que esté en funcionamiento.",
       "error"
     );

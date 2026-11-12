@@ -119,7 +119,7 @@ function crear({ fetchImpl, tactil = false, imagen = null }) {
   vm.createContext(sandbox);
   vm.runInContext(authSource, sandbox);
   vm.runInContext(adjSource, sandbox);
-  sandbox.mostrarAviso = (mensaje, tipo) => avisos.push({ mensaje, tipo });
+  sandbox.avisar = (mensaje, tipo = "exito") => avisos.push({ mensaje, tipo });
   // Sin body, confirmarAccion usa window.confirm; la vista previa lo pone.
   sandbox.document.body = undefined;
   const conBody = () => { sandbox.document.body = body; };
@@ -223,9 +223,12 @@ test("tipo no permitido o más de 4 MB: no se envía y se explica", async () => 
     { name: "enorme.pdf", size: 4 * 1024 * 1024 + 1, type: "application/pdf" },
   ]);
   assert.equal(a.llamadas.filter((l) => l.method === "POST").length, 0);
-  assert.match(a.ids["adj-estado"].textContent, /«programa\.exe»: tipo no permitido\. Se aceptan jpg, png, pdf, docx, xlsx o txt\./);
-  assert.match(a.ids["adj-estado"].textContent, /«enorme\.pdf» pesa más de 4 MB\./);
-  assert.equal(a.ids["adj-estado"].className, "estado error");
+  // Cada archivo rechazado en su propio aviso rojo (avisar, js/avisos.js).
+  assert.equal(a.avisos.length, 2);
+  assert.ok(a.avisos.every((aviso) => aviso.tipo === "error"));
+  assert.match(a.avisos[0].mensaje, /«programa\.exe»: tipo no permitido\. Se aceptan jpg, png, pdf, docx, xlsx o txt\./);
+  assert.match(a.avisos[1].mensaje, /«enorme\.pdf» pesa más de 4 MB\./);
+  assert.equal(a.ids["adj-estado"].hidden, true, "el «Subiendo…» se quita; no queda un cartel fijo");
 });
 
 test("respeta el máximo de 10: con 9 solo sube uno más", async () => {
@@ -235,7 +238,8 @@ test("respeta el máximo de 10: con 9 solo sube uno más", async () => {
   const f = (n) => ({ name: `${n}.txt`, size: 5, type: "text/plain" });
   await a.sandbox.subirArchivos([f("x"), f("y"), f("z")]);
   assert.equal(a.llamadas.filter((l) => l.method === "POST").length, 1);
-  assert.match(a.ids["adj-estado"].textContent, /Solo se pueden agregar 1 archivo\(s\) más \(máximo 10 por ticket\)/);
+  assert.deepEqual(a.avisos.map((aviso) => aviso.tipo), ["exito", "error"]);
+  assert.match(a.avisos[1].mensaje, /Solo se pueden agregar 1 archivo\(s\) más \(máximo 10 por ticket\)/);
 });
 
 test("el error del servidor se muestra tal cual", async () => {
@@ -246,7 +250,8 @@ test("el error del servidor se muestra tal cual", async () => {
   });
   await a.sandbox.iniciarAdjuntos();
   await a.sandbox.subirArchivos([{ name: "a.png", size: 50, type: "text/plain" }]);
-  assert.match(a.ids["adj-estado"].textContent, /no corresponde a un archivo PNG válido/);
+  assert.equal(a.avisos.at(-1).tipo, "error");
+  assert.match(a.avisos.at(-1).mensaje, /no corresponde a un archivo PNG válido/);
 });
 
 test("una foto grande se achica a 2000 px de lado antes de subirla", async () => {

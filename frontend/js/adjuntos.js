@@ -55,11 +55,6 @@ function adjMostrarEstado(mensaje, tipo = "") {
   estado.hidden = !mensaje;
 }
 
-function adjAvisar(mensaje, tipo) {
-  if (typeof mostrarAviso === "function") mostrarAviso(mensaje, tipo);
-  else adjMostrarEstado(mensaje, tipo);
-}
-
 /* 900 B · 12,5 KB · 3,4 MB */
 function formatoTamano(bytes) {
   const n = Number(bytes) || 0;
@@ -186,7 +181,7 @@ async function descargarAdjunto(adjunto) {
     enlace.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (error) {
-    adjAvisar(`No se pudo descargar «${adjunto.nombre}».`, "error");
+    avisar(`No se pudo descargar «${adjunto.nombre}».`, "error");
   }
 }
 
@@ -203,12 +198,12 @@ async function eliminarAdjunto(adjunto) {
   try {
     const response = await fetchWithAuth(`/api/tickets/${adjunto.ticket_id}/adjuntos/${adjunto.id}`, { method: "DELETE" });
     if (response.status === 204) {
-      adjAvisar(`«${adjunto.nombre}» eliminado.`, "exito");
+      avisar(`«${adjunto.nombre}» eliminado.`, "exito");
     } else {
-      adjAvisar(await adjMensaje(response, "No se pudo eliminar el adjunto."), "error");
+      avisar(await adjMensaje(response, "No se pudo eliminar el adjunto."), "error");
     }
   } catch (error) {
-    adjAvisar("Error al comunicarse con la API.", "error");
+    avisar("Error al comunicarse con la API.", "error");
   } finally {
     adjOcupado = false;
   }
@@ -427,9 +422,10 @@ async function subirArchivos(lista) {
     if (el.archivos) el.archivos.value = "";
     if (el.camara) el.camara.value = "";
   }
-  if (subidos) adjAvisar(subidos === 1 ? "Archivo adjuntado." : `${subidos} archivos adjuntados.`, "exito");
+  if (subidos) avisar(subidos === 1 ? "Archivo adjuntado." : `${subidos} archivos adjuntados.`, "exito");
   await cargarAdjuntos();
-  if (errores.length) adjMostrarEstado(errores.join(" "), "error");
+  /* Cada archivo que no se pudo subir, en su propio aviso rojo. */
+  errores.forEach((error) => avisar(error, "error"));
 }
 
 /* detalle.js avisa cada vez que pinta el ticket: si cambió de estado (por

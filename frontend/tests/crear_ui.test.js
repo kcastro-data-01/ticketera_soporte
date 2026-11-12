@@ -14,6 +14,7 @@ const vm = require("node:vm");
 const authSource = fs.readFileSync(path.join(__dirname, "..", "js", "auth.js"), "utf8");
 const crearSource = fs.readFileSync(path.join(__dirname, "..", "js", "crear.js"), "utf8");
 const adjSource = fs.readFileSync(path.join(__dirname, "..", "js", "adjuntos.js"), "utf8");
+const avisosSource = fs.readFileSync(path.join(__dirname, "..", "js", "avisos.js"), "utf8");
 const crearHtml = fs.readFileSync(path.join(__dirname, "..", "crear.html"), "utf8").replace(/\?v=[\w-]+"/g, '"');
 
 function nodo(extra = {}) {
@@ -43,6 +44,7 @@ function montar() {
     setTimeout() {}, console: { error() {} },
   };
   vm.createContext(sandbox);
+  vm.runInContext(avisosSource, sandbox);
   vm.runInContext(authSource, sandbox);
   vm.runInContext(crearSource, sandbox);
   sandbox.init();
@@ -158,7 +160,7 @@ function montarAdj({ tactil = false, imagen = null, fetchAdjunto = () => respues
   vm.runInContext(authSource, sandbox);
   vm.runInContext(adjSource, sandbox);
   vm.runInContext(crearSource, sandbox);
-  sandbox.mostrarAviso = (mensaje, tipo) => avisos.push({ mensaje, tipo });
+  sandbox.avisar = (mensaje, tipo = "exito") => avisos.push({ mensaje, tipo });
   sandbox.avisoPendiente = (mensaje) => pendientes.push(mensaje);
   sandbox.init();
   return { sandbox, ids, llamadas, avisos, pendientes, temporizadores, lienzos };
@@ -254,7 +256,8 @@ test("sin adjuntos se crea el ticket como siempre", async () => {
   await f.sandbox.createTicket();
   assert.deepEqual(f.llamadas.map((l) => l.url), ["/api/tickets"]);
   assert.deepEqual(f.pendientes, ["Ticket #7 guardado correctamente."]);
-  assert.equal(f.temporizadores.length, 1, "redirige al listado");
+  assert.equal(f.sandbox.window.location.href, "index.html", "va directo al listado, donde se ve el aviso");
+  assert.equal(f.temporizadores.length, 0, "sin esperar con un cartel fijo");
 });
 
 test("primero se crea el ticket y después se sube cada archivo, uno por uno", async () => {
@@ -271,7 +274,7 @@ test("primero se crea el ticket y después se sube cada archivo, uno por uno", a
   assert.equal(postsAdjuntos(f)[0].headers["Content-Type"], "application/octet-stream");
   assert.equal(postsAdjuntos(f)[0].body, a);
   assert.deepEqual(f.pendientes, ["Ticket #7 guardado correctamente con 2 adjuntos."]);
-  assert.equal(f.temporizadores.length, 1);
+  assert.equal(f.sandbox.window.location.href, "index.html");
   assert.equal(f.ids.guardar.disabled, true);
 });
 

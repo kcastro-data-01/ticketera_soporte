@@ -150,9 +150,12 @@ function montarDetalle(usuario, t, rutas = {}) {
     URLSearchParams,
     Map,
   };
+  /* avisar() es de js/avisos.js: acá se anotan los avisos. */
+  const avisos = [];
+  sandbox.avisar = (texto, tipo = "exito") => avisos.push({ texto, tipo });
   vm.runInNewContext(authSource, sandbox, { filename: "auth.js" });
   vm.runInNewContext(detalleSource, sandbox, { filename: "detalle.js" });
-  return { sandbox, nodo: (id) => sandbox.document.getElementById(id), llamadas };
+  return { sandbox, nodo: (id) => sandbox.document.getElementById(id), llamadas, avisos };
 }
 
 function visibles(h) {
@@ -217,7 +220,7 @@ test("Detalle: un 409 al comentar muestra el motivo del servidor y recarga el ti
 
   await h.sandbox.agregarComentario();
 
-  assert.equal(h.nodo("estado-carga").textContent, "El ticket #1 está Cerrado y no admite cambios.");
+  assert.deepEqual(h.avisos.at(-1), { texto: "El ticket #1 está Cerrado y no admite cambios.", tipo: "error" });
   assert.deepEqual(visibles(h), ["estado-final"], "los controles se ocultan");
 });
 
@@ -232,7 +235,8 @@ test("Detalle: un 403 al editar muestra el motivo del servidor", async () => {
 
   await h.sandbox.guardarEdicion();
 
-  assert.match(h.nodo("estado-carga").textContent, /mientras está «Nuevo»/);
+  assert.match(h.avisos.at(-1).texto, /mientras está «Nuevo»/);
+  assert.equal(h.avisos.at(-1).tipo, "error");
 });
 
 /* ---------------- app.js: «Editar» o «Ver» en el listado ---------------- */

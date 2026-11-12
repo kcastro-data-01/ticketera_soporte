@@ -8,7 +8,6 @@
    con el enlace al detalle para reintentarlo. */
 
 const API_TICKETS_URL = "/api/tickets";
-const REDIRECT_DELAY_MS = 1500;
 
 let enviando = false;
 let redirigiendo = false;
@@ -162,7 +161,7 @@ function mostrarFallas(ticketId, fallas, subidos) {
   elements.resultadoDetalle.href = `detalle.html?id=${ticketId}`;
   elements.resultado.hidden = false;
   if (typeof elements.resultadoTitulo.focus === "function") elements.resultadoTitulo.focus();
-  if (typeof mostrarAviso === "function") mostrarAviso(`Ticket #${ticketId} creado. ${no}.`, "error");
+  avisar(`Ticket #${ticketId} creado. ${no}.`, "error");
 }
 
 function showStatus(message, type) {
@@ -172,11 +171,17 @@ function showStatus(message, type) {
   elements.estado.hidden = false;
 }
 
-/* Los errores se muestran como aviso flotante en rojo suave. */
+function hideStatus() {
+  const elements = getElements();
+  elements.estado.textContent = "";
+  elements.estado.hidden = true;
+}
+
+/* Los errores van en un aviso flotante rojo (avisar, js/avisos.js) y se
+   quita el «Guardando...». */
 function avisarError(message) {
-  showStatus(message, "error");
-  getElements().estado.hidden = true;
-  if (typeof mostrarAviso === "function") mostrarAviso(message, "error");
+  hideStatus();
+  avisar(message, "error");
 }
 
 /* ¿Hay áreas para elegir? Sin áreas activas el ticket queda «Sin área». */
@@ -285,15 +290,10 @@ async function createTicket() {
       }
     }
     const conAdjuntos = cantidad === 1 ? " con 1 adjunto" : cantidad ? ` con ${cantidad} adjuntos` : "";
-    /* El aviso se ve al llegar al listado. */
-    if (typeof avisoPendiente === "function") avisoPendiente(`Ticket #${ticket.id} guardado correctamente${conAdjuntos}.`);
-    showStatus(
-      `Ticket #${ticket.id} creado correctamente${conAdjuntos}. Redirigiendo al listado...`,
-      "exito"
-    );
-    setTimeout(() => {
-      window.location.href = "index.html";
-    }, REDIRECT_DELAY_MS);
+    /* El aviso verde se ve al llegar al listado. */
+    avisoPendiente(`Ticket #${ticket.id} guardado correctamente${conAdjuntos}.`);
+    showStatus("Ticket guardado. Abriendo el listado...", "cargando");
+    window.location.href = "index.html";
   } catch (error) {
     avisarError("Error al comunicarse con la API.");
   } finally {

@@ -95,6 +95,9 @@ const IDS_DETALLE = ["usuario", "usuarios-nota", "area-destino", "area-reasignar
 
 function detalle(rol, fetchImpl) {
   const h = sandboxCon(rol, fetchImpl, IDS_DETALLE);
+  /* avisar() es de js/avisos.js: acá se anotan los avisos. */
+  h.avisos = [];
+  h.sandbox.avisar = (texto, tipo = "exito") => h.avisos.push({ texto, tipo });
   vm.runInNewContext(leer("js/detalle.js"), h.sandbox, { filename: "detalle.js" });
   vm.runInNewContext("ticketId = 7;", h.sandbox);
   return h;
@@ -121,7 +124,7 @@ test("un ticket viejo asignado a un Solicitante muestra su nombre para reasignar
 });
 
 test("«Cambiar área» envía el área y la casilla de reasignar", async () => {
-  const { sandbox, nodos, llamadas } = detalle("Técnico", async (url, op) =>
+  const { sandbox, nodos, llamadas, avisos } = detalle("Técnico", async (url, op) =>
     (op.method === "PATCH" ? respuesta(200, { id: 7, area_id: 4, area_name: "Infraestructura", assigned_to_id: null })
       : respuesta(200, { id: 7, state: "Nuevo", area_id: 4, area_name: "Infraestructura" })));
   nodos.get("area-destino").value = "4";
@@ -130,13 +133,15 @@ test("«Cambiar área» envía el área y la casilla de reasignar", async () => 
   const patch = llamadas.find((l) => l.opciones.method === "PATCH");
   assert.equal(patch.url, "/api/tickets/7/area");
   assert.deepEqual(JSON.parse(patch.opciones.body), { area_id: 4, reasignar: true });
+  assert.deepEqual(avisos.at(-1), { texto: "El ticket pasó al departamento «Infraestructura».", tipo: "exito" });
 });
 
 test("«Cambiar área» sin elegir un área no llama a la API", async () => {
-  const { sandbox, nodos, llamadas } = detalle("Técnico", async () => respuesta(200, {}));
+  const { sandbox, nodos, llamadas, avisos } = detalle("Técnico", async () => respuesta(200, {}));
   nodos.get("area-destino").value = "";
   await sandbox.cambiarAreaTicket();
   assert.equal(llamadas.length, 0);
+  assert.deepEqual(avisos, [{ texto: "Elija el departamento al que pasa el ticket.", tipo: "error" }]);
 });
 
 test("detalle.html: «Departamento» en los datos y la sección «Cambiar departamento» para quien puede", () => {

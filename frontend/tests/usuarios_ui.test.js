@@ -42,7 +42,6 @@ const USER_B = {
 };
 
 const ELEMENT_IDS = [
-  "estado-usuario",
   "form-usuario",
   "nombre",
   "email",
@@ -52,7 +51,6 @@ const ELEMENT_IDS = [
   "usuarios-estado",
   "tabla-usuarios",
   "cuerpo-usuarios",
-  "estado-pagina",
   "dialogo-usuario",
   "dialogo-usuario-titulo",
   "abrir-agregar-usuario",
@@ -66,7 +64,6 @@ const ELEMENT_IDS = [
   "editar-rol",
   "guardar-edicion",
   "cancelar-edicion",
-  "estado-edicion",
 ];
 
 function createNode(id) {
@@ -122,6 +119,9 @@ function makeFetch(overrides = {}) {
     if (url === "/api/users") {
       return resolve(overrides.users, jsonResponse(200, [USER_A]));
     }
+    if (url.startsWith("/api/users/") && method === "PATCH") {
+      return resolve(overrides.patch, jsonResponse(200, USER_A));
+    }
     throw new Error(`URL no soportada por el harness: ${method} ${url}`);
   };
 }
@@ -159,6 +159,10 @@ function createHarness(fetchImpl) {
     Map,
   };
 
+  /* avisar() es de js/avisos.js: acá se anotan los avisos. */
+  const avisos = [];
+  sandbox.avisar = (texto, tipo = "exito") => avisos.push({ texto, tipo });
+
   vm.runInNewContext(authSource, sandbox, { filename: "auth.js" });
   vm.runInNewContext(usuariosSource, sandbox, { filename: "usuarios.js" });
 
@@ -176,6 +180,9 @@ function createHarness(fetchImpl) {
       return sandbox[name](...args);
     },
     node: (id) => nodes.get(id),
+    sandbox,
+    avisos,
+    aviso: () => avisos.at(-1) || { texto: "", tipo: "" },
     urls: () => fetchCalls.map((call) => call.url),
     fetchCalls,
     consoleErrors,
@@ -294,8 +301,8 @@ async function assertValidation(harness, fill, expectedMessage) {
   await harness.crear();
 
   assert.deepEqual(harness.urls(), [], "la validación no debe enviar peticiones");
-  assert.equal(harness.node("estado-usuario").textContent, expectedMessage);
-  assert.equal(harness.node("estado-usuario").className, "estado error");
+  assert.equal(harness.aviso().texto, expectedMessage);
+  assert.equal(harness.aviso().tipo, "error");
   assert.equal(harness.node("crear").disabled, false);
 }
 
@@ -414,12 +421,12 @@ test("crear usuario envía los datos, recarga la lista y limpia el formulario", 
   assert.equal(harness.node("email").value, "");
   assert.equal(harness.node("password").value, "", "no deja la contraseña escrita");
   assert.equal(harness.node("rol").value, "Técnico");
-  /* La ventana se cierra y el aviso queda en la página, arriba de la tabla. */
+  /* La ventana se cierra y el aviso verde flotante lo confirma. */
   assert.equal(
-    harness.node("estado-pagina").textContent,
+    harness.aviso().texto,
     "Usuario agregado correctamente."
   );
-  assert.equal(harness.node("estado-pagina").className, "estado exito");
+  assert.equal(harness.aviso().tipo, "exito");
   assert.ok(!harness.node("dialogo-usuario").open, "la ventana queda cerrada");
   assert.equal(harness.node("crear").disabled, false);
 });
@@ -441,10 +448,10 @@ test("email duplicado (409) muestra el detail y no recarga la lista", async () =
 
   assert.deepEqual(harness.urls(), ["/api/users"], "solo el POST fallido");
   assert.equal(
-    harness.node("estado-usuario").textContent,
+    harness.aviso().texto,
     "El email ana@soporte.local ya está registrado"
   );
-  assert.equal(harness.node("estado-usuario").className, "estado error");
+  assert.equal(harness.aviso().tipo, "error");
   assert.equal(harness.node("email").value, "ana@soporte.local", "conserva lo escrito");
   assert.equal(harness.node("crear").disabled, false);
 });
@@ -466,10 +473,10 @@ test("datos inválidos (422) muestran los errores de campo", async () => {
 
   assert.deepEqual(harness.urls(), ["/api/users"]);
   assert.equal(
-    harness.node("estado-usuario").textContent,
+    harness.aviso().texto,
     "email: el email no tiene un formato válido"
   );
-  assert.equal(harness.node("estado-usuario").className, "estado error");
+  assert.equal(harness.aviso().tipo, "error");
 });
 
 test("error de conexión al crear informa que el servidor no responde", async () => {
@@ -488,10 +495,10 @@ test("error de conexión al crear informa que el servidor no responde", async ()
 
   assert.equal(harness.fetchCalls.length, 1, "solo el POST");
   assert.equal(
-    harness.node("estado-usuario").textContent,
+    harness.aviso().texto,
     "No se pudo conectar con el servidor. Verifique que esté en funcionamiento."
   );
-  assert.equal(harness.node("estado-usuario").className, "estado error");
+  assert.equal(harness.aviso().tipo, "error");
   assert.ok(harness.consoleErrors.length > 0);
   assert.equal(harness.node("crear").disabled, false);
 });
@@ -565,7 +572,6 @@ test("«Agregar usuario» abre la ventana vacía en modo agregar; Cancelar y ✕
   await harness.init();
   const dialogo = dialogoDePrueba(harness);
   harness.node("nombre").value = "Quedó escrito";
-  harness.node("estado-usuario").hidden = false;
 
   harness.node("abrir-agregar-usuario").listeners.click[0]();
   assert.equal(dialogo.open, true);
@@ -575,7 +581,6 @@ test("«Agregar usuario» abre la ventana vacía en modo agregar; Cancelar y ✕
   assert.equal(harness.node("form-editar-usuario").hidden, true);
   assert.equal(harness.node("nombre").value, "", "empieza vacío");
   assert.equal(harness.node("rol").value, "Técnico");
-  assert.equal(harness.node("estado-usuario").hidden, true);
   assert.equal(harness.node("nombre").enfocado, true, "el foco en Nombre");
 
   harness.node("cancelar-usuario").listeners.click[0]();
@@ -594,8 +599,8 @@ test("un error al agregar queda dentro de la ventana, que sigue abierta", async 
   harness.node("email").value = "ana@data.cr";
   await harness.crear();
   assert.equal(dialogo.open, true);
-  assert.equal(harness.node("estado-usuario").className, "estado error");
-  assert.equal(harness.node("estado-pagina").textContent, "", "en la página no aparece nada");
+  assert.equal(harness.avisos.length, 1);
+  assert.equal(harness.aviso().tipo, "error", "aviso rojo (avisos.js lo pone dentro de la ventana abierta)");
 });
 
 test("«Editar» usa la misma ventana con los datos del usuario; al guardar se cierra y avisa en la página", async () => {
@@ -671,4 +676,47 @@ test("cada id que busca usuarios.js existe en usuarios.html (ninguno desapareci�
     assert.match(html, new RegExp(`id="${id}"`), id);
   }
   assert.doesNotMatch(usuariosSource, /seccion-editar|seccionEditar|limpiar-usuario/, "nada de la página vieja");
+});
+
+/* ---------------------------------------------------------------------------
+   Avisos flotantes de las acciones (avisar, js/avisos.js)
+   --------------------------------------------------------------------------- */
+
+test("desactivar y reactivar avisan en verde; un error del servidor, en rojo", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  harness.sandbox.confirmarAccion = async () => true;
+
+  await harness.call("cambiarActivo", USER_A, false);
+  assert.deepEqual(harness.aviso(), { texto: "Ana Pérez fue desactivado.", tipo: "exito" });
+  await harness.call("cambiarActivo", USER_A, true);
+  assert.deepEqual(harness.aviso(), { texto: "Ana Pérez fue reactivado.", tipo: "exito" });
+
+  const conError = createHarness(makeFetch({ patch: jsonResponse(409, { detail: "No puede desactivarse a sí mismo." }) }));
+  await conError.init();
+  conError.sandbox.confirmarAccion = async () => true;
+  await conError.call("cambiarActivo", USER_A, false);
+  assert.deepEqual(conError.aviso(), { texto: "No puede desactivarse a sí mismo.", tipo: "error" });
+});
+
+test("editar: guardar avisa «Usuario actualizado correctamente.» y sin cambios avisa en rojo", async () => {
+  const harness = createHarness(makeFetch());
+  await harness.init();
+  dialogoDePrueba(harness);
+  harness.call("editarUsuario", { ...USER_A, area_id: null });
+  harness.node("editar-nombre").value = "Ana María Pérez";
+  await harness.sandbox.guardarEdicion({ preventDefault() {} });
+  assert.deepEqual(harness.aviso(), { texto: "Usuario actualizado correctamente.", tipo: "exito" });
+
+  harness.call("editarUsuario", { ...USER_A, area_id: null });
+  for (const id of ["editar-nombre", "editar-email", "editar-rol"]) harness.node(id).value = "";
+  await harness.sandbox.guardarEdicion({ preventDefault() {} });
+  assert.deepEqual(harness.aviso(), { texto: "No hay cambios para guardar.", tipo: "error" });
+});
+
+test("usuarios.html ya no tiene carteles fijos para las acciones", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "usuarios.html"), "utf8");
+  assert.doesNotMatch(html, /id="estado-(pagina|usuario|edicion)"/);
+  assert.match(html, /<p id="usuarios-estado" class="estado"/, "el «Cargando usuarios…» sigue igual");
+  assert.doesNotMatch(usuariosSource, /avisarPagina|estadoPagina|estadoUsuario|estadoEdicion/);
 });

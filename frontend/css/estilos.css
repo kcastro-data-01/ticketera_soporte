@@ -90,6 +90,7 @@
   /* ---------- 2. Base y tipografía ---------- */
   /* Sombras mínimas: la separación la dan los bordes de 1 px. */
   --sombra-tarjeta: 0 1px 2px rgba(11, 24, 77, 0.04);
+  --sombra-aviso: 0 4px 14px rgba(11, 24, 77, 0.12);
   --sombra-suave: none;
 
   /* Radios: 6 px en tarjetas, botones y campos; 8 px en las ventanas que
@@ -190,6 +191,7 @@
   --login-link-color: #93acff;
 
   --sombra-tarjeta: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sombra-aviso: 0 4px 14px rgba(0, 0, 0, 0.45);
   --sombra-suave: none;
 
   /* Gráficos de métricas: tonos más claros sobre fondo oscuro. */
@@ -3180,35 +3182,39 @@ td.con-avatar {
   align-items: center;
 }
 
-/* ===== Avisos flotantes ===== */
+/* ===== Avisos flotantes (js/avisos.js) =====
+   Arriba a la derecha, debajo de la barra del título (avisos.js calcula
+   --avisos-arriba); se apilan hacia abajo. Éxito en verde suave y error en
+   rojo suave, los mismos colores de .estado.exito / .estado.error; claro y
+   oscuro por las variables. Entrada y salida con una transición corta. */
 .avisos {
   position: fixed;
-  left: 1.25rem;
-  bottom: 1.25rem;
-  z-index: 1200;
+  top: var(--avisos-arriba, 5.5rem);
+  right: 1.5rem;
+  z-index: 1400; /* encima de la ventana de confirmación y del visor */
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  max-width: min(360px, calc(100vw - 2.5rem));
+  width: min(380px, calc(100vw - 2rem));
   pointer-events: none;
 }
 
 .aviso {
   display: flex;
   align-items: flex-start;
-  gap: 0.55rem;
-  padding: 0.65rem 0.9rem;
-  border: 1px solid var(--etiqueta-verde-texto);
-  border-left-width: 4px;
+  gap: 0.6rem;
+  padding: 0.65rem 0.5rem 0.65rem 0.85rem;
+  border: 1px solid rgba(22, 101, 52, 0.25);
+  border-left: 4px solid var(--color-exito);
   border-radius: var(--radio-suave);
-  background: var(--etiqueta-verde-fondo);
-  color: var(--etiqueta-verde-texto);
-  box-shadow: var(--sombra-tarjeta);
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+  box-shadow: var(--sombra-aviso);
   font-size: var(--texto-sm);
-  font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.45;
   pointer-events: auto;
-  transition: opacity 0.2s ease;
+  animation: aviso-entrada 0.18s ease-out;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 /* Ícono de línea (círculo con tilde o con «!») dibujado con una máscara:
@@ -3218,16 +3224,17 @@ td.con-avatar {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  margin-top: 1px;
+  margin-top: 2px;
   background: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12.5l2.5 2.5L16 9.5'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12.5l2.5 2.5L16 9.5'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .aviso.error {
-  border-color: var(--etiqueta-rojo-texto);
-  background: var(--etiqueta-rojo-fondo);
-  color: var(--etiqueta-rojo-texto);
+  border-color: rgba(185, 28, 28, 0.25);
+  border-left-color: var(--color-error);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
 }
 
 .aviso.error::before {
@@ -3235,26 +3242,81 @@ td.con-avatar {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7.5v5.5M12 16.5h.01'/%3E%3C/svg%3E");
 }
 
-.aviso.saliendo {
-  opacity: 0;
+.aviso-texto {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
-/* Con el menú lateral a la vista, el aviso queda al lado y no lo tapa. */
-@media (min-width: 901px) {
-  body:has(.barra-lateral) .avisos { left: calc(248px + 1.25rem); }
-  body.menu-plegado:has(.barra-lateral) .avisos { left: calc(76px + 1.25rem); }
+/* La ✕: botón real (Tab y Enter), del color del aviso. */
+.aviso-cerrar {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: -0.15rem 0 -0.15rem 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radio-suave);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.aviso-cerrar:hover {
+  border-color: currentColor;
+  opacity: 1;
+}
+
+.aviso-cerrar:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.aviso.saliendo {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+@keyframes aviso-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .aviso { transition: none; }
+  .aviso {
+    animation: none;
+    transition: none;
+  }
 }
 
+/* En el celular: a todo el ancho arriba (el botón del chat queda abajo). */
 @media (max-width: 600px) {
   .avisos {
+    right: 0.75rem;
     left: 0.75rem;
-    right: 5rem; /* deja libre el botón del asistente */
-    bottom: 0.9rem;
-    max-width: none;
+    width: auto;
+  }
+}
+
+/* En la hoja impresa no salen. */
+@media print {
+  .avisos {
+    display: none;
   }
 }
 

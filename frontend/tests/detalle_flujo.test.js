@@ -206,11 +206,20 @@ function createHarness(fetchImpl, { confirmar = true, usuario = null } = {}) {
     Map,
   };
 
+  /* avisar() y avisoPendiente() son de js/avisos.js: acá se anotan. */
+  const avisos = [];
+  const pendientes = [];
+  sandbox.avisar = (texto, tipo = "exito") => avisos.push({ texto, tipo });
+  sandbox.avisoPendiente = (texto) => pendientes.push(texto);
+
   vm.runInNewContext(authSource, sandbox, { filename: "auth.js" });
   vm.runInNewContext(detalleSource, sandbox, { filename: "detalle.js" });
 
   return {
     init: () => sandbox.init(),
+    avisos,
+    pendientes,
+    aviso: () => avisos.at(-1) || { texto: "", tipo: "" },
     call(name, ...args) {
       assert.equal(typeof sandbox[name], "function", `${name} debe existir en detalle.js`);
       return sandbox[name](...args);
@@ -408,10 +417,10 @@ test("agregarComentario vuelve a consultar la lista sin recargar", async () => {
   assert.equal(cards[0].children[1].textContent, "Primer comentario.");
   assert.equal(harness.node("contenido").value, "");
   assert.equal(
-    harness.node("estado-carga").textContent,
+    harness.aviso().texto,
     "Comentario agregado correctamente."
   );
-  assert.equal(harness.node("estado-carga").className, "estado exito");
+  assert.equal(harness.aviso().tipo, "exito");
 });
 
 test("agregarComentario vacío no hace ninguna petición", async () => {
@@ -424,10 +433,10 @@ test("agregarComentario vacío no hace ninguna petición", async () => {
 
   assert.deepEqual(harness.urls(), []);
   assert.equal(
-    harness.node("estado-carga").textContent,
+    harness.aviso().texto,
     "El comentario no puede estar vacío."
   );
-  assert.equal(harness.node("estado-carga").className, "estado error");
+  assert.equal(harness.aviso().tipo, "error");
 });
 
 test("asignación con usuario inexistente muestra el detail del backend", async () => {
@@ -446,10 +455,10 @@ test("asignación con usuario inexistente muestra el detail del backend", async 
     assigned_to_id: 9999,
   });
   assert.equal(
-    harness.node("estado-carga").textContent,
+    harness.aviso().texto,
     "Usuario 9999 no encontrado"
   );
-  assert.equal(harness.node("estado-carga").className, "estado error");
+  assert.equal(harness.aviso().tipo, "error");
 });
 
 test("asignar la opción «Sin asignar» envía null y confirma el cambio", async () => {
@@ -467,10 +476,10 @@ test("asignar la opción «Sin asignar» envía null y confirma el cambio", asyn
     assigned_to_id: null,
   });
   assert.equal(
-    harness.node("estado-carga").textContent,
+    harness.aviso().texto,
     "El ticket quedó sin asignar."
   );
-  assert.equal(harness.node("estado-carga").className, "estado exito");
+  assert.equal(harness.aviso().tipo, "exito");
   /* Tras guardar se reconsulta el ticket: el panel sigue el estado real. */
   assert.ok(harness.urls().includes("/api/tickets/1"));
 });
@@ -497,10 +506,10 @@ test("usuarios no disponibles: select deshabilitado y no se envía nada", async 
 
   assert.deepEqual(harness.urls(), [], "no debe enviar una asignación inválida");
   assert.match(
-    harness.node("estado-carga").textContent,
+    harness.aviso().texto,
     /No se pudo cargar la lista de usuarios/
   );
-  assert.equal(harness.node("estado-carga").className, "estado error");
+  assert.equal(harness.aviso().tipo, "error");
   assert.ok(harness.consoleErrors.length > 0);
 });
 
@@ -529,10 +538,10 @@ test("sin usuarios: nota visible, select deshabilitado y guardado bloqueado", as
 
   assert.deepEqual(harness.urls(), [], "no debe enviar una asignación sin usuarios");
   assert.match(
-    harness.node("estado-carga").textContent,
+    harness.aviso().texto,
     /No hay usuarios disponibles/
   );
-  assert.equal(harness.node("estado-carga").className, "estado error");
+  assert.equal(harness.aviso().tipo, "error");
 });
 
 /* ---------------------------------------------------------------------------
@@ -597,7 +606,7 @@ test("cancelarEdicion vuelve al modo consulta y descarta lo escrito", async () =
   assert.equal(harness.node("editar").hidden, false, "vuelve el botón Editar ticket");
   assert.equal(harness.node("title").value, TICKET.title, "los cambios se descartan");
   assert.deepEqual(harness.urls(), [], "cancelar no envía peticiones");
-  assert.match(harness.node("estado-carga").textContent, /Edición cancelada/);
+  assert.match(harness.aviso().texto, /Edición cancelada/);
   assert.equal(harness.node("editar").focused, true);
 });
 
@@ -626,7 +635,7 @@ test("guardarEdicion guarda, recarga el ticket y vuelve al modo consulta", async
     priority: TICKET.priority,
   });
   assert.equal(
-    harness.node("estado-carga").textContent,
+    harness.aviso().texto,
     "Cambios guardados correctamente."
   );
   assert.equal(harness.node("seccion-edicion").hidden, true, "vuelve a consulta");
@@ -652,8 +661,8 @@ test("si guardar falla se mantiene el modo edición con el error visible", async
     "sigue en modo edición"
   );
   assert.equal(harness.node("editar").hidden, true);
-  assert.match(harness.node("estado-carga").textContent, /HTTP 500/);
-  assert.equal(harness.node("estado-carga").className, "estado error");
+  assert.match(harness.aviso().texto, /HTTP 500/);
+  assert.equal(harness.aviso().tipo, "error");
   assert.equal(harness.node("guardar").disabled, false, "se puede reintentar");
 });
 
@@ -739,6 +748,7 @@ test("Eliminar: confirma con el número del ticket, borra y vuelve al listado", 
   assert.equal(harness.fetchCalls[0].url, "/api/tickets/1");
   assert.equal(harness.fetchCalls[0].options.method, "DELETE");
   assert.equal(harness.location(), "index.html");
+  assert.deepEqual(harness.pendientes, ["Ticket #1 eliminado correctamente."], "el aviso verde sale en el listado");
 });
 
 test("Eliminar: si se cancela la confirmación no se borra nada", async () => {
@@ -761,8 +771,9 @@ test("Eliminar: un 403 muestra el aviso y deja el ticket en pantalla", async () 
 
   await clickEliminar(harness);
 
-  assert.equal(harness.node("estado-carga").textContent, "Solo un Administrador puede eliminar tickets.");
-  assert.equal(harness.node("estado-carga").className, "estado error");
+  assert.equal(harness.aviso().texto, "Solo un Administrador puede eliminar tickets.");
+  assert.equal(harness.aviso().tipo, "error");
+  assert.equal(harness.node("estado-carga").hidden, true, "se quita «Eliminando…»: sin cartel fijo");
   assert.equal(harness.location(), "detalle.html?id=1");
   assert.equal(harness.node("eliminar").disabled, false);
 });
@@ -775,7 +786,7 @@ test("Eliminar: un 404 avisa que el ticket ya no existe", async () => {
 
   await clickEliminar(harness);
 
-  assert.equal(harness.node("estado-carga").textContent, "El ticket ya no existe. Regrese al listado.");
+  assert.equal(harness.aviso().texto, "El ticket ya no existe. Regrese al listado.");
 });
 
 /* Cambio de estado con confirmación y motivo opcional (puntos del recorrido

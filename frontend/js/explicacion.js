@@ -145,20 +145,22 @@ async function iaExplicar(regenerar = false) {
       signal: control ? control.signal : undefined,
     });
     const datos = await response.json().catch(() => null);
+    iaEstado("");
     if (response.ok && datos) {
-      iaEstado("");
       iaRenderizar(datos);
+      avisar(regenerar ? "Explicación regenerada correctamente." : "Explicación generada correctamente.");
     } else if (response.status === 403) {
-      iaEstado("Su rol no tiene permiso para usar «Explicar con IA».", "error");
+      avisar("Su rol no tiene permiso para usar «Explicar con IA».", "error");
     } else if (response.status === 404) {
-      iaEstado("El ticket ya no existe.", "error");
+      avisar("El ticket ya no existe.", "error");
     } else {
       const detalle = datos && typeof datos.detail === "string" ? datos.detail : IA_NO_DISPONIBLE_TXT;
-      iaEstado(detalle, "error");
+      avisar(detalle, "error");
     }
   } catch (error) {
     console.error("POST explicacion:", error);
-    iaEstado(
+    iaEstado("");
+    avisar(
       error && error.name === "AbortError" ? IA_TARDO_TXT : "Error al comunicarse con la API.",
       "error"
     );

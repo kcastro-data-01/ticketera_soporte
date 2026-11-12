@@ -88,13 +88,8 @@ function showStatus(message, type) {
   elements.estado.hidden = false;
 }
 
-/* Resultado de una acción (guardar, asignar, comentar, cambiar estado,
-   eliminar): se muestra como aviso flotante en lugar del cartel fijo. */
-function avisar(message, type) {
-  showStatus(message, type);
-  getElements().estado.hidden = true;
-  if (typeof mostrarAviso === "function") mostrarAviso(message, type);
-}
+/* El resultado de una acción (guardar, asignar, comentar, cambiar estado,
+   eliminar…) va con avisar() de js/avisos.js, en un aviso flotante. */
 
 function hideStatus() {
   const elements = getElements();
@@ -474,7 +469,7 @@ function cancelarEdicion() {
   if (ocupado) return;
   rellenarFormularioEdicion(ticketActual);
   salirModoEdicion();
-  showStatus("Edición cancelada. Los datos del ticket no se modificaron.");
+  avisar("Edición cancelada. Los datos del ticket no se modificaron.");
   getElements().editar.focus();
 }
 
@@ -496,10 +491,11 @@ async function eliminarTicket() {
   try {
     const response = await fetchWithAuth(`/api/tickets/${ticketId}`, { method: "DELETE" });
     if (response.status === 204) {
-      if (typeof avisoPendiente === "function") avisoPendiente(`Ticket #${ticketId} eliminado correctamente.`);
+      avisoPendiente(`Ticket #${ticketId} eliminado correctamente.`);
       window.location.href = "index.html";
       return;
     }
+    hideStatus();
     if (response.status === 403) {
       avisar("Solo un Administrador puede eliminar tickets.", "error");
     } else if (response.status === 409) {
@@ -511,6 +507,7 @@ async function eliminarTicket() {
     }
   } catch (error) {
     console.error(`DELETE /api/tickets/${ticketId}:`, error);
+    hideStatus();
     avisar("Error al comunicarse con la API.", "error");
   }
   ocupado = false;
