@@ -123,56 +123,6 @@ function formatFecha(value) {
   });
 }
 
-/* Fecha relativa para «Detalles» (hora de Costa Rica): «Hace un momento»,
-   «Hace 5 min», «Hace 2 h» (mismo día), «Ayer, 11:15» o «11/11/2026». */
-const ZONA_CR = "America/Costa_Rica";
-
-function diaCR(fecha) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: ZONA_CR, year: "numeric", month: "2-digit", day: "2-digit" }).format(fecha);
-}
-
-function fechaRelativa(value, ahora = new Date()) {
-  const fecha = new Date(value);
-  if (Number.isNaN(fecha.getTime())) return "—";
-  const minutos = Math.floor((ahora.getTime() - fecha.getTime()) / 60000);
-  if (minutos < 1) return "Hace un momento";
-  if (minutos < 60) return `Hace ${minutos} min`;
-  if (diaCR(fecha) === diaCR(ahora)) return `Hace ${Math.floor(minutos / 60)} h`;
-  if (diaCR(fecha) === diaCR(new Date(ahora.getTime() - 86400000))) {
-    const hora = new Intl.DateTimeFormat("es-CR", { timeZone: ZONA_CR, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(fecha);
-    return `Ayer, ${hora}`;
-  }
-  return new Intl.DateTimeFormat("es-CR", { timeZone: ZONA_CR, day: "2-digit", month: "2-digit", year: "numeric" }).format(fecha);
-}
-
-/* La relativa en pantalla y la exacta al pasar el mouse; al imprimir, el CSS
-   muestra la exacta (.fecha-completa) en lugar de la relativa. */
-function pintarFecha(el, value) {
-  if (!el) return;
-  const completa = value ? formatFecha(value) : "—";
-  const relativa = value ? fechaRelativa(value) : "—";
-  el.title = completa;
-  if (typeof document.createElement !== "function" || typeof el.replaceChildren !== "function") {
-    el.textContent = relativa;
-    return;
-  }
-  const rel = document.createElement("span");
-  rel.className = "fecha-relativa";
-  rel.textContent = relativa;
-  const exacta = document.createElement("span");
-  exacta.className = "fecha-completa";
-  exacta.textContent = completa;
-  el.replaceChildren(rel, exacta);
-}
-
-/* Asignado y Solicitante: círculo de iniciales y nombre; si no entra se corta
-   con «…» (CSS) y el nombre completo queda al pasar el mouse. */
-function pintarPersonaDato(el, nombre) {
-  if (!el) return;
-  pintarPersona(el, nombre);
-  el.title = nombre && nombre !== "—" ? nombre : "";
-}
-
 function nombreAsignado(ticket) {
   if (ticket.assigned_to_id === null || ticket.assigned_to_id === undefined) {
     return "—";
@@ -328,13 +278,6 @@ function pintarCierreAutomatico(ticket) {
   nota.hidden = !cuando;
 }
 
-function pintarFechasDetalle(ticket) {
-  if (!ticket) return;
-  const elements = getElements();
-  pintarFecha(elements.ver.created, ticket.created_at);
-  pintarFecha(elements.ver.updated, ticket.updated_at);
-}
-
 function renderTicket(ticket) {
   const elements = getElements();
   ticketActual = ticket;
@@ -351,10 +294,11 @@ function renderTicket(ticket) {
   aplicarReglasTicket(ticket);
   /* Adjuntos (js/adjuntos.js): si cambió el estado, vuelve a pedir sus permisos. */
   if (typeof adjuntosTicketActualizado === "function") adjuntosTicketActualizado(ticket);
-  pintarPersonaDato(elements.ver.assigned, nombreAsignado(ticket));
+  pintarPersona(elements.ver.assigned, nombreAsignado(ticket));
   if (elements.ver.area) elements.ver.area.textContent = ticket.area_name || SIN_AREA;
-  pintarPersonaDato(elements.ver.creator, nombreSolicitante(ticket));
-  pintarFechasDetalle(ticket);
+  pintarPersona(elements.ver.creator, nombreSolicitante(ticket));
+  elements.ver.created.textContent = formatFecha(ticket.created_at);
+  elements.ver.updated.textContent = formatFecha(ticket.updated_at);
 
   rellenarFormularioEdicion(ticket);
 
@@ -1153,8 +1097,6 @@ function iniciarPestanas() {
 async function init() {
   const elements = getElements();
   iniciarPestanas();
-  /* «Hace 5 min» se mantiene al día mientras la página está abierta. */
-  if (typeof setInterval === "function") setInterval(() => pintarFechasDetalle(ticketActual), 60000);
 
   elements.formEditar.addEventListener("submit", (event) => {
     event.preventDefault();

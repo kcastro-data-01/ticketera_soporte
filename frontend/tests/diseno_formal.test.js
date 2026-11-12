@@ -91,12 +91,10 @@ test("detalle: «Detalles» arriba del panel derecho, fijo al bajar y debajo en 
   const lateral = detalleHtml.slice(inicio, detalleHtml.indexOf("</aside>", inicio));
   const secciones = [...lateral.matchAll(/<section[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(secciones, ["Detalles del ticket", "Asignación del ticket", "Departamento del ticket"]);
-  const datos = [...lateral.matchAll(/<dt><span class="dato-icono icono-([a-z]+)" aria-hidden="true"><\/span>([^<]+)<\/dt>\s*<dd id="(ver-[a-z]+)">/g)]
-    .map((m) => [m[2], m[3], m[1]]);
+  const datos = [...lateral.matchAll(/<dt>([^<]+)<\/dt>\s*<dd id="(ver-[a-z]+)">/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(datos, [
-    ["Categoría", "ver-category", "categoria"], ["Departamento", "ver-area", "departamento"],
-    ["Asignado a", "ver-assigned", "persona"], ["Solicitante", "ver-creator", "persona"],
-    ["Creado", "ver-created", "calendario"], ["Actualizado", "ver-updated", "calendario"],
+    ["Categoría", "ver-category"], ["Departamento", "ver-area"], ["Asignado a", "ver-assigned"], ["Solicitante", "ver-creator"],
+    ["Fecha de creación", "ver-created"], ["Fecha de actualización", "ver-updated"],
   ]);
   const tarjeta = detalleHtml.slice(detalleHtml.indexOf('id="panel-ticket"'), detalleHtml.indexOf("</section>", detalleHtml.indexOf('id="panel-ticket"')));
   assert.doesNotMatch(tarjeta, /<dl/, "la grilla ya no está en la tarjeta");

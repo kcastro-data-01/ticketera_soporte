@@ -141,7 +141,7 @@ test("«Cambiar área» sin elegir un área no llama a la API", async () => {
 
 test("detalle.html: «Departamento» en los datos y la sección «Cambiar departamento» para quien puede", () => {
   const html = leer("detalle.html");
-  assert.match(html, /<dt><span class="dato-icono icono-departamento" aria-hidden="true"><\/span>Departamento<\/dt>\s*<dd id="ver-area">/);
+  assert.match(html, /<dt>Departamento<\/dt>\s*<dd id="ver-area">/);
   assert.match(html, /<h2>Cambiar departamento<\/h2>/);
   assert.match(html, /id="cambiar-area">Cambiar departamento<\/button>/);
   assert.match(html, /Reasignar al técnico del nuevo departamento con menos tickets abiertos/);
