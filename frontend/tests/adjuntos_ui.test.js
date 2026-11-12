@@ -65,7 +65,7 @@ function lista(adjuntos, extra) {
 }
 
 const IDS = ["seccion-adjuntos", "adj-subir", "adj-foto", "adj-archivos", "adj-camara",
-  "adj-acciones", "adj-nota", "adj-estado", "adj-lista"];
+  "adj-acciones", "adj-vacio", "adj-nota", "adj-estado", "adj-lista"];
 
 function crear({ fetchImpl, tactil = false, imagen = null }) {
   const ids = {};
@@ -163,14 +163,18 @@ test("lista nombre, tamaño, quién y cuándo; miniatura en imágenes pedida con
   assert.equal(botones(pdf, "Descargar").length, 1);
   assert.equal(botones(pdf, "Eliminar").length, 0, "solo quien lo subió o el Administrador");
   assert.equal(a.ids["adj-acciones"].hidden, false);
-  assert.match(a.ids["adj-nota"].textContent, /hasta 4 MB cada uno y 10 por ticket \(2 de 10\)/);
+  assert.equal(a.ids["adj-nota"].textContent, "jpg, png, pdf, docx, xlsx o txt · hasta 4 MB cada uno · 2 de 10");
+  assert.equal(a.ids["adj-vacio"].hidden, true, "con archivos no dice «Sin adjuntos»");
+  assert.equal(a.ids["adj-estado"].hidden, true);
 });
 
-test("sin adjuntos muestra el aviso vacío", async () => {
+test("sin adjuntos: solo la línea «Sin adjuntos» al lado del botón, sin la caja grande", async () => {
   const a = crear({ fetchImpl: async () => respuesta(200, lista([])) });
   await a.sandbox.iniciarAdjuntos();
   assert.equal(a.ids["adj-lista"].hidden, true);
-  assert.equal(a.ids["adj-estado"].textContent, "Todavía no hay adjuntos.");
+  assert.equal(a.ids["adj-vacio"].hidden, false);
+  assert.equal(a.ids["adj-estado"].hidden, true, "sin el bloque «Todavía no hay adjuntos»");
+  assert.equal(a.ids["adj-nota"].textContent, "jpg, png, pdf, docx, xlsx o txt · hasta 4 MB cada uno · 0 de 10");
 });
 
 test("en Cerrado no hay botones para subir ni eliminar", async () => {

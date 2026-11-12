@@ -34,6 +34,7 @@ function adjElementos() {
     camara: document.getElementById("adj-camara"),
     acciones: document.getElementById("adj-acciones"),
     nota: document.getElementById("adj-nota"),
+    vacio: document.getElementById("adj-vacio"),
     estado: document.getElementById("adj-estado"),
     lista: document.getElementById("adj-lista"),
   };
@@ -230,18 +231,20 @@ function renderAdjuntos(datos) {
   el.acciones.hidden = !datos.puede_subir;
   if (el.subir) el.subir.disabled = adjOcupado;
   if (el.foto) el.foto.hidden = !adjEsTactil();
+  /* Texto chico debajo del botón: «jpg, png… · hasta 4 MB cada uno · 0 de 10». */
   el.nota.textContent = datos.puede_subir
-    ? `Se aceptan ${ADJ_TIPOS_TEXTO}, hasta 4 MB cada uno y ${datos.max_archivos} por ticket (${adjuntos.length} de ${datos.max_archivos}).`
+    ? `${ADJ_TIPOS_TEXTO} · hasta 4 MB cada uno · ${adjuntos.length} de ${datos.max_archivos}`
     : (datos.cerrado
       ? "El ticket está Cerrado: no se agregan ni se eliminan adjuntos."
       : `El ticket ya tiene ${datos.max_archivos} adjuntos, el máximo permitido.`);
 
+  /* Sin archivos: solo la línea «Sin adjuntos» al lado del botón. */
+  if (el.vacio) el.vacio.hidden = adjuntos.length > 0;
+  adjMostrarEstado("");
   if (adjuntos.length === 0) {
     el.lista.hidden = true;
-    adjMostrarEstado("Todavía no hay adjuntos.", "vacio");
     return;
   }
-  adjMostrarEstado("");
   adjuntos.forEach((adjunto) => {
     const fila = adjNodo("li", "adjunto");
     let ver = null;

@@ -840,6 +840,7 @@ async function agregarComentario() {
       return;
     }
     elements.contenido.value = "";
+    ajustarAltoComentario();
     avisar("Comentario agregado correctamente.", "exito");
     /* El comentario nuevo aparece en la lista sin recargar la página. */
     await cargarComentarios();
@@ -862,6 +863,18 @@ function ocultarComentariosEstado() {
   const elements = getElements();
   elements.comentariosEstado.textContent = "";
   elements.comentariosEstado.hidden = true;
+}
+
+/* «Nuevo comentario»: arranca con 3 líneas (CSS), crece al enfocarlo (CSS) y a
+   medida que se escribe, hasta un tope; vacío vuelve al alto del CSS. */
+const ALTO_MAXIMO_COMENTARIO = 320;
+
+function ajustarAltoComentario() {
+  const campo = getElements().contenido;
+  if (!campo || !campo.style) return;
+  campo.style.height = "";
+  if (!campo.value) return;
+  campo.style.height = `${Math.min(campo.scrollHeight + 2, ALTO_MAXIMO_COMENTARIO)}px`;
 }
 
 /* Renderiza con textContent: los datos del backend nunca se interpretan
@@ -1122,6 +1135,7 @@ async function init() {
     event.preventDefault();
     agregarComentario();
   });
+  if (elements.contenido) elements.contenido.addEventListener("input", ajustarAltoComentario);
   elements.historial.addEventListener("click", () => cargarHistorial());
   const imprimir = document.getElementById("imprimir");
   if (imprimir) imprimir.addEventListener("click", imprimirTicket);

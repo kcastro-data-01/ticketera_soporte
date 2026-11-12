@@ -4223,6 +4223,7 @@ td.con-avatar {
   #seccion-ia,
   #form-comentario,
   .seccion .nota,
+  .seccion .nota-chica,
   .seccion:has(#tabla-historial[hidden]),
   .seccion .filtros.formulario,
   #estado-carga,
@@ -4971,6 +4972,69 @@ summary:focus-visible,
     min-width: 44px;
     padding: 0 0.5rem;
   }
+}
+
+/* ===== Detalle: secciones vacías compactas =====
+   Sin adjuntos, comentarios o historial no hay cajas grandes: una línea
+   chica y tenue. Las notas de ayuda pasan a texto chico debajo del botón.
+   Con datos, las listas se ven igual que siempre. */
+.adj-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  min-width: 0;
+}
+
+.linea-vacia,
+#comentarios-estado.vacio:not([hidden]),
+#historial-estado.vacio:not([hidden]) {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--texto-sm);
+  line-height: 1.5;
+  color: var(--color-tenue);
+  text-align: left;
+}
+
+#comentarios-estado.vacio::before,
+#historial-estado.vacio::before {
+  display: none;
+}
+
+#comentarios-estado.vacio:not([hidden]) {
+  margin-bottom: 0.75rem;
+}
+
+#historial-estado.vacio:not([hidden]) {
+  margin-top: 0.6rem;
+}
+
+.nota-chica {
+  margin: 0.4rem 0 0;
+  font-size: var(--texto-sm);
+  line-height: 1.5;
+  color: var(--color-tenue);
+  overflow-wrap: anywhere;
+}
+
+#seccion-ia .nota-chica {
+  margin: 0 0 0.6rem;
+}
+
+/* «Nuevo comentario»: 3 líneas de alto; al enfocarlo se agranda y, al
+   escribir, detalle.js lo estira con el texto (hasta 320 px). */
+.campo #contenido {
+  min-height: calc(4.5em + 0.9rem + 2px);
+  line-height: 1.5;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, min-height 0.15s ease;
+}
+
+.campo #contenido:focus {
+  min-height: 130px;
 }
 
 /* Nuevo ticket: archivos elegidos antes de crear (✕ para quitar). */

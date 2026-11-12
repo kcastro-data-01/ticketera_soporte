@@ -6,13 +6,13 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Detalle del ticket · American Data Networks</title>
   <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
-  <script src="js/tema.js?v=20261112-1"></script>
+  <script src="js/tema.js?v=20261112-2"></script>
   <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="css/estilos.css?v=20261112-1">
+  <link rel="stylesheet" href="css/estilos.css?v=20261112-2">
 </head>
 <body class="app">
   <aside class="barra-lateral">
@@ -157,17 +157,21 @@
   
           <!-- Adjuntos (js/adjuntos.js): quien ve el ticket los ve y sube;
                borra quien lo subió o el Administrador. En Cerrado, solo lectura.
-               «Sacar foto» solo aparece en pantallas táctiles. -->
+               «Sacar foto» solo aparece en pantallas táctiles. Sin archivos,
+               solo la línea «Sin adjuntos» al lado del botón. -->
           <section id="seccion-adjuntos" class="seccion adjuntos" aria-labelledby="adjuntos-titulo">
             <h2 id="adjuntos-titulo">Adjuntos</h2>
-            <div id="adj-acciones" class="acciones" hidden>
-              <button type="button" id="adj-subir">Adjuntar archivos</button>
-              <button type="button" id="adj-foto" class="secundario" hidden>Sacar foto</button>
-              <input type="file" id="adj-archivos" multiple hidden
-                     accept=".jpg,.jpeg,.png,.pdf,.docx,.xlsx,.txt,image/jpeg,image/png,application/pdf,text/plain">
-              <input type="file" id="adj-camara" accept="image/*" capture="environment" hidden>
+            <div class="adj-barra">
+              <div id="adj-acciones" class="acciones" hidden>
+                <button type="button" id="adj-subir">Adjuntar archivos</button>
+                <button type="button" id="adj-foto" class="secundario" hidden>Sacar foto</button>
+                <input type="file" id="adj-archivos" multiple hidden
+                       accept=".jpg,.jpeg,.png,.pdf,.docx,.xlsx,.txt,image/jpeg,image/png,application/pdf,text/plain">
+                <input type="file" id="adj-camara" accept="image/*" capture="environment" hidden>
+              </div>
+              <span id="adj-vacio" class="linea-vacia" hidden>Sin adjuntos</span>
             </div>
-            <p id="adj-nota" class="nota"></p>
+            <p id="adj-nota" class="nota-chica"></p>
             <p id="adj-estado" class="estado" role="status" aria-live="polite" hidden></p>
             <ul id="adj-lista" class="adjuntos-lista" hidden></ul>
           </section>
@@ -224,9 +228,6 @@
 
             <section id="seccion-comentarios" class="seccion pestana-panel" role="tabpanel" aria-labelledby="pestana-comentarios">
               <h2>Comentarios</h2>
-              <p class="nota">
-                Los comentarios se muestran de más antiguo a más reciente.
-              </p>
               <p
                 id="comentarios-estado"
                 class="estado"
@@ -238,9 +239,11 @@
               <form id="form-comentario" class="filtros formulario" novalidate>
                 <label class="campo">
                   <span>Nuevo comentario</span>
+                  <!-- Arranca con 3 líneas; crece al enfocarlo y al escribir (detalle.js). -->
                   <textarea
                     id="contenido"
                     name="content"
+                    rows="3"
                     maxlength="2000"
                     placeholder="Escriba aquí el comentario"
                   ></textarea>
@@ -253,10 +256,8 @@
 
             <section id="seccion-historial" class="seccion pestana-panel" role="tabpanel" aria-labelledby="pestana-historial" hidden>
               <h2>Historial de cambios</h2>
-              <div class="filtros formulario">
-                <div class="acciones">
-                  <button type="button" id="historial">Ver historial</button>
-                </div>
+              <div class="acciones">
+                <button type="button" id="historial">Ver historial</button>
               </div>
               <p
                 id="historial-estado"
@@ -281,7 +282,7 @@
             <!-- Explicar con IA: Técnico y Administrador (js/explicacion.js). -->
             <section id="seccion-ia" class="seccion pestana-panel" role="tabpanel" aria-labelledby="pestana-ia" data-permiso="explicar_ia" hidden>
               <h2>Explicación con IA</h2>
-              <p class="nota">
+              <p class="nota-chica">
                 Interpreta el ticket, propone causas probables y qué revisar primero.
               </p>
               <div class="acciones">
@@ -342,12 +343,12 @@
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
-  <script src="js/auth.js?v=20261112-1" defer></script>
-  <script src="js/sesion.js?v=20261112-1" defer></script>
-  <script src="js/asistente.js?v=20261112-1" defer></script>
-  <script src="js/detalle.js?v=20261112-1" defer></script>
-  <script src="js/adjuntos.js?v=20261112-1" defer></script>
-  <script src="js/explicacion.js?v=20261112-1" defer></script>
-  <script src="js/guardia.js?v=20261112-1"></script>
+  <script src="js/auth.js?v=20261112-2" defer></script>
+  <script src="js/sesion.js?v=20261112-2" defer></script>
+  <script src="js/asistente.js?v=20261112-2" defer></script>
+  <script src="js/detalle.js?v=20261112-2" defer></script>
+  <script src="js/adjuntos.js?v=20261112-2" defer></script>
+  <script src="js/explicacion.js?v=20261112-2" defer></script>
+  <script src="js/guardia.js?v=20261112-2"></script>
 </body>
 </html>
