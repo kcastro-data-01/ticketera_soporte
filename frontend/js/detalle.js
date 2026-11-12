@@ -269,6 +269,14 @@ function pintarCierreAutomatico(ticket) {
   nota.hidden = !cuando;
 }
 
+/* Asignado y Solicitante en la ficha: círculo de iniciales y nombre; si no
+   entra se corta con «…» (CSS) y el nombre completo queda al pasar el mouse. */
+function pintarPersonaFicha(el, nombre) {
+  if (!el) return;
+  pintarPersona(el, nombre);
+  el.title = nombre && nombre !== "—" ? nombre : "";
+}
+
 function renderTicket(ticket) {
   const elements = getElements();
   ticketActual = ticket;
@@ -285,9 +293,9 @@ function renderTicket(ticket) {
   aplicarReglasTicket(ticket);
   /* Adjuntos (js/adjuntos.js): si cambió el estado, vuelve a pedir sus permisos. */
   if (typeof adjuntosTicketActualizado === "function") adjuntosTicketActualizado(ticket);
-  pintarPersona(elements.ver.assigned, nombreAsignado(ticket));
+  pintarPersonaFicha(elements.ver.assigned, nombreAsignado(ticket));
   if (elements.ver.area) elements.ver.area.textContent = ticket.area_name || SIN_AREA;
-  pintarPersona(elements.ver.creator, nombreSolicitante(ticket));
+  pintarPersonaFicha(elements.ver.creator, nombreSolicitante(ticket));
   elements.ver.created.textContent = formatearFechaHora(ticket.created_at);
   elements.ver.updated.textContent = formatearFechaHora(ticket.updated_at);
 

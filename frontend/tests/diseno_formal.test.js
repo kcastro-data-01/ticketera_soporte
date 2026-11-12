@@ -94,7 +94,7 @@ test("detalle: «Detalles» arriba del panel derecho, fijo al bajar y debajo en 
   const datos = [...lateral.matchAll(/<dt>([^<]+)<\/dt>\s*<dd id="(ver-[a-z]+)">/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(datos, [
     ["Categoría", "ver-category"], ["Departamento", "ver-area"], ["Asignado a", "ver-assigned"], ["Solicitante", "ver-creator"],
-    ["Fecha de creación", "ver-created"], ["Fecha de actualización", "ver-updated"],
+    ["Creado", "ver-created"], ["Actualizado", "ver-updated"],
   ]);
   const tarjeta = detalleHtml.slice(detalleHtml.indexOf('id="panel-ticket"'), detalleHtml.indexOf("</section>", detalleHtml.indexOf('id="panel-ticket"')));
   assert.doesNotMatch(tarjeta, /<dl/, "la grilla ya no está en la tarjeta");
