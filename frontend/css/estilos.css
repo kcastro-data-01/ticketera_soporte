@@ -1105,38 +1105,184 @@ button.peligro:disabled:hover {
   box-shadow: var(--sombra-tarjeta);
 }
 
-.tarjeta-ticket-cabecera {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+/* ===== Detalle: encabezado del ticket =====
+   Franja a todo el ancho arriba del detalle: número y título; debajo, las
+   etiquetas (estado, prioridad, departamento y asignado); una línea tenue
+   con el solicitante y las fechas; los avisos del ticket (cierre
+   automático, Cerrado…) y el recorrido de estados. Claro y oscuro por las
+   variables; en el celular las etiquetas bajan a varias líneas. */
+.encabezado-ticket {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem 1.5rem 1.1rem;
+  border: 1px solid var(--color-borde);
+  border-top: 3px solid var(--color-primario);
+  border-radius: var(--radio-medio);
+  background: var(--color-superficie);
+  box-shadow: var(--sombra-tarjeta);
 }
 
-.tarjeta-ticket-titulos {
+.encabezado-ticket-titulos {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
   min-width: 0;
 }
 
-.tarjeta-ticket-id {
-  display: block;
-  margin-bottom: 0.2rem;
-  font-size: 0.8rem;
+.encabezado-ticket-id {
+  flex: none;
+  font-size: 1.15rem;
   font-weight: 600;
   color: var(--color-tenue);
   font-variant-numeric: tabular-nums;
 }
 
-.tarjeta-ticket-titulo {
+.encabezado-ticket-titulo {
+  min-width: 0;
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   font-weight: 600;
   line-height: 1.3;
-  color: var(--color-texto);
+  color: var(--color-titulo);
   overflow-wrap: anywhere;
 }
 
-.tarjeta-ticket-etiquetas {
+.encabezado-ticket-etiquetas {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.encabezado-ticket-etiquetas > li {
+  display: flex;
+  max-width: 100%;
+}
+
+/* Estado y prioridad: las mismas etiquetas del listado, un poco más altas
+   para que midan igual que las de departamento y asignado. */
+.encabezado-ticket-etiquetas .badge {
+  min-height: 1.75rem;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.75rem;
+}
+
+/* Departamento y asignado: nombre gris chico y el valor. */
+.etiqueta-dato {
+  display: inline-flex;
+  align-items: center;
   gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 1.75rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 3px;
+  background: var(--color-fondo-neutro);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--color-texto);
+}
+
+.etiqueta-dato-nombre {
+  flex: none;
+  color: var(--color-tenue);
+}
+
+.etiqueta-dato-valor {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.etiqueta-dato-valor.con-avatar::before {
+  width: 1.3rem;
+  height: 1.3rem;
+  margin-right: 0.35rem;
+  font-size: 0.58rem;
+}
+
+.etiqueta-dato-valor.sin-asignar {
+  font-weight: 500;
+  color: var(--color-tenue);
+}
+
+/* Tercera línea: solicitante, creación y última actualización. */
+.encabezado-ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1.1rem;
+  margin: 0.7rem 0 0;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue);
+}
+
+.encabezado-ticket-meta b {
+  font-weight: 500;
+  color: var(--color-tenue-fuerte);
+}
+
+/* Avisos del ticket dentro del encabezado; sin ninguno visible, no ocupa. */
+.encabezado-ticket-avisos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+}
+
+.encabezado-ticket-avisos:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
+.encabezado-ticket-avisos > .pasos-nota {
+  margin: 0;
+  text-align: left;
+}
+
+/* El recorrido de estados, separado por una línea fina. */
+.encabezado-ticket .pasos-estado {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-borde);
+}
+
+@media (max-width: 600px) {
+  .encabezado-ticket {
+    padding: 1rem 1rem 0.9rem;
+  }
+
+  .encabezado-ticket-titulos {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .encabezado-ticket-id {
+    font-size: 0.85rem;
+  }
+
+  .encabezado-ticket-titulo {
+    font-size: 1.25rem;
+  }
+
+  .encabezado-ticket-meta {
+    flex-direction: column;
+  }
+}
+
+/* Categoría (lo único de «Detalles» que no está arriba), en la tarjeta de
+   la descripción. */
+.tarjeta-ticket-datos {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.85rem 2rem;
+}
+
+.tarjeta-ticket-datos + .tarjeta-ticket-subtitulo {
+  margin-top: 1rem;
 }
 
 /* Descripción: título chico en gris y el texto en un recuadro neutro, con
@@ -1879,6 +2025,19 @@ body.app {
 
 .detalle-lateral > .seccion:first-child {
   margin-top: 0;
+}
+
+/* La barra de acciones y el encabezado ocupan las dos columnas. */
+.detalle-layout > .acciones-principales,
+.detalle-layout > .encabezado-ticket {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* Sin Asignación ni Cambiar departamento (p. ej. el Solicitante), la
+   descripción usa todo el ancho. */
+.detalle-layout:not(:has(.detalle-lateral > .seccion:not([hidden]))) {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /* Pestañas del detalle (Comentarios, Historial, Explicación IA): texto
@@ -3193,8 +3352,7 @@ td.con-avatar {
 .metricas-tarjetas.esqueleto-activo .tarjeta-etiqueta,
 .esqueleto-activo .metrica-nota,
 .esqueleto-activo .grafico-lienzo,
-#panel-ticket.esqueleto-activo :is(.tarjeta-ticket-titulo, .tarjeta-ticket-descripcion, .tarjeta-ticket-id, .tarjeta-ticket-etiquetas > span),
-.detalle-layout:has(#panel-ticket.esqueleto-activo) #panel-datos dd {
+#detalle-layout.esqueleto-activo :is(.encabezado-ticket-titulo, .encabezado-ticket-id, .encabezado-ticket-etiquetas > li > span, .encabezado-ticket-meta b, .tarjeta-ticket-descripcion, #ver-category) {
   color: transparent !important;
   border-color: transparent !important;
   border-radius: 6px;
@@ -3203,7 +3361,7 @@ td.con-avatar {
 }
 
 .esqueleto-activo .grafico-lienzo canvas,
-.detalle-layout:has(#panel-ticket.esqueleto-activo) #panel-datos .con-avatar::before {
+#detalle-layout.esqueleto-activo .encabezado-ticket-etiquetas * {
   visibility: hidden;
 }
 
@@ -3249,10 +3407,11 @@ td.con-avatar {
 
 .esqueleto-activo .metrica-nota { width: 55%; }
 
-#panel-ticket.esqueleto-activo .tarjeta-ticket-titulo { width: 60%; }
-#panel-ticket.esqueleto-activo .tarjeta-ticket-descripcion { width: 90%; min-height: 2.6rem; }
-#panel-ticket.esqueleto-activo .tarjeta-ticket-etiquetas > span { display: inline-block; width: 4.5rem; }
-.detalle-layout:has(#panel-ticket.esqueleto-activo) #panel-datos dd { width: 7rem; }
+#detalle-layout.esqueleto-activo .encabezado-ticket-titulo { width: 60%; }
+#detalle-layout.esqueleto-activo .tarjeta-ticket-descripcion { width: 90%; min-height: 2.6rem; }
+#detalle-layout.esqueleto-activo .encabezado-ticket-etiquetas > li > span { display: inline-block; width: 6rem; }
+#detalle-layout.esqueleto-activo .encabezado-ticket-meta b { display: inline-block; width: 7rem; }
+#detalle-layout.esqueleto-activo #ver-category { width: 7rem; }
 
 
 
@@ -4059,7 +4218,7 @@ td.con-avatar {
   .cabecera,
   .pie,
   .acciones-principales,
-  .detalle-lateral > .seccion:not(#panel-datos),
+  .detalle-lateral,
   #seccion-edicion,
   #seccion-ia,
   #form-comentario,
@@ -4101,14 +4260,13 @@ td.con-avatar {
     display: contents;
   }
 
-  #panel-ticket {
+  .encabezado-ticket {
     order: 1;
+    margin: 0;
   }
 
-  #panel-datos {
+  #panel-ticket {
     order: 2;
-    margin: 0;
-    padding: 1rem 1.25rem;
   }
 
   .detalle-principal > :not(#panel-ticket) {
@@ -4131,7 +4289,7 @@ td.con-avatar {
   }
 
   .tarjeta-ticket,
-  #panel-datos,
+  .encabezado-ticket,
   .comentario,
   .listado {
     border: 1px solid #999 !important;
@@ -4145,7 +4303,7 @@ td.con-avatar {
   }
 
   .seccion h2,
-  .tarjeta-ticket-titulo {
+  .encabezado-ticket-titulo {
     color: #000;
   }
 

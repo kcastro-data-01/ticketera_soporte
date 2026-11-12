@@ -278,6 +278,20 @@ function pintarCierreAutomatico(ticket) {
   nota.hidden = !cuando;
 }
 
+/* Etiqueta «Asignado» del encabezado: nombre con su círculo de iniciales o,
+   sin nadie, «Sin asignar» en gris. */
+function pintarAsignadoEncabezado(el, nombre) {
+  if (!el) return;
+  pintarPersona(el, nombre);
+  const clase = String(el.className || "").replace(/\s*\bsin-asignar\b/g, "").trim();
+  if (nombre === "—") {
+    el.textContent = "Sin asignar";
+    el.className = `${clase} sin-asignar`.trim();
+  } else {
+    el.className = clase;
+  }
+}
+
 function renderTicket(ticket) {
   const elements = getElements();
   ticketActual = ticket;
@@ -294,9 +308,9 @@ function renderTicket(ticket) {
   aplicarReglasTicket(ticket);
   /* Adjuntos (js/adjuntos.js): si cambió el estado, vuelve a pedir sus permisos. */
   if (typeof adjuntosTicketActualizado === "function") adjuntosTicketActualizado(ticket);
-  pintarPersona(elements.ver.assigned, nombreAsignado(ticket));
+  pintarAsignadoEncabezado(elements.ver.assigned, nombreAsignado(ticket));
   if (elements.ver.area) elements.ver.area.textContent = ticket.area_name || SIN_AREA;
-  pintarPersona(elements.ver.creator, nombreSolicitante(ticket));
+  elements.ver.creator.textContent = nombreSolicitante(ticket);
   elements.ver.created.textContent = formatFecha(ticket.created_at);
   elements.ver.updated.textContent = formatFecha(ticket.updated_at);
 
@@ -418,7 +432,8 @@ function mostrarNoEncontrado(mensaje) {
 }
 
 async function cargarTicket({ silencioso = false } = {}) {
-  const panel = document.getElementById("panel-ticket");
+  /* Esqueleto en el encabezado y la tarjeta de la descripción a la vez. */
+  const panel = document.getElementById("detalle-layout");
   if (!silencioso) marcarCargando(panel, true);
   try {
     const response = await fetchWithAuth(`/api/tickets/${ticketId}`);
