@@ -1,29 +1,32 @@
-/* Página de métricas (solo Administrador): consulta
-   GET /api/metricas?desde=&hasta= y pinta tarjetas y gráficos (Chart.js).
+/* Página de métricas (solo Administrador) como informe de gestión:
+   consulta GET /api/metricas (el período y el anterior de la misma
+   duración) y pinta tablas (Resumen, Situación de hoy, Tickets por
+   categoría, Por técnico) y dos gráficos de barras clásicos (Chart.js):
+   tickets por estado y creados por día.
    Los números los calcula el servidor; aquí solo se muestran.
    Cada gráfico tiene debajo su tabla («Ver datos»); si Chart.js no carga
    (sin internet), las tablas quedan abiertas y la página sirve igual.
+   «Imprimir» imprime solo el informe, con los gráficos en grises.
    Todo lo que llega del servidor se pinta como texto, nunca como HTML. */
 
 const API_METRICAS_URL = "/api/metricas";
 const ZONA = "America/Costa_Rica";
 const DIAS_POR_DEFECTO = 30;
-/* Paleta validada (dataviz): serie 1 azul, serie 2 naranja. Se pueden
-   cambiar en estilos.css con --color-serie-1 / --color-serie-2. */
+/* Un solo color para las barras: el azul de la app (--color-primario);
+   texto, ejes y líneas de fondo en grises. */
 const COLORES_POR_DEFECTO = {
-  serie1: "#2a78d6",
-  serie2: "#eb6834",
+  barra: "#1746e0",
   texto: "#5d6880",
-  rejilla: "#dde3ee",
-  superficie: "#ffffff",
-  radio: 6,
+  eje: "#c4cddd",
+  rejilla: "#eef1f5",
 };
+/* En la hoja impresa: blanco y negro. */
+const COLORES_IMPRESION = { barra: "#555555", texto: "#000000", eje: "#000000", rejilla: "#dddddd" };
 
 /* Letra del sitio (la de body en estilos.css) para ejes, leyendas y
    tooltips; sin esto Chart.js usa la suya. */
 const FUENTE_SITIO = '"Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif';
 
-let graficos = [];
 
 /* --- Fechas (días de Costa Rica) ------------------------------------- */
 
@@ -65,6 +68,12 @@ function urlMetricas(desde, hasta, area = "") {
   return `${API_METRICAS_URL}?${params.toString()}`;
 }
 
+/* 2026-10-01 → 01/10/2026. */
+function fechaLarga(fecha) {
+  const [a, m, d] = String(fecha || "").split("-");
+  return a && m && d ? `${d}/${m}/${a}` : "—";
+}
+
 function diaCorto(fecha) {
   const [, m, d] = fecha.split("-");
   return `${d}/${m}`;
@@ -90,7 +99,10 @@ function elementos() {
     hasta: document.getElementById("hasta"),
     area: document.getElementById("m-area"),
     aplicar: document.getElementById("aplicar"),
+    imprimir: document.getElementById("imprimir-informe"),
     estado: document.getElementById("estado-carga"),
+    informe: document.getElementById("informe"),
+    alcance: document.getElementById("informe-alcance"),
   };
 }
 
@@ -108,125 +120,162 @@ function nodo(tag, clase, texto) {
   return el;
 }
 
-function ponerTexto(id, texto) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = texto;
+/* --- Números ------------------------------------------------------------- */
+
+const MENOS = "\u2212"; // «−», el signo menos tipográfico
+
+function porcentaje(parte, total) {
+  if (!total) return "—";
+  return `${Math.round((parte * 100) / total)} %`;
 }
 
-function pintarTarjetas(datos) {
-  const t = datos.tarjetas;
-  ponerTexto("m-abiertos", String(t.abiertos));
-  ponerTexto("m-en-proceso", String(t.en_proceso));
-  ponerTexto("m-resueltos", String(t.resueltos_periodo));
-  ponerTexto("m-promedio", formatearHoras(t.tiempo_promedio_horas));
-  ponerTexto("m-origen", `${t.por_correo} / ${t.por_web}`);
-  const porcentaje = t.creados_periodo ? Math.round((t.por_correo * 100) / t.creados_periodo) : 0;
-  ponerTexto(
-    "m-origen-nota",
-    t.creados_periodo
-      ? `${t.creados_periodo} creados en el período · ${porcentaje}% por correo`
-      : "Ningún ticket creado en el período"
-  );
+function conSigno(valor, texto = String(Math.abs(valor))) {
+  if (valor > 0) return `+${texto}`;
+  if (valor < 0) return `${MENOS}${texto}`;
+  return texto;
 }
 
-/* --- Comparación con el período anterior --------------------------------
-   Cada tarjeta del período muestra «▲ 12 % vs. período anterior», en verde
-   si el cambio es bueno y en rojo si es malo. «Abiertos» y «En proceso»
-   son el valor de hoy (no dependen del rango), así que no se comparan. */
-
-const COMPARACIONES = [
-  { id: "c-resueltos", campo: "resueltos_periodo", mejor: "subir" },
-  { id: "c-promedio", campo: "tiempo_promedio_horas", mejor: "bajar" },
-  { id: "c-origen", campo: "creados_periodo", mejor: "neutro", sufijo: " creados" },
-];
-const SIN_COMPARACION = ["c-abiertos", "c-en-proceso"];
-
-/* Devuelve { texto, tono } con tono «bueno», «malo» o «neutro». */
-function cambioVsAnterior(actual, anterior, mejor = "subir", sufijo = "") {
-  const fin = " vs. período anterior";
-  if (actual === null || actual === undefined || anterior === null || anterior === undefined) {
-    return { texto: "Sin datos del período anterior", tono: "neutro" };
-  }
-  if (actual === anterior) return { texto: `= igual${fin}`, tono: "neutro" };
-  const sube = actual > anterior;
-  const flecha = sube ? "▲" : "▼";
-  const tono = mejor === "neutro" ? "neutro" : sube === (mejor === "subir") ? "bueno" : "malo";
-  if (!anterior) return { texto: `${flecha} desde 0${sufijo} en el período anterior`, tono };
-  const porcentaje = Math.round((Math.abs(actual - anterior) * 100) / Math.abs(anterior));
-  return { texto: `${flecha} ${porcentaje} %${sufijo}${fin}`, tono };
+/* Variación frente al período anterior, sin colores: «+3 (+25 %)»,
+   «−2 h (−10 %)», «Sin cambio» o «—» si no hay dato anterior. */
+function variacion(actual, anterior, { horas = false } = {}) {
+  if (actual === null || actual === undefined || anterior === null || anterior === undefined) return "—";
+  const diferencia = horas ? Math.round((actual - anterior) * 10) / 10 : actual - anterior;
+  if (diferencia === 0) return "Sin cambio";
+  const cantidad = conSigno(diferencia, horas ? formatearHoras(Math.abs(diferencia)) : String(Math.abs(diferencia)));
+  if (!anterior) return cantidad;
+  const pct = Math.round((Math.abs(diferencia) * 100) / Math.abs(anterior));
+  return `${cantidad} (${conSigno(diferencia, `${pct} %`)})`;
 }
 
-function pintarComparacion(tarjetas, anteriores) {
-  COMPARACIONES.forEach(({ id, campo, mejor, sufijo }) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (!anteriores) {
-      el.hidden = true;
-      return;
+/* «5 (42 %)»: cantidad y parte de los creados. */
+function cantidadYParte(cantidad, total) {
+  if (cantidad === null || cantidad === undefined) return "—";
+  return total ? `${cantidad} (${porcentaje(cantidad, total)})` : String(cantidad);
+}
+
+/* --- Tablas -------------------------------------------------------------- */
+
+/* Llena el <tbody> de una tabla: cada fila es una lista de celdas; las
+   que no son la primera van alineadas a la derecha (números) salvo que se
+   pida texto. ``total`` pinta la fila en negrita. */
+function llenarTabla(id, filas, { textos = [0] } = {}) {
+  const tabla = document.getElementById(id);
+  if (!tabla) return;
+  const cuerpo = tabla.querySelector("tbody");
+  cuerpo.replaceChildren();
+  filas.forEach(({ celdas, total = false, vacia = false }) => {
+    const tr = nodo("tr", total ? "fila-total" : "");
+    if (vacia) {
+      const td = nodo("td", "celda-vacia", celdas[0]);
+      td.colSpan = tabla.querySelectorAll("thead th").length || 1;
+      tr.appendChild(td);
+    } else {
+      celdas.forEach((valor, i) => {
+        const celda = nodo(i === 0 ? "th" : "td", textos.includes(i) ? "" : "num", String(valor));
+        if (i === 0) celda.scope = "row";
+        tr.appendChild(celda);
+      });
     }
-    const { texto, tono } = cambioVsAnterior(tarjetas[campo], anteriores[campo], mejor, sufijo);
-    el.textContent = texto;
-    el.className = `metrica-cambio ${tono}`;
-    el.hidden = false;
-  });
-  SIN_COMPARACION.forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.hidden = !anteriores;
+    cuerpo.appendChild(tr);
   });
 }
 
-/* Tabla simple: encabezados + filas de texto. */
-function tabla(encabezados, filas) {
-  const t = nodo("table", "listado tabla-datos");
+function filasResumen(t, a) {
+  const anterior = (campo) => (a ? a[campo] : null);
+  return [
+    { celdas: ["Tickets creados", t.creados_periodo, a ? a.creados_periodo : "—",
+      variacion(t.creados_periodo, anterior("creados_periodo"))] },
+    { celdas: ["Tickets resueltos", t.resueltos_periodo, a ? a.resueltos_periodo : "—",
+      variacion(t.resueltos_periodo, anterior("resueltos_periodo"))] },
+    { celdas: ["Tiempo promedio de resolución", formatearHoras(t.tiempo_promedio_horas),
+      a ? formatearHoras(a.tiempo_promedio_horas) : "—",
+      variacion(t.tiempo_promedio_horas, anterior("tiempo_promedio_horas"), { horas: true })] },
+    { celdas: ["Creados por correo", cantidadYParte(t.por_correo, t.creados_periodo),
+      a ? cantidadYParte(a.por_correo, a.creados_periodo) : "—", variacion(t.por_correo, anterior("por_correo"))] },
+    { celdas: ["Creados por la web", cantidadYParte(t.por_web, t.creados_periodo),
+      a ? cantidadYParte(a.por_web, a.creados_periodo) : "—", variacion(t.por_web, anterior("por_web"))] },
+  ];
+}
+
+function filasHoy(t) {
+  const nuevo = t.nuevo !== undefined ? t.nuevo : t.abiertos - t.en_proceso;
+  return [
+    { celdas: ["Nuevo", nuevo, porcentaje(nuevo, t.abiertos)] },
+    { celdas: ["En proceso", t.en_proceso, porcentaje(t.en_proceso, t.abiertos)] },
+    { celdas: ["Total abiertos", t.abiertos, t.abiertos ? "100 %" : "—"], total: true },
+  ];
+}
+
+function filasCategoria(categorias) {
+  const total = categorias.reduce((suma, c) => suma + c.total, 0);
+  return [
+    ...categorias.map((c) => ({ celdas: [c.nombre, c.total, porcentaje(c.total, total)] })),
+    { celdas: ["Total", total, total ? "100 %" : "—"], total: true },
+  ];
+}
+
+function nombreTecnico(p) {
+  const rol = p.rol && p.rol !== "Técnico" ? ` (${p.rol})` : "";
+  return `${p.nombre}${rol}${p.activo ? "" : " · desactivado"}`;
+}
+
+/* Ordenada por abiertos hoy (el servidor ya la manda así); «Sin asignar»
+   al final, con los abiertos que no tienen persona. */
+function filasTecnicos(datos) {
+  const filas = [...datos.por_persona]
+    .sort((x, y) => y.abiertos - x.abiertos || y.resueltos - x.resueltos)
+    .map((p) => ({ celdas: [nombreTecnico(p), p.area || "—", p.abiertos, p.resueltos] }));
+  if (datos.sin_asignar_abiertos) {
+    filas.push({ celdas: ["Sin asignar", "—", datos.sin_asignar_abiertos, "—"] });
+  }
+  return filas.length ? filas : [{ celdas: ["No hay tickets asignados en el período."], vacia: true }];
+}
+
+function pintarTablas(datos, anteriores) {
+  llenarTabla("tabla-resumen", filasResumen(datos.tarjetas, anteriores));
+  llenarTabla("tabla-hoy", filasHoy(datos.tarjetas));
+  llenarTabla("tabla-categoria", filasCategoria(datos.por_categoria));
+  llenarTabla("tabla-tecnicos", filasTecnicos(datos), { textos: [0, 1] });
+}
+
+/* «Período: 01/10/2026 al 30/10/2026 · Departamento: Todos». */
+function textoAlcance(desde, hasta, departamento) {
+  return `Período: ${fechaLarga(desde)} al ${fechaLarga(hasta)} · Departamento: ${departamento || "Todos"}`;
+}
+
+function nombreDepartamento() {
+  const { area } = elementos();
+  if (!area || area.selectedIndex === undefined || area.selectedIndex < 0 || !area.options) return "Todos";
+  const opcion = area.options[area.selectedIndex];
+  return opcion ? opcion.textContent : "Todos";
+}
+
+/* Tabla de datos debajo de cada gráfico («Ver datos»). */
+function tablaDatos(encabezados, filas) {
+  const t = nodo("table", "tabla-informe");
   const thead = nodo("thead");
   const fila = nodo("tr");
-  encabezados.forEach((e) => fila.appendChild(nodo("th", "", e)));
+  encabezados.forEach((e, i) => fila.appendChild(nodo("th", i ? "num" : "", e)));
   thead.appendChild(fila);
   t.appendChild(thead);
   const tbody = nodo("tbody");
   filas.forEach((valores) => {
     const tr = nodo("tr");
-    valores.forEach((v) => tr.appendChild(nodo("td", "", String(v))));
+    valores.forEach((v, i) => tr.appendChild(nodo("td", i ? "num" : "", String(v))));
     tbody.appendChild(tr);
   });
   t.appendChild(tbody);
   return t;
 }
 
-function etiquetaPersona(p) {
-  return `${p.nombre} (${p.rol})${p.activo ? "" : " · desactivado"}`;
-}
-
-/* Lo que muestra cada gráfico, ya preparado para Chart.js y para la tabla. */
-function series(datos) {
-  const personas = datos.por_persona.map((p) => ({
-    etiqueta: etiquetaPersona(p), abiertos: p.abiertos, resueltos: p.resueltos,
-  }));
-  if (datos.sin_asignar_abiertos) {
-    personas.push({ etiqueta: "Sin asignar", abiertos: datos.sin_asignar_abiertos, resueltos: 0 });
-  }
-  return {
-    estado: datos.por_estado,
-    categoria: datos.por_categoria,
-    personas,
-    dias: datos.por_dia,
-  };
-}
-
-function pintarTablas(s) {
+function pintarDatosDeGraficos(s) {
   const bloques = {
-    "g-estado": tabla(["Estado", "Tickets"], s.estado.map((e) => [e.nombre, e.total])),
-    "g-categoria": tabla(["Categoría", "Tickets"], s.categoria.map((c) => [c.nombre, c.total])),
-    "g-persona": s.personas.length
-      ? tabla(["Persona (rol)", "Abiertos hoy", "Resueltos en el período"],
-          s.personas.map((p) => [p.etiqueta, p.abiertos, p.resueltos]))
-      : nodo("p", "estado", "No hay tickets asignados."),
-    "g-dia": tabla(["Día", "Tickets creados"], s.dias.map((d) => [diaCorto(d.fecha), d.total])),
+    "g-estado": tablaDatos(["Estado", "Tickets"], s.estado.map((e) => [e.nombre, e.total])),
+    "g-dia": tablaDatos(["Día", "Tickets creados"], s.dias.map((d) => [fechaLarga(d.fecha), d.total])),
   };
   Object.entries(bloques).forEach(([id, contenido]) => {
     const figura = document.getElementById(id);
-    if (!figura) return;
-    figura.querySelector(".grafico-datos > div").replaceChildren(contenido);
+    if (figura) figura.querySelector(".grafico-datos > div").replaceChildren(contenido);
   });
 }
 
@@ -237,18 +286,14 @@ function colores() {
   if (typeof getComputedStyle !== "function" || !document.documentElement) return valores;
   const estilo = getComputedStyle(document.documentElement);
   const leer = (variable, actual) => (estilo.getPropertyValue(variable) || "").trim() || actual;
-  valores.serie1 = leer("--color-serie-1", valores.serie1);
-  valores.serie2 = leer("--color-serie-2", valores.serie2);
+  valores.barra = leer("--color-primario", valores.barra);
   valores.texto = leer("--color-tenue", valores.texto);
+  valores.eje = leer("--color-borde-fuerte", valores.eje);
   valores.rejilla = leer("--color-borde", valores.rejilla);
-  valores.superficie = leer("--color-superficie", valores.superficie);
-  /* Esquinas de las barras: las mismas que el resto (--radio-suave). */
-  const radio = Number.parseFloat(leer("--radio-suave", ""));
-  if (Number.isFinite(radio)) valores.radio = radio;
   return valores;
 }
 
-/* Escribe el valor al final de cada barra (gráficos de una sola serie). */
+/* Escribe el número arriba de cada barra. */
 const valoresEnBarras = {
   id: "valoresEnBarras",
   afterDatasetsDraw(chart, _args, opciones) {
@@ -256,94 +301,46 @@ const valoresEnBarras = {
     const { ctx } = chart;
     ctx.save();
     ctx.fillStyle = opciones.color;
-    ctx.font = `600 12px ${FUENTE_SITIO}`;
+    ctx.font = `600 ${opciones.chico ? 10 : 12}px ${FUENTE_SITIO}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     chart.getDatasetMeta(0).data.forEach((barra, i) => {
       const valor = chart.data.datasets[0].data[i];
-      ctx.fillText(String(valor), barra.x, barra.y - 4);
+      if (opciones.ocultarCeros && !valor) return;
+      ctx.fillText(String(valor), barra.x, barra.y - 3);
     });
     ctx.restore();
   },
 };
 
-function base(c) {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: { displayColors: false },
-      valoresEnBarras: { activo: false, color: c.texto },
-    },
-    scales: {
-      x: { grid: { display: false }, ticks: { color: c.texto } },
-      y: { beginAtZero: true, grid: { color: c.rejilla }, border: { display: false },
-           ticks: { color: c.texto, precision: 0 } },
-    },
-  };
-}
-
-function barrasSimples(canvas, filas, c) {
-  const opciones = base(c);
-  opciones.plugins.valoresEnBarras.activo = true;
-  opciones.layout = { padding: { top: 20 } };
+/* Barras clásicas: un color, ejes visibles, líneas de fondo suaves y el
+   número arriba de cada barra. Sin esquinas redondeadas ni leyenda. */
+function barras(canvas, etiquetas, valores, c, { muchas = false } = {}) {
   return new Chart(canvas, {
     type: "bar",
     data: {
-      labels: filas.map((f) => f.nombre),
-      datasets: [{
-        label: "Tickets", data: filas.map((f) => f.total), backgroundColor: c.serie1,
-        borderRadius: c.radio, borderSkipped: "start", maxBarThickness: 48,
-      }],
+      labels: etiquetas,
+      datasets: [{ label: "Tickets", data: valores, backgroundColor: c.barra, borderWidth: 0,
+                   categoryPercentage: 0.8, barPercentage: 0.9, maxBarThickness: 56 }],
     },
-    options: opciones,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      layout: { padding: { top: 18 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { displayColors: false },
+        valoresEnBarras: { activo: true, color: c.texto, chico: muchas, ocultarCeros: muchas },
+      },
+      scales: {
+        x: { grid: { display: false }, border: { display: true, color: c.eje },
+             ticks: { color: c.texto, autoSkip: true, maxRotation: 0, maxTicksLimit: muchas ? 10 : undefined } },
+        y: { beginAtZero: true, grid: { color: c.rejilla }, border: { display: true, color: c.eje },
+             ticks: { color: c.texto, precision: 0 } },
+      },
+    },
     plugins: [valoresEnBarras],
-  });
-}
-
-function barrasPersonas(canvas, personas, c) {
-  const opciones = base(c);
-  opciones.indexAxis = "y";
-  opciones.plugins.legend = { display: true, position: "top", align: "start",
-                              labels: { color: c.texto, boxWidth: 12, boxHeight: 12 } };
-  opciones.plugins.tooltip = { displayColors: true };
-  opciones.scales = {
-    x: { beginAtZero: true, grid: { color: c.rejilla }, border: { display: false },
-         ticks: { color: c.texto, precision: 0 } },
-    y: { grid: { display: false }, ticks: { color: c.texto } },
-  };
-  const barra = { borderRadius: c.radio, borderSkipped: "start", borderColor: c.superficie,
-                  borderWidth: 1, categoryPercentage: 0.7, barPercentage: 0.9, maxBarThickness: 18 };
-  return new Chart(canvas, {
-    type: "bar",
-    data: {
-      labels: personas.map((p) => p.etiqueta),
-      datasets: [
-        { ...barra, label: "Abiertos hoy", data: personas.map((p) => p.abiertos), backgroundColor: c.serie1 },
-        { ...barra, label: "Resueltos en el período", data: personas.map((p) => p.resueltos), backgroundColor: c.serie2 },
-      ],
-    },
-    options: opciones,
-  });
-}
-
-function lineaDias(canvas, dias, c) {
-  const opciones = base(c);
-  opciones.interaction = { mode: "index", intersect: false };
-  opciones.scales.x.ticks = { color: c.texto, autoSkip: true, maxRotation: 0, maxTicksLimit: 8 };
-  return new Chart(canvas, {
-    type: "line",
-    data: {
-      labels: dias.map((d) => diaCorto(d.fecha)),
-      datasets: [{
-        label: "Tickets creados", data: dias.map((d) => d.total), borderColor: c.serie1,
-        backgroundColor: c.serie1, borderWidth: 2, tension: 0, pointRadius: dias.length > 45 ? 0 : 3,
-        pointHoverRadius: 5, pointBorderColor: c.superficie, pointBorderWidth: 2,
-      }],
-    },
-    options: opciones,
   });
 }
 
@@ -352,42 +349,45 @@ function lienzo(id) {
   return figura ? figura.querySelector("canvas") : null;
 }
 
-function pintarGraficos(s) {
+let graficos = [];
+
+function pintarGraficos(s, c = colores()) {
   graficos.forEach((g) => g.destroy());
   graficos = [];
   const disponible = typeof Chart === "function";
-  document.querySelectorAll(".grafico").forEach((figura) => {
+  document.querySelectorAll(".informe-grafico").forEach((figura) => {
     figura.querySelector(".grafico-lienzo").hidden = !disponible;
     figura.querySelector(".grafico-datos").open = !disponible;
   });
   if (!disponible) return false;
-
   if (Chart.defaults && Chart.defaults.font) Chart.defaults.font.family = FUENTE_SITIO;
-  const c = colores();
-  /* El gráfico de personas crece con la cantidad de filas. */
-  const alto = Math.max(220, 46 * s.personas.length + 70);
-  document.querySelector("#g-persona .grafico-lienzo").style.height = `${alto}px`;
   graficos = [
-    barrasSimples(lienzo("g-estado"), s.estado, c),
-    barrasSimples(lienzo("g-categoria"), s.categoria, c),
-    barrasPersonas(lienzo("g-persona"), s.personas, c),
-    lineaDias(lienzo("g-dia"), s.dias, c),
+    barras(lienzo("g-estado"), s.estado.map((e) => e.nombre), s.estado.map((e) => e.total), c),
+    barras(lienzo("g-dia"), s.dias.map((d) => diaCorto(d.fecha)), s.dias.map((d) => d.total), c,
+      { muchas: s.dias.length > 31 }),
   ];
   return true;
 }
 
 let ultimasSeries = null;
 
-function pintar(datos) {
-  pintarTarjetas(datos);
-  const s = series(datos);
+function pintar(datos, anteriores) {
+  const { alcance } = elementos();
+  if (alcance) alcance.textContent = textoAlcance(datos.desde, datos.hasta, nombreDepartamento());
+  pintarTablas(datos, anteriores);
+  const s = { estado: datos.por_estado, dias: datos.por_dia };
   ultimasSeries = s;
-  pintarTablas(s);
+  pintarDatosDeGraficos(s);
   return pintarGraficos(s);
 }
 
 /* Al cambiar entre modo claro y oscuro se vuelven a dibujar los gráficos
-   con los colores nuevos (los datos son los mismos). */
+   con los colores nuevos; al imprimir, en grises, y al terminar, como
+   estaban. */
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("beforeprint", () => { if (ultimasSeries) pintarGraficos(ultimasSeries, COLORES_IMPRESION); });
+  window.addEventListener("afterprint", () => { if (ultimasSeries) pintarGraficos(ultimasSeries); });
+}
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
   document.addEventListener("tema-cambiado", () => {
     if (ultimasSeries) pintarGraficos(ultimasSeries);
@@ -409,7 +409,7 @@ async function cargarTarjetasAnteriores({ desde, hasta }, area = "") {
 }
 
 async function cargarMetricas() {
-  const { desde, hasta, aplicar, area } = elementos();
+  const { desde, hasta, aplicar, area, informe } = elementos();
   const areaElegida = area ? String(area.value || "") : "";
   if (!desde.value || !hasta.value) {
     mostrarEstado("Seleccione las dos fechas.", "error");
@@ -417,20 +417,19 @@ async function cargarMetricas() {
   }
   aplicar.disabled = true;
   mostrarEstado("");
-  const zonas = [document.querySelector(".metricas-tarjetas"), document.querySelector(".metricas-graficos")];
+  const zonas = [informe];
   zonas.forEach((zona) => marcarCargando(zona, true));
   const previo = rangoAnterior(desde.value, hasta.value);
   try {
     /* Las dos consultas salen juntas; si falla la del período anterior,
-       la página se muestra igual, sin comparación. */
+       el informe se muestra igual, con «—» en esa columna. */
     const [response, anteriores] = await Promise.all([
       fetchWithAuth(urlMetricas(desde.value, hasta.value, areaElegida)),
       cargarTarjetasAnteriores(previo, areaElegida),
     ]);
     const datos = await response.json().catch(() => null);
     if (response.ok && datos) {
-      const conGraficos = pintar(datos);
-      pintarComparacion(datos.tarjetas, anteriores);
+      const conGraficos = pintar(datos, anteriores);
       mostrarEstado(
         conGraficos ? "" : "No se pudieron cargar los gráficos. Los datos se muestran en tablas.",
         conGraficos ? "" : "vacio"
@@ -451,7 +450,7 @@ async function cargarMetricas() {
 }
 
 async function iniciarMetricas() {
-  const { form, desde, hasta, area } = elementos();
+  const { form, desde, hasta, area, imprimir } = elementos();
   if (!form) return;
   if (area && typeof cargarAreas === "function") {
     llenarSelectAreas(area, await cargarAreas(), { primera: "Todos", sinArea: true });
@@ -466,6 +465,7 @@ async function iniciarMetricas() {
     event.preventDefault();
     cargarMetricas();
   });
+  if (imprimir) imprimir.addEventListener("click", () => window.print());
   await cargarMetricas();
 }
 

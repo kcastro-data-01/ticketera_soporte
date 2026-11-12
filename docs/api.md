@@ -320,21 +320,21 @@ si el rango pasa de 366 días o si una fecha está mal escrita.
   "desde": "2026-09-20",
   "hasta": "2026-10-19",
   "tarjetas": {
-    "abiertos": 12, "en_proceso": 5,
+    "abiertos": 12, "nuevo": 7, "en_proceso": 5,
     "resueltos_periodo": 30, "tiempo_promedio_horas": 26.5,
     "creados_periodo": 41, "por_correo": 9, "por_web": 32
   },
   "por_estado": [{"nombre": "Nuevo", "total": 7}],
   "por_categoria": [{"nombre": "Hardware", "total": 10}],
   "por_persona": [{"id": 3, "nombre": "Carlos Solís", "rol": "Técnico", "activo": true,
-                   "abiertos": 4, "resueltos": 9}],
+                   "area": "Soporte IT", "abiertos": 4, "resueltos": 9}],
   "sin_asignar_abiertos": 2,
   "por_dia": [{"fecha": "2026-09-20", "total": 0}]
 }
 ```
 
-`abiertos` y `en_proceso` (y `abiertos` por persona, y `sin_asignar_abiertos`)
-son la cola de hoy. El resto usa el rango: `por_estado`, `por_categoria`,
+`abiertos`, `nuevo` y `en_proceso` (y `abiertos` por persona, y `sin_asignar_abiertos`)
+son la cola de hoy. `area` es el departamento de IT de la persona (`null` si no tiene). El resto usa el rango: `por_estado`, `por_categoria`,
 `por_dia` y el origen cuentan los tickets **creados** en el rango;
 `resueltos_periodo`, `resueltos` por persona y `tiempo_promedio_horas` (`null`
 si no hay resueltos) usan el primer paso a «Resuelto» de cada ticket. Un

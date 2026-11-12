@@ -193,10 +193,6 @@
   --sombra-tarjeta: 0 1px 2px rgba(0, 0, 0, 0.3);
   --sombra-aviso: 0 4px 14px rgba(0, 0, 0, 0.45);
   --sombra-suave: none;
-
-  /* Gráficos de métricas: tonos más claros sobre fondo oscuro. */
-  --color-serie-1: #5aa2ff;
-  --color-serie-2: #ff8f61;
 }
 
 /* Botón de luna/sol en la barra superior. */
@@ -3144,12 +3140,6 @@ body.app {
 
 /* ---------- Métricas ---------- */
 
-:root {
-  /* Series de los gráficos (paleta validada para daltonismo). */
-  --color-serie-1: #2a78d6;
-  --color-serie-2: #eb6834;
-}
-
 .metricas-rango {
   margin-bottom: var(--espaciado-lg);
 }
@@ -3177,68 +3167,207 @@ body.app {
   color: var(--color-tenue);
 }
 
-.metricas-graficos {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--espaciado-md);
-  margin-bottom: var(--espaciado-lg);
+/* ===== Métricas: informe de gestión (metricas.js) =====
+   Una hoja centrada con borde fino, como un documento: encabezado con una
+   línea oscura, secciones con títulos chicos en mayúsculas y grises,
+   tablas con los números a la derecha y dos gráficos de barras clásicos
+   en el azul de la app. Sin íconos, pastillas ni verde y rojo. Claro y
+   oscuro por las variables; al imprimir, solo el informe en blanco y
+   negro. */
+.informe {
+  max-width: 980px;
+  margin: 0 auto var(--espaciado-lg);
+  padding: 2rem 2.25rem 2.25rem;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: 2px;
+  background: var(--color-superficie);
+  color: var(--color-texto);
 }
 
-.grafico {
+.informe-encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1.5rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 2px solid var(--color-titulo);
+}
+
+.informe-encabezado h2 {
+  margin: 0;
+  padding: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-titulo);
+}
+
+/* Sin la barrita de color de los títulos de sección de la app. */
+.informe-encabezado h2::before {
+  display: none;
+}
+
+.informe-alcance {
+  margin: 0;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue-fuerte);
+  font-variant-numeric: tabular-nums;
+}
+
+.informe-seccion {
+  margin-top: 1.9rem;
+}
+
+.informe-seccion-titulo {
+  margin: 0 0 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-tenue);
+}
+
+.informe-seccion-titulo::before {
+  display: none;
+}
+
+.informe-nota {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-tenue);
+}
+
+/* Distribución: gráfico a la izquierda y tabla a la derecha. */
+.informe-columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 1.75rem;
+  align-items: start;
+}
+
+.informe-grafico,
+.informe-bloque {
   min-width: 0;
   margin: 0;
-  padding: 1rem 1.1rem;
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio-medio);
-  background: var(--color-superficie);
-  box-shadow: var(--sombra-suave);
 }
 
-.grafico.ancho {
-  grid-column: 1 / -1;
-}
-
-.grafico figcaption {
-  margin-bottom: 0.75rem;
+.informe-grafico figcaption,
+.informe-bloque-titulo {
+  margin: 0 0 0.5rem;
+  font-size: var(--texto-sm);
   font-weight: 600;
   color: var(--color-texto);
 }
 
-.grafico figcaption span {
+.informe-grafico figcaption span,
+.informe-bloque-titulo span {
   display: block;
-  font-size: var(--texto-sm);
+  font-size: 0.75rem;
   font-weight: 400;
   color: var(--color-tenue);
 }
 
-.grafico-lienzo {
+.informe .grafico-lienzo {
   position: relative;
   height: 240px;
 }
 
-.grafico-datos {
-  margin-top: 0.75rem;
-  font-size: var(--texto-sm);
+.informe-grafico.ancho .grafico-lienzo {
+  height: 220px;
 }
 
-.grafico-datos summary {
+.informe .grafico-datos {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.informe .grafico-datos summary {
   cursor: pointer;
   color: var(--color-enlace);
+}
+
+.informe .grafico-datos > div {
+  margin-top: 0.4rem;
+  overflow-x: auto;
+}
+
+/* Tablas: líneas finas, encabezado con línea más marcada, números a la
+   derecha y la fila de total en negrita. Las anchas se desplazan dentro
+   de su caja. */
+.informe-tabla {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.tabla-informe {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--texto-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-informe th,
+.tabla-informe td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--color-borde);
+  text-align: left;
+  white-space: nowrap;
+  font-weight: 400;
+  color: var(--color-texto);
+}
+
+.tabla-informe thead th {
+  border-bottom: 1px solid var(--color-tenue);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-tenue-fuerte);
+  background: transparent;
+}
+
+.tabla-informe th:first-child,
+.tabla-informe td:first-child {
+  padding-left: 0;
+}
+
+.tabla-informe th:last-child,
+.tabla-informe td:last-child {
+  padding-right: 0;
+}
+
+.tabla-informe .num {
+  text-align: right;
+}
+
+.tabla-informe .fila-total th,
+.tabla-informe .fila-total td {
+  border-top: 1px solid var(--color-tenue);
+  border-bottom: 0;
   font-weight: 600;
 }
 
-.grafico-datos > div {
-  overflow-x: auto;
-  margin-top: 0.5rem;
-}
-
-.tabla-datos {
-  width: 100%;
+.tabla-informe .celda-vacia {
+  color: var(--color-tenue);
+  white-space: normal;
 }
 
 @media (max-width: 900px) {
-  .metricas-graficos {
+  .informe-columnas {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .informe {
+    padding: 1.1rem 1rem 1.3rem;
+  }
+
+  .informe-encabezado {
+    flex-direction: column;
+  }
+
+  .informe .grafico-lienzo,
+  .informe-grafico.ancho .grafico-lienzo {
+    height: 200px;
   }
 }
 
@@ -3248,13 +3377,85 @@ body.app {
   .metricas-rango button {
     width: 100%;
   }
+}
 
-  .grafico {
-    padding: 0.75rem;
+/* Imprimir: solo el informe, blanco y negro, sin menú, filtros ni chat. */
+@media print {
+  .metricas .barra-lateral,
+  body:has(.informe) .barra-lateral,
+  body:has(.informe) .cabecera,
+  body:has(.informe) .pie,
+  body:has(.informe) .chat-asistente,
+  body:has(.informe) .avisos,
+  .metricas-rango,
+  .metricas #estado-carga,
+  .informe .grafico-datos {
+    display: none !important;
   }
 
-  .grafico-lienzo {
-    height: 200px;
+  body:has(.informe),
+  body:has(.informe) .app-principal,
+  body:has(.informe) .contenido {
+    display: block;
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+  }
+
+  .informe {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .informe *,
+  .informe .tabla-informe th,
+  .informe .tabla-informe td {
+    color: #000 !important;
+    background: transparent !important;
+  }
+
+  .informe-encabezado {
+    border-bottom-color: #000;
+  }
+
+  .informe-seccion-titulo,
+  .informe-nota,
+  .informe-alcance {
+    color: #444 !important;
+  }
+
+  .tabla-informe th,
+  .tabla-informe td {
+    border-bottom-color: #bbb;
+  }
+
+  .tabla-informe thead th,
+  .tabla-informe .fila-total th,
+  .tabla-informe .fila-total td {
+    border-color: #000;
+  }
+
+  .informe-columnas {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  }
+
+  .informe-seccion,
+  .informe-grafico,
+  .tabla-informe tr {
+    break-inside: avoid;
+  }
+
+  .informe-tabla {
+    overflow: visible;
+  }
+
+  .informe .grafico-lienzo canvas {
+    max-width: 100% !important;
+    height: auto !important;
   }
 }
 
@@ -3503,34 +3704,6 @@ td.con-avatar {
 .detalle-layout:has(#panel-ticket.esqueleto-activo) #panel-datos dd { width: 7rem; }
 
 
-
-/* ===== Métricas: cambio frente al período anterior ===== */
-.metrica-cambio {
-  display: inline-block;
-  align-self: flex-start;
-  margin-top: 0.45rem;
-  padding: 0.15rem 0.45rem;
-  border-radius: 6px;
-  background: var(--etiqueta-gris-fondo);
-  color: var(--etiqueta-gris-texto);
-  font-size: 0.74rem;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.metrica-cambio.bueno {
-  background: var(--etiqueta-verde-fondo);
-  color: var(--etiqueta-verde-texto);
-}
-
-.metrica-cambio.malo {
-  background: var(--etiqueta-rojo-fondo);
-  color: var(--etiqueta-rojo-texto);
-}
-
-.esqueleto-activo .metrica-cambio {
-  visibility: hidden;
-}
 
 /* ===== Listado: vista simple del Solicitante ===== */
 /* «Atendido por» sin responsable todavía. */

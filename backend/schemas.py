@@ -579,6 +579,7 @@ class MetricasTarjetas(BaseModel):
     """«abiertos» y «en_proceso»: la cola de hoy. El resto, del período."""
 
     abiertos: int
+    nuevo: int = 0
     en_proceso: int
     resueltos_periodo: int
     tiempo_promedio_horas: float | None
@@ -597,6 +598,8 @@ class MetricaPersona(BaseModel):
     nombre: str
     rol: str
     activo: bool
+    # Departamento de IT de la persona (``None`` si no tiene).
+    area: str | None = None
     abiertos: int
     resueltos: int
 

@@ -63,7 +63,7 @@ def test_counts_cards_states_categories_and_people(client, session, admin):
     m = metricas(client, admin, desde="2026-10-01", hasta="2026-10-10")
     assert m["desde"] == "2026-10-01" and m["hasta"] == "2026-10-10"
     assert m["tarjetas"] == {
-        "abiertos": 4, "en_proceso": 2, "resueltos_periodo": 2, "tiempo_promedio_horas": 20.0,
+        "abiertos": 4, "nuevo": 2, "en_proceso": 2, "resueltos_periodo": 2, "tiempo_promedio_horas": 20.0,
         "creados_periodo": 6, "por_correo": 0, "por_web": 6,
     }
     assert m["por_estado"] == [{"nombre": "Nuevo", "total": 2}, {"nombre": "En proceso", "total": 2},
@@ -71,8 +71,10 @@ def test_counts_cards_states_categories_and_people(client, session, admin):
     categorias = {c["nombre"]: c["total"] for c in m["por_categoria"]}
     assert categorias == {"Hardware": 2, "Software": 1, "Red": 2, "Accesos": 1}
     assert m["por_persona"] == [
-        {"id": carlos.id, "nombre": "Carlos Solís", "rol": "Técnico", "activo": True, "abiertos": 2, "resueltos": 1},
-        {"id": sup.id, "nombre": "Marta Rojas", "rol": "Técnico", "activo": True, "abiertos": 1, "resueltos": 1},
+        {"id": carlos.id, "nombre": "Carlos Solís", "rol": "Técnico", "activo": True, "area": None,
+         "abiertos": 2, "resueltos": 1},
+        {"id": sup.id, "nombre": "Marta Rojas", "rol": "Técnico", "activo": True, "area": None,
+         "abiertos": 1, "resueltos": 1},
     ]
     assert m["sin_asignar_abiertos"] == 1
 
@@ -179,3 +181,20 @@ def test_permissions(client, session, rol, codigo):
 
 def test_requires_login(client):
     assert client.get("/api/metricas").status_code == 401
+
+
+def test_por_tecnico_trae_su_departamento(client, session, admin):
+    """«Por técnico» del informe: el departamento de cada persona."""
+    from backend.models import ItArea
+
+    redes = ItArea(name="Redes e Infraestructura")
+    session.add(redes)
+    session.commit()
+    ana = persona(session, "Ana Vargas", "Técnico", "ana@x.local")
+    ana.area_id = redes.id
+    session.commit()
+    ticket(session, cr("2026-10-02"), "En proceso", "Red", ana)
+
+    m = metricas(client, admin, desde="2026-10-01", hasta="2026-10-10")
+    assert [(p["nombre"], p["area"]) for p in m["por_persona"]] == [("Ana Vargas", "Redes e Infraestructura")]
+    assert (m["tarjetas"]["nuevo"], m["tarjetas"]["en_proceso"], m["tarjetas"]["abiertos"]) == (0, 1, 1)

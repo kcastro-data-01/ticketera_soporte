@@ -144,6 +144,7 @@ def calcular(session, desde: date, hasta: date, area_id: int | None = None,
         (
             {
                 "id": u.id, "nombre": u.name, "rol": u.role, "activo": u.is_active,
+                "area": u.area.name if u.area is not None else None,
                 "abiertos": abiertos_por_persona.get(u.id, 0),
                 "resueltos": resueltos_por_persona.get(u.id, 0),
             }
@@ -157,6 +158,7 @@ def calcular(session, desde: date, hasta: date, area_id: int | None = None,
         "hasta": hasta,
         "tarjetas": {
             "abiertos": abiertos,
+            "nuevo": por_estado_hoy.get(TicketState.NEW.value, 0),
             "en_proceso": por_estado_hoy.get(TicketState.IN_PROGRESS.value, 0),
             "resueltos_periodo": len(resueltos),
             "tiempo_promedio_horas": promedio,

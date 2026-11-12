@@ -6,13 +6,13 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Métricas · American Data Networks</title>
   <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
-  <script src="js/tema.js?v=20261112-10"></script>
+  <script src="js/tema.js?v=20261112-11"></script>
   <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="css/estilos.css?v=20261112-10">
+  <link rel="stylesheet" href="css/estilos.css?v=20261112-11">
 </head>
 <body class="app">
   <aside class="barra-lateral">
@@ -71,77 +71,101 @@
       </label>
       <div class="acciones">
         <button type="submit" id="aplicar">Aplicar</button>
+        <!-- Imprime solo el informe (sin menú ni filtros). -->
+        <button type="button" id="imprimir-informe" class="secundario">Imprimir</button>
       </div>
     </form>
 
     <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
 
-    <section class="resumen metricas-tarjetas" aria-label="Números principales">
-      <div class="tarjeta-resumen metrica">
-        <span class="tarjeta-numero" id="m-abiertos">—</span>
-        <span class="tarjeta-etiqueta">Abiertos hoy</span>
-        <span class="metrica-nota">Nuevo + En proceso</span>
-        <span class="metrica-cambio neutro" id="c-abiertos" hidden>Valor de hoy</span>
-      </div>
-      <div class="tarjeta-resumen metrica">
-        <span class="tarjeta-numero" id="m-en-proceso">—</span>
-        <span class="tarjeta-etiqueta">En proceso hoy</span>
-        <span class="metrica-cambio neutro" id="c-en-proceso" hidden>Valor de hoy</span>
-      </div>
-      <div class="tarjeta-resumen metrica">
-        <span class="tarjeta-numero" id="m-resueltos">—</span>
-        <span class="tarjeta-etiqueta">Resueltos en el período</span>
-        <span class="metrica-cambio" id="c-resueltos" hidden></span>
-      </div>
-      <div class="tarjeta-resumen metrica">
-        <span class="tarjeta-numero" id="m-promedio">—</span>
-        <span class="tarjeta-etiqueta">Tiempo promedio de resolución</span>
-        <span class="metrica-nota">De los resueltos en el período</span>
-        <span class="metrica-cambio" id="c-promedio" hidden></span>
-      </div>
-      <div class="tarjeta-resumen metrica">
-        <span class="tarjeta-numero" id="m-origen">—</span>
-        <span class="tarjeta-etiqueta">Por correo / por web</span>
-        <span class="metrica-nota" id="m-origen-nota">Creados en el período</span>
-        <span class="metrica-cambio" id="c-origen" hidden></span>
-      </div>
-    </section>
+    <!-- Informe de gestión: una hoja con secciones y tablas (metricas.js). -->
+    <article id="informe" class="informe" aria-labelledby="informe-titulo">
+      <header class="informe-encabezado">
+        <h2 id="informe-titulo">Indicadores de la mesa de soporte</h2>
+        <p id="informe-alcance" class="informe-alcance">Período: — · Departamento: Todos</p>
+      </header>
 
-    <section class="metricas-graficos" aria-label="Gráficos">
-      <figure class="grafico" id="g-estado">
-        <figcaption>Tickets por estado <span>creados en el período, según su estado actual</span></figcaption>
-        <div class="grafico-lienzo"><canvas aria-label="Tickets por estado" role="img"></canvas></div>
-        <details class="grafico-datos"><summary>Ver datos</summary><div></div></details>
-      </figure>
-      <figure class="grafico" id="g-categoria">
-        <figcaption>Tickets por categoría <span>creados en el período</span></figcaption>
-        <div class="grafico-lienzo"><canvas aria-label="Tickets por categoría" role="img"></canvas></div>
-        <details class="grafico-datos"><summary>Ver datos</summary><div></div></details>
-      </figure>
-      <figure class="grafico ancho" id="g-persona">
-        <figcaption>Tickets por persona asignada <span>abiertos hoy y resueltos en el período</span></figcaption>
-        <div class="grafico-lienzo"><canvas aria-label="Tickets por persona asignada" role="img"></canvas></div>
-        <details class="grafico-datos"><summary>Ver datos</summary><div></div></details>
-      </figure>
-      <figure class="grafico ancho" id="g-dia">
-        <figcaption>Tickets creados por día</figcaption>
-        <div class="grafico-lienzo"><canvas aria-label="Tickets creados por día" role="img"></canvas></div>
-        <details class="grafico-datos"><summary>Ver datos</summary><div></div></details>
-      </figure>
-    </section>
+      <section class="informe-seccion" aria-labelledby="s-resumen">
+        <h3 id="s-resumen" class="informe-seccion-titulo">Resumen</h3>
+        <div class="informe-tabla">
+          <table id="tabla-resumen" class="tabla-informe">
+            <thead>
+              <tr><th scope="col">Indicador</th><th scope="col" class="num">Este período</th><th scope="col" class="num">Período anterior</th><th scope="col" class="num">Variación</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="informe-seccion" aria-labelledby="s-hoy">
+        <h3 id="s-hoy" class="informe-seccion-titulo">Situación de hoy</h3>
+        <div class="informe-tabla">
+          <table id="tabla-hoy" class="tabla-informe">
+            <thead>
+              <tr><th scope="col">Estado</th><th scope="col" class="num">Tickets</th><th scope="col" class="num">% del total abierto</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="informe-nota">Abiertos = Nuevo + En proceso, al momento de consultar.</p>
+      </section>
+
+      <section class="informe-seccion" aria-labelledby="s-distribucion">
+        <h3 id="s-distribucion" class="informe-seccion-titulo">Distribución</h3>
+        <div class="informe-columnas">
+          <figure class="informe-grafico" id="g-estado">
+            <figcaption>Tickets por estado <span>creados en el período, según su estado actual</span></figcaption>
+            <div class="grafico-lienzo"><canvas aria-label="Tickets por estado" role="img"></canvas></div>
+            <details class="grafico-datos"><summary>Ver datos</summary><div></div></details>
+          </figure>
+          <div class="informe-bloque">
+            <h4 class="informe-bloque-titulo">Tickets por categoría <span>creados en el período</span></h4>
+            <div class="informe-tabla">
+              <table id="tabla-categoria" class="tabla-informe">
+                <thead>
+                  <tr><th scope="col">Categoría</th><th scope="col" class="num">Tickets</th><th scope="col" class="num">%</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="informe-seccion" aria-labelledby="s-dia">
+        <h3 id="s-dia" class="informe-seccion-titulo">Por día</h3>
+        <figure class="informe-grafico ancho" id="g-dia">
+          <figcaption>Tickets creados por día</figcaption>
+          <div class="grafico-lienzo"><canvas aria-label="Tickets creados por día" role="img"></canvas></div>
+          <details class="grafico-datos"><summary>Ver datos</summary><div></div></details>
+        </figure>
+      </section>
+
+      <section class="informe-seccion" aria-labelledby="s-tecnico">
+        <h3 id="s-tecnico" class="informe-seccion-titulo">Por técnico</h3>
+        <div class="informe-tabla">
+          <table id="tabla-tecnicos" class="tabla-informe">
+            <thead>
+              <tr><th scope="col">Técnico</th><th scope="col">Departamento</th><th scope="col" class="num">Abiertos hoy</th><th scope="col" class="num">Resueltos en el período</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </article>
     </main>
 
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
-  <script src="js/guardia.js?v=20261112-10" data-permiso="metricas"></script>
-  <script src="js/avisos.js?v=20261112-10" defer></script>
-  <script src="js/auth.js?v=20261112-10" defer></script>
-  <script src="js/sesion.js?v=20261112-10" defer></script>
-  <script src="js/asistente.js?v=20261112-10" defer></script>
+  <script src="js/guardia.js?v=20261112-11" data-permiso="metricas"></script>
+  <script src="js/avisos.js?v=20261112-11" defer></script>
+  <script src="js/auth.js?v=20261112-11" defer></script>
+  <script src="js/sesion.js?v=20261112-11" defer></script>
+  <script src="js/asistente.js?v=20261112-11" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
           integrity="sha384-bs/nf9FbdNouRbMiFcrcZfLXYPKiPaGVGplVbv7dLGECccEXDW+S3zjqSKR5ZEaD"
           crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
-  <script src="js/metricas.js?v=20261112-10" defer></script>
+  <script src="js/metricas.js?v=20261112-11" defer></script>
 </body>
 </html>

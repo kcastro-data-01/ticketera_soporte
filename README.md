@@ -837,26 +837,31 @@ Todos los números los calcula el servidor (sin IA) y se filtran por un rango de
 días en hora de Costa Rica (por defecto, los últimos 30 días contando hoy;
 máximo 366).
 
-Tarjetas:
+La pantalla es un informe de gestión: una hoja con el encabezado
+«Indicadores de la mesa de soporte», el período y el departamento, y estas
+secciones:
 
-- **Abiertos hoy** (Nuevo + En proceso) y **En proceso hoy**: la cola actual,
-  sin importar el rango.
-- **Resueltos en el período**: tickets cuyo primer paso a «Resuelto» cae en el
-  rango (un Cerrado cuenta, porque antes pasó por Resuelto).
-- **Tiempo promedio de resolución**: de esos tickets, desde que se crearon hasta
-  ese primer «Resuelto» (por ejemplo «1 d 4 h»).
-- **Por correo / por web**: tickets creados en el rango que llegaron del buzón
-  de soporte frente al resto (los anteriores a la lectura del correo cuentan
-  como web).
+- **Resumen**: tickets creados, tickets resueltos, tiempo promedio de
+  resolución, creados por correo y creados por la web (cantidad y %). Cada
+  fila muestra este período, el período anterior de la misma duración y la
+  variación («+6 (+12 %)»; «—» si no hay dato del anterior).
+  - **Resueltos**: tickets cuyo primer paso a «Resuelto» cae en el rango (un
+    Cerrado cuenta, porque antes pasó por Resuelto).
+  - **Tiempo promedio**: de esos tickets, desde que se crearon hasta ese primer
+    «Resuelto» (por ejemplo «1 d 4 h»).
+  - **Por correo**: llegaron del buzón de soporte; los anteriores a la lectura
+    del correo cuentan como web.
+- **Situación de hoy**: Nuevo, En proceso y Total abiertos, con su %. Es la
+  cola actual, sin importar el rango.
+- **Distribución**: gráfico de barras de los tickets creados en el rango
+  según su estado actual, y tabla por categoría con su % y el total.
+- **Por día**: gráfico de barras de los creados por día (los días sin
+  tickets, en 0).
+- **Por técnico**: departamento, abiertos hoy y resueltos en el período,
+  ordenada por abiertos, con una fila «Sin asignar». Los resueltos se cuentan
+  a quien tiene el ticket asignado ahora.
 
-Gráficos (cada uno con su tabla en «Ver datos»):
-
-- **Por estado** y **por categoría**: tickets creados en el rango, según su
-  estado y su categoría actuales.
-- **Por persona asignada**: abiertos hoy y resueltos en el período, con el rol
-  de cada persona («Carlos Solís (Técnico)») y una fila «Sin asignar». Los
-  resueltos se cuentan a quien tiene el ticket asignado ahora.
-- **Creados por día**, con los días sin tickets en 0.
+«Imprimir» imprime solo el informe, en blanco y negro.
 
 Los gráficos usan Chart.js 4.4.1 desde cdnjs (versión fija, con hash de
 integridad). Si el navegador no tiene internet, la página muestra las mismas
