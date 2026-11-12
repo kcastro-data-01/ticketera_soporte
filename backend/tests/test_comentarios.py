@@ -13,7 +13,8 @@ VALID_TICKET = {
     "category": TicketCategory.SOFTWARE.value,
     "priority": TicketPriority.MEDIUM.value,
 }
-COMMENT_RESPONSE_KEYS = {"id", "ticket_id", "author", "content", "created_at"}
+COMMENT_RESPONSE_KEYS = {"id", "ticket_id", "author", "content", "created_at",
+                         "author_id", "author_es_it", "origen", "estado_nuevo"}
 
 
 def create_ticket(auth_client, **overrides) -> dict:

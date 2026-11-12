@@ -29,6 +29,11 @@
   --color-superficie: #ffffff;
   --color-superficie-alta: #ffffff;
   --color-fondo-neutro: #eef2f9;
+  /* Burbujas de los comentarios: las propias en azul muy claro, las demás en gris. */
+  --burbuja-propia-fondo: #edf2fe;
+  --burbuja-propia-borde: #d6e0fb;
+  --burbuja-otra-fondo: #f4f5f7;
+  --burbuja-otra-borde: #e3e6eb;
 
   /* Texto */
   --color-texto: #1a2233;
@@ -143,6 +148,10 @@
   --color-superficie: #171d2b;
   --color-superficie-alta: #1c2333;
   --color-fondo-neutro: #232b3c;
+  --burbuja-propia-fondo: #1c2644;
+  --burbuja-propia-borde: #2b3a66;
+  --burbuja-otra-fondo: #20283a;
+  --burbuja-otra-borde: #2c3547;
 
   --color-texto: #e6e9f0;
   --color-tenue: #9aa4b8;
@@ -935,18 +944,189 @@ button.peligro:disabled:hover {
    Solo componentes nuevos construidos con los tokens existentes:
    no cambia la paleta ni la identidad de la Tarea 20.1. */
 
-/* Comentarios como línea de tiempo: punto y línea vertical a la izquierda;
-   autor y fecha en gris arriba del texto. */
+/* Comentarios como conversación (detalle.js, renderComentarios): los
+   propios a la derecha en azul muy claro, los de los demás a la izquierda
+   en gris muy claro; bordes de 8 px, sin sombras. Los seguidos de la misma
+   persona van pegados y sin repetir el nombre. El motivo de un cambio de
+   estado, centrado y en gris chico. La lista tiene alto máximo y muestra
+   el último al abrir. Claro y oscuro por las variables --burbuja-*. */
 .comentarios {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 0.85rem;
+  max-height: min(34rem, 65vh);
   margin: 0 0 1.1rem;
-  padding-left: 1.6rem;
+  padding: 0.25rem 0.15rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
-.comentarios::before,
+.comentarios:focus-visible {
+  outline: 2px solid var(--color-primario-foco);
+  outline-offset: 2px;
+  border-radius: var(--radio-ventana);
+}
+
+.comentario {
+  align-self: flex-start;
+  min-width: 0;
+  max-width: 75%;
+  padding: 0.55rem 0.8rem 0.6rem;
+  border: 1px solid var(--burbuja-otra-borde);
+  border-radius: var(--radio-ventana);
+  background: var(--burbuja-otra-fondo);
+}
+
+.comentario.propio {
+  align-self: flex-end;
+  border-color: var(--burbuja-propia-borde);
+  background: var(--burbuja-propia-fondo);
+}
+
+/* Varios seguidos de la misma persona: más juntos. */
+.comentario.seguido {
+  margin-top: -0.5rem;
+}
+
+.comentario-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.5rem;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-tenue);
+}
+
+.comentario.propio .comentario-cabecera {
+  justify-content: flex-end;
+}
+
+.comentario-autor {
+  min-width: 0;
+  font-weight: 600;
+  color: var(--color-tenue-fuerte);
+  overflow-wrap: anywhere;
+}
+
+.comentario-fecha {
+  font-variant-numeric: tabular-nums;
+}
+
+/* «IT» (Técnico o Administrador) y «por correo»: etiquetas chicas. */
+.comentario-it,
+.comentario-correo {
+  padding: 0 0.35rem;
+  border: 1px solid var(--color-borde-fuerte);
+  border-radius: 3px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+  color: var(--color-tenue-fuerte);
+}
+
+.comentario-correo {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.comentario-contenido {
+  margin: 0.3rem 0 0;
+  font-size: var(--texto-md);
+  line-height: 1.55;
+  color: var(--color-texto);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comentario.seguido .comentario-contenido {
+  margin-top: 0.15rem;
+}
+
+/* Aviso del sistema: «Pasó a Resuelto · se cambió el tóner». */
+.comentario-sistema {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.1rem 0.5rem;
+  max-width: 90%;
+  margin: 0.15rem auto;
+  font-size: var(--texto-sm);
+  line-height: 1.45;
+  text-align: center;
+  color: var(--color-tenue);
+  overflow-wrap: anywhere;
+}
+
+.comentario-sistema-texto {
+  font-weight: 500;
+}
+
+.comentario-sistema-meta {
+  font-size: 0.75rem;
+}
+
+/* Texto que solo oye el lector de pantalla (y sale en la hoja impresa). */
+.solo-lector {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 600px) {
+  .comentario {
+    max-width: 90%;
+  }
+}
+
+/* En la hoja impresa: lista simple, todos a lo ancho y con el nombre en
+   cada comentario. */
+@media print {
+  .comentarios {
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    gap: 0.5rem;
+  }
+
+  .comentario,
+  .comentario.propio {
+    align-self: stretch;
+    max-width: none;
+    margin-top: 0;
+  }
+
+  .comentario.propio .comentario-cabecera {
+    justify-content: flex-start;
+  }
+
+  .comentario .solo-lector {
+    position: static !important;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  .comentario-sistema {
+    justify-content: flex-start;
+    max-width: none;
+    margin: 0;
+    text-align: left;
+  }
+}
+
+/* Línea y puntos de la línea de tiempo del historial. */
 #historial-cuerpo::before {
   content: "";
   position: absolute;
@@ -958,16 +1138,6 @@ button.peligro:disabled:hover {
   background: var(--color-borde);
 }
 
-.comentario {
-  position: relative;
-  background: var(--color-superficie-alta);
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio-medio);
-  padding: 0.7rem 0.95rem;
-  box-shadow: var(--sombra-suave);
-}
-
-.comentario::before,
 #historial-cuerpo tr::before {
   content: "";
   position: absolute;
@@ -980,34 +1150,6 @@ button.peligro:disabled:hover {
   background: var(--color-superficie-alta);
   border: 2px solid var(--color-primario-claro);
   box-sizing: border-box;
-}
-
-.comentario-cabecera {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--color-tenue);
-}
-
-.comentario-autor {
-  font-weight: 600;
-  color: var(--color-tenue-fuerte);
-}
-
-.comentario-fecha {
-  font-variant-numeric: tabular-nums;
-}
-
-.comentario-contenido {
-  margin: 0.3rem 0 0;
-  font-size: var(--texto-md);
-  line-height: 1.55;
-  color: var(--color-texto);
-  white-space: pre-wrap;
 }
 
 /* Historial del ticket como línea de tiempo (misma tabla, otra forma):

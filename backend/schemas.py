@@ -384,6 +384,13 @@ class CommentResponse(BaseModel):
     author: str
     content: str
     created_at: datetime
+    # Para mostrarlos como conversación: quién lo escribió (``null`` en los
+    # viejos), si es de IT, de dónde vino (``app``, ``correo`` o ``estado``)
+    # y, si es el motivo de un cambio de estado, a qué estado pasó.
+    author_id: int | None = None
+    author_es_it: bool = False
+    origen: str = "app"
+    estado_nuevo: str | None = None
 
 
 class HistoryResponse(BaseModel):

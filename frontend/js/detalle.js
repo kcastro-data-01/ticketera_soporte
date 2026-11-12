@@ -858,8 +858,87 @@ function ajustarAltoComentario() {
   campo.style.height = `${Math.min(campo.scrollHeight + 2, ALTO_MAXIMO_COMENTARIO)}px`;
 }
 
-/* Renderiza con textContent: los datos del backend nunca se interpretan
-   como HTML. */
+/* Comentarios como conversación (del más antiguo al más reciente):
+   - los de quien está viendo el ticket a la derecha y los demás a la
+     izquierda, en burbujas;
+   - arriba de cada burbuja, iniciales y nombre, «IT» si es Técnico o
+     Administrador, la hora y «por correo» si llegó respondiendo un aviso;
+   - varios seguidos de la misma persona (menos de 10 minutos) se agrupan
+     sin repetir nombre ni iniciales;
+   - el motivo de un cambio de estado va centrado, chico y gris, como aviso
+     del sistema: «Pasó a Resuelto · se cambió el tóner».
+   Todo con textContent: los datos del backend nunca se interpretan como
+   HTML. */
+const COMENTARIOS_AGRUPAR_MS = 10 * 60 * 1000;
+
+function nodoComentario(tag, clase, texto) {
+  const el = document.createElement(tag);
+  if (clase) el.className = clase;
+  if (texto !== undefined) el.textContent = texto;
+  return el;
+}
+
+/* ¿Lo escribió quien está viendo el ticket? Por id; los comentarios viejos
+   sin autor guardado, por el nombre. */
+function esComentarioPropio(comment, usuario) {
+  if (!usuario) return false;
+  if (comment.author_id !== null && comment.author_id !== undefined) {
+    return usuario.id !== undefined && Number(comment.author_id) === Number(usuario.id);
+  }
+  return Boolean(usuario.name) && comment.author === usuario.name;
+}
+
+function claveAutor(comment) {
+  return comment.author_id !== null && comment.author_id !== undefined
+    ? `id:${comment.author_id}`
+    : `nombre:${comment.author || "Anónimo"}`;
+}
+
+/* ¿Va pegado al anterior? Misma persona, burbuja (no aviso del sistema) y
+   menos de 10 minutos entre uno y otro. */
+function agruparConAnterior(anterior, comment) {
+  if (!anterior || anterior.origen === "estado" || comment.origen === "estado") return false;
+  if (claveAutor(anterior) !== claveAutor(comment)) return false;
+  const diferencia = new Date(comment.created_at) - new Date(anterior.created_at);
+  return Number.isFinite(diferencia) && diferencia >= 0 && diferencia < COMENTARIOS_AGRUPAR_MS;
+}
+
+function comentarioDelSistema(comment) {
+  const linea = nodoComentario("p", "comentario-sistema");
+  const motivo = String(comment.content || "").trim();
+  const texto = comment.estado_nuevo ? `Pasó a ${comment.estado_nuevo}` : "Cambio de estado";
+  linea.appendChild(nodoComentario("span", "comentario-sistema-texto", motivo ? `${texto} · ${motivo}` : texto));
+  linea.appendChild(nodoComentario("span", "comentario-sistema-meta",
+    `${comment.author || "Anónimo"} · ${formatearFechaHora(comment.created_at)}`));
+  return linea;
+}
+
+function burbujaComentario(comment, { propio, seguido }) {
+  const card = nodoComentario("article",
+    `comentario ${propio ? "propio" : "ajeno"}${seguido ? " seguido" : ""}`);
+  const header = nodoComentario("div", "comentario-cabecera");
+  const author = nodoComentario("span", "comentario-autor");
+  if (seguido) {
+    /* Sin repetir nombre ni iniciales; el lector de pantalla y la hoja
+       impresa igual lo dicen. */
+    author.className = "comentario-autor solo-lector";
+    author.textContent = comment.author || "Anónimo";
+  } else {
+    pintarPersona(author, comment.author || "Anónimo");
+  }
+  header.appendChild(author);
+  if (!seguido && comment.author_es_it) {
+    const it = nodoComentario("span", "comentario-it", "IT");
+    it.title = "Técnico o Administrador";
+    header.appendChild(it);
+  }
+  header.appendChild(nodoComentario("span", "comentario-fecha", formatearFechaHora(comment.created_at)));
+  if (comment.origen === "correo") header.appendChild(nodoComentario("span", "comentario-correo", "por correo"));
+  card.appendChild(header);
+  card.appendChild(nodoComentario("p", "comentario-contenido", comment.content));
+  return card;
+}
+
 function renderComentarios(comments) {
   const elements = getElements();
   elements.listaComentarios.replaceChildren();
@@ -871,31 +950,22 @@ function renderComentarios(comments) {
     );
     return;
   }
+  const usuario = typeof getUser === "function" ? getUser() : null;
+  let anterior = null;
   comments.forEach((comment) => {
-    const card = document.createElement("article");
-    card.className = "comentario";
-
-    const header = document.createElement("div");
-    header.className = "comentario-cabecera";
-    const author = document.createElement("span");
-    author.className = "comentario-autor";
-    pintarPersona(author, comment.author || "Anónimo");
-    const fecha = document.createElement("span");
-    fecha.className = "comentario-fecha";
-    fecha.textContent = formatearFechaHora(comment.created_at);
-    header.appendChild(author);
-    header.appendChild(fecha);
-
-    const content = document.createElement("p");
-    content.className = "comentario-contenido";
-    content.textContent = comment.content;
-
-    card.appendChild(header);
-    card.appendChild(content);
-    elements.listaComentarios.appendChild(card);
+    const nodo = comment.origen === "estado"
+      ? comentarioDelSistema(comment)
+      : burbujaComentario(comment, {
+        propio: esComentarioPropio(comment, usuario),
+        seguido: agruparConAnterior(anterior, comment),
+      });
+    elements.listaComentarios.appendChild(nodo);
+    anterior = comment;
   });
   ocultarComentariosEstado();
   elements.listaComentarios.hidden = false;
+  /* Al abrir el ticket (y al agregar uno) se ve el último. */
+  elements.listaComentarios.scrollTop = elements.listaComentarios.scrollHeight || 0;
 }
 
 async function cargarComentarios() {

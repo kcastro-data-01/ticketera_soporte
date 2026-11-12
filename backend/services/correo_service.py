@@ -1178,7 +1178,7 @@ def procesar_correo(session, correo: CorreoEntrante, config: ConfigCorreo,
             return "cerrado", _respuesta_cerrado(correo, usuario, hilo)
         ticket_service.create_comment(
             session, hilo.id,
-            CommentCreate(content=correo.cuerpo[:MAX_DESCRIPCION]), usuario,
+            CommentCreate(content=correo.cuerpo[:MAX_DESCRIPCION]), usuario, origen="correo",
         )
         _registrar(session, correo, "comentario", hilo.id)
         return "comentario", _respuesta_comentario(correo, usuario, hilo, config)
@@ -1294,7 +1294,8 @@ def procesar_enviado(session, correo: CorreoEntrante, config: ConfigCorreo,
             return "cerrado", None
         if _puede_comentar(hilo, dueno, por_hilo) and correo.cuerpo:
             ticket_service.create_comment(
-                session, hilo.id, CommentCreate(content=correo.cuerpo[:MAX_DESCRIPCION]), dueno)
+                session, hilo.id, CommentCreate(content=correo.cuerpo[:MAX_DESCRIPCION]), dueno,
+                origen="correo")
             _registrar(session, correo, "comentario", hilo.id)
             logger.info("Enviado «%s» → comentario en el ticket #%s", correo.asunto, hilo.id)
             return "comentario", None

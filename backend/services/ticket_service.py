@@ -717,7 +717,8 @@ def change_ticket_state(
         )
     )
     if motivo and motivo.strip():
-        _add_comment(session, ticket.id, motivo.strip(), current_user)
+        _add_comment(session, ticket.id, motivo.strip(), current_user,
+                     origen="estado", estado_nuevo=new_state.value)
     session.commit()
     session.refresh(ticket)
     return ticket
@@ -728,6 +729,7 @@ def create_comment(
     ticket_id: int,
     payload: CommentCreate,
     current_user: User | None = None,
+    origen: str = "app",
 ) -> Comment:
     """Persist a comment on an existing ticket (RF5).
 
@@ -740,7 +742,7 @@ def create_comment(
         raise TicketNotFoundError(ticket_id)
     _ensure_open(ticket)
 
-    comment = _add_comment(session, ticket_id, payload.content, current_user)
+    comment = _add_comment(session, ticket_id, payload.content, current_user, origen=origen)
     _reabrir_si_responde_el_solicitante(session, ticket, current_user)
     session.commit()
     session.refresh(comment)
@@ -766,15 +768,19 @@ def _reabrir_si_responde_el_solicitante(session, ticket: Ticket, current_user: U
     return True
 
 
-def _add_comment(session, ticket_id: int, content: str, current_user: User | None) -> Comment:
+def _add_comment(session, ticket_id: int, content: str, current_user: User | None,
+                 origen: str = "app", estado_nuevo: str | None = None) -> Comment:
     """Add a comment and its history entry (RF9) to the session, uncommitted.
 
     The author is the authenticated user; "Anónimo" only remains for
     internal calls without a user. Used by ``create_comment`` and by the
-    ``motivo`` of ``change_ticket_state``.
+    ``motivo`` of ``change_ticket_state`` (``origen="estado"``, with the new
+    state). ``origen="correo"`` for replies to a notification email.
     """
     author = current_user.name if current_user is not None else "Anónimo"
-    comment = Comment(ticket_id=ticket_id, author=author, content=content)
+    comment = Comment(ticket_id=ticket_id, author=author, content=content,
+                      author_id=current_user.id if current_user is not None else None,
+                      origen=origen, estado_nuevo=estado_nuevo)
     session.add(comment)
     author_name, author_id = _audit_author(current_user)
     session.add(

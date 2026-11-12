@@ -242,8 +242,25 @@ class Comment(Base):
         nullable=False,
         default=utc_now,
     )
+    # Quién lo escribió (``None`` en los viejos sin usuario) y de dónde vino:
+    # ``app``, ``correo`` (respuesta a un aviso) o ``estado`` (el motivo al
+    # cambiar de estado, con el estado al que pasó en ``estado_nuevo``).
+    author_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    origen: Mapped[str] = mapped_column(String(10), nullable=False, default="app", server_default="app")
+    estado_nuevo: Mapped[str | None] = mapped_column(String(20))
 
     ticket: Mapped[Ticket] = relationship(back_populates="comments")
+    author_user: Mapped[User | None] = relationship(foreign_keys=[author_id], viewonly=True, lazy="joined")
+
+    @property
+    def author_es_it(self) -> bool:
+        """¿Lo escribió alguien de IT (Técnico o Administrador)?"""
+        rol = self.author_user.role if self.author_user is not None else None
+        return rol in (UserRole.ADMIN.value, UserRole.TECHNICIAN.value)
 
 
 class History(Base):
