@@ -1165,14 +1165,11 @@ button.peligro:disabled:hover {
   overflow-wrap: anywhere;
 }
 
-/* Panel derecho del detalle: «Detalles» con un dato debajo del otro, sin
-   cajas ni bordes: etiqueta chica y tenue (mayúscula inicial), valor en peso
-   medio y el mismo espacio entre todos. Las fechas van al final, después de
-   una línea fina. Claro y oscuro por las variables. */
+/* Panel derecho del detalle: «Detalles» con un dato debajo del otro. */
 .detalle-datos-lista {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 0.85rem;
   margin: 0;
 }
 
@@ -1181,42 +1178,21 @@ button.peligro:disabled:hover {
 }
 
 .detalle-datos-lista dt {
-  margin-bottom: 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 400;
+  margin-bottom: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--color-tenue);
 }
 
 .detalle-datos-lista dd {
   margin: 0;
   font-size: var(--texto-md);
-  font-weight: 500;
   color: var(--color-texto);
   overflow-wrap: anywhere;
 }
 
-/* Departamento: pastilla discreta, igual que las de estado y prioridad
-   (gris neutro, como «Baja» o «Cerrado»). */
-.detalle-datos-lista #ver-area {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  padding: 0.1rem 0.45rem;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  background: var(--etiqueta-gris-fondo);
-  color: var(--etiqueta-gris-texto);
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-/* La primera fecha lleva la línea fina; el espacio arriba y abajo de la
-   línea es el mismo que entre los demás datos. */
-.detalle-datos-lista .dato-fechas {
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--color-borde);
-}
 
 /* ---------- Listas de constantes (Configuración) ---------- */
 
@@ -4175,8 +4151,7 @@ td.con-avatar {
   }
 
   /* Las etiquetas con borde se leen bien también en blanco y negro. */
-  .badge,
-  .detalle-datos-lista #ver-area {
+  .badge {
     border: 1px solid currentColor !important;
   }
 
