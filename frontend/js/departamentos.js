@@ -255,6 +255,17 @@ function pintarDetalle(fila) {
   pintarAbiertos(fila);
 }
 
+/* Resumen de todos los departamentos, debajo de la lista. */
+function pintarResumenTodos(datos) {
+  const poner = (id, valor) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(valor || 0);
+  };
+  poner("d-total-abiertos", datos.total_abiertos);
+  poner("d-sin-asignar", datos.sin_asignar);
+  poner("d-resueltos-mes", datos.resueltos_mes);
+}
+
 /* Índice del departamento de la dirección (#programacion); si no hay o no
    existe, el primero. */
 function indiceDesdeHash(hash) {
@@ -286,6 +297,7 @@ async function cargarDepartamentos() {
     }
     departamentosActuales = departamentosVisibles(datos.departamentos);
     pintarLista(departamentosActuales);
+    pintarResumenTodos(datos);
     const hash = typeof window !== "undefined" && window.location ? window.location.hash : "";
     /* Sin departamento en la dirección se elige el primero sin tocarla. */
     elegirDepartamento(indiceDesdeHash(hash), { guardar: Boolean(hash) });

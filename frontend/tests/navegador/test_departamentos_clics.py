@@ -38,6 +38,8 @@ def _fila(area_id, nombre, estados, atiende="", tecnicos=(), tickets=()):
 
 RESUMEN = {
     "total_abiertos": 9,
+    "sin_asignar": 4,
+    "resueltos_mes": 6,
     "mas_abiertos": {"area_id": 1, "nombre": "Soporte IT", "abiertos": 5},
     "departamentos": [
         _fila(1, "Soporte IT", [3, 2, 4, 6], "computadoras, impresoras, programas",
@@ -134,6 +136,34 @@ def test_cada_departamento_en_una_linea_con_la_barrita_abajo(navegador, base, te
         ctx.close()
 
 
+@pytest.mark.parametrize("ancho", [1280, 1920])
+@pytest.mark.parametrize("tema", ["claro", "oscuro"])
+def test_la_lista_tiene_el_alto_del_detalle_con_el_resumen_abajo(navegador, base, ancho, tema):
+    ctx, pg = abrir(navegador, base, ancho, tema)
+    try:
+        m = pg.evaluate("""(() => {
+            const r = (s) => document.querySelector(s).getBoundingClientRect();
+            const col = r('.deptos-columna'), det = r('#deptos-detalle'), lista = r('#deptos-lista'),
+                  res = r('.deptos-resumen'), main = r('main'), app = r('.app-principal');
+            return { col: [col.top, col.bottom], det: [det.top, det.bottom], listaBottom: lista.bottom,
+                     res: [res.top, res.bottom, res.height],
+                     filas: [...document.querySelectorAll('.deptos-resumen-fila')].map(f =>
+                        [f.querySelector('dt').textContent, f.querySelector('dd').textContent,
+                         f.querySelector('dt').getBoundingClientRect().left < f.querySelector('dd').getBoundingClientRect().left]),
+                     linea: getComputedStyle(document.querySelector('.deptos-resumen')).borderTopWidth,
+                     margenes: [main.left - app.left, app.right - main.right] };
+        })()""")
+        assert m["col"] == pytest.approx(m["det"], abs=0.5), "alineadas arriba y abajo"
+        assert m["res"][1] == pytest.approx(m["col"][1] - 1, abs=1), "el resumen pegado abajo"
+        assert m["res"][0] > m["listaBottom"] + 20, "los departamentos quedan arriba, el espacio en el medio"
+        assert m["filas"] == [["Total abiertos", "9", True], ["Sin asignar", "4", True], ["Resueltos este mes", "6", True]]
+        assert m["linea"] == "1px"
+        assert m["margenes"] == [0, 0], "todo el ancho, sin márgenes de más"
+        assert pg.errores == []
+    finally:
+        ctx.close()
+
+
 @pytest.mark.parametrize("ancho", [880, 375])
 def test_angosto_la_lista_es_una_fila_horizontal_con_scroll_propio(navegador, base, ancho):
     ctx, pg = abrir(navegador, base, ancho)
@@ -142,7 +172,7 @@ def test_angosto_la_lista_es_una_fila_horizontal_con_scroll_propio(navegador, ba
         assert len({round(b["top"]) for b in botones}) == 1, "todos en una fila"
         lista = pg.evaluate("""(() => { const l = document.getElementById('deptos-lista');
             const d = document.getElementById('deptos-detalle').getBoundingClientRect();
-            const r = l.getBoundingClientRect();
+            const r = document.querySelector('.deptos-columna').getBoundingClientRect();
             return { ori: l.getAttribute('aria-orientation'), bottom: r.bottom, width: r.width,
                      scroll: l.scrollWidth, cliente: l.clientWidth, detalleTop: d.top, detalleAncho: d.width,
                      pagina: document.documentElement.scrollWidth, ventana: window.innerWidth }; })()""")
@@ -150,6 +180,7 @@ def test_angosto_la_lista_es_una_fila_horizontal_con_scroll_propio(navegador, ba
         assert lista["detalleTop"] >= lista["bottom"], "el detalle debajo"
         assert abs(lista["detalleAncho"] - lista["width"]) < 1, "el detalle a todo el ancho"
         assert lista["pagina"] <= lista["ventana"], "sin scroll de costado en la página"
+        assert pg.evaluate("getComputedStyle(document.querySelector('.deptos-resumen')).display") == "none"
         if ancho == 375:
             assert lista["scroll"] > lista["cliente"], "los botones no entran: scroll dentro de la fila"
         # Con el teclado, el elegido se ve dentro de la fila.

@@ -78,7 +78,9 @@ def resumen_departamentos(session) -> dict:
     fijo y «Sin departamento», cuántos tickets hay en total, abiertos (Nuevo
     + En proceso) y en cada estado, y sus Técnicos activos. Arriba, el total
     de abiertos y el departamento con más abiertos (``None`` si ninguno
-    tiene; empate: el primero en el orden de ``IT_AREAS``).
+    tiene; empate: el primero en el orden de ``IT_AREAS``), los abiertos
+    sin asignar (``sin_asignar``) y los resueltos este mes (``resueltos_mes``)
+    de todos los departamentos.
 
     Para el detalle de cada departamento: qué atiende (``atiende``), cada
     Técnico con sus abiertos y sus resueltos de este mes (primer paso a
@@ -166,6 +168,9 @@ def resumen_departamentos(session) -> dict:
     mayor = max(con_abiertos, key=lambda f: f["abiertos"], default=None)
     return {
         "total_abiertos": sum(f["abiertos"] for f in filas),
+        # Resumen de todos los departamentos (debajo de la lista).
+        "sin_asignar": sum(n for (_, persona), n in abiertos_persona.items() if persona is None),
+        "resueltos_mes": sum(resueltos_persona.values()),
         "mas_abiertos": ({"area_id": mayor["area_id"], "nombre": mayor["nombre"],
                           "abiertos": mayor["abiertos"]} if mayor else None),
         "departamentos": filas,
