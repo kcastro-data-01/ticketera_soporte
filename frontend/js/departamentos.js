@@ -76,9 +76,22 @@ function barraEstados(fila) {
   return barra;
 }
 
+/* Debajo de 900 px la lista es una fila horizontal: se avisa a los lectores
+   de pantalla (las flechas funcionan igual en los dos sentidos). */
+const MEDIA_LISTA_HORIZONTAL = "(max-width: 900px)";
+
+function orientarLista(lista) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+  const consulta = window.matchMedia(MEDIA_LISTA_HORIZONTAL);
+  const aplicar = () => lista.setAttribute("aria-orientation", consulta.matches ? "horizontal" : "vertical");
+  aplicar();
+  if (typeof consulta.addEventListener === "function") consulta.addEventListener("change", aplicar);
+}
+
 function pintarLista(departamentos) {
   const lista = document.getElementById("deptos-lista");
   lista.replaceChildren();
+  orientarLista(lista);
   departamentos.forEach((fila, indice) => {
     const slug = slugDepartamento(fila.nombre);
     const boton = deptoNodo("button", "depto-boton");
@@ -91,10 +104,12 @@ function pintarLista(departamentos) {
     if (boton.dataset) boton.dataset.slug = slug;
     if (fila.area_id === null || fila.area_id === undefined) boton.className += " sin-departamento";
 
-    const textos = deptoNodo("span", "depto-boton-textos");
-    textos.appendChild(deptoNodo("span", "depto-boton-nombre", fila.nombre));
-    textos.appendChild(deptoNodo("span", "depto-boton-abiertos", textoAbiertos(fila.abiertos)));
-    boton.appendChild(textos);
+    /* Una sola línea: nombre, «N abiertos», la pastilla con el total y la
+       barrita pegada abajo. */
+    const nombre = deptoNodo("span", "depto-boton-nombre", fila.nombre);
+    nombre.title = fila.nombre; /* si no entra, se ve completo al pasar el mouse */
+    boton.appendChild(nombre);
+    boton.appendChild(deptoNodo("span", "depto-boton-abiertos", textoAbiertos(fila.abiertos)));
     const pastilla = deptoNodo("span", "depto-pastilla", String(fila.total));
     pastilla.setAttribute("aria-label", `${textoTickets(fila.total)} en total`);
     boton.appendChild(pastilla);
@@ -131,6 +146,9 @@ function elegirDepartamento(indice, { foco = false, guardar = true } = {}) {
     const base = String(boton.className).replace(/\s*\belegido\b/g, "");
     boton.className = elegido ? `${base} elegido` : base;
     if (elegido && foco && typeof boton.focus === "function") boton.focus();
+    if (elegido && foco && typeof boton.scrollIntoView === "function") {
+      boton.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
   });
   const slug = slugDepartamento(fila.nombre);
   document.getElementById("deptos-detalle").setAttribute("aria-labelledby", `tab-${slug}`);

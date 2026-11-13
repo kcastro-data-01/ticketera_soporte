@@ -118,10 +118,17 @@ test("departamentos.js no usa innerHTML ni atributos style: los colores van por 
   assert.match(css, /\.deptos-layout \{[^}]*grid-template-columns: 260px minmax\(0, 1fr\)/);
   assert.match(css, /\.deptos-lista \{[^}]*position: sticky;[^}]*border-radius: 10px;/);
   assert.match(css, /\.deptos-detalle \{[^}]*border-radius: 10px;/);
-  assert.match(css, /\.depto-barra \{[^}]*height: 4px;/);
+  assert.match(css, /\.depto-barra \{[^}]*position: absolute;[^}]*bottom: 0;[^}]*height: 3px;/, "fina y pegada abajo");
+  assert.match(css, /\.depto-boton \{[^}]*position: relative;[^}]*display: flex;[^}]*padding: 9px /, "una línea, 9 px arriba y abajo");
+  assert.match(css, /\.depto-boton-nombre \{[^}]*white-space: nowrap;/);
+  assert.match(css, /\.depto-boton \+ \.depto-boton\.sin-departamento \{\s*border-top: 1px solid var\(--color-borde-fuerte\);/, "«Sin departamento» separado");
   assert.match(css, /\.depto-caja \{[^}]*border-top: 3px solid/);
   assert.match(css, /\.depto-tabla tbody tr:hover \{/);
-  assert.match(css, /@media \(max-width: 700px\) \{\s*\.deptos-layout \{\s*grid-template-columns: minmax\(0, 1fr\);/);
+  const angosto = css.match(/@media \(max-width: 900px\) \{\s*\.deptos-layout \{[\s\S]*?\n\}/);
+  assert.ok(angosto, "debajo de 900 px cambia el diseño");
+  assert.match(angosto[0], /\.deptos-layout \{\s*grid-template-columns: minmax\(0, 1fr\);/, "el detalle a todo el ancho");
+  assert.match(angosto[0], /\.deptos-lista \{[^}]*position: static;[^}]*flex-direction: row;[^}]*overflow-x: auto;/, "fila con scroll propio");
+  assert.match(angosto[0], /\.depto-boton \{[^}]*flex: none;/);
 });
 
 test("la lista: un botón por departamento (con «Sin departamento» si tiene tickets), su total y la barrita de estados", async () => {
@@ -130,20 +137,22 @@ test("la lista: un botón por departamento (con «Sin departamento» si tiene ti
   assert.deepEqual(llamadas, ["/api/departamentos/resumen"]);
   assert.equal(nodos.get("deptos-layout").hidden, false);
   const botones = nodos.get("deptos-lista").children;
-  assert.deepEqual(botones.map((b) => b.children[0].children[0].textContent),
+  assert.deepEqual(botones.map((b) => b.children[0].textContent),
     ["Soporte IT", "Redes e Infraestructura", "Ciberseguridad", "Programación", "Sin departamento"]);
   const [soporte] = botones;
   assert.equal(soporte.attrs.role, "tab");
   assert.equal(soporte.type, "button");
   assert.equal(soporte.id, "tab-soporte-it");
-  assert.equal(soporte.children[0].children[1].textContent, "2 abiertos");
-  assert.equal(botones[2].children[0].children[1].textContent, "0 abiertos");
-  assert.equal(soporte.children[1].className, "depto-pastilla");
-  assert.equal(soporte.children[1].textContent, "4");
-  const partes = soporte.children[2].children;
+  assert.deepEqual(soporte.children.map((h) => h.className),
+    ["depto-boton-nombre", "depto-boton-abiertos", "depto-pastilla", "depto-barra"], "una sola línea y la barrita al final");
+  assert.equal(soporte.children[1].textContent, "2 abiertos");
+  assert.equal(botones[1].children[0].title, "Redes e Infraestructura", "nombre completo al pasar el mouse");
+  assert.equal(botones[2].children[1].textContent, "0 abiertos");
+  assert.equal(soporte.children[2].textContent, "4");
+  const partes = soporte.children[3].children;
   assert.deepEqual(partes.map((p) => [p.style.width, p.style.backgroundColor]), [
     ["25%", "#1d4ed8"], ["25%", "#7c9fe8"], ["25%", "#0e8a7d"], ["25%", "#a3abbb"]]);
-  assert.equal(botones[2].children[2].children.length, 0, "sin tickets: barrita vacía");
+  assert.equal(botones[2].children[3].children.length, 0, "sin tickets: barrita vacía");
   // Al entrar queda elegido el primero, sin tocar la dirección.
   assert.equal(soporte.attrs["aria-selected"], "true");
   assert.match(soporte.className, /\belegido\b/);
@@ -230,6 +239,21 @@ test("al recargar con #programacion queda elegido Programación; con más de 10 
   assert.equal(otro.nodos.get("depto-nombre").textContent, "Soporte IT", "lo que no existe: el primero");
   assert.equal(sandbox.slugDepartamento("Redes e Infraestructura"), "redes-e-infraestructura");
   assert.equal(sandbox.slugDepartamento("Programación"), "programacion");
+});
+
+test("debajo de 900 px la lista se anuncia horizontal (y vuelve a vertical al agrandar)", async () => {
+  const m = montar("Administrador", ok(RESUMEN));
+  let cambio = null;
+  const consulta = { matches: true, addEventListener: (_t, fn) => { cambio = fn; } };
+  const pedidas = [];
+  m.sandbox.window.matchMedia = (q) => { pedidas.push(q); return consulta; };
+  await m.sandbox.cargarDepartamentos();
+  assert.deepEqual(pedidas, ["(max-width: 900px)"]);
+  const lista = m.nodos.get("deptos-lista");
+  assert.equal(lista.attrs["aria-orientation"], "horizontal");
+  consulta.matches = false;
+  cambio();
+  assert.equal(lista.attrs["aria-orientation"], "vertical");
 });
 
 test("sin abiertos lo dice, y con 403 avisa que el rol no tiene permiso", async () => {

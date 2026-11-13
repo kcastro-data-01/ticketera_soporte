@@ -5586,23 +5586,25 @@ summary:focus-visible,
   top: var(--espaciado-lg);
   display: flex;
   flex-direction: column;
-  padding: 0.35rem;
+  overflow: hidden;
   background: var(--color-superficie);
   border: 1px solid var(--color-borde);
   border-radius: 10px;
 }
 
+/* Cada departamento en una sola línea: nombre a la izquierda; «N abiertos»
+   y la pastilla a la derecha; la barrita de estados pegada abajo. */
 .depto-boton {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  position: relative;
+  display: flex;
   align-items: center;
-  gap: 0.35rem 0.6rem;
+  gap: 0.5rem;
   width: 100%;
   min-height: 0;
-  padding: 0.6rem 0.7rem 0.6rem 0.8rem;
+  padding: 9px 0.75rem 9px 0.8rem;
   border: none;
   border-left: 3px solid transparent;
-  border-radius: 6px;
+  border-radius: 0;
   background: transparent;
   color: var(--color-texto);
   font: inherit;
@@ -5610,10 +5612,25 @@ summary:focus-visible,
   cursor: pointer;
 }
 
+.depto-boton + .depto-boton {
+  border-top: 1px solid var(--color-borde);
+}
+
+/* «Sin departamento» va último, separado con una línea más marcada. */
+.depto-boton + .depto-boton.sin-departamento {
+  border-top: 1px solid var(--color-borde-fuerte);
+}
+
 .depto-boton:hover,
 .depto-boton:active {
   background: var(--color-fondo-neutro);
-  border-color: transparent;
+  border-color: var(--color-borde);
+  border-left-color: transparent;
+}
+
+.depto-boton.sin-departamento:hover,
+.depto-boton.sin-departamento:active {
+  border-top-color: var(--color-borde-fuerte);
 }
 
 .depto-boton:focus-visible {
@@ -5628,16 +5645,14 @@ summary:focus-visible,
   border-left-color: var(--color-primario);
 }
 
-.depto-boton-textos {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
 .depto-boton-nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   font-size: var(--texto-md);
   font-weight: 600;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .depto-boton.sin-departamento .depto-boton-nombre {
@@ -5646,18 +5661,22 @@ summary:focus-visible,
 }
 
 .depto-boton-abiertos {
-  font-size: var(--texto-sm);
+  flex: none;
+  font-size: 0.75rem;
   color: var(--color-tenue);
+  white-space: nowrap;
 }
 
 .depto-pastilla {
-  min-width: 1.9rem;
-  padding: 0.1rem 0.5rem;
+  flex: none;
+  min-width: 1.75rem;
+  padding: 0.05rem 0.45rem;
   border-radius: var(--radio-pill);
   background: var(--color-fondo-neutro);
   color: var(--color-tenue-fuerte);
-  font-size: var(--texto-sm);
+  font-size: 0.75rem;
   font-weight: 600;
+  line-height: 1.4;
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
@@ -5668,11 +5687,13 @@ summary:focus-visible,
 }
 
 .depto-barra {
-  grid-column: 1 / -1;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
-  height: 4px;
+  height: 3px;
   overflow: hidden;
-  border-radius: 2px;
   background: var(--color-borde);
 }
 
@@ -5828,23 +5849,58 @@ summary:focus-visible,
   color: var(--color-tenue);
 }
 
+/* Menos de 900 px: la lista es una fila de botones arriba del detalle (con
+   scroll de costado solo dentro de esa fila) y el detalle va debajo a todo
+   el ancho. */
 @media (max-width: 900px) {
-  .depto-cajas {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-/* Celular: la lista arriba (sin quedar fija) y el detalle debajo; las
-   tablas pasan a filas apiladas para no tener scroll de costado. */
-@media (max-width: 700px) {
   .deptos-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .deptos-lista {
     position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
   }
 
+  .depto-boton {
+    flex: none;
+    width: auto;
+  }
+
+  .depto-boton-nombre {
+    overflow: visible;
+  }
+
+  .depto-boton + .depto-boton {
+    border-top: none;
+    border-left-color: transparent;
+    box-shadow: inset 1px 0 0 var(--color-borde);
+  }
+
+  .depto-boton + .depto-boton.sin-departamento {
+    border-top: none;
+    box-shadow: inset 1px 0 0 var(--color-borde-fuerte);
+  }
+
+  .depto-boton.elegido,
+  .depto-boton.elegido:hover,
+  .depto-boton.elegido:active {
+    border-left-color: var(--color-primario);
+    box-shadow: none;
+  }
+
+  .depto-cajas {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Celular: las tablas pasan a filas apiladas para no tener scroll de
+   costado. */
+@media (max-width: 700px) {
   .deptos-detalle {
     padding: var(--espaciado-lg);
   }
