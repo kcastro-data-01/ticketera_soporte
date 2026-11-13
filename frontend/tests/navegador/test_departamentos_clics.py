@@ -1,5 +1,5 @@
 """Departamentos en un navegador de verdad (Chromium headless con
-Playwright): la lista (filas de 56 px con el nombre arriba y «N abiertos»
+Playwright): la lista (filas de 64 px con el nombre arriba y «N abiertos»
 debajo, la pastilla a la derecha, barrita de 3 px pegada abajo, «Sin
 departamento» último; la tarjeta al alto del detalle), y debajo de 900 px la fila de
 botones horizontal con scroll propio sin scroll de costado en la página.
@@ -118,11 +118,11 @@ def test_cada_departamento_con_nombre_arriba_abiertos_abajo_y_la_barrita(navegad
         botones = cajas(pg)
         assert [b["texto"] for b in botones][-1] == "Sin departamento"
         for b in botones:
-            assert b["alto"] == pytest.approx(56, abs=0.5), b
+            assert b["alto"] == pytest.approx(64, abs=0.5), b
             assert b["nombre"][1] <= b["abiertos"][0], "«N abiertos» debajo del nombre"
             assert abs(b["nombre"][2] - b["abiertos"][2]) < 1, "alineados a la izquierda"
             assert b["pastilla"][2] > max(b["nombre"][3], b["abiertos"][3]), "la pastilla a la derecha"
-            centro = (b["top"] + b["bottom"] - 3) / 2  # sin la barrita
+            centro = (b["top"] + b["bottom"]) / 2
             assert (b["pastilla"][0] + b["pastilla"][1]) / 2 == pytest.approx(centro, abs=1.5), "pastilla centrada"
             assert (b["nombre"][0] + b["abiertos"][1]) / 2 == pytest.approx(centro, abs=1.5), "texto centrado"
             assert b["barra"][4] == 3, b
@@ -140,7 +140,7 @@ def test_cada_departamento_con_nombre_arriba_abiertos_abajo_y_la_barrita(navegad
 
 @pytest.mark.parametrize("ancho", [1366, 1920])
 @pytest.mark.parametrize("tema", ["claro", "oscuro"])
-def test_la_tarjeta_llega_hasta_abajo_con_filas_de_56_px(navegador, base, ancho, tema):
+def test_la_tarjeta_llega_hasta_abajo_con_filas_de_64_px(navegador, base, ancho, tema):
     ctx, pg = abrir(navegador, base, ancho, tema)
     try:
         m = pg.evaluate("""(() => {
@@ -160,7 +160,7 @@ def test_la_tarjeta_llega_hasta_abajo_con_filas_de_56_px(navegador, base, ancho,
         assert m["col"][1] >= m["alto"] - 34, "como mínimo hasta abajo de la pantalla (menos el margen)"
         filas = m["filas"]
         assert filas[0]["top"] == pytest.approx(m["col"][0] + 1, abs=0.5), "los departamentos arriba"
-        assert [round(f["alto"]) for f in filas] == [56] * len(filas), "alto fijo, no se estiran"
+        assert [round(f["alto"]) for f in filas] == [64] * len(filas), "alto fijo, no se estiran"
         assert m["col"][1] - filas[-1]["bottom"] > 100, "lo que sobra queda debajo, dentro de la tarjeta"
         assert m["lista"][1] == pytest.approx(m["col"][1] - 1, abs=0.5), "la lista ocupa la tarjeta (mismo fondo)"
         for f in filas:
@@ -171,7 +171,11 @@ def test_la_tarjeta_llega_hasta_abajo_con_filas_de_56_px(navegador, base, ancho,
         assert fondos[0] == fondos[1] and fondos[2] == "rgba(0, 0, 0, 0)", fondos
         tamanos = pg.evaluate("""[getComputedStyle(document.body).fontSize,
             getComputedStyle(document.querySelector('.depto-boton-nombre')).fontSize]""")
-        assert tamanos[0] == tamanos[1] == "14px", "letra normal de la app"
+        assert tamanos == ["14px", "15px"], "nombre de 15 px"
+        letras = pg.evaluate("""(() => { const b = document.querySelector('.depto-boton'), g = (s, p) => getComputedStyle(b.querySelector(s))[p], e = getComputedStyle(b);
+            return [g('.depto-boton-nombre', 'fontWeight'), g('.depto-boton-abiertos', 'fontSize'), g('.depto-pastilla', 'fontSize'),
+                    e.paddingTop, e.paddingBottom, e.paddingRight, g('.depto-barra', 'height')]; })()""")
+        assert letras == ["600", "12.5px", "13px", "12px", "12px", "16px", "3px"], letras
         assert m["margenes"] == [0, 0], "todo el ancho"
         assert pg.evaluate("document.querySelector('.deptos-resumen')") is None, "sin el resumen"
         assert pg.errores == []
@@ -196,7 +200,7 @@ def test_angosto_la_lista_es_una_fila_horizontal_con_scroll_propio(navegador, ba
         assert abs(lista["detalleAncho"] - lista["width"]) < 1, "el detalle a todo el ancho"
         assert lista["pagina"] <= lista["ventana"], "sin scroll de costado en la página"
         alto_boton = pg.evaluate("document.querySelector('.depto-boton').getBoundingClientRect().height")
-        assert round(alto_boton) == 56, "en el celular, el mismo alto fijo"
+        assert round(alto_boton) == 64, "en el celular, el mismo alto fijo"
         if ancho == 375:
             assert lista["scroll"] > lista["cliente"], "los botones no entran: scroll dentro de la fila"
         # Con el teclado, el elegido se ve dentro de la fila.

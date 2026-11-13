@@ -120,10 +120,11 @@ test("departamentos.js no usa innerHTML ni atributos style: los colores van por 
   assert.match(css, /\.deptos-columna \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*border-radius: 10px;/);
   assert.match(css, /\.deptos-layout \{[^}]*min-height: calc\(100vh - var\(--deptos-alto-cabecera\) - 2rem - var\(--deptos-alto-ayuda\) - 2rem\);/, "como mínimo hasta abajo de la pantalla");
   assert.match(css, /\.deptos-lista \{\s*display: flex;\s*flex: 1 1 auto;\s*flex-direction: column;/, "la lista ocupa toda la tarjeta");
-  assert.match(css, /\.depto-boton \{[^}]*display: grid;[^}]*flex: none;[^}]*height: 56px;/, "alto fijo de 56 px, sin flex: 1");
+  assert.match(css, /\.depto-boton \{[^}]*display: grid;[^}]*flex: none;[^}]*height: 64px;[^}]*padding: 12px 16px;/, "alto fijo de 64 px, sin flex: 1, 12 px y 16 px de espaciado");
   assert.doesNotMatch(css.match(/\.depto-boton \{[^}]*\}/)[0], /flex: 1/);
-  assert.match(css, /\.depto-boton-nombre \{\s*grid-column: 1;\s*grid-row: 1;[^}]*font-size: var\(--texto-md\);/, "nombre arriba, letra normal");
-  assert.match(css, /\.depto-boton-abiertos \{\s*grid-column: 1;\s*grid-row: 2;\s*font-size: var\(--texto-sm\);/, "«N abiertos» debajo, chico");
+  assert.match(css, /\.depto-boton-nombre \{\s*grid-column: 1;\s*grid-row: 1;[^}]*font-size: 15px;\s*font-weight: 600;/, "nombre arriba, 15 px seminegrita");
+  assert.match(css, /\.depto-boton-abiertos \{\s*grid-column: 1;\s*grid-row: 2;\s*font-size: 12.5px;\s*line-height: 1.35;\s*color: var\(--color-tenue\);/, "«N abiertos» debajo, 12.5 px gris");
+  assert.match(css, /\.depto-pastilla \{[^}]*font-size: 13px;/, "pastilla de 13 px");
   assert.match(css, /\.depto-pastilla \{\s*grid-column: 2;\s*grid-row: 1 \/ 3;/, "pastilla a la derecha, centrada");
   assert.doesNotMatch(css + leer("departamentos.html") + leer("js/departamentos.js"), /deptos-resumen|d-sin-asignar/, "sin el resumen de abajo");
   assert.match(css, /\.app \.contenido\.departamentos \{\s*max-width: none;/, "todo el ancho");
