@@ -292,3 +292,18 @@ def test_help_and_api_docs_explain_the_filters():
     api = (RAIZ / "docs" / "api.md").read_text(encoding="utf-8")
     for parametro in ("`assigned_to`", "`sin_asignar`", "`fecha_campo`", "`desde`", "`hasta`"):
         assert parametro in api, parametro
+
+
+# --- «creado_antes» (Departamentos → «Más de 2 días en Nuevo») ------------------
+
+
+def test_creado_antes_deja_solo_los_mas_viejos(client, session, equipo):
+    headers, _ = equipo["admin"]
+    viejo = ticket(session, "Ticket viejo", creado=utc(2026, 3, 1, 10))
+    ticket(session, "Ticket nuevo", creado=utc(2026, 3, 5, 10))
+    cerrado_viejo = ticket(session, "Cerrado viejo", creado=utc(2026, 2, 1, 10), estado="Cerrado")
+    assert ids(listar(client, headers, creado_antes="2026-03-03T00:00:00Z")) == sorted([viejo.id, cerrado_viejo.id])
+    assert ids(listar(client, headers, creado_antes="2026-03-03T00:00:00Z", state="Nuevo")) == [viejo.id]
+    # Con zona de Costa Rica: 2026-03-01 04:00 −06:00 = 10:00 UTC (no es «antes»).
+    assert ids(listar(client, headers, creado_antes="2026-03-01T04:00:00-06:00", state="Nuevo")) == []
+    assert listar(client, headers, creado_antes="ayer").status_code == 422

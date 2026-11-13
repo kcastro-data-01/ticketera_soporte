@@ -255,6 +255,52 @@ function pintarDetalle(fila) {
   pintarAbiertos(fila);
 }
 
+/* «Requieren atención» (de todos los departamentos): cada fila abre la
+   lista de tickets con ese filtro. Con número mayor que cero va en negrita
+   (clase «con-valor»); con cero, en gris («en-cero»). */
+function filasAtencion(atencion) {
+  const dias = atencion.dias_nuevo || 2;
+  return [
+    ["Críticos abiertos", atencion.criticos, "index.html?prioridad=Cr%C3%ADtica&estado=abiertos"],
+    ["Altos abiertos", atencion.altos, "index.html?prioridad=Alta&estado=abiertos"],
+    ["Sin asignar", atencion.sin_asignar, "index.html?asignado=sin&estado=abiertos"],
+    [`Más de ${dias} días en Nuevo`, atencion.nuevos_viejos, `index.html?estado=Nuevo&antiguedad=${dias}`],
+  ];
+}
+
+function pintarAtencion(atencion) {
+  const lista = document.getElementById("deptos-atencion");
+  if (!lista) return;
+  lista.replaceChildren();
+  filasAtencion(atencion || {}).forEach(([etiqueta, valor, href]) => {
+    const n = Number(valor) || 0;
+    const li = deptoNodo("li");
+    const enlace = deptoNodo("a", `deptos-atencion-fila ${n > 0 ? "con-valor" : "en-cero"}`);
+    enlace.href = href;
+    enlace.appendChild(deptoNodo("span", "deptos-atencion-etiqueta", etiqueta));
+    enlace.appendChild(deptoNodo("span", "deptos-atencion-numero", String(n)));
+    enlace.setAttribute("aria-label", `${etiqueta}: ${n}. Abrir la lista de tickets`);
+    li.appendChild(enlace);
+    lista.appendChild(li);
+  });
+}
+
+/* Leyenda de la barrita: los colores van por element.style (CSP). */
+function pintarLeyenda() {
+  const lista = document.getElementById("deptos-leyenda");
+  if (!lista) return;
+  lista.replaceChildren();
+  ESTADOS_DEPARTAMENTO.forEach((estado) => {
+    const li = deptoNodo("li", "deptos-leyenda-item");
+    const muestra = deptoNodo("span", "deptos-leyenda-color");
+    muestra.setAttribute("aria-hidden", "true");
+    muestra.style.backgroundColor = COLORES_ESTADO[estado];
+    li.appendChild(muestra);
+    li.appendChild(deptoNodo("span", "", estado));
+    lista.appendChild(li);
+  });
+}
+
 /* Índice del departamento de la dirección (#programacion); si no hay o no
    existe, el primero. */
 function indiceDesdeHash(hash) {
@@ -286,6 +332,8 @@ async function cargarDepartamentos() {
     }
     departamentosActuales = departamentosVisibles(datos.departamentos);
     pintarLista(departamentosActuales);
+    pintarAtencion(datos.atencion);
+    pintarLeyenda();
     const hash = typeof window !== "undefined" && window.location ? window.location.hash : "";
     /* Sin departamento en la dirección se elige el primero sin tocarla. */
     elegirDepartamento(indiceDesdeHash(hash), { guardar: Boolean(hash) });

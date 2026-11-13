@@ -153,3 +153,36 @@ def test_detail_brings_scope_technicians_and_open_tickets(auth_client, session, 
         nuevo("Baja")
     soporte = {f["nombre"]: f for f in auth_client.get(URL).json()["departamentos"]}[SOP]
     assert soporte["abiertos"] == 13 and len(soporte["tickets_abiertos"]) == 10
+
+
+def test_requieren_atencion_de_todos_los_departamentos(auth_client, session, areas):
+    """Abiertos Críticos y Altos, abiertos sin asignar y los que siguen en
+    Nuevo creados hace más de 2 días (de todos los departamentos)."""
+    from datetime import datetime, timedelta, timezone
+
+    tecnico(session, "Ana Mora", areas[SOP])
+    ana = session.scalar(select(User).where(User.name == "Ana Mora"))
+    ahora = datetime.now(timezone.utc)
+
+    def nuevo(prioridad, estado="Nuevo", dias=0, quien=None, area=None):
+        session.add(Ticket(title="Ticket de atención", description="Para contar", category="Red",
+                           priority=prioridad, state=estado, area_id=area.id if area else None,
+                           assigned_to_id=quien.id if quien else None,
+                           created_at=ahora - timedelta(days=dias)))
+        session.commit()
+
+    nuevo("Crítica", "En proceso", quien=ana, area=areas[SOP])
+    nuevo("Crítica", dias=3, area=areas[RED])          # crítico, sin asignar, viejo en Nuevo
+    nuevo("Crítica", "Resuelto", dias=9)               # no está abierto: no cuenta
+    nuevo("Alta", dias=1, quien=ana)                   # alto (1 día: no es viejo)
+    nuevo("Media", "En proceso", dias=5)               # sin asignar (En proceso: no es «en Nuevo»)
+    nuevo("Baja", dias=2.5, quien=ana, area=areas[PROG])  # viejo en Nuevo
+
+    datos = auth_client.get(URL).json()
+    assert datos["atencion"] == {"criticos": 2, "altos": 1, "sin_asignar": 2,
+                                 "nuevos_viejos": 2, "dias_nuevo": 2}
+
+
+def test_sin_tickets_la_atencion_queda_en_cero(auth_client, areas):
+    assert auth_client.get(URL).json()["atencion"] == {
+        "criticos": 0, "altos": 0, "sin_asignar": 0, "nuevos_viejos": 0, "dias_nuevo": 2}

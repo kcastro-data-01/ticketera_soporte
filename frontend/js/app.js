@@ -85,6 +85,32 @@ function estadoFiltro(valor) {
   return ESTADOS_FILTRO.includes(valor) ? valor : "";
 }
 
+/* «Más de N días» (llega en la dirección desde «Departamentos» →
+   «Requieren atención»): los creados hace más de N días. No tiene campo en
+   el formulario: se muestra como un aviso con «Quitar». 0 = sin filtro. */
+let antiguedadDias = 0;
+const MAX_ANTIGUEDAD_DIAS = 365;
+
+function antiguedadValida(valor) {
+  const n = Number(valor);
+  return Number.isInteger(n) && n >= 1 && n <= MAX_ANTIGUEDAD_DIAS ? n : 0;
+}
+
+/* Momento límite (ISO, UTC) para «creados hace más de N días». */
+function creadoAntesDe(dias, ahora = Date.now()) {
+  return new Date(ahora - dias * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function pintarAntiguedad() {
+  const aviso = document.getElementById("filtro-antiguedad");
+  const texto = document.getElementById("filtro-antiguedad-texto");
+  if (!aviso || !texto) return;
+  aviso.hidden = !antiguedadDias;
+  texto.textContent = antiguedadDias
+    ? `Solo los creados hace más de ${antiguedadDias === 1 ? "1 día" : `${antiguedadDias} días`}.`
+    : "";
+}
+
 function valorDe(elemento) {
   return elemento ? String(elemento.value || "").trim() : "";
 }
@@ -103,13 +129,14 @@ function getFilters() {
     asignado: vistaSolicitante ? "" : valorDe(elements.assigned),
     area: vistaSolicitante ? "" : valorDe(elements.area),
     fecha: valorDe(elements.fecha),
+    antiguedad: antiguedadDias,
   };
 }
 
 function hayFiltros(filters) {
   return Boolean(
     filters.search || filters.category || filters.priority || filters.state || filters.mios
-      || filters.asignado || filters.area || filters.fecha
+      || filters.asignado || filters.area || filters.fecha || filters.antiguedad
   );
 }
 
@@ -152,6 +179,8 @@ function buildTicketsUrl(filters) {
     params.set("desde", filters.fecha);
     params.set("hasta", filters.fecha);
   }
+  const dias = antiguedadValida(filters.antiguedad);
+  if (dias) params.set("creado_antes", creadoAntesDe(dias));
   params.set("limit", String(LIMITE_LISTADO));
   const query = params.toString();
   return query ? `${API_TICKETS_URL}?${query}` : API_TICKETS_URL;
@@ -668,8 +697,18 @@ function init() {
 
   elements.limpiar.addEventListener("click", () => {
     elements.form.reset();
+    antiguedadDias = 0;
+    pintarAntiguedad();
     mostrarSoloMios(false);
   });
+  const quitarAntiguedad = document.getElementById("quitar-antiguedad");
+  if (quitarAntiguedad) {
+    quitarAntiguedad.addEventListener("click", () => {
+      antiguedadDias = 0;
+      pintarAntiguedad();
+      fetchTickets();
+    });
+  }
 
   if (elements.vistaTodos) {
     elements.vistaTodos.addEventListener("click", () => mostrarSoloMios(false));
@@ -707,8 +746,10 @@ function init() {
   });
 }
 
-/* Filtros que llegan en la dirección: ``area`` (id o «sin») y ``estado``
-   (un estado o «abiertos»). Lo que no está entre las opciones se ignora. */
+/* Filtros que llegan en la dirección (desde la pantalla «Departamentos»):
+   ``area`` (id o «sin»), ``estado`` (un estado o «abiertos»), ``prioridad``,
+   ``asignado`` (id o «sin») y ``antiguedad`` (días). Lo que no está entre
+   las opciones se ignora. */
 function aplicarFiltrosDeUrl(search = typeof window !== "undefined" && window.location ? window.location.search : "") {
   if (!search) return;
   const params = new URLSearchParams(search);
@@ -721,6 +762,13 @@ function aplicarFiltrosDeUrl(search = typeof window !== "undefined" && window.lo
   if (!vistaSolicitante) poner(elements.area, params.get("area"));
   const estado = estadoFiltro(params.get("estado") || "");
   if (estado) poner(elements.state, estado);
+  if (!vistaSolicitante) {
+    poner(elements.priority, params.get("prioridad"));
+    poner(elements.assigned, params.get("asignado"));
+    const dias = antiguedadValida(params.get("antiguedad"));
+    if (dias) antiguedadDias = dias;
+  }
+  pintarAntiguedad();
 }
 
 if (typeof document !== "undefined") {

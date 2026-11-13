@@ -5559,6 +5559,43 @@ summary:focus-visible,
   font-weight: 600;
 }
 
+/* Lista de tickets: filtro «Más de N días» que llega en la dirección
+   (no tiene campo en el formulario). */
+.filtro-extra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: var(--espaciado-md) 0;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-suave);
+  background: var(--color-primario-tenue);
+  font-size: var(--texto-md);
+  color: var(--color-texto);
+}
+
+.filtro-extra[hidden] {
+  display: none;
+}
+
+button.enlace-quitar {
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-enlace);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+button.enlace-quitar:hover,
+button.enlace-quitar:active {
+  background: transparent;
+  color: var(--color-primario-texto-fuerte);
+}
+
 /* ---------- Pantalla «Departamentos» (solo Administrador) ----------
    Dos columnas: la lista de departamentos (pestañas) a la izquierda, fija
    al bajar, y el detalle del elegido a la derecha. En el celular, la lista
@@ -5606,8 +5643,102 @@ summary:focus-visible,
 
 .deptos-lista {
   display: flex;
-  flex: 1 1 auto;
+  flex: none;
   flex-direction: column;
+}
+
+/* Debajo de la lista, en la misma tarjeta: «Requieren atención» y la
+   leyenda de la barrita, separados por una línea fina. */
+.deptos-extras {
+  border-top: 1px solid var(--color-borde);
+}
+
+.deptos-bloque {
+  padding: 14px 16px 6px;
+}
+
+.deptos-bloque + .deptos-bloque {
+  padding-top: 8px;
+}
+
+.deptos-bloque-titulo {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--color-tenue);
+}
+
+.deptos-atencion,
+.deptos-leyenda {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deptos-atencion-fila {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 -8px;
+  padding: 5px 8px;
+  border-radius: var(--radio-suave);
+  color: var(--color-texto);
+  font-size: var(--texto-md);
+  text-decoration: none;
+}
+
+.deptos-atencion-fila:hover {
+  background: var(--color-fondo-neutro);
+}
+
+.deptos-atencion-fila:hover .deptos-atencion-etiqueta {
+  text-decoration: underline;
+}
+
+.deptos-atencion-fila:focus-visible {
+  outline: 2px solid var(--color-primario);
+  outline-offset: -2px;
+}
+
+.deptos-atencion-numero {
+  font-variant-numeric: tabular-nums;
+}
+
+.deptos-atencion-fila.con-valor .deptos-atencion-numero {
+  font-weight: 700;
+  color: var(--color-texto);
+}
+
+.deptos-atencion-fila.en-cero,
+.deptos-atencion-fila.en-cero .deptos-atencion-numero {
+  color: var(--color-tenue);
+}
+
+.deptos-leyenda {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  padding-bottom: 8px;
+}
+
+.deptos-leyenda-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue-fuerte);
+}
+
+.deptos-leyenda-color {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
 }
 
 
@@ -5893,8 +6024,31 @@ summary:focus-visible,
     min-height: 0;
   }
 
+  /* La tarjeta de la izquierda se separa: la fila de botones arriba, el
+     detalle en el medio y «Requieren atención» con la leyenda debajo,
+     cada uno en su tarjeta. */
+  .deptos-columna {
+    display: contents;
+  }
+
+  .deptos-lista,
+  .deptos-extras {
+    overflow: hidden;
+    background: var(--color-superficie);
+    border: 1px solid var(--color-borde);
+    border-radius: 10px;
+  }
+
   .deptos-lista {
-    flex: none;
+    order: 1;
+  }
+
+  .deptos-detalle {
+    order: 2;
+  }
+
+  .deptos-extras {
+    order: 3;
   }
 
   .deptos-lista {

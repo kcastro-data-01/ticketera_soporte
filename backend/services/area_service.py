@@ -71,6 +71,8 @@ def area_for_category(session, category: str) -> ItArea | None:
 
 # Tickets abiertos que trae cada departamento (el resto, en la lista filtrada).
 MAX_TICKETS_ABIERTOS = 10
+# «Más de N días en Nuevo» del bloque «Requieren atención».
+DIAS_EN_NUEVO = 2
 
 
 def resumen_departamentos(session) -> dict:
@@ -80,12 +82,18 @@ def resumen_departamentos(session) -> dict:
     de abiertos y el departamento con más abiertos (``None`` si ninguno
     tiene; empate: el primero en el orden de ``IT_AREAS``).
 
+    ``atencion`` (de todos los departamentos): abiertos Críticos, abiertos
+    Altos, abiertos sin asignar y los que siguen en Nuevo creados hace más de
+    ``DIAS_EN_NUEVO`` días (``dias_nuevo``, para que la lista use el mismo).
+
     Para el detalle de cada departamento: qué atiende (``atiende``), cada
     Técnico con sus abiertos y sus resueltos de este mes (primer paso a
     «Resuelto» desde el día 1 del mes en Costa Rica) y hasta
     ``MAX_TICKETS_ABIERTOS`` tickets abiertos, de mayor a menor prioridad y,
     con la misma prioridad, el más viejo primero."""
-    from backend.constants import IT_AREA_SCOPE, TICKET_PRIORITIES, TICKET_STATES, TicketState
+    from datetime import datetime, timedelta, timezone
+
+    from backend.constants import IT_AREA_SCOPE, TICKET_PRIORITIES, TICKET_STATES, TicketPriority, TicketState
     from backend.models import Ticket
     from backend.services import metricas_service
 
@@ -131,12 +139,25 @@ def resumen_departamentos(session) -> dict:
     # Tickets abiertos: prioridad (Crítica primero) y después antigüedad.
     peso = {p: i for i, p in enumerate(reversed(TICKET_PRIORITIES))}
     abiertos_lista: dict[int | None, list] = {}
+    todos_abiertos = session.scalars(select(Ticket).options(selectinload(Ticket.assignee))
+                                     .where(Ticket.state.in_(abiertos_estados))).all()
     for t in sorted(
-        session.scalars(select(Ticket).options(selectinload(Ticket.assignee))
-                        .where(Ticket.state.in_(abiertos_estados))).all(),
+        todos_abiertos,
         key=lambda t: (peso.get(t.priority, len(peso)), metricas_service._como_utc(t.created_at), t.id),
     ):
         abiertos_lista.setdefault(t.area_id, []).append(t)
+
+    # Requieren atención (todos los departamentos).
+    limite_nuevo = datetime.now(timezone.utc) - timedelta(days=DIAS_EN_NUEVO)
+    atencion = {
+        "criticos": sum(t.priority == TicketPriority.CRITICAL.value for t in todos_abiertos),
+        "altos": sum(t.priority == TicketPriority.HIGH.value for t in todos_abiertos),
+        "sin_asignar": sum(t.assigned_to_id is None for t in todos_abiertos),
+        "nuevos_viejos": sum(t.state == TicketState.NEW.value
+                             and metricas_service._como_utc(t.created_at) < limite_nuevo
+                             for t in todos_abiertos),
+        "dias_nuevo": DIAS_EN_NUEVO,
+    }
 
     def fila(area_id: int | None, nombre: str) -> dict:
         por_estado = {estado: conteos.get(area_id, {}).get(estado, 0) for estado in TICKET_STATES}
@@ -166,6 +187,7 @@ def resumen_departamentos(session) -> dict:
     mayor = max(con_abiertos, key=lambda f: f["abiertos"], default=None)
     return {
         "total_abiertos": sum(f["abiertos"] for f in filas),
+        "atencion": atencion,
         "mas_abiertos": ({"area_id": mayor["area_id"], "nombre": mayor["nombre"],
                           "abiertos": mayor["abiertos"]} if mayor else None),
         "departamentos": filas,

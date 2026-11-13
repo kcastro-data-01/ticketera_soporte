@@ -1,7 +1,7 @@
 """Ticket endpoints (creation, listing with search and filters, retrieval,
 edition, assignment, state changes, history and deletion)."""
 
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
@@ -129,6 +129,13 @@ def list_tickets(
     hasta: date | None = Query(
         None, description="Hasta este día (hora de Costa Rica, incluido)."
     ),
+    creado_antes: datetime | None = Query(
+        None,
+        description=(
+            "Solo los creados antes de este momento (ISO 8601; sin zona se toma "
+            "UTC). Lo usa «Más de 2 días en Nuevo» de la pantalla Departamentos."
+        ),
+    ),
     limit: int | None = Query(
         None, ge=1, le=1000,
         description="Cuántos tickets como máximo (sin él, todos; la lista de la app pide 1000).",
@@ -189,6 +196,7 @@ def list_tickets(
         fecha_campo=fecha_campo,
         desde=desde,
         hasta=hasta,
+        creado_antes=creado_antes,
         limit=limit,
         offset=offset,
     )

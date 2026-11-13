@@ -6,13 +6,13 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Departamentos · American Data Networks</title>
   <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
-  <script src="js/tema.js?v=20261113-06"></script>
+  <script src="js/tema.js?v=20261113-08"></script>
   <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="css/estilos.css?v=20261113-06">
+  <link rel="stylesheet" href="css/estilos.css?v=20261113-08">
 </head>
 <body class="app">
   <aside class="barra-lateral">
@@ -59,6 +59,18 @@
     <div class="deptos-layout" id="deptos-layout" hidden>
       <div class="deptos-columna">
         <div class="deptos-lista" id="deptos-lista" role="tablist" aria-orientation="vertical" aria-label="Departamentos" aria-describedby="deptos-ayuda"></div>
+
+        <!-- Debajo de la lista (en el celular, debajo del detalle). -->
+        <div class="deptos-extras" id="deptos-extras">
+          <section class="deptos-bloque" aria-labelledby="atencion-titulo">
+            <h2 class="deptos-bloque-titulo" id="atencion-titulo">Requieren atención</h2>
+            <ul class="deptos-atencion" id="deptos-atencion"></ul>
+          </section>
+          <section class="deptos-bloque" aria-labelledby="leyenda-titulo">
+            <h2 class="deptos-bloque-titulo" id="leyenda-titulo">Leyenda</h2>
+            <ul class="deptos-leyenda" id="deptos-leyenda"></ul>
+          </section>
+        </div>
       </div>
 
       <section class="deptos-detalle" id="deptos-detalle" role="tabpanel" tabindex="0">
@@ -111,11 +123,11 @@
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
-  <script src="js/guardia.js?v=20261113-06" data-permiso="departamentos"></script>
-  <script src="js/avisos.js?v=20261113-06" defer></script>
-  <script src="js/auth.js?v=20261113-06" defer></script>
-  <script src="js/sesion.js?v=20261113-06" defer></script>
-  <script src="js/asistente.js?v=20261113-06" defer></script>
-  <script src="js/departamentos.js?v=20261113-06" defer></script>
+  <script src="js/guardia.js?v=20261113-08" data-permiso="departamentos"></script>
+  <script src="js/avisos.js?v=20261113-08" defer></script>
+  <script src="js/auth.js?v=20261113-08" defer></script>
+  <script src="js/sesion.js?v=20261113-08" defer></script>
+  <script src="js/asistente.js?v=20261113-08" defer></script>
+  <script src="js/departamentos.js?v=20261113-08" defer></script>
 </body>
 </html>

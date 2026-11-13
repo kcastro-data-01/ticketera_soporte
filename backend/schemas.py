@@ -325,10 +325,23 @@ class DepartamentoMasAbiertos(BaseModel):
     abiertos: int
 
 
+class DepartamentosAtencion(BaseModel):
+    """«Requieren atención» (todos los departamentos): abiertos Críticos,
+    abiertos Altos, abiertos sin asignar y los que siguen en Nuevo creados
+    hace más de ``dias_nuevo`` días."""
+
+    criticos: int
+    altos: int
+    sin_asignar: int
+    nuevos_viejos: int
+    dias_nuevo: int
+
+
 class DepartamentosResumen(BaseModel):
     """Respuesta de ``GET /api/departamentos/resumen`` (solo Administrador)."""
 
     total_abiertos: int
+    atencion: DepartamentosAtencion
     mas_abiertos: DepartamentoMasAbiertos | None
     departamentos: list[DepartamentoFila]
 

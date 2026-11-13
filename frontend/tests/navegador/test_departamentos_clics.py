@@ -39,6 +39,7 @@ def _fila(area_id, nombre, estados, atiende="", tecnicos=(), tickets=()):
 
 RESUMEN = {
     "total_abiertos": 9,
+    "atencion": {"criticos": 1, "altos": 0, "sin_asignar": 4, "nuevos_viejos": 2, "dias_nuevo": 2},
     "mas_abiertos": {"area_id": 1, "nombre": "Soporte IT", "abiertos": 5},
     "departamentos": [
         _fila(1, "Soporte IT", [3, 2, 4, 6], "computadoras, impresoras, programas",
@@ -161,8 +162,29 @@ def test_la_tarjeta_llega_hasta_abajo_con_filas_de_64_px(navegador, base, ancho,
         filas = m["filas"]
         assert filas[0]["top"] == pytest.approx(m["col"][0] + 1, abs=0.5), "los departamentos arriba"
         assert [round(f["alto"]) for f in filas] == [64] * len(filas), "alto fijo, no se estiran"
-        assert m["col"][1] - filas[-1]["bottom"] > 100, "lo que sobra queda debajo, dentro de la tarjeta"
-        assert m["lista"][1] == pytest.approx(m["col"][1] - 1, abs=0.5), "la lista ocupa la tarjeta (mismo fondo)"
+        assert m["lista"][1] == pytest.approx(filas[-1]["bottom"], abs=0.5), "la lista con su alto"
+        extras = pg.evaluate("""(() => { const e = document.getElementById('deptos-extras'), r = e.getBoundingClientRect();
+            const fila = (a) => { const x = a.getBoundingClientRect(), n = a.querySelector('.deptos-atencion-numero');
+                return [a.querySelector('.deptos-atencion-etiqueta').textContent, n.textContent,
+                        getComputedStyle(n).fontWeight, getComputedStyle(n).color, a.getAttribute('href'),
+                        Math.round(n.getBoundingClientRect().right) <= Math.round(x.right)]; };
+            const items = [...document.querySelectorAll('.deptos-leyenda-item')].map(i => i.getBoundingClientRect());
+            return { top: r.top, bottom: r.bottom, linea: getComputedStyle(e).borderTopWidth,
+                     titulos: [...e.querySelectorAll('.deptos-bloque-titulo')].map(t => [t.textContent, getComputedStyle(t).textTransform]),
+                     filas: [...e.querySelectorAll('.deptos-atencion-fila')].map(fila),
+                     columnasLeyenda: new Set(items.map(i => Math.round(i.left))).size, filasLeyenda: new Set(items.map(i => Math.round(i.top))).size }; })()""")
+        assert extras["top"] == pytest.approx(filas[-1]["bottom"], abs=0.5), "debajo de la lista"
+        assert extras["bottom"] <= m["col"][1], "dentro de la misma tarjeta"
+        assert extras["linea"] == "1px"
+        assert extras["titulos"] == [["Requieren atención", "uppercase"], ["Leyenda", "uppercase"]]
+        etiquetas = [f[0] for f in extras["filas"]]
+        assert etiquetas == ["Críticos abiertos", "Altos abiertos", "Sin asignar", "Más de 2 días en Nuevo"]
+        pesos = {f[0]: f[2] for f in extras["filas"]}
+        assert pesos["Críticos abiertos"] == "700" and pesos["Altos abiertos"] == "400", pesos
+        colores = {f[0]: f[3] for f in extras["filas"]}
+        assert colores["Altos abiertos"] != colores["Sin asignar"], "el cero va en gris"
+        assert all(f[5] for f in extras["filas"]), "el número a la derecha"
+        assert (extras["columnasLeyenda"], extras["filasLeyenda"]) == (2, 2), "leyenda en dos columnas"
         for f in filas:
             assert f["barraBottom"] == pytest.approx(f["bottom"], abs=0.5), "la barrita pegada abajo"
         fondos = pg.evaluate("""[getComputedStyle(document.querySelector('.deptos-columna')).backgroundColor,
@@ -191,7 +213,7 @@ def test_angosto_la_lista_es_una_fila_horizontal_con_scroll_propio(navegador, ba
         assert len({round(b["top"]) for b in botones}) == 1, "todos en una fila"
         lista = pg.evaluate("""(() => { const l = document.getElementById('deptos-lista');
             const d = document.getElementById('deptos-detalle').getBoundingClientRect();
-            const r = document.querySelector('.deptos-columna').getBoundingClientRect();
+            const r = l.getBoundingClientRect();
             return { ori: l.getAttribute('aria-orientation'), bottom: r.bottom, width: r.width,
                      scroll: l.scrollWidth, cliente: l.clientWidth, detalleTop: d.top, detalleAncho: d.width,
                      pagina: document.documentElement.scrollWidth, ventana: window.innerWidth }; })()""")
@@ -207,9 +229,31 @@ def test_angosto_la_lista_es_una_fila_horizontal_con_scroll_propio(navegador, ba
         pg.focus(".depto-boton.elegido")
         pg.keyboard.press("End")
         assert pg.evaluate("document.activeElement.textContent").startswith("Sin departamento")
+        orden = pg.evaluate("""['#deptos-lista', '#deptos-detalle', '#deptos-extras'].map(s => {
+            const r = document.querySelector(s).getBoundingClientRect(); return [r.top, r.bottom, r.width]; })""")
+        assert orden[0][1] <= orden[1][0] and orden[1][1] <= orden[2][0], "lista, detalle y debajo los bloques"
+        assert orden[2][2] == pytest.approx(orden[1][2], abs=1), "a todo el ancho"
         visible = pg.evaluate("""(() => { const l = document.getElementById('deptos-lista').getBoundingClientRect();
             const b = document.activeElement.getBoundingClientRect(); return b.right <= l.right + 1; })()""")
         assert visible
+        assert pg.errores == []
+    finally:
+        ctx.close()
+
+
+def test_cada_fila_de_atencion_abre_la_lista_con_su_filtro(navegador, base):
+    ctx, pg = abrir(navegador, base, 1366)
+    try:
+        pg.click("text=Más de 2 días en Nuevo")
+        pg.wait_for_url("**/index.html?estado=Nuevo&antiguedad=2")
+        pg.wait_for_selector("#filtro-antiguedad:not([hidden])")
+        assert pg.text_content("#filtro-antiguedad-texto") == "Solo los creados hace más de 2 días."
+        assert pg.eval_on_selector("#state", "s => s.value") == "Nuevo"
+        pg.go_back()
+        pg.wait_for_selector(".deptos-atencion-fila")
+        with pg.expect_request(lambda r: "/api/tickets?" in r.url and "priority=" in r.url) as pedido:
+            pg.click("text=Críticos abiertos")
+        assert "priority=Cr%C3%ADtica" in pedido.value.url and "state=Nuevo&state=En+proceso" in pedido.value.url
         assert pg.errores == []
     finally:
         ctx.close()

@@ -33,6 +33,7 @@ function nodo(tag = "") {
 
 const RESUMEN = {
   total_abiertos: 5,
+  atencion: { criticos: 2, altos: 0, sin_asignar: 3, nuevos_viejos: 1, dias_nuevo: 2 },
   mas_abiertos: { area_id: 2, nombre: "Redes e Infraestructura", abiertos: 3 },
   departamentos: [
     { area_id: 1, nombre: "Soporte IT", total: 4, abiertos: 2, atiende: "computadoras, impresoras, programas",
@@ -56,7 +57,7 @@ const RESUMEN = {
 
 const IDS = ["estado-carga", "deptos-layout", "deptos-lista", "deptos-detalle", "depto-nombre", "depto-atiende",
   "depto-total", "depto-ver-todos", "depto-cajas", "depto-tecnicos", "depto-tecnicos-vacio", "depto-abiertos",
-  "depto-abiertos-vacio", "depto-abiertos-nota"];
+  "depto-abiertos-vacio", "depto-abiertos-nota", "deptos-atencion", "deptos-leyenda"];
 
 function montar(rol, respuesta, hash = "") {
   const nodos = new Map(IDS.map((id) => [id, nodo(id)]));
@@ -119,7 +120,12 @@ test("departamentos.js no usa innerHTML ni atributos style: los colores van por 
   assert.match(css, /\.deptos-layout \{[^}]*align-items: stretch;/, "mismo alto que el detalle");
   assert.match(css, /\.deptos-columna \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*border-radius: 10px;/);
   assert.match(css, /\.deptos-layout \{[^}]*min-height: calc\(100vh - var\(--deptos-alto-cabecera\) - 2rem - var\(--deptos-alto-ayuda\) - 2rem\);/, "como mínimo hasta abajo de la pantalla");
-  assert.match(css, /\.deptos-lista \{\s*display: flex;\s*flex: 1 1 auto;\s*flex-direction: column;/, "la lista ocupa toda la tarjeta");
+  assert.match(css, /\.deptos-lista \{\s*display: flex;\s*flex: none;\s*flex-direction: column;/, "la lista arriba, con su alto");
+  assert.match(css, /\.deptos-extras \{\s*border-top: 1px solid var\(--color-borde\);/, "separados de la lista por una línea fina");
+  assert.match(css, /\.deptos-bloque-titulo \{[^}]*text-transform: uppercase;[^}]*color: var\(--color-tenue\);/, "títulos chicos en mayúsculas grises");
+  assert.match(css, /\.deptos-atencion-fila\.con-valor \.deptos-atencion-numero \{\s*font-weight: 700;/, "mayor que cero: negrita");
+  assert.match(css, /\.deptos-atencion-fila\.en-cero,\s*\.deptos-atencion-fila\.en-cero \.deptos-atencion-numero \{\s*color: var\(--color-tenue\);/, "cero: gris");
+  assert.match(css, /\.deptos-leyenda \{\s*display: grid;\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/, "leyenda en dos columnas");
   assert.match(css, /\.depto-boton \{[^}]*display: grid;[^}]*flex: none;[^}]*height: 64px;[^}]*padding: 12px 16px;/, "alto fijo de 64 px, sin flex: 1, 12 px y 16 px de espaciado");
   assert.doesNotMatch(css.match(/\.depto-boton \{[^}]*\}/)[0], /flex: 1/);
   assert.match(css, /\.depto-boton-nombre \{\s*grid-column: 1;\s*grid-row: 1;[^}]*font-size: 15px;\s*font-weight: 600;/, "nombre arriba, 15 px seminegrita");
@@ -139,6 +145,8 @@ test("departamentos.js no usa innerHTML ni atributos style: los colores van por 
   assert.match(angosto[0], /\.deptos-layout \{\s*grid-template-columns: minmax\(0, 1fr\);/, "el detalle a todo el ancho");
   assert.match(angosto[0], /\.deptos-lista \{[^}]*flex-direction: row;[^}]*overflow-x: auto;/, "fila con scroll propio");
   assert.match(angosto[0], /\.deptos-layout \{\s*min-height: 0;/, "en el celular, su alto normal");
+  assert.match(angosto[0], /\.deptos-columna \{\s*display: contents;/);
+  assert.match(angosto[0], /\.deptos-lista \{\s*order: 1;[\s\S]*\.deptos-detalle \{\s*order: 2;[\s\S]*\.deptos-extras \{\s*order: 3;/, "en el celular, los bloques debajo del detalle");
   assert.match(angosto[0], /\.depto-boton \{[^}]*flex: none;/);
 });
 
@@ -252,6 +260,34 @@ test("al recargar con #programacion queda elegido Programación; con más de 10 
   assert.equal(sandbox.slugDepartamento("Programación"), "programacion");
 });
 
+test("«Requieren atención»: cada fila es un enlace a la lista filtrada, en negrita si es mayor que cero; y la leyenda", async () => {
+  const html = leer("departamentos.html");
+  const columna = html.match(/<div class="deptos-columna">[\s\S]*?<\/div>\n      <\/div>/)[0];
+  assert.ok(columna.indexOf('id="deptos-lista"') < columna.indexOf('id="deptos-extras"'), "debajo de la lista, en la misma tarjeta");
+  assert.deepEqual([...columna.matchAll(/<h2 class="deptos-bloque-titulo"[^>]*>([^<]+)<\/h2>/g)].map((m) => m[1]),
+    ["Requieren atención", "Leyenda"]);
+
+  const { sandbox, nodos } = montar("Administrador", ok(RESUMEN));
+  await sandbox.cargarDepartamentos();
+  const filas = nodos.get("deptos-atencion").children.map((li) => li.children[0]);
+  assert.deepEqual(filas.map((a) => [a.children[0].textContent, a.children[1].textContent, a.href]), [
+    ["Críticos abiertos", "2", "index.html?prioridad=Cr%C3%ADtica&estado=abiertos"],
+    ["Altos abiertos", "0", "index.html?prioridad=Alta&estado=abiertos"],
+    ["Sin asignar", "3", "index.html?asignado=sin&estado=abiertos"],
+    ["Más de 2 días en Nuevo", "1", "index.html?estado=Nuevo&antiguedad=2"],
+  ]);
+  assert.deepEqual(filas.map((a) => a.className.split(" ")[1]), ["con-valor", "en-cero", "con-valor", "con-valor"]);
+  assert.equal(filas[0].attrs["aria-label"], "Críticos abiertos: 2. Abrir la lista de tickets");
+
+  const leyenda = nodos.get("deptos-leyenda").children;
+  assert.deepEqual(leyenda.map((li) => [li.children[1].textContent, li.children[0].style.backgroundColor]), [
+    ["Nuevo", "#1d4ed8"], ["En proceso", "#7c9fe8"], ["Resuelto", "#0e8a7d"], ["Cerrado", "#a3abbb"]]);
+
+  const sin = montar("Administrador", ok({ ...RESUMEN, atencion: undefined }));
+  await sin.sandbox.cargarDepartamentos();
+  assert.deepEqual(sin.nodos.get("deptos-atencion").children.map((li) => li.children[0].children[1].textContent), ["0", "0", "0", "0"]);
+});
+
 test("debajo de 900 px la lista se anuncia horizontal (y vuelve a vertical al agrandar)", async () => {
   const m = montar("Administrador", ok(RESUMEN));
   let cambio = null;
@@ -280,10 +316,13 @@ test("sin abiertos lo dice, y con 403 avisa que el rol no tiene permiso", async 
 });
 
 test("la lista aplica ?area=&estado= y «abiertos» pide Nuevo y En proceso", () => {
-  const nodos = new Map(["state", "area", "search", "category", "priority", "assigned", "fecha"].map((id) => [id, nodo(id)]));
+  const nodos = new Map(["state", "area", "search", "category", "priority", "assigned", "fecha",
+    "filtro-antiguedad", "filtro-antiguedad-texto"].map((id) => [id, nodo(id)]));
   const opcion = (v) => Object.assign(nodo("option"), { value: v });
   nodos.get("state").children = ["", "abiertos", "Nuevo", "En proceso", "Resuelto", "Cerrado"].map(opcion);
   nodos.get("area").children = ["", "sin", "1", "2"].map(opcion);
+  nodos.get("priority").children = ["", "Baja", "Media", "Alta", "Crítica"].map(opcion);
+  nodos.get("assigned").children = ["", "sin", "7"].map(opcion);
   const sandbox = {
     document: { getElementById: (id) => nodos.get(id), createElement: (t) => nodo(t), addEventListener() {} },
     window: { location: { search: "" } }, localStorage: { getItem: () => null }, console, URLSearchParams, Map,
@@ -295,4 +334,19 @@ test("la lista aplica ?area=&estado= y «abiertos» pide Nuevo y En proceso", ()
     "/api/tickets?state=Nuevo&state=En+proceso&area=2&limit=1000");
   sandbox.aplicarFiltrosDeUrl("?area=99&estado=Inventado");
   assert.deepEqual([nodos.get("area").value, nodos.get("state").value], ["2", "abiertos"], "lo que no existe se ignora");
+
+  // Desde «Requieren atención»: prioridad, sin asignar y antigüedad.
+  sandbox.aplicarFiltrosDeUrl("?prioridad=Cr%C3%ADtica&estado=abiertos&asignado=sin");
+  assert.deepEqual([nodos.get("priority").value, nodos.get("assigned").value], ["Crítica", "sin"]);
+  assert.equal(nodos.get("filtro-antiguedad").hidden, true, "sin antigüedad no hay aviso");
+  sandbox.aplicarFiltrosDeUrl("?estado=Nuevo&antiguedad=2");
+  assert.equal(nodos.get("filtro-antiguedad").hidden, false);
+  assert.equal(nodos.get("filtro-antiguedad-texto").textContent, "Solo los creados hace más de 2 días.");
+  const url = new URL(sandbox.buildTicketsUrl({ state: "Nuevo", antiguedad: 2 }), "http://x");
+  const limite = Date.parse(url.searchParams.get("creado_antes"));
+  assert.ok(Math.abs(Date.now() - 2 * 86400000 - limite) < 5000, url.search);
+  assert.equal(url.searchParams.get("state"), "Nuevo");
+  assert.equal(sandbox.creadoAntesDe(2, Date.parse("2026-11-13T12:00:00Z")), "2026-11-11T12:00:00.000Z");
+  assert.equal(new URL(sandbox.buildTicketsUrl({ antiguedad: 0 }), "http://x").searchParams.has("creado_antes"), false);
+  for (const malo of ["0", "-3", "1.5", "abc", "9999"]) assert.equal(sandbox.antiguedadValida(malo), 0, malo);
 });

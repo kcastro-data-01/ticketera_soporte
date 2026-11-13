@@ -317,6 +317,7 @@ def list_tickets(
     fecha_campo: TicketDateField = TicketDateField.CREATED,
     desde: date | None = None,
     hasta: date | None = None,
+    creado_antes: datetime | None = None,
     limit: int | None = None,
     offset: int = 0,
 ) -> tuple[list[Ticket], int]:
@@ -363,6 +364,11 @@ def list_tickets(
         statement = statement.where(Ticket.area_id.is_(None))
     if desde is not None or hasta is not None:
         statement = _filtrar_fechas(statement, fecha_campo, desde, hasta)
+    if creado_antes is not None:
+        # La base guarda UTC sin zona: se compara igual.
+        if creado_antes.tzinfo is not None:
+            creado_antes = creado_antes.astimezone(timezone.utc)
+        statement = statement.where(Ticket.created_at < creado_antes.replace(tzinfo=None))
 
     if category is not None:
         statement = statement.where(Ticket.category == category.value)
