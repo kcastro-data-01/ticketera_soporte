@@ -5576,20 +5576,24 @@ summary:focus-visible,
   max-width: none;
 }
 
-/* Las dos tarjetas con el mismo alto, alineadas arriba y abajo. */
+/* Las dos tarjetas con el mismo alto, alineadas arriba y abajo, y como
+   mínimo hasta abajo de la pantalla: 100vh menos el encabezado de la
+   página, el margen de arriba del contenido, la ayuda y el margen de abajo. */
 .deptos-layout {
+  --deptos-alto-cabecera: 99px;
+  --deptos-alto-ayuda: 1.6rem;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
   gap: var(--espaciado-lg);
   align-items: stretch;
+  min-height: calc(100vh - var(--deptos-alto-cabecera) - 2rem - var(--deptos-alto-ayuda) - 2rem);
 }
 
 .deptos-layout[hidden] {
   display: none;
 }
 
-/* La tarjeta de la izquierda: los departamentos arriba y el resumen de
-   todos pegado abajo, en el espacio que sobra. */
+/* La tarjeta de la izquierda: los departamentos se reparten todo el alto. */
 .deptos-columna {
   display: flex;
   flex-direction: column;
@@ -5602,41 +5606,17 @@ summary:focus-visible,
 
 .deptos-lista {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
 }
 
-.deptos-resumen {
-  margin: auto 0 0;
-  padding: 0.6rem 0.8rem 0.7rem;
-  border-top: 1px solid var(--color-borde);
-}
-
-.deptos-resumen-fila {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.2rem 0;
-}
-
-.deptos-resumen dt {
-  font-size: var(--texto-sm);
-  color: var(--color-tenue);
-}
-
-.deptos-resumen dd {
-  margin: 0;
-  font-size: var(--texto-md);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-texto);
-}
 
 /* Cada departamento en una sola línea: nombre a la izquierda; «N abiertos»
    y la pastilla a la derecha; la barrita de estados pegada abajo. */
 .depto-boton {
   position: relative;
   display: flex;
+  flex: 1 1 0;
   align-items: center;
   gap: 0.5rem;
   width: 100%;
@@ -5897,9 +5877,13 @@ summary:focus-visible,
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* La fila de botones no se estira ni lleva el resumen (como antes). */
-  .deptos-resumen {
-    display: none;
+  /* La fila de botones con su alto normal (no llega hasta abajo). */
+  .deptos-layout {
+    min-height: 0;
+  }
+
+  .deptos-lista {
+    flex: none;
   }
 
   .deptos-lista {

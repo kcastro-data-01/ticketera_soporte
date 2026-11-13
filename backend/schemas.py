@@ -329,8 +329,6 @@ class DepartamentosResumen(BaseModel):
     """Respuesta de ``GET /api/departamentos/resumen`` (solo Administrador)."""
 
     total_abiertos: int
-    sin_asignar: int = 0
-    resueltos_mes: int = 0
     mas_abiertos: DepartamentoMasAbiertos | None
     departamentos: list[DepartamentoFila]
 

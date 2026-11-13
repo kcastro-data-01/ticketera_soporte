@@ -33,8 +33,6 @@ function nodo(tag = "") {
 
 const RESUMEN = {
   total_abiertos: 5,
-  sin_asignar: 2,
-  resueltos_mes: 7,
   mas_abiertos: { area_id: 2, nombre: "Redes e Infraestructura", abiertos: 3 },
   departamentos: [
     { area_id: 1, nombre: "Soporte IT", total: 4, abiertos: 2, atiende: "computadoras, impresoras, programas",
@@ -58,7 +56,7 @@ const RESUMEN = {
 
 const IDS = ["estado-carga", "deptos-layout", "deptos-lista", "deptos-detalle", "depto-nombre", "depto-atiende",
   "depto-total", "depto-ver-todos", "depto-cajas", "depto-tecnicos", "depto-tecnicos-vacio", "depto-abiertos",
-  "depto-abiertos-vacio", "depto-abiertos-nota", "d-total-abiertos", "d-sin-asignar", "d-resueltos-mes"];
+  "depto-abiertos-vacio", "depto-abiertos-nota"];
 
 function montar(rol, respuesta, hash = "") {
   const nodos = new Map(IDS.map((id) => [id, nodo(id)]));
@@ -112,21 +110,6 @@ test("departamentos.html: solo Administrador, sin código ni estilos inline, con
   assert.match(html, />Tickets abiertos<\/h3>/);
 });
 
-test("debajo de la lista, el resumen de todos: total abiertos, sin asignar y resueltos este mes", async () => {
-  const html = leer("departamentos.html");
-  const columna = html.match(/<div class="deptos-columna">[\s\S]*?<\/dl>/);
-  assert.ok(columna, "la lista y el resumen en la misma tarjeta");
-  assert.ok(columna[0].indexOf('id="deptos-lista"') < columna[0].indexOf("<dl"), "la lista arriba");
-  assert.deepEqual([...columna[0].matchAll(/<dt>([^<]+)<\/dt>/g)].map((m) => m[1]),
-    ["Total abiertos", "Sin asignar", "Resueltos este mes"]);
-  const { sandbox, nodos } = montar("Administrador", ok(RESUMEN));
-  await sandbox.cargarDepartamentos();
-  assert.deepEqual(["d-total-abiertos", "d-sin-asignar", "d-resueltos-mes"].map((id) => nodos.get(id).textContent), ["5", "2", "7"]);
-  const viejo = montar("Administrador", ok({ ...RESUMEN, sin_asignar: undefined, resueltos_mes: undefined }));
-  await viejo.sandbox.cargarDepartamentos();
-  assert.equal(viejo.nodos.get("d-sin-asignar").textContent, "0");
-});
-
 test("departamentos.js no usa innerHTML ni atributos style: los colores van por element.style", () => {
   const js = leer("js/departamentos.js");
   assert.doesNotMatch(js, /innerHTML|insertAdjacentHTML|setAttribute\(\s*["']style/);
@@ -135,7 +118,10 @@ test("departamentos.js no usa innerHTML ni atributos style: los colores van por 
   assert.match(css, /\.deptos-layout \{[^}]*grid-template-columns: 260px minmax\(0, 1fr\)/);
   assert.match(css, /\.deptos-layout \{[^}]*align-items: stretch;/, "mismo alto que el detalle");
   assert.match(css, /\.deptos-columna \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*border-radius: 10px;/);
-  assert.match(css, /\.deptos-resumen \{\s*margin: auto 0 0;[^}]*border-top: 1px solid var\(--color-borde\);/, "pegado abajo, con línea fina");
+  assert.match(css, /\.deptos-layout \{[^}]*min-height: calc\(100vh - var\(--deptos-alto-cabecera\) - 2rem - var\(--deptos-alto-ayuda\) - 2rem\);/, "como mínimo hasta abajo de la pantalla");
+  assert.match(css, /\.deptos-lista \{\s*display: flex;\s*flex: 1 1 auto;\s*flex-direction: column;/, "la lista ocupa toda la tarjeta");
+  assert.match(css, /\.depto-boton \{[^}]*flex: 1 1 0;[^}]*align-items: center;/, "cada fila crece por igual, centrada");
+  assert.doesNotMatch(css + leer("departamentos.html") + leer("js/departamentos.js"), /deptos-resumen|d-sin-asignar/, "sin el resumen de abajo");
   assert.match(css, /\.app \.contenido\.departamentos \{\s*max-width: none;/, "todo el ancho");
   assert.match(css, /\.deptos-detalle \{[^}]*border-radius: 10px;/);
   assert.match(css, /\.depto-barra \{[^}]*position: absolute;[^}]*bottom: 0;[^}]*height: 3px;/, "fina y pegada abajo");
@@ -148,7 +134,7 @@ test("departamentos.js no usa innerHTML ni atributos style: los colores van por 
   assert.ok(angosto, "debajo de 900 px cambia el diseño");
   assert.match(angosto[0], /\.deptos-layout \{\s*grid-template-columns: minmax\(0, 1fr\);/, "el detalle a todo el ancho");
   assert.match(angosto[0], /\.deptos-lista \{[^}]*flex-direction: row;[^}]*overflow-x: auto;/, "fila con scroll propio");
-  assert.match(angosto[0], /\.deptos-resumen \{\s*display: none;/, "en el celular no cambia");
+  assert.match(angosto[0], /\.deptos-layout \{\s*min-height: 0;/, "en el celular, su alto normal");
   assert.match(angosto[0], /\.depto-boton \{[^}]*flex: none;/);
 });
 

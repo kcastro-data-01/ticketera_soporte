@@ -38,8 +38,6 @@ def _fila(area_id, nombre, estados, atiende="", tecnicos=(), tickets=()):
 
 RESUMEN = {
     "total_abiertos": 9,
-    "sin_asignar": 4,
-    "resueltos_mes": 6,
     "mas_abiertos": {"area_id": 1, "nombre": "Soporte IT", "abiertos": 5},
     "departamentos": [
         _fila(1, "Soporte IT", [3, 2, 4, 6], "computadoras, impresoras, programas",
@@ -119,13 +117,13 @@ def test_cada_departamento_en_una_linea_con_la_barrita_abajo(navegador, base, te
         botones = cajas(pg)
         assert [b["texto"] for b in botones][-1] == "Sin departamento"
         for b in botones:
-            assert b["alto"] < 44, b  # una sola línea, 9 px arriba y abajo
+            assert b["nombre"][4] < 24, b  # una sola línea
             # nombre, «N abiertos» y pastilla en la misma línea, en ese orden
             assert b["nombre"][3] <= b["abiertos"][2] < b["pastilla"][2], b
             assert abs(b["nombre"][0] - b["abiertos"][0]) < 8 and abs(b["abiertos"][1] - b["pastilla"][1]) < 8, b
             assert b["barra"][4] == 3, b
             assert abs(b["barra"][1] - b["bottom"]) < 0.5, "pegada al borde de abajo"
-        # filas seguidas, sin espacio extra entre ellas
+        # filas seguidas, sin espacio entre ellas
         for arriba, abajo in zip(botones, botones[1:]):
             assert abs(abajo["top"] - arriba["bottom"]) < 0.5
         separador = pg.evaluate("""[...document.querySelectorAll('.depto-boton')].map(b =>
@@ -136,29 +134,38 @@ def test_cada_departamento_en_una_linea_con_la_barrita_abajo(navegador, base, te
         ctx.close()
 
 
-@pytest.mark.parametrize("ancho", [1280, 1920])
+@pytest.mark.parametrize("ancho", [1366, 1920])
 @pytest.mark.parametrize("tema", ["claro", "oscuro"])
-def test_la_lista_tiene_el_alto_del_detalle_con_el_resumen_abajo(navegador, base, ancho, tema):
+def test_la_lista_llega_hasta_abajo_y_reparte_el_alto(navegador, base, ancho, tema):
     ctx, pg = abrir(navegador, base, ancho, tema)
     try:
         m = pg.evaluate("""(() => {
             const r = (s) => document.querySelector(s).getBoundingClientRect();
             const col = r('.deptos-columna'), det = r('#deptos-detalle'), lista = r('#deptos-lista'),
-                  res = r('.deptos-resumen'), main = r('main'), app = r('.app-principal');
-            return { col: [col.top, col.bottom], det: [det.top, det.bottom], listaBottom: lista.bottom,
-                     res: [res.top, res.bottom, res.height],
-                     filas: [...document.querySelectorAll('.deptos-resumen-fila')].map(f =>
-                        [f.querySelector('dt').textContent, f.querySelector('dd').textContent,
-                         f.querySelector('dt').getBoundingClientRect().left < f.querySelector('dd').getBoundingClientRect().left]),
-                     linea: getComputedStyle(document.querySelector('.deptos-resumen')).borderTopWidth,
-                     margenes: [main.left - app.left, app.right - main.right] };
+                  main = r('main'), app = r('.app-principal');
+            const filas = [...document.querySelectorAll('.depto-boton')].map(b => {
+                const f = b.getBoundingClientRect(), n = b.querySelector('.depto-boton-nombre').getBoundingClientRect(),
+                      p = b.querySelector('.depto-pastilla').getBoundingClientRect(), barra = b.querySelector('.depto-barra').getBoundingClientRect();
+                return { top: f.top, bottom: f.bottom, alto: f.height, centroFila: (f.top + f.bottom) / 2,
+                         centroNombre: (n.top + n.bottom) / 2, centroPastilla: (p.top + p.bottom) / 2, barraBottom: barra.bottom };
+            });
+            return { col: [col.top, col.bottom], det: [det.top, det.bottom], lista: [lista.top, lista.bottom],
+                     filas, alto: window.innerHeight, margenes: [main.left - app.left, app.right - main.right] };
         })()""")
-        assert m["col"] == pytest.approx(m["det"], abs=0.5), "alineadas arriba y abajo"
-        assert m["res"][1] == pytest.approx(m["col"][1] - 1, abs=1), "el resumen pegado abajo"
-        assert m["res"][0] > m["listaBottom"] + 20, "los departamentos quedan arriba, el espacio en el medio"
-        assert m["filas"] == [["Total abiertos", "9", True], ["Sin asignar", "4", True], ["Resueltos este mes", "6", True]]
-        assert m["linea"] == "1px"
-        assert m["margenes"] == [0, 0], "todo el ancho, sin márgenes de más"
+        assert m["col"] == pytest.approx(m["det"], abs=0.5), "mismo alto que el detalle"
+        assert m["col"][1] >= m["alto"] - 34, "como mínimo hasta abajo de la pantalla (menos el margen)"
+        filas = m["filas"]
+        assert filas[0]["top"] == pytest.approx(m["lista"][0], abs=0.5)
+        assert filas[-1]["bottom"] == pytest.approx(m["lista"][1], abs=0.5), "sin espacio vacío debajo"
+        altos = [f["alto"] for f in filas]
+        assert max(altos) - min(altos) < 1.5, altos  # crecen por igual
+        assert min(altos) > 60, "las filas se estiran"
+        for f in filas:
+            assert f["centroNombre"] == pytest.approx(f["centroFila"], abs=1.5), "centrado vertical"
+            assert f["centroPastilla"] == pytest.approx(f["centroFila"], abs=1.5)
+            assert f["barraBottom"] == pytest.approx(f["bottom"], abs=0.5), "la barrita pegada abajo"
+        assert m["margenes"] == [0, 0], "todo el ancho"
+        assert pg.evaluate("document.querySelector('.deptos-resumen')") is None, "sin el resumen"
         assert pg.errores == []
     finally:
         ctx.close()
@@ -180,7 +187,8 @@ def test_angosto_la_lista_es_una_fila_horizontal_con_scroll_propio(navegador, ba
         assert lista["detalleTop"] >= lista["bottom"], "el detalle debajo"
         assert abs(lista["detalleAncho"] - lista["width"]) < 1, "el detalle a todo el ancho"
         assert lista["pagina"] <= lista["ventana"], "sin scroll de costado en la página"
-        assert pg.evaluate("getComputedStyle(document.querySelector('.deptos-resumen')).display") == "none"
+        alto_boton = pg.evaluate("document.querySelector('.depto-boton').getBoundingClientRect().height")
+        assert alto_boton < 44, "en el celular, el alto normal"
         if ancho == 375:
             assert lista["scroll"] > lista["cliente"], "los botones no entran: scroll dentro de la fila"
         # Con el teclado, el elegido se ve dentro de la fila.

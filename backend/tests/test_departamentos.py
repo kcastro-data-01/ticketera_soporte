@@ -138,10 +138,6 @@ def test_detail_brings_scope_technicians_and_open_tickets(auth_client, session, 
     session.commit()
 
     filas = {f["nombre"]: f for f in auth_client.get(URL).json()["departamentos"]}
-    datos = auth_client.get(URL).json()
-    # Resumen de todos: abiertos sin asignar (Media nueva + el Alta de Redes)
-    # y resueltos este mes (el del otro mes no cuenta).
-    assert (datos["total_abiertos"], datos["sin_asignar"], datos["resueltos_mes"]) == (5, 2, 1)
     soporte = filas[SOP]
     assert soporte["atiende"] == "computadoras, impresoras, programas"
     assert filas["Sin departamento"]["atiende"]
