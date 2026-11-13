@@ -285,8 +285,24 @@ class AreaResponse(BaseModel):
 
 
 class DepartamentoTecnico(BaseModel):
+    """Técnico activo del departamento: sus abiertos (Nuevo + En proceso) y
+    los que resolvió este mes, en ese departamento."""
+
     id: int
     name: str
+    abiertos: int = 0
+    resueltos_mes: int = 0
+
+
+class DepartamentoTicket(BaseModel):
+    """Ticket abierto de un departamento (detalle de la pantalla)."""
+
+    id: int
+    title: str
+    state: str
+    priority: str
+    assigned_to_name: str | None
+    created_at: datetime
 
 
 class DepartamentoFila(BaseModel):
@@ -299,6 +315,8 @@ class DepartamentoFila(BaseModel):
     abiertos: int
     por_estado: dict[str, int]
     tecnicos: list[DepartamentoTecnico]
+    atiende: str = ""
+    tickets_abiertos: list[DepartamentoTicket] = []
 
 
 class DepartamentoMasAbiertos(BaseModel):

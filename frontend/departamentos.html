@@ -6,13 +6,13 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Departamentos · American Data Networks</title>
   <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
-  <script src="js/tema.js?v=20261112-11"></script>
+  <script src="js/tema.js?v=20261113-01"></script>
   <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="css/estilos.css?v=20261112-11">
+  <link rel="stylesheet" href="css/estilos.css?v=20261113-01">
 </head>
 <body class="app">
   <aside class="barra-lateral">
@@ -47,57 +47,73 @@
     <header class="cabecera">
       <div>
         <h1>Departamentos</h1>
-        <p>Tickets de cada departamento de IT por estado y sus técnicos</p>
+        <p>Tickets de cada departamento de IT, sus técnicos y lo que tienen abierto</p>
       </div>
     </header>
 
-    <main class="contenido metricas departamentos">
+    <main class="contenido departamentos">
     <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
 
-    <section class="resumen metricas-tarjetas" aria-label="Resumen">
-      <div class="tarjeta-resumen metrica">
-        <span class="tarjeta-numero" id="d-total-abiertos">—</span>
-        <span class="tarjeta-etiqueta">Abiertos en la ticketera</span>
-        <span class="metrica-nota">Nuevo + En proceso</span>
-      </div>
-      <div class="tarjeta-resumen metrica">
-        <span class="tarjeta-numero tarjeta-texto" id="d-mas-abiertos">—</span>
-        <span class="tarjeta-etiqueta">Departamento con más abiertos</span>
-        <span class="metrica-nota" id="d-mas-abiertos-nota"></span>
-      </div>
-    </section>
+    <p class="deptos-ayuda" id="deptos-ayuda">Toque un departamento para ver su detalle</p>
 
-    <section class="seccion" aria-label="Tickets por departamento">
-      <h2>Tickets por departamento</h2>
-      <p class="ayuda-campo">Toque un número para abrir la lista de tickets con ese departamento y ese estado.</p>
-      <div class="tabla-scroll">
-        <table class="listado tabla-departamentos" id="tabla-departamentos" hidden>
-          <thead>
-            <tr>
-              <th scope="col">Departamento</th>
-              <th scope="col">Total</th>
-              <th scope="col">Abiertos</th>
-              <th scope="col">Nuevo</th>
-              <th scope="col">En proceso</th>
-              <th scope="col">Resuelto</th>
-              <th scope="col">Cerrado</th>
-              <th scope="col">Técnicos activos</th>
-            </tr>
-          </thead>
-          <tbody id="cuerpo-departamentos"></tbody>
-        </table>
-      </div>
-    </section>
+    <div class="deptos-layout" id="deptos-layout" hidden>
+      <div class="deptos-lista" id="deptos-lista" role="tablist" aria-orientation="vertical" aria-label="Departamentos" aria-describedby="deptos-ayuda"></div>
+
+      <section class="deptos-detalle" id="deptos-detalle" role="tabpanel" tabindex="0">
+        <header class="depto-cabecera">
+          <div class="depto-titulos">
+            <h2 id="depto-nombre"></h2>
+            <p class="depto-atiende" id="depto-atiende"></p>
+            <p class="depto-total" id="depto-total"></p>
+          </div>
+          <a class="enlace-boton secundario" id="depto-ver-todos" href="index.html">Ver todos sus tickets</a>
+        </header>
+
+        <ul class="depto-cajas" id="depto-cajas" aria-label="Tickets por estado"></ul>
+
+        <h3 class="depto-subtitulo" id="depto-tecnicos-titulo">Técnicos</h3>
+        <div class="tabla-scroll">
+          <table class="depto-tabla" aria-labelledby="depto-tecnicos-titulo">
+            <thead>
+              <tr>
+                <th scope="col">Técnico</th>
+                <th scope="col" class="celda-num">Abiertos</th>
+                <th scope="col" class="celda-num">Resueltos este mes</th>
+              </tr>
+            </thead>
+            <tbody id="depto-tecnicos"></tbody>
+          </table>
+        </div>
+        <p class="depto-vacio" id="depto-tecnicos-vacio" hidden></p>
+
+        <h3 class="depto-subtitulo" id="depto-abiertos-titulo">Tickets abiertos</h3>
+        <div class="tabla-scroll">
+          <table class="depto-tabla" aria-labelledby="depto-abiertos-titulo">
+            <thead>
+              <tr>
+                <th scope="col">Ticket</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Prioridad</th>
+                <th scope="col">Asignado</th>
+              </tr>
+            </thead>
+            <tbody id="depto-abiertos"></tbody>
+          </table>
+        </div>
+        <p class="depto-vacio" id="depto-abiertos-vacio" hidden></p>
+        <p class="depto-nota" id="depto-abiertos-nota" hidden></p>
+      </section>
+    </div>
     </main>
 
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
-  <script src="js/guardia.js?v=20261112-11" data-permiso="departamentos"></script>
-  <script src="js/avisos.js?v=20261112-11" defer></script>
-  <script src="js/auth.js?v=20261112-11" defer></script>
-  <script src="js/sesion.js?v=20261112-11" defer></script>
-  <script src="js/asistente.js?v=20261112-11" defer></script>
-  <script src="js/departamentos.js?v=20261112-11" defer></script>
+  <script src="js/guardia.js?v=20261113-01" data-permiso="departamentos"></script>
+  <script src="js/avisos.js?v=20261113-01" defer></script>
+  <script src="js/auth.js?v=20261113-01" defer></script>
+  <script src="js/sesion.js?v=20261113-01" defer></script>
+  <script src="js/asistente.js?v=20261113-01" defer></script>
+  <script src="js/departamentos.js?v=20261113-01" defer></script>
 </body>
 </html>

@@ -5560,133 +5560,345 @@ summary:focus-visible,
 }
 
 /* ---------- Pantalla «Departamentos» (solo Administrador) ----------
-   Mismas tarjetas que Métricas; la tabla con números que son enlaces a la
-   lista filtrada y los técnicos activos debajo de su cantidad. */
-.departamentos .metricas-tarjetas {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.departamentos .tarjeta-numero.tarjeta-texto {
-  font-size: 1.35rem;
-  line-height: 1.25;
-}
-
-/* El nombre del departamento (encabezado de fila) con letra normal, no en
-   mayúsculas como los títulos de las columnas. */
-.listado.tabla-departamentos tbody th[scope="row"] {
-  font-size: var(--texto-md);
-  font-weight: 600;
-  letter-spacing: normal;
-  text-transform: none;
-  color: var(--color-texto);
-  background: transparent;
-  border-bottom-color: var(--color-borde);
-  text-align: left;
-  white-space: nowrap;
-}
-
-.listado.tabla-departamentos tbody tr:last-child th[scope="row"] {
-  border-bottom: none;
-}
-
-.tabla-departamentos thead th:not(:first-child):not(:last-child),
-.tabla-departamentos .celda-numero {
-  text-align: right;
-}
-
-.tabla-departamentos .enlace-numero {
-  display: inline-block;
-  min-width: 2.2rem;
-  padding: 0.15rem 0.4rem;
-  border-radius: var(--radio-suave);
-  color: var(--color-primario-texto);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  text-decoration: none;
-}
-
-.tabla-departamentos .enlace-numero:hover,
-.tabla-departamentos .enlace-numero:focus-visible {
-  background: var(--color-primario-tenue);
-  text-decoration: underline;
-}
-
-.tabla-departamentos .celda-tecnicos {
-  min-width: 12rem;
-}
-
-.tabla-departamentos .tecnicos-cantidad {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.tabla-departamentos .tecnicos-nombres {
-  display: block;
-  margin-top: 0.15rem;
+   Dos columnas: la lista de departamentos (pestañas) a la izquierda, fija
+   al bajar, y el detalle del elegido a la derecha. En el celular, la lista
+   arriba y el detalle debajo. Los anchos de las barritas y los colores de
+   estado los pone el JS (element.style): aquí no hay colores de estado. */
+.deptos-ayuda {
+  margin: 0 0 var(--espaciado-sm);
   font-size: var(--texto-sm);
   color: var(--color-tenue);
 }
 
-.listado.tabla-departamentos .fila-sin-departamento th[scope="row"] {
-  color: var(--color-tenue-fuerte);
-  font-style: italic;
+.deptos-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--espaciado-lg);
+  align-items: start;
 }
 
-/* En el celular cada departamento es una tarjeta: el nombre arriba y cada
-   número con su etiqueta al lado (sin la tabla ancha ni scroll de costado). */
-@media (max-width: 600px) {
-  .tabla-departamentos thead {
+.deptos-layout[hidden] {
+  display: none;
+}
+
+.deptos-lista {
+  position: sticky;
+  top: var(--espaciado-lg);
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+}
+
+.depto-boton {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  width: 100%;
+  min-height: 0;
+  padding: 0.6rem 0.7rem 0.6rem 0.8rem;
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.depto-boton:hover,
+.depto-boton:active {
+  background: var(--color-fondo-neutro);
+  border-color: transparent;
+}
+
+.depto-boton:focus-visible {
+  outline: 2px solid var(--color-primario);
+  outline-offset: -2px;
+}
+
+.depto-boton.elegido,
+.depto-boton.elegido:hover,
+.depto-boton.elegido:active {
+  background: var(--color-primario-tenue);
+  border-left-color: var(--color-primario);
+}
+
+.depto-boton-textos {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.depto-boton-nombre {
+  font-size: var(--texto-md);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.depto-boton.sin-departamento .depto-boton-nombre {
+  font-style: italic;
+  color: var(--color-tenue-fuerte);
+}
+
+.depto-boton-abiertos {
+  font-size: var(--texto-sm);
+  color: var(--color-tenue);
+}
+
+.depto-pastilla {
+  min-width: 1.9rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radio-pill);
+  background: var(--color-fondo-neutro);
+  color: var(--color-tenue-fuerte);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.depto-boton.elegido .depto-pastilla {
+  background: var(--color-primario);
+  color: var(--color-texto-inverso);
+}
+
+.depto-barra {
+  grid-column: 1 / -1;
+  display: flex;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--color-borde);
+}
+
+.depto-barra-parte {
+  display: block;
+  height: 100%;
+}
+
+/* Detalle */
+.deptos-detalle {
+  min-width: 0;
+  padding: var(--espaciado-xl);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+}
+
+.deptos-detalle:focus-visible {
+  outline: 2px solid var(--color-primario);
+  outline-offset: 2px;
+}
+
+.depto-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espaciado-md);
+}
+
+.depto-titulos h2 {
+  margin: 0;
+}
+
+.depto-atiende,
+.depto-total {
+  margin: 0.2rem 0 0;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue);
+}
+
+.depto-cajas {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--espaciado-sm);
+  margin: var(--espaciado-xl) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.depto-caja {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-borde);
+  border-top: 3px solid var(--color-borde-fuerte);
+  border-radius: 6px;
+  background: var(--color-superficie);
+}
+
+.depto-caja-abiertos {
+  background: var(--color-fondo-neutro);
+  border-top-color: var(--color-titulo);
+}
+
+.depto-caja-numero {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto);
+}
+
+.depto-caja-abiertos .depto-caja-numero {
+  color: var(--color-titulo);
+}
+
+.depto-caja-etiqueta {
+  font-size: var(--texto-sm);
+  color: var(--color-tenue);
+}
+
+.depto-subtitulo {
+  margin: var(--espaciado-xl) 0 var(--espaciado-sm);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-tenue);
+}
+
+.depto-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--texto-md);
+}
+
+.depto-tabla[hidden] {
+  display: none;
+}
+
+.depto-tabla th {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--color-borde);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  text-align: left;
+  color: var(--color-tenue);
+}
+
+.depto-tabla td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--color-borde);
+  vertical-align: middle;
+}
+
+.depto-tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.depto-tabla tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.depto-tabla tbody tr:hover {
+  background: var(--color-fondo-neutro);
+}
+
+.depto-tabla .celda-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.depto-tabla .celda-ticket .enlace-tabla {
+  margin-right: 0.45rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.depto-tabla .celda-ticket-titulo {
+  overflow-wrap: anywhere;
+}
+
+.depto-tabla .sin-asignar {
+  color: var(--color-tenue);
+}
+
+.depto-vacio,
+.depto-nota {
+  margin: var(--espaciado-sm) 0 0;
+  font-size: var(--texto-sm);
+  color: var(--color-tenue);
+}
+
+@media (max-width: 900px) {
+  .depto-cajas {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Celular: la lista arriba (sin quedar fija) y el detalle debajo; las
+   tablas pasan a filas apiladas para no tener scroll de costado. */
+@media (max-width: 700px) {
+  .deptos-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .deptos-lista {
+    position: static;
+  }
+
+  .deptos-detalle {
+    padding: var(--espaciado-lg);
+  }
+
+  .depto-cabecera .enlace-boton {
+    flex: 1 1 100%;
+  }
+
+  .depto-cajas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .depto-tabla thead {
     display: none;
   }
 
-  .tabla-departamentos,
-  .tabla-departamentos tbody,
-  .tabla-departamentos tr {
+  .depto-tabla,
+  .depto-tabla tbody,
+  .depto-tabla tr {
     display: block;
     width: 100%;
   }
 
-  .listado.tabla-departamentos tbody tr {
-    padding: 0.4rem 0.85rem 0.6rem;
+  .depto-tabla tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.6rem;
+    padding: 0.55rem 0.2rem;
     border-bottom: 1px solid var(--color-borde);
   }
 
-  .listado.tabla-departamentos tbody tr:last-child {
+  .depto-tabla tbody tr:last-child {
     border-bottom: none;
   }
 
-  .listado.tabla-departamentos tbody th[scope="row"] {
-    display: block;
-    padding: 0.35rem 0;
+  .depto-tabla td {
+    padding: 0;
     border: none;
   }
 
-  .listado.tabla-departamentos tbody td {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 1rem;
-    padding: 0.2rem 0;
-    border: none;
-    text-align: right;
+  .depto-tabla td.celda-ticket,
+  .depto-tabla td.celda-persona:first-child {
+    flex: 1 1 100%;
   }
 
-  .listado.tabla-departamentos tbody td::before {
-    content: attr(data-label);
-    color: var(--color-tenue);
+  /* Sin encabezados: cada número lleva su etiqueta al lado. */
+  .depto-tabla td.celda-num {
     font-size: var(--texto-sm);
-    text-align: left;
   }
 
-  .tabla-departamentos .celda-tecnicos {
-    min-width: 0;
-    flex-wrap: wrap;
-  }
-
-  .tabla-departamentos .celda-tecnicos .tecnicos-nombres {
-    flex-basis: 100%;
-    text-align: right;
+  .depto-tabla td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--color-tenue);
   }
 }
 
