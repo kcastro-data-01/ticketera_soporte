@@ -120,12 +120,15 @@ test("departamentos.js no usa innerHTML ni atributos style: los colores van por 
   assert.match(css, /\.deptos-columna \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*border-radius: 10px;/);
   assert.match(css, /\.deptos-layout \{[^}]*min-height: calc\(100vh - var\(--deptos-alto-cabecera\) - 2rem - var\(--deptos-alto-ayuda\) - 2rem\);/, "como mínimo hasta abajo de la pantalla");
   assert.match(css, /\.deptos-lista \{\s*display: flex;\s*flex: 1 1 auto;\s*flex-direction: column;/, "la lista ocupa toda la tarjeta");
-  assert.match(css, /\.depto-boton \{[^}]*flex: 1 1 0;[^}]*align-items: center;/, "cada fila crece por igual, centrada");
+  assert.match(css, /\.depto-boton \{[^}]*display: grid;[^}]*flex: none;[^}]*height: 56px;/, "alto fijo de 56 px, sin flex: 1");
+  assert.doesNotMatch(css.match(/\.depto-boton \{[^}]*\}/)[0], /flex: 1/);
+  assert.match(css, /\.depto-boton-nombre \{\s*grid-column: 1;\s*grid-row: 1;[^}]*font-size: var\(--texto-md\);/, "nombre arriba, letra normal");
+  assert.match(css, /\.depto-boton-abiertos \{\s*grid-column: 1;\s*grid-row: 2;\s*font-size: var\(--texto-sm\);/, "«N abiertos» debajo, chico");
+  assert.match(css, /\.depto-pastilla \{\s*grid-column: 2;\s*grid-row: 1 \/ 3;/, "pastilla a la derecha, centrada");
   assert.doesNotMatch(css + leer("departamentos.html") + leer("js/departamentos.js"), /deptos-resumen|d-sin-asignar/, "sin el resumen de abajo");
   assert.match(css, /\.app \.contenido\.departamentos \{\s*max-width: none;/, "todo el ancho");
   assert.match(css, /\.deptos-detalle \{[^}]*border-radius: 10px;/);
   assert.match(css, /\.depto-barra \{[^}]*position: absolute;[^}]*bottom: 0;[^}]*height: 3px;/, "fina y pegada abajo");
-  assert.match(css, /\.depto-boton \{[^}]*position: relative;[^}]*display: flex;[^}]*padding: 9px /, "una línea, 9 px arriba y abajo");
   assert.match(css, /\.depto-boton-nombre \{[^}]*white-space: nowrap;/);
   assert.match(css, /\.depto-boton \+ \.depto-boton\.sin-departamento \{\s*border-top: 1px solid var\(--color-borde-fuerte\);/, "«Sin departamento» separado");
   assert.match(css, /\.depto-caja \{[^}]*border-top: 3px solid/);
@@ -151,7 +154,7 @@ test("la lista: un botón por departamento (con «Sin departamento» si tiene ti
   assert.equal(soporte.type, "button");
   assert.equal(soporte.id, "tab-soporte-it");
   assert.deepEqual(soporte.children.map((h) => h.className),
-    ["depto-boton-nombre", "depto-boton-abiertos", "depto-pastilla", "depto-barra"], "una sola línea y la barrita al final");
+    ["depto-boton-nombre", "depto-boton-abiertos", "depto-pastilla", "depto-barra"], "nombre, abiertos, pastilla y la barrita al final");
   assert.equal(soporte.children[1].textContent, "2 abiertos");
   assert.equal(botones[1].children[0].title, "Redes e Infraestructura", "nombre completo al pasar el mouse");
   assert.equal(botones[2].children[1].textContent, "0 abiertos");

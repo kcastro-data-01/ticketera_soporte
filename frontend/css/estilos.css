@@ -5611,17 +5611,23 @@ summary:focus-visible,
 }
 
 
-/* Cada departamento en una sola línea: nombre a la izquierda; «N abiertos»
-   y la pastilla a la derecha; la barrita de estados pegada abajo. */
+/* Cada departamento con alto fijo (56 px): el nombre arriba y «N abiertos»
+   debajo; la pastilla a la derecha, centrada; la barrita pegada abajo. Lo
+   que sobra de la tarjeta queda vacío debajo de los departamentos. */
 .depto-boton {
   position: relative;
-  display: flex;
-  flex: 1 1 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-content: center;
   align-items: center;
-  gap: 0.5rem;
+  column-gap: 0.6rem;
+  row-gap: 0.1rem;
+  flex: none;
   width: 100%;
+  height: 56px;
   min-height: 0;
-  padding: 9px 0.75rem 9px 0.8rem;
+  padding: 0 0.75rem 3px 0.8rem;
   border: none;
   border-left: 3px solid transparent;
   border-radius: 0;
@@ -5666,7 +5672,8 @@ summary:focus-visible,
 }
 
 .depto-boton-nombre {
-  flex: 1 1 auto;
+  grid-column: 1;
+  grid-row: 1;
   min-width: 0;
   overflow: hidden;
   font-size: var(--texto-md);
@@ -5681,20 +5688,22 @@ summary:focus-visible,
 }
 
 .depto-boton-abiertos {
-  flex: none;
-  font-size: 0.75rem;
+  grid-column: 1;
+  grid-row: 2;
+  font-size: var(--texto-sm);
   color: var(--color-tenue);
   white-space: nowrap;
 }
 
 .depto-pastilla {
-  flex: none;
+  grid-column: 2;
+  grid-row: 1 / 3;
   min-width: 1.75rem;
   padding: 0.05rem 0.45rem;
   border-radius: var(--radio-pill);
   background: var(--color-fondo-neutro);
   color: var(--color-tenue-fuerte);
-  font-size: 0.75rem;
+  font-size: var(--texto-sm);
   font-weight: 600;
   line-height: 1.4;
   font-variant-numeric: tabular-nums;

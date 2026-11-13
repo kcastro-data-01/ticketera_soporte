@@ -104,8 +104,8 @@ function pintarLista(departamentos) {
     if (boton.dataset) boton.dataset.slug = slug;
     if (fila.area_id === null || fila.area_id === undefined) boton.className += " sin-departamento";
 
-    /* Una sola línea: nombre, «N abiertos», la pastilla con el total y la
-       barrita pegada abajo. */
+    /* El nombre arriba y «N abiertos» debajo; la pastilla con el total a la
+       derecha y la barrita pegada abajo (la ubicación la da el CSS). */
     const nombre = deptoNodo("span", "depto-boton-nombre", fila.nombre);
     nombre.title = fila.nombre; /* si no entra, se ve completo al pasar el mouse */
     boton.appendChild(nombre);
