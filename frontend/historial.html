@@ -6,13 +6,13 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Historial · American Data Networks</title>
   <!-- Modo oscuro guardado: se aplica antes de pintar (sin destello). -->
-  <script src="js/tema.js?v=20261113-08"></script>
+  <script src="js/tema.js?v=20261113-09"></script>
   <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="css/estilos.css?v=20261113-08">
+  <link rel="stylesheet" href="css/estilos.css?v=20261113-09">
 </head>
 <body class="app">
   <aside class="barra-lateral">
@@ -47,37 +47,65 @@
     <header class="cabecera">
       <div>
         <h1>Historial</h1>
-        <p>Registro de todas las acciones realizadas en los tickets</p>
+        <p>Los cambios hechos en los tickets, por persona</p>
       </div>
     </header>
 
-    <main class="contenido">
+    <!-- Mismo armado que Departamentos (reusa sus clases deptos-/depto-):
+         la lista de personas a la izquierda (pestañas) y el detalle de la
+         elegida a la derecha. historial.js pinta todo con textContent. -->
+    <main class="contenido historial-personas">
     <p id="estado-carga" class="estado" role="status" aria-live="polite" hidden></p>
 
-    <div class="tabla-scroll">
-      <table class="listado">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Ticket</th>
-            <th>Quién</th>
-            <th>Acción</th>
-            <th>Detalle</th>
-          </tr>
-        </thead>
-        <tbody id="lista-historial"></tbody>
-      </table>
+    <p class="deptos-ayuda" id="hist-ayuda">Toque una persona para ver sus cambios</p>
+
+    <div class="deptos-layout" id="hist-layout" hidden>
+      <div class="deptos-columna">
+        <div class="deptos-lista" id="hist-lista" role="tablist" aria-orientation="vertical" aria-label="Personas" aria-describedby="hist-ayuda"></div>
+      </div>
+
+      <section class="deptos-detalle" id="hist-detalle" role="tabpanel" tabindex="0">
+        <header class="depto-cabecera">
+          <div class="depto-titulos">
+            <h2 id="hist-nombre"></h2>
+            <p class="depto-atiende" id="hist-rol"></p>
+            <p class="depto-total" id="hist-total"></p>
+          </div>
+          <div class="hist-controles">
+            <label class="campo hist-campo-periodo">
+              <span>Período</span>
+              <select id="hist-periodo">
+                <option value="hoy">Hoy</option>
+                <option value="7" selected>Últimos 7 días</option>
+                <option value="30">Últimos 30 días</option>
+              </select>
+            </label>
+            <label class="campo hist-campo-buscar">
+              <span>Buscar ticket</span>
+              <input type="search" id="hist-buscar" placeholder="Número o título" autocomplete="off" maxlength="200">
+            </label>
+          </div>
+        </header>
+
+        <ul class="depto-cajas hist-cajas" id="hist-cajas" aria-label="Resumen del período"></ul>
+
+        <div class="hist-cambios" id="hist-cambios"></div>
+        <p class="depto-vacio" id="hist-vacio" role="status" hidden></p>
+        <div class="hist-mas">
+          <button type="button" id="hist-ver-mas" class="secundario" hidden>Ver más</button>
+        </div>
+      </section>
     </div>
     </main>
 
     <footer class="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
   </div>
 
-  <script src="js/guardia.js?v=20261113-08" data-permiso="historial_global"></script>
-  <script src="js/avisos.js?v=20261113-08" defer></script>
-  <script src="js/auth.js?v=20261113-08" defer></script>
-  <script src="js/sesion.js?v=20261113-08" defer></script>
-  <script src="js/asistente.js?v=20261113-08" defer></script>
-  <script src="js/historial.js?v=20261113-08" defer></script>
+  <script src="js/guardia.js?v=20261113-09" data-permiso="historial_global"></script>
+  <script src="js/avisos.js?v=20261113-09" defer></script>
+  <script src="js/auth.js?v=20261113-09" defer></script>
+  <script src="js/sesion.js?v=20261113-09" defer></script>
+  <script src="js/asistente.js?v=20261113-09" defer></script>
+  <script src="js/historial.js?v=20261113-09" defer></script>
 </body>
 </html>

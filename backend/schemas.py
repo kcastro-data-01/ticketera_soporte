@@ -448,6 +448,36 @@ class HistoryResponse(BaseModel):
     created_at: datetime
 
 
+class HistorialPersona(BaseModel):
+    """Una persona de la pantalla Historial (o «Sistema», ``clave`` «sistema»)."""
+
+    clave: str
+    user_id: int | None = None
+    nombre: str
+    rol: str | None = None
+    departamento: str | None = None
+    cambios: int
+
+
+class HistorialCajas(BaseModel):
+    """Totales del filtro elegido (persona, período y búsqueda)."""
+
+    cambios: int
+    tickets: int
+    comentarios: int
+    cambios_estado: int
+
+
+class HistorialResumen(BaseModel):
+    """Respuesta de ``GET /api/history/resumen``."""
+
+    periodo: str
+    desde: datetime
+    total: int
+    personas: list[HistorialPersona]
+    cajas: HistorialCajas
+
+
 # --- Authentication schemas ---
 
 

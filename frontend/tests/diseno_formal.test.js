@@ -37,8 +37,8 @@ test("tablas: filas alternadas con el fondo neutro y encabezados formales", () =
   assert.match(oscuro.slice(0, oscuro.indexOf("\n}")), /--color-fondo-neutro: #[0-9a-f]{6};/);
 });
 
-test("las tres tablas (listado, historial y usuarios) usan .listado", () => {
-  for (const pagina of ["index.html", "historial.html", "usuarios.html"]) {
+test("las tablas (listado y usuarios) usan .listado", () => {
+  for (const pagina of ["index.html", "usuarios.html"]) {
     const html = fs.readFileSync(path.join(__dirname, "..", pagina), "utf8");
     assert.match(html, /<table[^>]*class="listado( [a-z-]+)*"/, pagina);
   }

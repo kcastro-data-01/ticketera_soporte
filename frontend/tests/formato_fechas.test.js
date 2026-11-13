@@ -60,7 +60,7 @@ test("listado, detalle, historial, comentarios, adjuntos, IA, impresión y chat 
     "Impreso el ${formatearFechaHora(", 'formatearFechaHora(fecha, { parte: "hora" })']) {
     assert.ok(detalle.includes(uso), uso);
   }
-  assert.match(leer("historial.js"), /formatearFechaHora\(entry\.created_at\)/);
+  assert.match(leer("historial.js"), /formatearFechaHora\(entry\.created_at, \{ parte: "hora" \}\)/);
   assert.match(leer("adjuntos.js"), /formatearFechaHora\(valor\)/);
   assert.match(leer("explicacion.js"), /formatearFechaHora\(valor\)/);
   assert.match(leer("asistente.js"), /formatearFechaHora\(mensaje\.hora, \{ parte: "hora" \}\)/);

@@ -543,20 +543,6 @@ def get_ticket_history(session, ticket_id: int) -> list[History] | None:
     return list(entries)
 
 
-def get_global_history(session) -> list[History]:
-    """Return the audit entries of every ticket, newest first.
-
-    Read-only: it exposes the existing ``history`` rows and never creates
-    them. Ordering is ``created_at`` descending (most recent first) with
-    ``id`` descending as tiebreaker; there is no pagination.
-    """
-    entries = session.scalars(
-        select(History)
-        .order_by(History.created_at.desc(), History.id.desc())
-    ).all()
-    return list(entries)
-
-
 def get_ticket_comments(session, ticket_id: int) -> list[Comment] | None:
     """Return the comments stored for a ticket, oldest first (RF5).
 

@@ -133,7 +133,7 @@ test("departamentos.js no usa innerHTML ni atributos style: los colores van por 
   assert.match(css, /\.depto-pastilla \{[^}]*font-size: 13px;/, "pastilla de 13 px");
   assert.match(css, /\.depto-pastilla \{\s*grid-column: 2;\s*grid-row: 1 \/ 3;/, "pastilla a la derecha, centrada");
   assert.doesNotMatch(css + leer("departamentos.html") + leer("js/departamentos.js"), /deptos-resumen|d-sin-asignar/, "sin el resumen de abajo");
-  assert.match(css, /\.app \.contenido\.departamentos \{\s*max-width: none;/, "todo el ancho");
+  assert.match(css, /\.app \.contenido\.departamentos,(?:\s*[^{]+)?\{\s*max-width: none;/, "todo el ancho");
   assert.match(css, /\.deptos-detalle \{[^}]*border-radius: 10px;/);
   assert.match(css, /\.depto-barra \{[^}]*position: absolute;[^}]*bottom: 0;[^}]*height: 3px;/, "fina y pegada abajo");
   assert.match(css, /\.depto-boton-nombre \{[^}]*white-space: nowrap;/);

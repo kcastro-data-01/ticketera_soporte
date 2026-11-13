@@ -5609,7 +5609,8 @@ button.enlace-quitar:active {
 
 /* Todo el ancho disponible (con el mismo relleno de los costados que las
    demás pantallas), sin el tope de 1100 px. */
-.app .contenido.departamentos {
+.app .contenido.departamentos,
+.app .contenido.historial-personas {
   max-width: none;
 }
 
@@ -6148,6 +6149,223 @@ button.enlace-quitar:active {
   .depto-tabla td[data-label]::before {
     content: attr(data-label) ": ";
     color: var(--color-tenue);
+  }
+}
+
+/* ---------- Pantalla «Historial» (por persona) ----------
+   Mismo armado que Departamentos (reusa .deptos-layout, .deptos-columna,
+   .depto-boton, .depto-cajas…): aquí solo lo propio. Cada persona con su
+   círculo de iniciales a la izquierda; los cambios agrupados por día, una
+   línea por cambio. */
+/* Un poco más ancha que en Departamentos: los nombres de personas son
+   más largos (el alto de las filas es el mismo). */
+.historial-personas .deptos-layout {
+  grid-template-columns: 290px minmax(0, 1fr);
+}
+
+.depto-boton.hist-persona {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: 0.75rem;
+}
+
+.hist-persona .hist-avatar {
+  grid-column: 1;
+  grid-row: 1 / 3;
+}
+
+.hist-persona .depto-boton-nombre,
+.hist-persona .depto-boton-abiertos {
+  grid-column: 2;
+}
+
+.hist-persona .depto-pastilla {
+  grid-column: 3;
+}
+
+/* «Todas las personas» arriba, separada con una línea más marcada. */
+.depto-boton.hist-todas + .depto-boton {
+  border-top-color: var(--color-borde-fuerte);
+}
+
+.depto-boton.hist-sistema .depto-boton-nombre {
+  font-style: italic;
+  color: var(--color-tenue-fuerte);
+}
+
+.hist-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--avatar-fondo, var(--etiqueta-gris-fondo));
+  color: var(--avatar-texto, var(--etiqueta-gris-texto));
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.hist-avatar-icono {
+  background: var(--color-fondo-neutro);
+  color: var(--color-tenue-fuerte);
+}
+
+.depto-boton.elegido .hist-avatar-icono {
+  background: var(--color-superficie);
+  color: var(--color-primario);
+}
+
+.hist-avatar svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Período y búsqueda a la derecha del nombre. */
+.hist-controles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--espaciado-sm);
+}
+
+.hist-campo-periodo {
+  width: 10rem;
+}
+
+.hist-campo-buscar {
+  width: 12.5rem;
+}
+
+.hist-cajas {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.hist-lineas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Hora | (quién, con «Todas») | ticket | lo que hizo. */
+.hist-linea {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 2fr) minmax(0, 3fr);
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.6rem;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--color-borde);
+  font-size: var(--texto-md);
+  transition: background-color 0.15s ease;
+}
+
+.hist-linea.con-autor {
+  grid-template-columns: 5.5rem minmax(0, 1.6fr) minmax(0, 2fr) minmax(0, 2.6fr);
+}
+
+.hist-linea:last-child {
+  border-bottom: none;
+}
+
+.hist-linea:hover {
+  background: var(--color-fondo-neutro);
+}
+
+.hist-hora {
+  font-size: var(--texto-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-tenue);
+}
+
+.hist-autor {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hist-ticket {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.hist-ticket .enlace-tabla {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.hist-ticket-titulo {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-tenue-fuerte);
+}
+
+.hist-frase {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hist-mas {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--espaciado-md);
+}
+
+@media (max-width: 900px) {
+  .historial-personas .deptos-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hist-campo-periodo,
+  .hist-campo-buscar {
+    flex: 1 1 11rem;
+    width: auto;
+  }
+
+  .hist-controles {
+    flex: 1 1 100%;
+  }
+}
+
+/* Celular: cada cambio en dos o tres renglones (hora y quién arriba, el
+   ticket y lo que hizo debajo), sin scroll de costado. */
+@media (max-width: 700px) {
+  .hist-cajas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hist-linea,
+  .hist-linea.con-autor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem 0.6rem;
+    padding: 0.55rem 0.2rem;
+  }
+
+  .hist-ticket,
+  .hist-frase {
+    flex: 1 1 100%;
+  }
+
+  .hist-autor {
+    flex: 1 1 0;
+  }
+
+  .hist-mas button {
+    width: 100%;
   }
 }
 
