@@ -7,7 +7,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
-from backend.entorno import en_vercel
+from backend.cabeceras import CabecerasSeguridad
+from backend.entorno import en_produccion, en_vercel
 from backend.services import asistente_service, cierre_service, correo_service
 from backend.routers.adjuntos import router as adjuntos_router
 from backend.routers.areas import router as areas_router
@@ -48,11 +49,16 @@ app = FastAPI(
     description="API del sistema de ticketera de soporte (práctica de pasantes).",
     version="0.1.0",
     lifespan=lifespan,
-    # En Vercel (público) no se publica la documentación de la API.
-    docs_url=None if en_vercel() else "/docs",
-    redoc_url=None if en_vercel() else "/redoc",
-    openapi_url=None if en_vercel() else "/openapi.json",
+    # En la versión publicada (Vercel o Render) no va la documentación de la API.
+    docs_url=None if en_produccion() else "/docs",
+    redoc_url=None if en_produccion() else "/redoc",
+    openapi_url=None if en_produccion() else "/openapi.json",
 )
+
+
+# En Vercel las cabeceras de seguridad las pone vercel.json; en Render, FastAPI.
+if en_produccion() and not en_vercel():
+    app.add_middleware(CabecerasSeguridad)
 
 
 @app.get("/health", tags=["Salud"])

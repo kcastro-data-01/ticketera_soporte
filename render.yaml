@@ -1,0 +1,69 @@
+# Ticketera en Render (plan gratis), temporal mientras Vercel está pausado.
+# Usa el mismo Dockerfile que Docker Compose. README → «Publicar en Render».
+#
+# Los valores secretos (sync: false) no van aquí: Render los pide al crear el
+# Blueprint y quedan solo en el panel. Nunca poner secretos en este archivo.
+services:
+  - type: web
+    name: tickets-americandata
+    runtime: docker
+    plan: free
+    region: virginia          # cerca de Neon (us-east)
+    branch: prueba-render
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # --- Modo producción (igual que VERCEL=1) ---
+      - key: MODO_PRODUCCION
+        value: "1"
+      # --- Base de datos: Neon (la misma que usaba Vercel, con pooler) ---
+      - key: DATABASE_URL
+        sync: false
+      # --- Sesiones y cron ---
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      # --- Microsoft (login y buzón por Graph) ---
+      - key: CORREO_M365_TENANT
+        sync: false
+      - key: CORREO_M365_CLIENT_ID
+        sync: false
+      - key: ADMIN_INICIAL
+        sync: false
+      - key: DOMINIO_EMPRESA
+        sync: false
+      - key: CORREO_USUARIO
+        sync: false
+      - key: CORREO_ACTIVO
+        value: "1"
+      - key: CORREO_MODO
+        value: cron
+      - key: CORREO_PROVEEDOR
+        value: graph
+      - key: CORREO_FILTRO
+        value: ia
+      - key: CORREO_CARPETA_PROCESADOS
+        value: Tickets-Procesados
+      # --- Avisos y cierre automático ---
+      - key: AVISAR_ASIGNADO
+        value: "true"
+      - key: AVISAR_COMENTARIOS
+        value: "true"
+      - key: AVISAR_ESTADOS
+        value: "true"
+      - key: CIERRE_AUTOMATICO
+        value: "true"
+      # --- IA: Qwen en Groq ---
+      - key: ASISTENTE_PROVEEDOR
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      # --- Dirección pública (va en los correos) ---
+      - key: APP_URL
+        sync: false
+      # --- Adjuntos: Vercel Blob privado (si responde; ver README) ---
+      - key: BLOB_READ_WRITE_TOKEN
+        sync: false

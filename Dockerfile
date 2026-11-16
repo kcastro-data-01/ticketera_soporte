@@ -15,7 +15,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ backend/
 COPY frontend/ frontend/
 
+# Docker Compose uses 8000; Render sets PORT (10000) and checks /health.
+ENV PORT=8000
 EXPOSE 8000
 
-# API + frontend in a single process, reachable from outside the container
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# API + frontend in a single process, reachable from outside the container.
+# exec: uvicorn is PID 1 and gets SIGTERM (clean shutdown of the mail thread).
+# --proxy-headers: behind Render's proxy the app sees https and the real client.
+CMD ["sh", "-c", "exec uvicorn backend.main:app --host 0.0.0.0 --port \"${PORT:-8000}\" --proxy-headers --forwarded-allow-ips='*'"]

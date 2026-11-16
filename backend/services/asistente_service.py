@@ -36,7 +36,7 @@ import httpx
 from sqlalchemy import func, or_, select
 
 from backend.constants import TICKET_CATEGORIES, TICKET_PRIORITIES, TicketPriority, TicketState, UserRole
-from backend.entorno import en_vercel
+from backend.entorno import en_produccion
 from backend.fechas import ZONA_COSTA_RICA as _ZONA_FECHAS, formatear_fecha_hora
 from backend.models import Ticket, User
 from backend.services import metricas_service, ticket_service
@@ -3255,7 +3255,7 @@ PROVEEDOR_APAGADO = "ninguno"
 def nombre_proveedor() -> str:
     """``ASISTENTE_PROVEEDOR``: «qwen» por defecto; en Vercel, «ninguno»."""
     nombre = os.environ.get("ASISTENTE_PROVEEDOR", "").strip().lower()
-    return nombre or (PROVEEDOR_APAGADO if en_vercel() else "qwen")
+    return nombre or (PROVEEDOR_APAGADO if en_produccion() else "qwen")
 
 
 def ia_activa() -> bool:

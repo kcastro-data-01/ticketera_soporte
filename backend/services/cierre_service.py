@@ -208,9 +208,9 @@ def iniciar_hilo(session_factory=None) -> bool:
     """En Docker (modo hilo) arranca la revisión periódica si
     ``CIERRE_AUTOMATICO`` está encendida. En Vercel lo hace el cron."""
     global _hilo
-    from backend.entorno import en_vercel
+    from backend.entorno import en_produccion
 
-    if not activo() or en_vercel() or (os.environ.get("CORREO_MODO") or "").strip().lower() == "cron":
+    if not activo() or en_produccion() or (os.environ.get("CORREO_MODO") or "").strip().lower() == "cron":
         return False
     if _hilo is not None and _hilo.is_alive():
         return False

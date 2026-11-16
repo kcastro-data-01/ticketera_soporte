@@ -112,10 +112,12 @@ import httpx
 from sqlalchemy import func, or_, select
 
 from backend.constants import IT_ROLES, TicketCategory, TicketPriority, TicketState
-from backend.entorno import en_vercel
+from backend.entorno import en_produccion
 from backend.models import ProcessedEmail, Ticket, User
 from backend.schemas import CommentCreate, TicketCreate
-from backend.services import correo_adjuntos, correo_filtro, ticket_service
+# correo_adjuntos (Pillow, imágenes web, almacén de adjuntos) se importa solo
+# cuando un correo crea un ticket o un comentario: ver _guardar_adjuntos.
+from backend.services import correo_filtro, ticket_service
 from backend.services.correo_auth import AlmacenBD, ProveedorToken, SinSesionError, ruta_cache
 from backend.services.login_microsoft import asignar_rol_inicial
 
@@ -203,6 +205,8 @@ PROPIEDAD_X_TICKETERA = "String {00020386-0000-0000-C000-000000000046} Name x-ti
 _EXPANDIR_PROPIEDADES = "singleValueExtendedProperties($filter=" + " or ".join(
     f"id eq '{p}'" for p in (PROPIEDAD_IN_REPLY_TO, PROPIEDAD_REFERENCES, PROPIEDAD_X_TICKETERA)) + ")"
 SELECT_ADJUNTOS = "id,name,contentType,size,isInline"
+# Para la primera pasada (¿hay algo nuevo?): sin cuerpos ni cabeceras.
+_SELECT_RESUMEN = "id,internetMessageId,from,sentDateTime,receivedDateTime"
 _SELECT_MENSAJE = ("id,internetMessageId,conversationId,subject,from,toRecipients,ccRecipients,body,uniqueBody,"
                    "receivedDateTime,sentDateTime,internetMessageHeaders,hasAttachments")
 # «RE:», «RV:», «FW:», «Fwd:», «RE[2]:»… (también repetidos) al inicio del asunto.
@@ -370,7 +374,7 @@ def proveedor_desde_entorno(env=None) -> str:
     if valor not in PROVEEDORES:
         logger.warning("CORREO_PROVEEDOR=%s no existe: se usa graph", valor)
         return "graph"
-    if valor != "graph" and en_vercel(env):
+    if valor != "graph" and en_produccion(env):
         logger.warning("CORREO_PROVEEDOR=%s es solo para probar en local: en Vercel se usa graph",
                        valor)
         return "graph"
@@ -392,7 +396,7 @@ def avisar_comentarios_desde_entorno(env=None) -> bool:
     """``AVISAR_COMENTARIOS``; si no está, encendido en Vercel y apagado en Docker."""
     env = os.environ if env is None else env
     valor = (env.get("AVISAR_COMENTARIOS") or "").strip()
-    return _activo(valor) if valor else en_vercel(env)
+    return _activo(valor) if valor else en_produccion(env)
 
 
 def modo_desde_entorno(env=None) -> str:
@@ -401,7 +405,7 @@ def modo_desde_entorno(env=None) -> str:
     valor = (env.get("CORREO_MODO") or "").strip().lower()
     if valor in ("cron", "hilo"):
         return valor
-    return "cron" if en_vercel(env) else "hilo"
+    return "cron" if en_produccion(env) else "hilo"
 
 
 # --- Lectura del correo ---------------------------------------------------
@@ -1439,16 +1443,9 @@ class ClienteGraph:
         return [parte.get("content") or "" for parte in (datos.get("uniqueBody"), datos.get("body"))
                 if parte and (parte.get("contentType") or "").lower() == "html"]
 
-    def no_leidos(self) -> list[dict]:
-        """Correos no leídos de la bandeja de entrada (todas las páginas)."""
+    def _paginas(self, url: str, params: dict) -> list[dict]:
+        """Hasta ``MAX_PAGINAS`` páginas de una lista de mensajes."""
         mensajes: list[dict] = []
-        url = "/me/mailFolders/inbox/messages"
-        params = {
-            "$filter": "isRead eq false",
-            "$top": "50",
-            "$select": _SELECT_MENSAJE,
-            "$expand": _EXPANDIR_PROPIEDADES,
-        }
         for _ in range(MAX_PAGINAS):
             datos = self._pedir("GET", url, params=params,
                                 headers={"Prefer": 'outlook.body-content-type="text"'})
@@ -1459,27 +1456,36 @@ class ClienteGraph:
             params = None  # el nextLink ya trae los parámetros
         return mensajes
 
-    def enviados(self, desde: datetime) -> list[dict]:
+    @staticmethod
+    def _campos(completo: bool) -> dict:
+        if completo:
+            return {"$select": _SELECT_MENSAJE, "$expand": _EXPANDIR_PROPIEDADES}
+        return {"$select": _SELECT_RESUMEN}
+
+    def no_leidos(self, completo: bool = True) -> list[dict]:
+        """Correos no leídos de la bandeja de entrada (todas las páginas).
+        Con ``completo=False``, solo :data:`_SELECT_RESUMEN` (sin cuerpos)."""
+        return self._paginas("/me/mailFolders/inbox/messages",
+                             {"$filter": "isRead eq false", "$top": "50", **self._campos(completo)})
+
+    def enviados(self, desde: datetime, completo: bool = True) -> list[dict]:
         """Correos de Elementos enviados desde ``desde``, del más viejo al más
         nuevo (hasta ``MAX_PAGINAS`` páginas de los más recientes)."""
-        mensajes: list[dict] = []
-        url = "/me/mailFolders/sentitems/messages"
-        params = {
+        mensajes = self._paginas("/me/mailFolders/sentitems/messages", {
             "$filter": f"sentDateTime ge {desde.astimezone(timezone.utc):%Y-%m-%dT%H:%M:%SZ}",
             "$orderby": "sentDateTime desc",
             "$top": "50",
-            "$select": _SELECT_MENSAJE,
-            "$expand": _EXPANDIR_PROPIEDADES,
-        }
-        for _ in range(MAX_PAGINAS):
-            datos = self._pedir("GET", url, params=params,
-                                headers={"Prefer": 'outlook.body-content-type="text"'})
-            mensajes.extend(datos.get("value", []))
-            url = datos.get("@odata.nextLink")
-            if not url:
-                break
-            params = None
+            **self._campos(completo),
+        })
         return list(reversed(mensajes))
+
+    def mensaje(self, mensaje_id: str) -> dict:
+        """Un correo entero (los mismos campos que :meth:`no_leidos`)."""
+        return self._pedir("GET", f"/me/messages/{mensaje_id}", params=self._campos(True),
+                           headers={"Prefer": 'outlook.body-content-type="text"'})
+
+    # Las revisiones piden primero el resumen y el correo entero solo si es nuevo.
+    resumen_primero = True
 
     def id_carpeta(self, nombre: str) -> str:
         """Id de la carpeta (en la raíz del buzón); la crea si no existe."""
@@ -1947,6 +1953,53 @@ def _sin_tiempo(hasta: float | None) -> bool:
     return hasta is not None and time.monotonic() >= hasta
 
 
+def _resumen_primero(cliente) -> bool:
+    """Graph lista primero sin cuerpos (:data:`_SELECT_RESUMEN`) y baja el
+    correo entero solo si todavía no se procesó. Mailpit y los clientes de
+    prueba siguen trayendo todo de una vez."""
+    return getattr(cliente, "resumen_primero", False) is True
+
+
+def _message_id(mensaje: dict) -> str:
+    """El Message-ID con que :func:`correo_desde_graph` registra el correo."""
+    return ((mensaje.get("internetMessageId") or "").strip() or f"<graph:{mensaje.get('id')}>")[:500]
+
+
+def _ya_procesados(session_factory, mensajes: list[dict]) -> dict[str, str]:
+    """``{Message-ID: resultado}`` de los que ya están en el registro (una
+    sola consulta por cada 500)."""
+    ids = list(dict.fromkeys(_message_id(m) for m in mensajes))
+    previos: dict[str, str] = {}
+    with session_factory() as session:
+        for desde in range(0, len(ids), 500):
+            previos.update(session.execute(
+                select(ProcessedEmail.message_id, ProcessedEmail.result).where(
+                    ProcessedEmail.message_id.in_(ids[desde:desde + 500]))).all())
+    return previos
+
+
+def _remitente(mensaje: dict) -> str:
+    return (((mensaje.get("from") or {}).get("emailAddress") or {}).get("address") or "").strip().lower()
+
+
+def _antes_de(mensaje: dict, inicio: datetime) -> bool:
+    fecha = _fecha_iso(mensaje.get("sentDateTime") or mensaje.get("receivedDateTime"))
+    return fecha is not None and fecha < inicio
+
+
+def _salto_bandeja(mensaje: dict, previos: dict[str, str], config: ConfigCorreo) -> str | None:
+    """Con el resumen basta para saber que un no leído no cambia nada (el
+    mismo resultado que daría :func:`procesar_correo`): ``visto`` (el filtro
+    ia ya lo descartó) o ``de_la_app`` (aviso de la app al propio buzón).
+    Un ``repetido`` sí se baja entero: hay que volver a intentar moverlo."""
+    previo = previos.get(_message_id(mensaje))
+    if previo == NO_SOLICITUD:
+        return "visto"
+    if previo == "aviso_app" and _remitente(mensaje) == config.usuario.strip().lower():
+        return "de_la_app"
+    return None
+
+
 def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
                   avisados: set | None = None, hasta: float | None = None) -> dict[str, int]:
     """Revisa los no leídos una vez y procesa los que piden ayuda.
@@ -1983,12 +2036,28 @@ def revisar_buzon(session_factory, config: ConfigCorreo, cliente: ClienteGraph,
     if _sin_tiempo(hasta):
         freno.alertar(config.usuario)
         return conteo
-    mensajes = cliente.no_leidos()
+    resumen = _resumen_primero(cliente)
+    mensajes = cliente.no_leidos(completo=False) if resumen else cliente.no_leidos()
+    previos = _ya_procesados(session_factory, mensajes) if resumen and mensajes else {}
     carpeta_id = None
     for posicion, mensaje in enumerate(mensajes):
         if _sin_tiempo(hasta):
             conteo["pendientes"] = len(mensajes) - posicion
             break
+        if resumen:
+            if _antes_de(mensaje, inicio):
+                continue
+            salto = _salto_bandeja(mensaje, previos, config)
+            if salto is not None:
+                conteo[salto] = conteo.get(salto, 0) + 1
+                continue
+            try:
+                mensaje = cliente.mensaje(mensaje["id"])
+            except SinSesionError:
+                raise
+            except Exception:
+                logger.exception("No se pudo leer el correo %s", mensaje.get("id"))
+                continue
         correo = correo_desde_graph(mensaje)
         if correo.fecha is not None and correo.fecha < inicio:
             continue  # Llegó antes de activar la función: no se toca.
@@ -2072,6 +2141,8 @@ def _guardar_adjuntos(session_factory, config: ConfigCorreo, cliente: ClienteGra
     """Guarda los adjuntos (ver :mod:`correo_adjuntos`) y devuelve la
     respuesta con la nota de los que no se guardaron. Si algo falla, el
     ticket o el comentario ya están creados: se responde igual."""
+    from backend.services import correo_adjuntos  # noqa: PLC0415 — solo si hace falta
+
     try:
         resultado = correo_adjuntos.guardar(session_factory, cliente, mensaje_id,
                                             respuesta.ticket_id, correo.remitente, hasta)
@@ -2095,10 +2166,27 @@ def revisar_enviados(session_factory, config: ConfigCorreo, cliente: ClienteGrap
     freno = freno or _Freno()
     with session_factory() as session:
         inicio = fecha_de_inicio(session, MARCA_INICIO_ENVIADOS)
-    for mensaje in cliente.enviados(inicio):
+    resumen = _resumen_primero(cliente)
+    mensajes = cliente.enviados(inicio, completo=False) if resumen else cliente.enviados(inicio)
+    # Todos los enviados quedan registrados: con el resumen se saltan sin bajarlos.
+    previos = _ya_procesados(session_factory, mensajes) if resumen and mensajes else {}
+    for mensaje in mensajes:
         if _sin_tiempo(hasta):
             conteo["pendientes"] = conteo.get("pendientes", 0) + 1
             continue
+        if resumen:
+            if _antes_de(mensaje, inicio):
+                continue
+            if _message_id(mensaje) in previos:
+                conteo["repetido"] = conteo.get("repetido", 0) + 1
+                continue
+            try:
+                mensaje = cliente.mensaje(mensaje["id"])
+            except SinSesionError:
+                raise
+            except Exception:
+                logger.exception("No se pudo leer el enviado %s", mensaje.get("id"))
+                continue
         correo = correo_desde_graph(mensaje)
         if correo.fecha is not None and correo.fecha < inicio:
             continue
@@ -2204,6 +2292,24 @@ LIMITE_CRON = 25.0
 TIMEOUT_GRAPH_CRON = 15.0
 
 
+# En un servidor que sigue encendido (Render, Docker con CORREO_MODO=cron) el
+# cliente de Graph se reutiliza entre llamadas: la conexión HTTPS y la app de
+# msal quedan abiertas y la caché de tokens solo se relee si cambió.
+_cliente_guardado: tuple | None = None
+_candado_cliente = threading.Lock()
+
+
+def _cliente_cron(config: ConfigCorreo, session_factory, crear):
+    global _cliente_guardado
+    if crear is not crear_cliente:  # las pruebas pasan su propio cliente
+        return crear(config, session_factory)
+    clave = (config, id(session_factory))
+    with _candado_cliente:
+        if _cliente_guardado is None or _cliente_guardado[0] != clave:
+            _cliente_guardado = (clave, crear(config, session_factory))
+        return _cliente_guardado[1]
+
+
 class CorreoApagado(Exception):
     """``CORREO_ACTIVO`` no está encendido (o falta ``CORREO_USUARIO``)."""
 
@@ -2221,7 +2327,8 @@ def revisar_una_vez(session_factory=None, limite: float = LIMITE_CRON,
         from backend.database import SessionLocal
 
         session_factory = SessionLocal
-    conteo = revisar_buzon(session_factory, config, crear(config, session_factory), hasta=hasta)
+    conteo = revisar_buzon(session_factory, config, _cliente_cron(config, session_factory, crear),
+                           hasta=hasta)
     if conteo:
         logger.info("revisión del buzón por cron: %s", conteo)
     return conteo

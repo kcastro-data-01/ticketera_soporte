@@ -25,7 +25,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 
 from backend.constants import UserRole
-from backend.entorno import en_vercel
+from backend.entorno import en_produccion
 from backend.models import Attachment, History, Ticket, User
 from backend.services.ticket_service import _audit_author, _ensure_open
 
@@ -304,7 +304,7 @@ def almacen_actual():
     """Donde se guardan los adjuntos nuevos."""
     if (os.environ.get("BLOB_READ_WRITE_TOKEN") or "").strip():
         return AlmacenBlob()
-    if en_vercel():
+    if en_produccion():
         # En Vercel el disco no dura entre llamadas: sin Blob no se guarda.
         raise AlmacenNoConfiguradoError(
             "Los adjuntos no están configurados en este servidor.")

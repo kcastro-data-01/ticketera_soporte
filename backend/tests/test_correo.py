@@ -367,6 +367,11 @@ class FakeGraph:
         if request.method == "GET" and partes[4:] == ["attachments"]:
             # Como Graph con un correo sin adjuntos (la app siempre pide la lista).
             return httpx.Response(200, json={"value": []})
+        if request.method == "GET" and len(partes) == 4 and request.url.params["$select"] != "uniqueBody,body":
+            # El correo entero (después del resumen sin cuerpos de la lista).
+            assert request.url.params["$select"] == cs._SELECT_MENSAJE
+            assert request.headers["Prefer"] == 'outlook.body-content-type="text"'
+            return httpx.Response(200, json=mensaje)
         if request.method == "GET" and len(partes) == 4:
             # El HTML del cuerpo (para las imágenes que no son adjuntos):
             # ``_html`` y ``_html_unico`` del mensaje de prueba, si tiene.

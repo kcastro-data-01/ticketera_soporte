@@ -1716,3 +1716,67 @@ se ve, sin «Volver a explicar»).
 * **Datos separados:** Docker (SQLite) y Vercel (Neon) son bases distintas.
   El código se edita en Docker y llega a Vercel al subir a `main`; los datos
   no viajan entre una y otra.
+
+## Publicar en Render (temporal)
+
+Mientras Vercel está pausado, la misma imagen de Docker corre en Render (plan
+gratis) hasta el 30 de noviembre, en la rama `prueba-render`, con la misma base
+Neon. `render.yaml` describe el servicio (*New → Blueprint* y elegir el repo y
+la rama). Diferencias con Vercel:
+
+* **Modo producción:** Render define `RENDER=true` y `render.yaml` además pone
+  `MODO_PRODUCCION=1`. Con cualquiera de las dos (o `VERCEL=1`) la app se porta
+  como en Vercel: IA apagada si no hay `ASISTENTE_PROVEEDOR`, correo por cron,
+  solo Graph, sin `/docs`, sin contraseña y sin arrancar si falta
+  `JWT_SECRET_KEY`. `MODO_PRODUCCION=1` sirve para cualquier otro servidor.
+* **Puerto y salud:** el contenedor escucha en `$PORT` (Render pone 10000;
+  Docker Compose sigue en 8000) y Render revisa `GET /health`.
+* **Cabeceras de seguridad:** en Vercel las pone `vercel.json`; fuera de
+  Vercel, en producción, las agrega FastAPI (`backend/cabeceras.py`, las
+  mismas; una prueba compara las dos).
+* **Correo:** igual que en Vercel, `POST /api/cron/correo` desde cron-job.org
+  (cambiar la URL a la de Render). Las listas de Graph se piden sin cuerpos;
+  solo se baja entero un correo que no está en el registro, y si no hay nada
+  nuevo la llamada termina con dos pedidos a Graph. El cliente de Graph (con
+  su conexión y la app de msal) se reutiliza entre llamadas.
+* **Disco:** Render gratis lo borra en cada reinicio o deploy. Los adjuntos van
+  a Vercel Blob (`BLOB_READ_WRITE_TOKEN`); sin el token, subir un adjunto
+  responde 503 y los de los correos se omiten con el motivo.
+* **Plan gratis:** 750 h al mes (alcanza para un servicio todo el mes); se
+  duerme tras 15 min sin tráfico (el cron de cada minuto lo mantiene
+  despierto; si se duerme, la primera llamada tarda ~1 min y cron-job.org la
+  corta a los 30 s: la siguiente ya responde); 512 MB de memoria.
+
+Pasos: crear el Blueprint, cargar las variables de la tabla, agregar en
+Microsoft Entra ID (plataforma SPA) `https://<servicio>.onrender.com/login.html`
+y `https://<servicio>.onrender.com/msal/silencioso.html`, y cambiar la URL del
+cronjob a `https://<servicio>.onrender.com/api/cron/correo` (mismo encabezado
+`Authorization: Bearer <CRON_SECRET>` con el valor nuevo). La sesión del
+buzón ya está en Neon (tabla `msal_cache`): no hace falta `correo_login`.
+
+| Variable | Valor | De dónde sale |
+|---|---|---|
+| `MODO_PRODUCCION` | `1` | ya en `render.yaml` |
+| `DATABASE_URL` | cadena de Neon con pooler (`…-pooler…`) | consola de Neon → *Connection string* (o Vercel → *Storage* → la base → *Open in Neon*) |
+| `JWT_SECRET_KEY` | aleatoria nueva | `python3 -c "import secrets; print(secrets.token_urlsafe(48))"` (todos vuelven a entrar) |
+| `CRON_SECRET` | aleatoria nueva | el mismo comando; va también en el encabezado de cron-job.org |
+| `CORREO_M365_TENANT` | el de `.env` | `.env` o Entra ID → la app → *Overview* → *Directory (tenant) ID* |
+| `CORREO_M365_CLIENT_ID` | el de `.env` | `.env` o Entra ID → *Application (client) ID* |
+| `ADMIN_INICIAL` | `kcastro@data.cr` | |
+| `DOMINIO_EMPRESA` | `data.cr` | |
+| `CORREO_USUARIO` | el buzón de soporte | `.env` |
+| `CORREO_ACTIVO` | `1` | ya en `render.yaml` |
+| `CORREO_MODO` | `cron` | ya en `render.yaml` |
+| `CORREO_PROVEEDOR` | `graph` | ya en `render.yaml` |
+| `CORREO_FILTRO` | `ia` | ya en `render.yaml` |
+| `CORREO_CARPETA_PROCESADOS` | `Tickets-Procesados` | ya en `render.yaml` |
+| `AVISAR_ASIGNADO`, `AVISAR_COMENTARIOS`, `AVISAR_ESTADOS` | `true` | ya en `render.yaml` |
+| `CIERRE_AUTOMATICO` | `true` | ya en `render.yaml` |
+| `ASISTENTE_PROVEEDOR` | `groq` | ya en `render.yaml` |
+| `GROQ_API_KEY` | la clave de Groq | <https://console.groq.com/keys> (la de Vercel o una nueva) |
+| `APP_URL` | `https://<servicio>.onrender.com` | la URL que muestra Render arriba del servicio |
+| `BLOB_READ_WRITE_TOKEN` | el token del store privado | Vercel → *Storage* → el store de Blob → *.env.local* / *Tokens*; vacío si Blob no responde |
+
+No cargar `PORT`, `RENDER` ni `VERCEL` (las pone cada plataforma). Antes de
+que Vercel vuelva, apagar el cronjob de uno de los dos: nunca leer el buzón
+desde los dos a la vez.
