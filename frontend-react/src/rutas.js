@@ -50,15 +50,6 @@ export function rutaNuevaDe(ruta, busqueda = "") {
   return resto ? `${nueva}?${resto}` : nueva;
 }
 
-/* Pantallas todavía no migradas: la ruta nueva abre la página actual. */
-export const PAGINAS_ACTUALES = {
-  metricas: "/metricas.html",
-  departamentos: "/departamentos.html",
-  historial: "/historial.html",
-  usuarios: "/usuarios.html",
-  cuenta: "/cuenta.html",
-  ayuda: "/ayuda.html",
-};
 
 /* Dirección completa del navegador para una ruta de la app («/login» →
    «/react/login»). */

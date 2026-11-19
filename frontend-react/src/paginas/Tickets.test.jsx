@@ -277,12 +277,20 @@ describe("menú lateral por rol", () => {
     expect(localStorage.getItem("menu_plegado")).toBe("1");
   });
 
-  it("pantallas no migradas abren la versión actual", async () => {
+  it("todo el menú lleva a pantallas React (ninguna abre la versión vieja)", async () => {
     const { navegador } = await import("../sesion/almacen.js");
     conSesion("Administrador");
     servidor();
-    renderApp("/metricas");
-    await waitFor(() => expect(navegador.reemplazar).toHaveBeenCalledWith("/metricas.html"));
+    renderApp("/");
+    await screen.findByText("Impresora sin tóner");
+    const menu = screen.getByRole("navigation", { name: "Menú principal" });
+    const hrefs = within(menu).getAllByRole("link").map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["/", "/crear", "/historial", "/metricas", "/departamentos", "/usuarios", "/ayuda"]);
+    await userEvent.click(within(menu).getByRole("link", { name: /Ayuda/ }));
+    expect(await screen.findByRole("heading", { name: "Ayuda" })).toBeInTheDocument();
+    expect(navegador.reemplazar).not.toHaveBeenCalled();
+    expect(navegador.ir).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('a[href$=".html"], a[href*=".html?"]')).toHaveLength(0);
   });
 
   it("menú, lista, detalle y crear llevan a pantallas React", async () => {

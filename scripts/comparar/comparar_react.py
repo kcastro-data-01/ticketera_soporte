@@ -8,8 +8,9 @@ de los elementos de la estructura y cuenta los píxeles distintos.
 Correr con: scripts/comparar_react.sh [roles…] [--paginas tickets,detalle,…]
 (deja las capturas en scripts/comparar/capturas/, que no se sube a Git)
 
-El chat del asistente (#chat-asistente) todavía no está en React (próxima
-etapa): se oculta en la página actual para comparar el resto.
+Para un rol sin permiso, las dos versiones mandan a «Acceso restringido» y
+se compara esa pantalla. El chat del asistente se compara cerrado en todas
+las pantallas y abierto con una conversación («chat»).
 """
 
 import base64
@@ -43,13 +44,35 @@ LISTO_DETALLE = """() => {
   const imgs = [...document.querySelectorAll('img.adjunto-miniatura')];
   return t && t.textContent !== '—' && c && a && imgs.every((i) => i.src && i.complete);
 }"""
+TODOS = ["Administrador", "Técnico", "Solicitante"]
+EQUIPO = ["Administrador", "Técnico"]
+ADMIN = ["Administrador"]
+LISTO_TABLA = "() => document.querySelector('#lista-tickets tr:not(.fila-esqueleto)')"
+ABRIR_CHAT = "() => document.querySelector('.chat-boton').click()"
+EDITAR_USUARIO = "() => document.querySelector('#cuerpo-usuarios .btn-accion').click()"
+# nombre: (actual, react, listo, roles con permiso, acción después de cargar, listo después de la acción)
 PAGINAS = {
-    "tickets": ("/index.html", "/react/", "() => document.querySelector('#lista-tickets tr:not(.fila-esqueleto)')"),
-    "detalle": ("/detalle.html?id=101", "/react/tickets/101", LISTO_DETALLE),
-    "detalle-ia": ("/detalle.html?id=101&pestana=ia", "/react/tickets/101?pestana=ia", LISTO_DETALLE),
-    "detalle-cerrado": ("/detalle.html?id=104", "/react/tickets/104", LISTO_DETALLE),
-    "crear": ("/crear.html", "/react/crear", "() => document.querySelector('#area option[value=\"2\"]')"),
+    "tickets": ("/index.html", "/react/", LISTO_TABLA, TODOS, None, None),
+    "detalle": ("/detalle.html?id=101", "/react/tickets/101", LISTO_DETALLE, TODOS, None, None),
+    "detalle-ia": ("/detalle.html?id=101&pestana=ia", "/react/tickets/101?pestana=ia", LISTO_DETALLE, TODOS, None, None),
+    "detalle-cerrado": ("/detalle.html?id=104", "/react/tickets/104", LISTO_DETALLE, TODOS, None, None),
+    "crear": ("/crear.html", "/react/crear", "() => document.querySelector('#area option[value=\"2\"]')", TODOS, None, None),
+    "historial": ("/historial.html", "/react/historial",
+                  "() => !document.querySelector('#hist-layout').hidden && document.querySelector('.hist-linea')", EQUIPO, None, None),
+    "departamentos": ("/departamentos.html", "/react/departamentos",
+                      "() => !document.querySelector('#deptos-layout').hidden && document.querySelector('#depto-tecnicos tr')", ADMIN, None, None),
+    "metricas": ("/metricas.html", "/react/metricas",
+                 "() => document.querySelectorAll('#tabla-tecnicos tbody tr').length && !document.querySelector('#informe').classList.contains('esqueleto-activo')",
+                 ADMIN, None, None),
+    "usuarios": ("/usuarios.html", "/react/usuarios", "() => document.querySelector('#cuerpo-usuarios tr')", ADMIN, None, None),
+    "usuarios-editar": ("/usuarios.html", "/react/usuarios", "() => document.querySelector('#cuerpo-usuarios tr')", ADMIN,
+                        EDITAR_USUARIO, "() => document.querySelector('#dialogo-usuario[open]')"),
+    "cuenta": ("/cuenta.html", "/react/cuenta", "() => document.querySelector('#cuenta-nombre').textContent !== '—'", TODOS, None, None),
+    "ayuda": ("/ayuda.html", "/react/ayuda", "() => document.querySelector('#tema-crear:not([hidden])')", TODOS, None, None),
+    "ayuda-correo": ("/ayuda.html#correo", "/react/ayuda#correo", "() => document.querySelector('#tema-correo:not([hidden])')", TODOS, None, None),
+    "chat": ("/index.html", "/react/", LISTO_TABLA, TODOS, ABRIR_CHAT, "() => document.querySelector('#chat-lista .chat-fila.usuario')"),
 }
+SIN_PERMISO = "() => document.querySelector('.pagina-error-codigo')"
 
 
 USUARIOS = {
@@ -119,6 +142,83 @@ EXPLICACION = {
     "modelo": "qwen3:0.6b", "generada_en": "2026-11-10T17:00:00Z", "ia_disponible": True,
 }
 
+HORA_CHAT = "2026-11-10T16:05:00Z"
+CONVERSACION = [
+    {"role": "user", "content": "¿Cuántos tickets pendientes hay?", "hora": HORA_CHAT},
+    {"role": "assistant", "content": "Resumen:\nHay **2** tickets nuevos sin asignar:\n- #101 Impresora del piso 2\n- [la VPN](detalle.html?id=102&pestana=ia)\n\n1. Revise primero el #101.",
+     "hora": HORA_CHAT, "fuente": "sistema"},
+    {"role": "user", "content": "Gracias", "hora": HORA_CHAT},
+    {"role": "assistant", "content": "La IA no está disponible en este momento", "error": True, "hora": HORA_CHAT},
+]
+HISTORIAL_PERSONAS = [
+    {"clave": "2", "nombre": "Tomás Técnico", "rol": "Técnico", "departamento": "Redes", "cambios": 3},
+    {"clave": "3", "nombre": "Sara Solicitante", "rol": "Solicitante", "departamento": None, "cambios": 1},
+    {"clave": "sistema", "nombre": "Sistema", "rol": None, "departamento": None, "cambios": 1},
+]
+
+
+def historial_cambios(hoy):
+    return [
+        {"id": 1, "ticket_id": 102, "ticket_title": "No conecta la VPN desde casa", "action": "commented",
+         "new_value": "Probé con otro cable y sigue igual", "author": "Tomás Técnico", "created_at": f"{hoy}T15:40:00Z"},
+        {"id": 2, "ticket_id": 102, "ticket_title": "No conecta la VPN desde casa", "action": "state_changed",
+         "old_value": "Nuevo", "new_value": "En proceso", "author": "Tomás Técnico", "created_at": f"{hoy}T15:10:00Z"},
+        {"id": 3, "ticket_id": 101, "ticket_title": "Impresora del piso 2 sin tóner", "action": "created",
+         "new_value": "Tomás Técnico", "author": "Sara Solicitante", "created_at": "2026-11-10T15:30:00Z"},
+        {"id": 4, "ticket_id": 104, "ticket_title": "Instalar Office en portátil nueva", "action": "Cierre automático",
+         "old_value": "Resuelto", "new_value": "Cerrado", "author": "", "created_at": "2026-11-09T12:00:00Z"},
+        {"id": 5, "ticket_id": 103, "ticket_title": "Restablecer clave del correo", "action": "assigned",
+         "old_value": None, "new_value": "Ana Admin", "author": "Tomás Técnico", "created_at": "2026-11-09T11:00:00Z"},
+    ]
+
+
+DEPARTAMENTOS = {
+    "departamentos": [
+        {"area_id": 1, "nombre": "Soporte IT", "atiende": "computadoras, impresoras y programas", "total": 9, "abiertos": 4,
+         "por_estado": {"Nuevo": 2, "En proceso": 2, "Resuelto": 3, "Cerrado": 2},
+         "tecnicos": [{"id": 2, "name": "Tomás Técnico", "abiertos": 3, "resueltos_mes": 5}, {"id": 1, "name": "Ana Admin", "abiertos": 1, "resueltos_mes": 2}],
+         "tickets_abiertos": [
+             {"id": 101, "title": "Impresora del piso 2 sin tóner", "state": "Nuevo", "priority": "Alta", "assigned_to_name": None},
+             {"id": 105, "title": "Pantalla parpadea en sala de juntas", "state": "En proceso", "priority": "Media", "assigned_to_name": "Tomás Técnico"}]},
+        {"area_id": 2, "nombre": "Redes e Infraestructura", "atiende": "internet, wifi, servidores y VPN", "total": 3, "abiertos": 1,
+         "por_estado": {"Nuevo": 0, "En proceso": 1, "Resuelto": 2, "Cerrado": 0}, "tecnicos": [],
+         "tickets_abiertos": [{"id": 102, "title": "No conecta la VPN desde casa", "state": "En proceso", "priority": "Crítica", "assigned_to_name": "Tomás Técnico"}]},
+        {"area_id": 3, "nombre": "Ciberseguridad", "atiende": None, "total": 0, "abiertos": 0, "por_estado": {}, "tecnicos": [], "tickets_abiertos": []},
+        {"area_id": None, "nombre": "Sin departamento", "total": 1, "abiertos": 1, "por_estado": {"Nuevo": 1},
+         "tecnicos": [], "tickets_abiertos": [{"id": 106, "title": "Sin clasificar", "state": "Nuevo", "priority": "Baja", "assigned_to_name": None}]},
+    ],
+    "atencion": {"criticos": 1, "altos": 1, "sin_asignar": 2, "nuevos_viejos": 0, "dias_nuevo": 2},
+}
+
+
+def metricas(desde, hasta, anterior=False):
+    import datetime as dt
+    d0 = dt.date.fromisoformat(desde)
+    dias = [(d0 + dt.timedelta(days=i)).isoformat() for i in range((dt.date.fromisoformat(hasta) - d0).days + 1)]
+    return {
+        "desde": desde, "hasta": hasta,
+        "tarjetas": {"creados_periodo": 9 if anterior else 14, "resueltos_periodo": 6 if anterior else 11,
+                     "tiempo_promedio_horas": 30.4 if anterior else 26.2, "por_correo": 3 if anterior else 5,
+                     "por_web": 6 if anterior else 9, "abiertos": 7, "en_proceso": 3, "nuevo": 4},
+        "por_estado": [{"nombre": "Nuevo", "total": 4}, {"nombre": "En proceso", "total": 3}, {"nombre": "Resuelto", "total": 5}, {"nombre": "Cerrado", "total": 2}],
+        "por_categoria": [{"nombre": "Hardware", "total": 6}, {"nombre": "Software", "total": 3}, {"nombre": "Red", "total": 4}, {"nombre": "Accesos", "total": 1}],
+        "por_dia": [{"fecha": f, "total": (i * 7) % 4} for i, f in enumerate(dias)],
+        "por_persona": [
+            {"nombre": "Tomás Técnico", "rol": "Técnico", "activo": True, "area": "Redes", "abiertos": 4, "resueltos": 7},
+            {"nombre": "Ana Admin", "rol": "Administrador", "activo": True, "area": "Soporte IT", "abiertos": 2, "resueltos": 4},
+            {"nombre": "Luis Baja", "rol": "Técnico", "activo": False, "area": None, "abiertos": 0, "resueltos": 1},
+        ],
+        "sin_asignar_abiertos": 1,
+    }
+
+
+USUARIOS_LISTA = [
+    {"id": 1, "name": "Ana Admin", "email": "ana@data.cr", "role": "Administrador", "area_id": 1, "area_name": "Soporte IT", "is_active": True},
+    {"id": 2, "name": "Tomás Técnico", "email": "tomas@data.cr", "role": "Técnico", "area_id": 2, "area_name": "Redes", "is_active": True},
+    {"id": 3, "name": "Sara Solicitante", "email": "sara@data.cr", "role": "Solicitante", "area_id": None, "is_active": True},
+    {"id": 4, "name": "Luis Baja", "email": "luis@data.cr", "role": "Técnico", "area_id": None, "is_active": False},
+]
+
 AREAS = [{"id": 1, "name": "Soporte IT"}, {"id": 2, "name": "Redes"}, {"id": 3, "name": "Desarrollo"}, {"id": 4, "name": "Infraestructura"}]
 SELECTORES = ["body", ".barra-lateral", ".marca", ".boton-plegar", ".menu", ".menu-usuario", ".app-principal",
               ".cabecera", ".cabecera h1", ".listado-controles", ".cabecera-acciones", ".boton-tema",
@@ -126,7 +226,10 @@ SELECTORES = ["body", ".barra-lateral", ".marca", ".boton-plegar", ".menu", ".me
               "#lista-tickets tr", ".pie", ".migas", ".acciones-principales", "#panel-ticket", "#pasos-estado",
               "#seccion-adjuntos", "#adj-lista", "#pestanas-detalle", "#lista-comentarios", "#form-comentario",
               ".detalle-lateral", "#panel-datos", "#seccion-asignacion", "#seccion-area", "#seccion-ia", "#ia-panel",
-              "#form-crear", ".crear-lateral", ".opciones-prioridad", ".acciones-crear"]
+              "#form-crear", ".crear-lateral", ".opciones-prioridad", ".acciones-crear",
+              "#chat-asistente", ".chat-boton", "#chat-panel", "#chat-lista", "#hist-lista", "#hist-detalle", "#hist-cambios",
+              "#deptos-lista", "#deptos-detalle", "#deptos-atencion", "#depto-cajas", "#informe", "#g-estado canvas", "#g-dia canvas",
+              "#tabla-usuarios", "#dialogo-usuario", "#form-editar-usuario", ".ayuda-temas", "#tema-correo", ".pagina-error-tarjeta"]
 
 
 def token(rol):
@@ -152,6 +255,9 @@ class Servidor(http.server.SimpleHTTPRequestHandler):
         return str(RAIZ / "frontend" / ruta.lstrip("/"))
 
 
+METRICAS_DESDE = ["9999-99-99"]
+
+
 def api(route, rol):
     url = route.request.url
     ruta = "/" + url.split("://", 1)[1].split("/", 1)[1]
@@ -170,6 +276,22 @@ def api(route, rol):
         if sub == "/history":
             return json_([])
         return json_(next(t for t in TICKETS if t["id"] == tid))
+    if ruta.startswith("/api/history/resumen"):
+        return json_({"personas": HISTORIAL_PERSONAS, "total": 5, "cajas": {"cambios": 5, "tickets": 4, "comentarios": 1, "cambios_estado": 2}})
+    if ruta.startswith("/api/history"):
+        from datetime import date
+        return json_(historial_cambios(date.today().isoformat()))
+    if ruta.startswith("/api/departamentos/resumen"):
+        return json_(DEPARTAMENTOS)
+    if ruta.startswith("/api/metricas"):
+        from urllib.parse import parse_qs, urlsplit
+        q = parse_qs(urlsplit(url).query)
+        desde, hasta = q["desde"][0], q["hasta"][0]
+        return json_(metricas(desde, hasta, anterior=desde < METRICAS_DESDE[0]))
+    if ruta.startswith("/api/auth/config"):
+        return json_({"tenant": "", "client_id": "", "login_local": False, "sesion_maxima_horas": 10})
+    if ruta.startswith("/api/users?todos=true"):
+        return json_(USUARIOS_LISTA)
     if ruta.startswith("/api/tickets/summary"):
         return json_({"mios_abiertos": 2})
     if ruta.startswith("/api/tickets?state=Nuevo"):
@@ -202,18 +324,29 @@ def capturar(navegador, puerto, rol, vista, tema, cual, pagina_nombre):
         localStorage.setItem("user", {json.dumps(json.dumps(USUARIOS[rol]))});
         localStorage.setItem("sesion_actividad", String(Date.now()));
         {'localStorage.setItem("tema", "oscuro");' if tema == "oscuro" else 'localStorage.removeItem("tema");'}
-        ["vista_listado", "densidad_listado", "orden_listado", "menu_plegado", "detalle_pestana"].forEach((k) => localStorage.removeItem(k));
+        ["vista_listado", "densidad_listado", "orden_listado", "menu_plegado", "detalle_pestana", "asistente_grande"].forEach((k) => localStorage.removeItem(k));
+        sessionStorage.setItem("asistente_chat", {json.dumps(json.dumps(CONVERSACION))});
     """)
     pagina = contexto.new_page()
     pagina.route("**/api/**", lambda route: api(route, rol))
     pagina.route("https://fonts.googleapis.com/**", lambda route: route.abort())
     pagina.route("https://fonts.gstatic.com/**", lambda route: route.abort())
     pagina.route("https://cdn.jsdelivr.net/**", lambda route: route.abort())
-    vieja, nueva, listo = PAGINAS[pagina_nombre]
+    vieja, nueva, listo, roles, accion, listo_accion = PAGINAS[pagina_nombre]
+    from datetime import date, timedelta
+    METRICAS_DESDE[0] = (date.today() - timedelta(days=29)).isoformat()
     pagina.goto(f"http://127.0.0.1:{puerto}" + (vieja if cual == "actual" else nueva))
-    pagina.wait_for_function(listo, timeout=15000)
+    if rol not in roles:
+        pagina.wait_for_function(SIN_PERMISO, timeout=15000)
+    else:
+        pagina.wait_for_function(listo, timeout=15000)
+        if accion:
+            pagina.wait_for_timeout(300)
+            pagina.evaluate(accion)
+            pagina.wait_for_function(listo_accion, timeout=15000)
     pagina.wait_for_timeout(400)
-    pagina.add_style_tag(content="#chat-asistente{display:none!important} *{transition:none!important;animation:none!important;caret-color:transparent!important}")
+    pagina.add_style_tag(content="*{transition:none!important;animation:none!important;caret-color:transparent!important}")
+    pagina.mouse.move(0, 0)
     pagina.wait_for_timeout(200)
     archivo = SALIDA / f"{pagina_nombre}-{rol}-{vista}-{tema}-{cual}.png"
     pagina.screenshot(path=str(archivo), full_page=True)
@@ -229,7 +362,7 @@ def diferencia(a, b):
     caja = ImageChops.difference(ia, ib).getbbox()
     if not caja:
         return 0, ia.size, ib.size
-    distintos = sum(1 for p in ImageChops.difference(ia, ib).convert("L").getdata() if p > 16)
+    distintos = ImageChops.difference(ia, ib).convert("L").point(lambda p: 255 if p > 16 else 0).histogram()[255]
     return distintos, ia.size, ib.size
 
 

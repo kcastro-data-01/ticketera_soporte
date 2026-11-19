@@ -322,7 +322,19 @@ en `/crear` (mismas validaciones, adjuntos y «Ir al ticket y reintentar» si
 alguno falla) y los avisos flotantes en todas las pantallas React
 (`src/avisos/Avisos.jsx`, con la misma clave `aviso_pendiente`). El menú y los
 botones llevan a las pantallas React que ya existen; solo las que faltan
-abren la versión actual (`/react/metricas` → `/metricas.html`).
+abrían la versión actual.
+
+**Etapa 3 (lista):** todas las pantallas que faltaban: Historial
+(`/historial`, agrupado por persona, con período, búsqueda y `#persona=…`),
+Departamentos (`/departamentos`, con «Requieren atención» y los enlaces a la
+lista filtrada `/?area=…&estado=…`), Métricas (`/metricas`, con Chart.js
+4.4.1 empaquetado en vez del CDN), Usuarios (`/usuarios`: agregar, editar,
+rol, departamento, desactivar y reactivar; contraseña solo con
+`LOGIN_LOCAL=true`), Mi cuenta (`/cuenta`), Ayuda (`/ayuda`, con `#tema`) y
+el chat del asistente en todas las pantallas (los enlaces a tickets llevan a
+`/tickets/N`; también los viejos `detalle.html?id=N` guardados en una
+conversación). Ningún menú, botón ni enlace de la app React abre ya la
+versión vieja.
 
 Direcciones (dentro de `/react/`): `/`, `/login`, `/tickets/:id`, `/crear`,
 `/metricas`, `/departamentos`, `/historial`, `/usuarios`, `/cuenta`, `/ayuda`,
@@ -338,9 +350,12 @@ npm run dev       # desarrollo con recarga: http://localhost:5173/react/
 ```
 
 Para comparar a ojo y al píxel las pantallas actuales con las de React
-(Tickets, Detalle —normal, con `?pestana=ia` y Cerrado— y Nuevo ticket;
-capturas con Playwright en 1366x768 y 390x844, claro y oscuro, con la misma
-API simulada), después de `npm run build`:
+(todas: Tickets, Detalle —normal, con `?pestana=ia` y Cerrado—, Nuevo
+ticket, Historial, Departamentos, Métricas, Usuarios —también con la ventana
+de edición abierta—, Mi cuenta, Ayuda —también `#correo`— y el chat abierto
+con una conversación; capturas con Playwright en 1366x768 y 390x844, claro y
+oscuro, con la misma API simulada; para un rol sin permiso se compara
+«Acceso restringido»), después de `npm run build`:
 
 ```bash
 scripts/comparar_react.sh Administrador Técnico Solicitante
@@ -348,8 +363,8 @@ scripts/comparar_react.sh Técnico --paginas detalle,crear   # una parte
 ```
 
 Deja las capturas en `scripts/comparar/capturas/` (no se suben) y termina con
-error si alguna difiere. El chat del asistente se oculta en la página actual
-porque todavía no está en React.
+error si alguna difiere. La página actual de Métricas baja Chart.js del CDN,
+así que esa comparación necesita internet.
 
 `npm run dev` necesita la app en `localhost:8000` (Docker o uvicorn): le pasa
 `/api`, `/msal` y las páginas `.html` viejas. Para entrar con Microsoft desde
@@ -390,11 +405,30 @@ oscuro antes de pintar va en `public/tema.js`), sin `dangerouslySetInnerHTML`
 ni `innerHTML`: todo lo que escriben los usuarios se muestra como texto
 (`src/pruebas/seguridad.test.js` lo revisa).
 
-**Próximas etapas.** Historial, Departamentos, Métricas, Usuarios, Mi
-cuenta, Ayuda y el chat del asistente. En la etapa final la app pasa a
-la raíz (`base: "/"` en `vite.config.js`), el servidor redirige con 301 las
-direcciones viejas (`backend/frontend_react.py` → `ruta_nueva`, p. ej.
-`detalle.html?id=N` → `/tickets/N`) y se retira `frontend/`.
+**Etapa final (pendiente).**
+
+1. React en la raíz: `BASE = "/"` en `frontend-react/vite.config.js` (el
+   `basename` del router sale de ahí) y `montar_react` en `/` en lugar del
+   frontend actual (`backend/main.py`); en `vercel.json`, `outputDirectory`
+   al build y la reescritura de cualquier ruta a `/index.html`.
+2. Redirecciones 301 desde las direcciones viejas con
+   `backend/frontend_react.py → ruta_nueva()` (ya probada:
+   `detalle.html?id=N` → `/tickets/N`, `index.html?…` → `/?…`, etc.), también
+   en `vercel.json` (`redirects`). Los correos de aviso que arma el servidor
+   con `detalle.html?id=N` siguen funcionando por la redirección; conviene
+   cambiarlos a `/tickets/N` (y el chat del servidor, que hoy manda
+   `[texto](detalle.html?id=N)`: el frontend React ya acepta los dos).
+3. Mover `/msal/silencioso.html` a `frontend-react/public/msal/` (misma
+   dirección, mismas cabeceras de `cabeceras.py` y `vercel.json`).
+4. Quitar `frontend/` viejo: antes, mover `frontend/css` e `frontend/images`
+   a `frontend-react/` (hoy se importan de ahí), pasar a Vitest o borrar las
+   pruebas de `frontend/tests` y las de `frontend/tests/navegador`, y quitar
+   del `Dockerfile` la copia de `frontend/`.
+5. Microsoft Entra: agregar las URI de la raíz (`…/login` en local, Render y
+   Vercel), mantener `…/msal/silencioso.html`, y cuando nadie use la versión
+   vieja ni `/react/`, quitar `…/login.html` y `…/react/login`.
+6. `scripts/comparar_react.sh` deja de tener sentido (ya no hay versión
+   vieja): se puede quitar o dejar como prueba visual contra capturas guardadas.
 
 ### Health check
 

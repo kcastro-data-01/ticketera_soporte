@@ -72,20 +72,33 @@ function Aviso({ aviso, onCerrar }) {
 }
 
 /* La zona, justo debajo de la barra del título (variable CSS con CSSOM: la
-   CSP no permite estilos en línea en el HTML). */
+   CSP no permite estilos en línea en el HTML). Con una ventana modal
+   abierta (<dialog>) va adentro de ella, para que se vea y se pueda cerrar;
+   al cerrarla vuelve al <body>. */
 function Zona({ avisos, onCerrar }) {
   const zona = useRef(null);
+  const [modal, setModal] = useState(null);
+  useLayoutEffect(() => {
+    const abierto = document.querySelector("dialog[open]");
+    if (abierto !== modal) setModal(abierto);
+  }, [avisos]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!modal) return undefined;
+    const alCerrar = () => setModal(null);
+    modal.addEventListener("close", alCerrar);
+    return () => modal.removeEventListener("close", alCerrar);
+  }, [modal]);
   useLayoutEffect(() => {
     if (!zona.current) return;
-    const cabecera = document.querySelector(".cabecera");
+    const cabecera = modal ? null : document.querySelector(".cabecera");
     const borde = cabecera ? Math.max(cabecera.getBoundingClientRect().bottom, 0) : 0;
     zona.current.style.setProperty("--avisos-arriba", `${Math.round(borde + AVISOS_MARGEN_PX)}px`);
-  }, [avisos]);
+  });
   return createPortal(
     <div id="avisos" className="avisos" aria-live="polite" aria-label="Avisos" ref={zona}>
       {avisos.map((aviso) => <Aviso key={aviso.id} aviso={aviso} onCerrar={onCerrar} />)}
     </div>,
-    document.body,
+    modal || document.body,
   );
 }
 

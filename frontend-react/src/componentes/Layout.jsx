@@ -3,6 +3,7 @@ import { Link, NavLink } from "react-router-dom";
 import logo from "../../../frontend/images/logo-circular.jpg";
 import { useSesion } from "../contexto/SesionContext.jsx";
 import { useSesionDeslizante } from "../sesion/useSesionDeslizante.js";
+import Asistente from "../chat/Asistente.jsx";
 import AvisoSesion from "./AvisoSesion.jsx";
 import MenuUsuario from "./MenuUsuario.jsx";
 import { useClaseBody } from "./claseBody.js";
@@ -132,6 +133,7 @@ export default function Layout({ children }) {
         <footer className="pie">© 2026 American Data Networks · Sistema de Tickets</footer>
       </div>
 
+      <Asistente />
       <AvisoSesion abierta={sesion.abierta} restanteMs={sesion.restanteMs}
         onSeguir={sesion.seguir} onSalir={sesion.salir} />
     </>

@@ -1,0 +1,272 @@
+/* Contenido de la Ayuda: generado una vez desde frontend/ayuda.html (mismo
+   texto, convertido a JSX); es fijo, sin datos de usuarios. */
+
+export const TEMAS = [
+  ["crear", "Crear un ticket"],
+  ["lista", "La lista de tickets"],
+  ["seguimiento", "Seguimiento"],
+  ["areas", "Departamentos"],
+  ["roles", "Roles y permisos"],
+  ["adjuntos", "Adjuntos"],
+  ["correo", "Tickets por correo"],
+  ["avisos", "Avisos por correo"],
+  ["asistente", "Asistente virtual"],
+  ["faq", "Preguntas frecuentes"],
+];
+
+export const PANELES = {
+  crear: (
+      <div className="ayuda-cuerpo">
+        <h3>¿Qué es la ticketera?</h3>
+        <p>Es el sistema de IT de American Data Networks para pedir soporte y darle seguimiento: cualquier persona de la empresa crea un ticket y el equipo de IT lo atiende hasta cerrarlo.</p>
+    
+        <h3>Cómo crear un ticket</h3>
+        <ol>
+          <li>En el menú, pulse «Nuevo ticket».</li>
+          <li>Escriba un <strong>título</strong> breve (por ejemplo, «La impresora del 2.º piso no imprime») y una <strong>descripción</strong>: qué sucede, desde cuándo, qué mensaje aparece y qué intentó.</li>
+          <li>Elija el <strong>departamento</strong> que atiende su pedido (debajo del campo se indica qué atiende cada uno), la <strong>categoría</strong> (Hardware, Software, Red o Accesos) y la <strong>prioridad</strong> (Baja, Media, Alta o Crítica; Crítica solo si nadie puede trabajar o un servicio está caído).</li>
+          <li>Si quiere, agregue archivos o fotos (ver «Adjuntos»).</li>
+          <li>Pulse «Crear ticket». El ticket se asigna solo al técnico del departamento elegido con menos tickets abiertos (ver «Departamentos»).</li>
+        </ol>
+        <p>También se puede crear un ticket escribiendo al buzón de soporte (ver «Tickets por correo»).</p>
+      </div>
+  ),
+  lista: (
+      <div className="ayuda-cuerpo">
+        <p>En «Tickets» se ven <strong>todos los tickets que cumplen los filtros, sin páginas</strong>. El total («23 tickets») aparece arriba de la lista.</p>
+        <h3>Barra de arriba</h3>
+        <ul>
+          <li><strong>Todos / Mis tickets</strong>: «Mis tickets» muestra solo los asignados a usted (Técnico y Administrador).</li>
+          <li><strong>Tabla / Tablero</strong>: la tabla lista los tickets en filas; el tablero los muestra en una columna por estado.</li>
+          <li><strong>Compacta / Cómoda</strong>: cambia el espacio de las filas de la tabla.</li>
+        </ul>
+        <p>La vista (tabla o tablero) y la densidad se recuerdan en el navegador.</p>
+        <h3>Filtros</h3>
+        <p>En escritorio van en una sola fila; en pantallas angostas bajan a varias líneas.</p>
+        <ul>
+          <li><strong>Buscar</strong>: texto en el título o la descripción.</li>
+          <li><strong>Categoría</strong>, <strong>Prioridad</strong> y <strong>Estado</strong>. El filtro «Estado» ofrece Todos, Abiertos (Nuevo y En proceso), Nuevo, En proceso, Resuelto o Cerrado.</li>
+          <li><strong>«Asignado a»</strong>: Todos, Sin asignar o una persona.</li>
+          <li><strong>Departamento</strong>: Todos, Sin departamento o uno de los cuatro departamentos.</li>
+          <li><strong>«Fecha de creación»</strong>: los tickets creados ese día, de 00:00 a 23:59 en hora de Costa Rica.</li>
+        </ul>
+        <p>Los filtros se combinan entre sí y con «Mis tickets», en la tabla y en el tablero. «Limpiar filtros» los borra todos. Las columnas ID, Título, Prioridad, Estado y Fecha de creación se ordenan con un clic en su título.</p>
+        <p>El Solicitante ve «Mis solicitudes»: los tickets que creó, con la búsqueda, el estado y la fecha.</p>
+      </div>
+  ),
+  seguimiento: (
+      <div className="ayuda-cuerpo">
+        <h3>El detalle del ticket</h3>
+        <p>Al abrir un ticket se ven sus datos (categoría, departamento, asignado, solicitante y fechas), el recorrido de estados, los comentarios, los adjuntos y el historial. Según el rol, también aparecen «Editar», «Asignación», «Cambiar departamento» (solo en Nuevo), «Explicar con IA», «Imprimir» y «Eliminar». Los comentarios se ven como una conversación, del más antiguo al más reciente: los de IT (Técnico o Administrador) con una línea azul a la izquierda y la etiqueta «IT», los demás con una línea gris, y «por correo» si llegaron respondiendo un aviso. El motivo de un cambio de estado aparece centrado, en gris («Pasó a Resuelto · …»).</p>
+    
+        <h3>Estados de los tickets</h3>
+        <p>Los tickets siguen el orden <code>Nuevo → En proceso → Resuelto → Cerrado</code>:</p>
+        <ul>
+          <li><code>Nuevo</code>: recién creado.</li>
+          <li><code>En proceso</code>: IT está trabajando en él.</li>
+          <li><code>Resuelto</code>: se dio una solución.</li>
+          <li><code>Cerrado</code>: terminado definitivamente.</li>
+        </ul>
+        <h3>Cambiar el estado</h3>
+        <p>En el detalle, toque el estado al que quiere pasarlo en el recorrido, debajo del título. Se pide confirmación y un <strong>motivo opcional</strong>, que queda como comentario del ticket.</p>
+        <ul>
+          <li><strong>Hacia adelante</strong> se puede saltar pasos: por ejemplo, de <code>Nuevo</code> a <code>Cerrado</code> si el pedido ya no corresponde.</li>
+          <li><strong>Hacia atrás</strong> solo se puede volver de <code>Resuelto</code> a <code>En proceso</code>. Nunca se vuelve a <code>Nuevo</code>.</li>
+          <li><code>Cerrado</code> es un estado <strong>final</strong>: no se reabre ni admite cambios. Si el problema vuelve a aparecer, cree un ticket nuevo y mencione el número del anterior.</li>
+          <li>El estado lo cambian el Técnico y el Administrador.</li>
+        </ul>
+    
+        <h3>Cierre automático</h3>
+        <p>Cuando la mesa de ayuda tiene activo el cierre automático, un ticket en <code>Resuelto</code> pasa solo a <code>Cerrado</code> si el solicitante no responde en <strong>3 días</strong>:</p>
+        <ul>
+          <li>Cuentan los días de lunes a sábado; el domingo no cuenta. Por ejemplo, un ticket resuelto el viernes a las 4:00 p. m. se cierra el martes a las 4:00 p. m.</li>
+          <li>En el detalle de un ticket Resuelto se indica: «Se cerrará automáticamente el … si no hay respuesta». El correo que avisa el paso a Resuelto también lo explica.</li>
+          <li>Si el solicitante <strong>comenta en la ticketera o responde el correo</strong> mientras el ticket está en Resuelto, el ticket vuelve a <code>En proceso</code> y queda en el historial como «Reabierto por respuesta del solicitante». Los comentarios de IT no lo reabren.</li>
+          <li>Si se vuelve a resolver, los 3 días empiezan a contar de nuevo.</li>
+          <li>Al cerrarse, el historial muestra «Cerrado automáticamente por falta de respuesta», hecho por «Sistema», y el solicitante y el asignado reciben un correo. Si el problema continúa, envíe un correo nuevo para crear otro ticket.</li>
+        </ul>
+    
+        <h3>Cómo leer el historial</h3>
+        <p>Cada fila del historial es una acción hecha sobre un ticket: cuándo pasó, quién la hizo, qué hizo y el detalle del cambio (valor anterior → valor nuevo).</p>
+        <div className="tabla-scroll">
+          <table className="listado">
+            <thead>
+              <tr><th>Acción</th><th>Cuándo aparece</th><th>Ejemplo de detalle</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Creó el ticket</td><td>Se registra un ticket nuevo; si se asignó solo, se indica a quién. Si vino por correo, quién lo envió y a quién.</td><td>Asignado automáticamente a José Solano</td></tr>
+              <tr><td>Editó el ticket</td><td>Se cambia el título, la descripción, la categoría o la prioridad (una fila por cada dato).</td><td>Prioridad: «Media» → «Alta»</td></tr>
+              <tr><td>Asignó el ticket</td><td>Se cambia la persona responsable.</td><td>José Solano → Carlos Rojas</td></tr>
+              <tr><td>Quitó la asignación</td><td>El ticket queda sin responsable.</td><td>Carlos Rojas → Sin asignar</td></tr>
+              <tr><td>Cambió el departamento</td><td>Un Técnico o un Administrador pasa el ticket a otro departamento.</td><td>Soporte IT → Programación</td></tr>
+              <tr><td>Cambió el estado</td><td>El ticket avanza, salta pasos o vuelve de Resuelto a En proceso.</td><td>Nuevo → Cerrado</td></tr>
+              <tr><td>Comentó</td><td>Alguien agrega un comentario.</td><td>«Ya revisé el cable de red»</td></tr>
+              <tr><td>Adjuntó un archivo</td><td>Alguien sube un archivo, o llegó en un correo.</td><td>«captura.png» (por correo)</td></tr>
+              <tr><td>Eliminó un adjunto</td><td>Quien lo subió o un Administrador borra un archivo.</td><td>«factura.pdf»</td></tr>
+              <tr><td>Adjuntos no guardados</td><td>Un correo traía archivos que no se guardaron.</td><td>No se guardó 1 adjunto del correo: programa.exe (tipo no permitido)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>«Sistema» en la columna Quién indica registros antiguos, guardados antes de que se identificara a cada usuario. El Técnico y el Administrador también tienen «Historial» en el menú, con los cambios de todos los tickets agrupados por persona: a la izquierda quién hizo cambios («Sistema» son los automáticos, como el cierre automático) y a la derecha sus cambios por día, de hoy o de los últimos 7 o 30 días, con búsqueda por número o título de ticket.</p>
+      </div>
+  ),
+  areas: (
+      <div className="ayuda-cuerpo">
+        <p>IT se organiza en cuatro departamentos fijos. Nadie los crea, renombra, desactiva ni borra, tampoco el Administrador.</p>
+        <ul>
+          <li><strong>Soporte IT</strong>: computadoras, impresoras, programas.</li>
+          <li><strong>Redes e Infraestructura</strong>: internet, wifi, servidores, VPN.</li>
+          <li><strong>Ciberseguridad</strong>: accesos, contraseñas, cuentas, incidentes de seguridad.</li>
+          <li><strong>Programación</strong>: sistemas internos, Odoo, desarrollos y reportes.</li>
+        </ul>
+        <ul>
+          <li><strong>Al crear un ticket</strong> se elige el «Departamento» (obligatorio). El ticket se asigna solo al Técnico activo de ese departamento con <strong>menos tickets abiertos</strong> (Nuevo o En proceso). Si el departamento no tiene técnicos, va al Técnico con menos tickets abiertos de cualquier departamento; si no hay ninguno, queda sin asignar.</li>
+          <li><strong>Si un ticket llega sin departamento</strong> (por ejemplo, un correo al buzón de soporte), se toma de la categoría: Hardware y Software → Soporte IT, Red → Redes e Infraestructura, Accesos → Ciberseguridad. Programación solo se elige a mano.</li>
+          <li><strong>Cambiar el departamento</strong>: el Técnico y el Administrador, en el detalle del ticket, con «Cambiar departamento», <strong>solo mientras el ticket está en Nuevo</strong>. En los demás estados esa sección no aparece; el departamento se ve en «Detalles». Si marcan «Reasignar al técnico del nuevo departamento», el ticket pasa al de ese departamento con menos tickets abiertos. El cambio queda en el historial.</li>
+          <li><strong>El departamento de cada Técnico</strong> lo elige el Administrador en «Usuarios». El Administrador también puede tener uno (opcional).</li>
+          <li><strong>Pantalla «Departamentos»</strong> (solo el Administrador, en el menú debajo de «Métricas»): una fila por departamento y otra «Sin departamento», con el total de tickets, los abiertos, cada estado y los técnicos activos (sus nombres aparecen debajo de la cantidad). Arriba, el total de abiertos de la ticketera y el departamento con más abiertos. Al tocar un número se abre la lista de tickets de ese departamento y ese estado.</li>
+          <li><strong>«Sin departamento»</strong>: tickets de antes de los departamentos. Se pueden filtrar en la lista y en las métricas, y pasar a un departamento.</li>
+        </ul>
+      </div>
+  ),
+  roles: (
+      <div className="ayuda-cuerpo">
+        <h3>Roles del sistema</h3>
+        <p>El sistema cuenta con 3 roles de usuario:</p>
+        <ul>
+          <li><strong>Administrador</strong>: Jefe de IT: tiene permisos completos</li>
+          <li><strong>Técnico</strong>: Empleado de IT de un departamento: atiende los tickets (recibe las asignaciones automáticas de su departamento)</li>
+          <li><strong>Solicitante</strong>: Cualquier persona de la empresa: crea tickets para IT (no tiene departamento)</li>
+        </ul>
+        <p><strong>IT solo recibe tickets</strong>: un ticket se asigna únicamente a un Técnico o a un Administrador, nunca a un Solicitante. Por eso «Asignar a» solo muestra personas de IT. La primera vez que alguien entra con su cuenta de Microsoft queda como Solicitante; el Administrador cambia el rol en «Usuarios».</p>
+    
+        <h3>Permisos por rol</h3>
+        <div className="tabla-scroll">
+          <table className="listado">
+            <thead>
+              <tr>
+                <th>Acción</th>
+                <th>Administrador</th>
+                <th>Técnico</th>
+                <th>Solicitante</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Ver tickets</td><td>Todos</td><td>Todos</td><td>Los que creó</td></tr>
+              <tr><td>Crear ticket</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+              <tr><td>Comentar</td><td>Sí</td><td>Sí</td><td>En los que creó</td></tr>
+              <tr><td>Adjuntar archivos</td><td>Sí</td><td>Sí</td><td>En los que creó</td></tr>
+              <tr><td>Eliminar adjuntos</td><td>Todos</td><td>Los que subió</td><td>Los que subió</td></tr>
+              <tr><td>Editar ticket</td><td>Todos, salvo los Cerrados</td><td>Los que creó, mientras están en Nuevo</td><td>Los que creó, mientras están en Nuevo</td></tr>
+              <tr><td>Cambiar estado</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+              <tr><td>Asignar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
+              <tr><td>Cambiar departamento</td><td>Mientras está en Nuevo</td><td>Mientras está en Nuevo</td><td>No</td></tr>
+              <tr><td>Historial global</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+              <tr><td>Métricas</td><td>Sí</td><td>No</td><td>No</td></tr>
+              <tr><td>Ver departamentos</td><td>Sí</td><td>No</td><td>No</td></tr>
+              <tr><td>Explicar con IA</td><td>Sí</td><td>Sí</td><td>No</td></tr>
+              <tr><td>Eliminar ticket</td><td>Sí</td><td>No</td><td>No</td></tr>
+              <tr><td>Administrar usuarios</td><td>Sí</td><td>No</td><td>No</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p id="nota-editar">Editar un ticket es cambiar su título, descripción, categoría o prioridad. Lo puede hacer quien lo creó, solo mientras está en <code>Nuevo</code>, y el Administrador, en cualquier estado salvo <code>Cerrado</code>; nadie más. Cada cambio queda en el historial con quién, qué y cuándo.</p>
+        <p id="nota-cerrado"><strong>Un ticket Cerrado es de solo lectura para todos, también para el Administrador</strong>: no se edita, no se reasigna, no se comenta, no se elimina, no cambia de estado y no se le agregan ni quitan adjuntos (sí se descargan). En su detalle se ve la nota «Este ticket está Cerrado y no admite cambios.»</p>
+        <p id="nota-asignados">Si a un Solicitante le quedó asignado un ticket de antes, lo sigue viendo y puede comentarlo y cambiarle el estado hasta que un Administrador lo reasigne a alguien de IT.</p>
+      </div>
+  ),
+  adjuntos: (
+      <div className="ayuda-cuerpo">
+        <p>Un ticket puede llevar archivos: una captura del error, una foto del equipo, un PDF o una planilla.</p>
+        <ul>
+          <li><strong>Tipos y límites</strong>: jpg, png, pdf, docx, xlsx y txt, hasta 4 MB cada uno y 10 por ticket. Se revisa el contenido del archivo, no solo su nombre. Las fotos grandes (de más de 2000 px) se achican solas antes de subirse.</li>
+          <li><strong>Al crear el ticket</strong>: en «Nuevo ticket», pulse «Adjuntar archivos» (en el celular también aparece «Sacar foto», que abre la cámara). Lo elegido se lista con su tamaño; con ✕ se quita. Si algún archivo no se puede subir, el ticket queda creado igual: se indica cuál falló y por qué, con el enlace «Ir al ticket y reintentar».</li>
+          <li><strong>En un ticket ya creado</strong>: en el detalle, la sección «Adjuntos» tiene «Adjuntar archivos» (y «Sacar foto» en el celular) y la lista de archivos con su nombre, tamaño, quién lo subió y cuándo. Las imágenes muestran una miniatura: tóquela para verla en grande. Cada archivo tiene «Descargar» y, para quien puede, «Eliminar».</li>
+          <li><strong>Por correo</strong>: los archivos de un correo que crea un ticket o agrega un comentario también se guardan; en la lista dicen «por correo» (ver «Tickets por correo»).</li>
+          <li><strong>Quién</strong>: adjunta y descarga quien puede ver el ticket. Elimina quien subió el archivo o un Administrador. En un ticket <code>Cerrado</code> no se agregan ni se eliminan adjuntos, pero se pueden descargar.</li>
+          <li>Los archivos solo se abren con la sesión iniciada. Subir y eliminar quedan en el historial.</li>
+        </ul>
+      </div>
+  ),
+  correo: (
+      <div className="ayuda-cuerpo">
+        <p>Si el buzón de soporte está activo, la ticketera revisa los correos nuevos y crea un ticket con cada correo que pide ayuda. Regla general: <strong>quien escribe el correo es el solicitante y quien lo recibe, el asignado</strong>.</p>
+        <h3>Correos que llegan al buzón</h3>
+        <ul>
+          <li>Para crear tickets por correo hay que tener cuenta: primero se ingresa a la ticketera con la cuenta de Microsoft de la empresa, y el correo se envía desde esa misma dirección. Si alguien de la empresa sin cuenta escribe al buzón, no se crea el ticket: se le responde una sola vez que ingrese primero y vuelva a enviar su solicitud. Los correos de fuera de la empresa se ignoran. Si la cuenta está desactivada, se le pide que se comunique con un Administrador.</li>
+          <li>El asunto se usa como título y el texto como descripción; la categoría y la prioridad se eligen según el contenido. El ticket queda a nombre de quien escribe, asignado al dueño del buzón y en el departamento de su categoría.</li>
+          <li>Crean ticket los pedidos de soporte, acceso o ayuda y los problemas técnicos, también los <strong>problemas de seguridad</strong> (por ejemplo, una cuenta hackeada, un acceso no autorizado o información confidencial comprometida). Los saludos, agradecimientos, boletines y avisos legales no crean tickets.</li>
+          <li>Si el asunto empieza con «Ticket:», siempre crea un ticket (sin «Ticket:» en el título), aunque no parezca una solicitud de ayuda.</li>
+        </ul>
+        <h3>Correos que envía el dueño del buzón</h3>
+        <ul>
+          <li>Los correos que el dueño del buzón envía a alguien de la empresa pasan por el mismo filtro que los que llegan: crean un ticket si el asunto empieza con «Ticket:» o si le reporta a un compañero un problema técnico o le pide soporte, acceso o ayuda (por ejemplo, «No me funciona la impresora, ¿la podés revisar?»). La coordinación, los saludos, los envíos de archivos, las reuniones, los agradecimientos y los informes no crean tickets, ni los que van a más de 3 personas o solo a gente de fuera de la empresa.</li>
+          <li>El ticket queda a nombre del dueño del buzón, asignado al primer destinatario de la empresa en «Para» (la copia no cuenta) y en su departamento (si no tiene, el de la categoría).</li>
+          <li><strong>IT solo recibe</strong>: si ese destinatario es Solicitante o no tiene cuenta, no se crea ticket. Las respuestas en el hilo de un ticket sí se agregan como comentario.</li>
+        </ul>
+        <h3>Respuestas y comentarios</h3>
+        <ul>
+          <li>Responder en el hilo de un ticket, o con «[Ticket #N]» en el asunto, agrega un comentario y nunca crea otro ticket. Pueden comentar así el solicitante, el asignado y cualquier usuario activo que esté en el hilo (en «Para» o en copia). Quien no tiene cuenta no puede comentar por correo.</li>
+          <li>Si el ticket está <code>Cerrado</code>, la respuesta no se agrega como comentario: se contesta una sola vez «El ticket #N está cerrado. Si el problema continúa, envíe un nuevo correo para crear otro ticket.»</li>
+          <li>Los avisos que envía la ticketera (confirmaciones, «Se le asignó el ticket #N», «Nuevo comentario…», «El ticket #N pasó a…», «El ticket #N fue asignado a…») nunca crean tickets, y un correo de una conversación que ya se procesó tampoco. La ticketera no responde a respuestas automáticas ni a rebotes. Por seguridad, en cada revisión del buzón se crean como máximo 5 tickets; el resto espera a la siguiente.</li>
+        </ul>
+        <h3>Adjuntos del correo</h3>
+        <ul>
+          <li>Los archivos de un correo que crea un ticket o agrega un comentario se guardan en el ticket, con los mismos tipos y límites (jpg, png, pdf, docx, xlsx o txt, hasta 4 MB cada uno), y como máximo 5 archivos y 10 MB por correo.</li>
+          <li>También se guardan las <strong>imágenes pegadas en el texto</strong> (por ejemplo, una captura de pantalla) y las <strong>imágenes copiadas de una página de internet</strong> y pegadas en el correo.</li>
+          <li>No se guardan las imágenes de la firma (los logos chicos que se repiten en cada correo), los íconos muy pequeños, una imagen que ya está en el ticket, los correos adjuntos ni los enlaces a OneDrive o SharePoint.</li>
+          <li>Si alguno no se guarda, el ticket o el comentario se crea igual, queda en el historial y la respuesta automática dice cuáles no se guardaron, con el enlace para subirlos desde la ticketera. En un ticket <code>Cerrado</code> no se guardan.</li>
+        </ul>
+      </div>
+  ),
+  avisos: (
+      <div className="ayuda-cuerpo">
+        <p>La ticketera envía estos correos. Quien hace el cambio nunca recibe su propio aviso. Los avisos de asignación, comentarios y cambios de estado se envían si están activados en la configuración de la ticketera.</p>
+        <ul>
+          <li><strong>Confirmación</strong>: a quien crea un ticket por correo le llega «Ticket #N creado» con el número, el título, la categoría, la prioridad, el estado y el enlace; si agrega un comentario por correo, «Comentario agregado al ticket #N».</li>
+          <li><strong>Asignación</strong>: cuando se asigna o reasigna un ticket, el nuevo asignado recibe «Se le asignó el ticket #N» (con el título, la prioridad y quién lo asignó) y el solicitante, «El ticket #N fue asignado a» esa persona. Quitar la asignación no envía nada.</li>
+          <li><strong>Comentarios</strong>: cuando alguien comenta desde la ticketera, el solicitante y el asignado reciben «Nuevo comentario en el ticket #N». Si responden a ese correo, la respuesta vuelve como comentario. Los comentarios que llegan por correo no generan este aviso.</li>
+          <li><strong>Cambios de estado</strong>: el solicitante y el asignado reciben «El ticket #N pasó a «Estado»», con el estado anterior y el nuevo, quién lo cambió y el motivo, si lo escribió. Si pasó a Cerrado, el correo avisa que ya no admite cambios.</li>
+        </ul>
+      </div>
+  ),
+  asistente: (
+      <div className="ayuda-cuerpo">
+        <p>El botón del asistente está abajo a la derecha en todas las pantallas. Responde preguntas sobre la ticketera y sobre los tickets que su rol puede ver: por ejemplo, cuántos tickets hay pendientes o en qué estado está uno.</p>
+        <ul>
+          <li>Solo usa la información que su rol ya ve en la aplicación: el Solicitante recibe respuestas solo sobre sus propios tickets.</li>
+          <li>El Técnico y el Administrador pueden pedirle que explique un ticket indicando su número (por ejemplo, «Explique el ticket #1»), o usar «Explicar con IA» en el detalle, si está disponible.</li>
+          <li>La conversación se borra al cerrar la pestaña o la sesión, o con el botón «Nueva conversación».</li>
+          <li>Las respuestas automáticas pueden contener errores: verifique la información importante en el detalle del ticket.</li>
+        </ul>
+      </div>
+  ),
+  faq: (
+      <div className="ayuda-cuerpo">
+        <dl className="ayuda-preguntas">
+          <dt>¿Por qué no veo algunas opciones del menú, como Métricas o Usuarios?</dt>
+          <dd>Cada rol ve solo las pantallas que puede usar. Consulte la tabla «Permisos por rol» en «Roles y permisos».</dd>
+          <dt>¿Puedo cambiar mi contraseña?</dt>
+          <dd>Se entra con la cuenta de Microsoft de la empresa, así que la contraseña es la de Microsoft: se cambia allí o con el área de TI. La ticketera no guarda contraseñas.</dd>
+          <dt>¿Por qué se cerró mi sesión?</dt>
+          <dd>Mientras usa la ticketera, la sesión se renueva sola. Si pasan 30 minutos sin actividad (sin mover el mouse, escribir, hacer clic ni tocar la pantalla en ninguna pestaña de la ticketera), aparece la ventana «¿Sigue ahí?» con una cuenta regresiva de 2 minutos: pulse «Seguir conectado» para continuar o «Cerrar sesión» para salir. Si la cuenta llega a cero, la sesión se cierra en todas las pestañas y el inicio de sesión muestra «Su sesión se cerró por inactividad». Además, una sesión dura como máximo 10 horas desde que inició sesión; después hay que volver a entrar.</dd>
+          <dt>¿Tengo que volver a iniciar sesión si salgo a otra página?</dt>
+          <dd>No. Si vuelve y la sesión venció, pero su cuenta de Microsoft sigue conectada en el navegador, la ticketera vuelve a entrar sola y lo lleva a la misma pantalla. Solo pide pulsar «Iniciar sesión con Microsoft» si la sesión se cerró por inactividad, si pasaron 10 horas desde que inició sesión, si usted cerró la sesión o si la cuenta de Microsoft ya no está conectada. «Cerrar sesión» la cierra en todas las pestañas.</dd>
+          <dt>¿Por qué se cerró mi ticket si nadie lo cerró?</dt>
+          <dd>Cuando el cierre automático está activo, un ticket en Resuelto se cierra solo si el solicitante no responde en 3 días (de lunes a sábado). En el historial aparece «Cerrado automáticamente por falta de respuesta», hecho por «Sistema». Si el problema continúa, cree un ticket nuevo o envíe un correo nuevo. Vea «Cierre automático» en «Seguimiento».</dd>
+          <dt>¿Qué departamento elijo?</dt>
+          <dd>El que atiende su pedido: Soporte IT (computadoras, impresoras, programas), Redes e Infraestructura (internet, wifi, servidores, VPN), Ciberseguridad (accesos, contraseñas, cuentas, incidentes de seguridad) o Programación (sistemas internos, Odoo, desarrollos y reportes). Si se equivoca, IT lo pasa al correcto.</dd>
+          <dt>¿Cómo sé quién atiende mi ticket?</dt>
+          <dd>En la lista, la columna «Atendido por» (o «Asignado a») muestra la persona responsable; en el detalle aparece en «Asignado a».</dd>
+          <dt>¿Puedo reabrir un ticket Cerrado?</dt>
+          <dd>No: Cerrado es un estado final. Si el problema vuelve, cree un ticket nuevo y mencione el número del anterior.</dd>
+          <dt>¿Se puede eliminar un ticket?</dt>
+          <dd>Solo el Administrador puede eliminarlo, y la acción no se puede deshacer. Un ticket Cerrado no se elimina.</dd>
+          <dt>¿Qué archivos puedo adjuntar?</dt>
+          <dd>jpg, png, pdf, docx, xlsx y txt, hasta 4 MB cada uno y 10 por ticket (ver «Adjuntos»).</dd>
+          <dt>¿Cómo imprimo un ticket?</dt>
+          <dd>En el detalle del ticket, use el botón «Imprimir»: la hoja sale sin menú ni botones.</dd>
+        </dl>
+      </div>
+  ),
+};
