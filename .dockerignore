@@ -22,6 +22,10 @@ env
 # Environment files
 .env
 
+# React: las dependencias y el build se hacen dentro de la imagen
+frontend-react/node_modules
+frontend-react/dist
+
 # Tests and docs are not needed inside the image
 backend/tests
 pytest.ini

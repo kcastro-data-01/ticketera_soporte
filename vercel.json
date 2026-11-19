@@ -1,16 +1,20 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "",
+  "buildCommand": "npm --prefix frontend-react ci --no-audit --no-fund && npm --prefix frontend-react run build && rm -rf frontend/react && cp -r frontend-react/dist frontend/react",
   "outputDirectory": "frontend",
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
-      "excludeFiles": "{frontend/**,backend/tests/**,docs/**,backups/**,*.db}"
+      "excludeFiles": "{frontend/**,frontend-react/**,backend/tests/**,docs/**,backups/**,*.db}"
     }
   },
+  "redirects": [
+    { "source": "/react", "destination": "/react/", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },
+    { "source": "/react/:path*", "destination": "/react/index.html" },
     { "source": "/health", "destination": "/api/index" }
   ],
   "headers": [

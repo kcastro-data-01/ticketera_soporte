@@ -15,3 +15,6 @@ INVENTARIO.md
 Dockerfile
 docker-compose.yml
 .dockerignore
+frontend-react/node_modules
+frontend-react/dist
+frontend/react

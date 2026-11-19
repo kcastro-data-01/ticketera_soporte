@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
 from backend.cabeceras import CabecerasSeguridad
+from backend.frontend_react import montar_react
 from backend.entorno import en_produccion, en_vercel
 from backend.services import asistente_service, cierre_service, correo_service
 from backend.routers.adjuntos import router as adjuntos_router
@@ -99,6 +100,12 @@ class FrontendSinCopiasViejas(StaticFiles):
         response.headers.setdefault("Cache-Control", "no-cache")
         return response
 
+
+# La app React (migración por etapas) bajo /react/, antes del frontend
+# actual para que su mount «/» no la tape. Solo si está compilada
+# (Dockerfile; en local, ``npm run build`` en frontend-react/).
+REACT_DIST_DIR = Path(__file__).resolve().parent.parent / "frontend-react" / "dist"
+montar_react(app, REACT_DIST_DIR)
 
 if FRONTEND_DIR.is_dir():
     app.mount("/", FrontendSinCopiasViejas(directory=str(FRONTEND_DIR), html=True), name="frontend")

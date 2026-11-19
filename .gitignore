@@ -41,3 +41,6 @@ Thumbs.db
 # Adjuntos guardados en local (fuera de Docker)
 /adjuntos/
 .env*
+
+# Build de React copiado para Vercel (lo arma vercel.json)
+/frontend/react/

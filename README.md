@@ -105,7 +105,7 @@ API es abierta; los usuarios solo sirven para asignación y firma).
 |------|------------|
 | Backend | Python + FastAPI |
 | Base de datos | SQLite |
-| Frontend | HTML / CSS / JavaScript |
+| Frontend | HTML / CSS / JavaScript (migrando a React + Vite en `frontend-react/`) |
 | Infraestructura | Docker |
 | Control de versiones | Git / GitHub |
 
@@ -132,6 +132,9 @@ ticketera_soporte/
 │   ├── routers/                # Endpoints de la API
 │   ├── services/               # Lógica de negocio y auditoría
 │   └── tests/                  # Pruebas con pytest
+├── frontend-react/             # La app en React (Vite), bajo /react/
+│   ├── src/                    # Páginas, componentes y pruebas (Vitest)
+│   └── vite.config.js
 └── frontend/
     ├── index.html              # Listado con búsqueda y filtros
     ├── crear.html              # Alta de tickets
@@ -290,6 +293,85 @@ mensaje claro — y permite, con los endpoints existentes:
 
 Todos los botones se deshabilitan mientras hay una operación en curso para
 evitar envíos duplicados.
+
+### Frontend en React (migración por etapas)
+
+La ticketera se está pasando a **React** (JavaScript, con Vite) en
+`frontend-react/`, **sin tocar `frontend/`**: la versión actual sigue
+funcionando igual en <http://localhost:8000/> y la nueva vive, mientras dura la
+migración, en <http://localhost:8000/react/>. Usa los mismos estilos e
+imágenes (los importa de `frontend/css` y `frontend/images`, no hay copia), la
+misma API y las mismas claves de `localStorage`, así que la sesión, el modo
+oscuro, la vista, la densidad y el orden se comparten entre las dos.
+
+**Etapa 1 (lista):** base (React Router con direcciones limpias, un cliente
+de API único con el token y el manejo de 401, sesión y tema, menú lateral por
+rol con el contador), inicio de sesión (Microsoft con `@azure/msal-browser` y
+contraseña con `LOGIN_LOCAL=true`), sesión deslizante igual que `sesion.js`
+(renovación, máximo de horas, «¿Sigue ahí?» y entrada en silencio) y la
+pantalla de Tickets (tabla, tablero, filtros, orden, densidad y vista del
+Solicitante). Las pantallas que faltan abren todavía la versión actual
+(`/react/tickets/5` → `/detalle.html?id=5`).
+
+Direcciones (dentro de `/react/`): `/`, `/login`, `/tickets/:id`, `/crear`,
+`/metricas`, `/departamentos`, `/historial`, `/usuarios`, `/cuenta`, `/ayuda`,
+`/sin-permiso`. Están en `frontend-react/src/rutas.js`, junto con el mapa de
+direcciones viejas → nuevas que usará la etapa final.
+
+```bash
+cd frontend-react
+npm ci            # dependencias (una vez)
+npm test          # pruebas (Vitest + React Testing Library)
+npm run build     # compila en frontend-react/dist
+npm run dev       # desarrollo con recarga: http://localhost:5173/react/
+```
+
+`npm run dev` necesita la app en `localhost:8000` (Docker o uvicorn): le pasa
+`/api`, `/msal` y las páginas `.html` viejas. Para entrar con Microsoft desde
+el puerto 5173 hay que registrar también esas URI (ver abajo); con
+`LOGIN_LOCAL=true` alcanza con la contraseña.
+
+**Cómo se sirve.** `backend/frontend_react.py` monta `frontend-react/dist` en
+`/react` (antes del frontend actual): un archivo del build se sirve tal cual
+(los de `assets/` llevan hash y se guardan un año) y cualquier otra ruta
+`/react/*` devuelve `index.html` para que la resuelva React Router. Si no hay
+build (por ejemplo, uvicorn sin haber corrido `npm run build`), `/react/` no
+existe y lo demás funciona igual. El `Dockerfile` tiene dos etapas: una con
+Node que compila `frontend-react/` y la de Python de siempre, que copia el
+`dist`; así funciona igual en Docker local, en Render (mismo Dockerfile,
+`render.yaml` sin cambios) y en el servidor. En Vercel, `vercel.json` compila
+el build y lo copia a `frontend/react` (lo sirve la CDN, con la reescritura
+`/react/*` → `/react/index.html`).
+
+**Microsoft Entra ID.** En la app registrada, plataforma **Aplicación de
+página única (SPA)**, agregar estas URI de redirección:
+
+| Entorno | URI nueva |
+|---------|-----------|
+| Local (Docker) | `http://localhost:8000/react/login` |
+| Render | `https://ticketera-soporte-tyx2.onrender.com/react/login` |
+| Vercel | `https://tickets-americandata.vercel.app/react/login` |
+| `npm run dev` (opcional) | `http://localhost:5173/react/login` y `http://localhost:5173/msal/silencioso.html` |
+
+La renovación silenciosa reutiliza la página que ya existe,
+`/msal/silencioso.html` (con sus cabeceras para el iframe), así que no hace
+falta una nueva: alcanza con que sigan registradas
+`http://localhost:8000/msal/silencioso.html`,
+`https://ticketera-soporte-tyx2.onrender.com/msal/silencioso.html` y
+`https://tickets-americandata.vercel.app/msal/silencioso.html`.
+
+**Seguridad.** Sin scripts ni estilos en línea (la CSP los prohíbe; el modo
+oscuro antes de pintar va en `public/tema.js`), sin `dangerouslySetInnerHTML`
+ni `innerHTML`: todo lo que escriben los usuarios se muestra como texto
+(`src/pruebas/seguridad.test.js` lo revisa).
+
+**Próximas etapas.** Detalle del ticket (`/tickets/:id`: comentarios,
+adjuntos, cambios de estado, asignación, explicación con IA, impresión),
+Nuevo ticket, Historial, Departamentos, Métricas, Usuarios, Mi cuenta, Ayuda,
+el chat del asistente y los avisos flotantes. En la etapa final la app pasa a
+la raíz (`base: "/"` en `vite.config.js`), el servidor redirige con 301 las
+direcciones viejas (`backend/frontend_react.py` → `ruta_nueva`, p. ej.
+`detalle.html?id=N` → `/tickets/N`) y se retira `frontend/`.
 
 ### Health check
 
