@@ -279,9 +279,22 @@ describe("menú lateral por rol", () => {
 
   it("pantallas no migradas abren la versión actual", async () => {
     const { navegador } = await import("../sesion/almacen.js");
+    conSesion("Administrador");
+    servidor();
+    renderApp("/metricas");
+    await waitFor(() => expect(navegador.reemplazar).toHaveBeenCalledWith("/metricas.html"));
+  });
+
+  it("menú, lista, detalle y crear llevan a pantallas React", async () => {
     conSesion("Técnico");
     servidor();
-    renderApp("/tickets/12");
-    await waitFor(() => expect(navegador.reemplazar).toHaveBeenCalledWith("/detalle.html?id=12"));
+    renderApp("/");
+    await screen.findByText("Impresora sin tóner");
+    const menu = screen.getByRole("navigation", { name: "Menú principal" });
+    expect(within(menu).getByRole("link", { name: /Nuevo ticket/ })).toHaveAttribute("href", "/crear");
+    expect(within(menu).getByRole("link", { name: /^Tickets/ })).toHaveAttribute("href", "/");
+    expect(within(menu).getByRole("link", { name: /Historial/ })).toHaveAttribute("href", "/historial");
+    await userEvent.click(screen.getByRole("link", { name: "11" }));
+    expect(await screen.findByRole("heading", { name: "Detalle del ticket" })).toBeInTheDocument();
   });
 });

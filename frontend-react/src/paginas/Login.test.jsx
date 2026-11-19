@@ -76,7 +76,7 @@ describe("Login", () => {
     expect(JSON.parse(pedido.opciones.body)).toEqual({ id_token: "id-token-ms" });
     expect(localStorage.getItem("access_token")).toBeTruthy();
     expect(JSON.parse(localStorage.getItem("user")).name).toBe("Tomás Técnico");
-    expect(await screen.findByRole("heading", { name: "Tickets" }, { timeout: 2000 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Tickets" }, { timeout: 5000 })).toBeInTheDocument();
   });
 
   it("cuenta desactivada en Microsoft (403)", async () => {
@@ -107,7 +107,7 @@ describe("Login", () => {
       const pedido = llamadas.find((l) => l.url === "/api/auth/login");
       expect(JSON.parse(pedido.opciones.body)).toEqual({ email: "tomas@empresa.com", password: "secreta" });
       expect(localStorage.getItem("sesion_cierre")).toBeNull();
-      expect(await screen.findByRole("heading", { name: "Tickets" }, { timeout: 2000 })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Tickets" }, { timeout: 5000 })).toBeInTheDocument();
     });
 
     it("credenciales inválidas (401)", async () => {

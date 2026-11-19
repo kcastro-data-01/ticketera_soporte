@@ -52,7 +52,6 @@ export function rutaNuevaDe(ruta, busqueda = "") {
 
 /* Pantallas todavía no migradas: la ruta nueva abre la página actual. */
 export const PAGINAS_ACTUALES = {
-  crear: "/crear.html",
   metricas: "/metricas.html",
   departamentos: "/departamentos.html",
   historial: "/historial.html",
@@ -60,8 +59,6 @@ export const PAGINAS_ACTUALES = {
   cuenta: "/cuenta.html",
   ayuda: "/ayuda.html",
 };
-
-export const paginaActualDeTicket = (id) => `/detalle.html?id=${encodeURIComponent(id)}`;
 
 /* Dirección completa del navegador para una ruta de la app («/login» →
    «/react/login»). */

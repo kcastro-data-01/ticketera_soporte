@@ -95,3 +95,24 @@ export function persona(nombre, claseBase = "") {
     iniciales: real ? inicialesDe(texto) : undefined,
   };
 }
+
+/* IT solo recibe: «Asignar a» ofrece solo estos roles (backend.constants.IT_ROLES). */
+export const ROLES_IT = ["Administrador", "Técnico"];
+
+/* Cambiar el estado: los roles de «cambiar_estado» y, sea cual sea su rol,
+   quien lo tiene asignado (ticket_service.can_change_state). Cerrado, nadie. */
+export function puedeCambiarEstado(user, ticket) {
+  if (ticketCerrado(ticket)) return false;
+  if (puede(user, "cambiar_estado")) return true;
+  return Boolean(user && ticket && user.id !== undefined && user.id !== null
+    && ticket.assigned_to_id === user.id);
+}
+
+/* Transiciones válidas (espejo del backend; el servidor vuelve a validar). */
+export const TRANSICIONES = {
+  Nuevo: ["En proceso", "Resuelto", "Cerrado"],
+  "En proceso": ["Resuelto", "Cerrado"],
+  Resuelto: ["Cerrado", "En proceso"],
+  Cerrado: [],
+};
+export const PASOS_ESTADO = ["Nuevo", "En proceso", "Resuelto", "Cerrado"];

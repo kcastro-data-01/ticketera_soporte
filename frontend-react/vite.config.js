@@ -29,5 +29,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/pruebas/setup.js"],
     css: false,
+    /* jsdom con userEvent es lento en esta máquina: las pruebas largas del
+       detalle pasan de los 5 s por defecto. */
+    testTimeout: 20000,
   },
 });

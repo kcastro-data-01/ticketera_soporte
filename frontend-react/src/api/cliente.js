@@ -10,9 +10,11 @@ export async function api(url, opciones = {}) {
   const headers = { ...opciones.headers };
   if (token) headers.Authorization = `Bearer ${token}`;
   let body = opciones.body;
-  if (body !== undefined && body !== null && typeof body === "object" && !(body instanceof FormData)) {
-    body = JSON.stringify(body);
-  }
+  /* Solo un objeto o lista simple se manda como JSON; un archivo (Blob)
+     o FormData va tal cual. */
+  const simple = body !== null && typeof body === "object"
+    && (Array.isArray(body) || Object.getPrototypeOf(body) === Object.prototype);
+  if (simple) body = JSON.stringify(body);
   if (typeof body === "string" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
 
   const response = await fetch(url, { ...opciones, headers, body });

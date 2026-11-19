@@ -310,8 +310,19 @@ rol con el contador), inicio de sesión (Microsoft con `@azure/msal-browser` y
 contraseña con `LOGIN_LOCAL=true`), sesión deslizante igual que `sesion.js`
 (renovación, máximo de horas, «¿Sigue ahí?» y entrada en silencio) y la
 pantalla de Tickets (tabla, tablero, filtros, orden, densidad y vista del
-Solicitante). Las pantallas que faltan abren todavía la versión actual
-(`/react/tickets/5` → `/detalle.html?id=5`).
+Solicitante).
+
+**Etapa 2 (lista):** Detalle del ticket en `/tickets/:id` (ficha, recorrido
+de estados con confirmación y motivo, edición según permisos, asignación
+solo a Técnicos y Administradores, cambio de departamento solo en Nuevo,
+comentarios como conversación, adjuntos con vista ampliada, descarga y
+borrado según permisos, historial, «Explicar con IA» y pestañas con
+`?pestana=ia`, eliminar e imprimir; Cerrado de solo lectura), Nuevo ticket
+en `/crear` (mismas validaciones, adjuntos y «Ir al ticket y reintentar» si
+alguno falla) y los avisos flotantes en todas las pantallas React
+(`src/avisos/Avisos.jsx`, con la misma clave `aviso_pendiente`). El menú y los
+botones llevan a las pantallas React que ya existen; solo las que faltan
+abren la versión actual (`/react/metricas` → `/metricas.html`).
 
 Direcciones (dentro de `/react/`): `/`, `/login`, `/tickets/:id`, `/crear`,
 `/metricas`, `/departamentos`, `/historial`, `/usuarios`, `/cuenta`, `/ayuda`,
@@ -326,12 +337,14 @@ npm run build     # compila en frontend-react/dist
 npm run dev       # desarrollo con recarga: http://localhost:5173/react/
 ```
 
-Para comparar a ojo y al píxel la pantalla de Tickets actual con la de React
-(capturas con Playwright en 1366x768 y 390x844, claro y oscuro, con la misma
+Para comparar a ojo y al píxel las pantallas actuales con las de React
+(Tickets, Detalle —normal, con `?pestana=ia` y Cerrado— y Nuevo ticket;
+capturas con Playwright en 1366x768 y 390x844, claro y oscuro, con la misma
 API simulada), después de `npm run build`:
 
 ```bash
 scripts/comparar_react.sh Administrador Técnico Solicitante
+scripts/comparar_react.sh Técnico --paginas detalle,crear   # una parte
 ```
 
 Deja las capturas en `scripts/comparar/capturas/` (no se suben) y termina con
@@ -377,10 +390,8 @@ oscuro antes de pintar va en `public/tema.js`), sin `dangerouslySetInnerHTML`
 ni `innerHTML`: todo lo que escriben los usuarios se muestra como texto
 (`src/pruebas/seguridad.test.js` lo revisa).
 
-**Próximas etapas.** Detalle del ticket (`/tickets/:id`: comentarios,
-adjuntos, cambios de estado, asignación, explicación con IA, impresión),
-Nuevo ticket, Historial, Departamentos, Métricas, Usuarios, Mi cuenta, Ayuda,
-el chat del asistente y los avisos flotantes. En la etapa final la app pasa a
+**Próximas etapas.** Historial, Departamentos, Métricas, Usuarios, Mi
+cuenta, Ayuda y el chat del asistente. En la etapa final la app pasa a
 la raíz (`base: "/"` en `vite.config.js`), el servidor redirige con 301 las
 direcciones viejas (`backend/frontend_react.py` → `ruta_nueva`, p. ej.
 `detalle.html?id=N` → `/tickets/N`) y se retira `frontend/`.
