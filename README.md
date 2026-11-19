@@ -326,6 +326,18 @@ npm run build     # compila en frontend-react/dist
 npm run dev       # desarrollo con recarga: http://localhost:5173/react/
 ```
 
+Para comparar a ojo y al píxel la pantalla de Tickets actual con la de React
+(capturas con Playwright en 1366x768 y 390x844, claro y oscuro, con la misma
+API simulada), después de `npm run build`:
+
+```bash
+scripts/comparar_react.sh Administrador Técnico Solicitante
+```
+
+Deja las capturas en `scripts/comparar/capturas/` (no se suben) y termina con
+error si alguna difiere. El chat del asistente se oculta en la página actual
+porque todavía no está en React.
+
 `npm run dev` necesita la app en `localhost:8000` (Docker o uvicorn): le pasa
 `/api`, `/msal` y las páginas `.html` viejas. Para entrar con Microsoft desde
 el puerto 5173 hay que registrar también esas URI (ver abajo); con

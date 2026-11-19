@@ -1,0 +1,8 @@
+/* React monta la app dentro de <div id="raiz">, pero estilos.css arma la
+   pantalla con body.app como contenedor flex de .barra-lateral y
+   .app-principal (y body.pagina-login / .pagina-error centran su tarjeta).
+   Con «display: contents» el div no genera caja: sus hijos quedan como
+   hijos directos del <body>, igual que en las páginas actuales. */
+#raiz {
+  display: contents;
+}
