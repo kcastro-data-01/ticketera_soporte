@@ -640,7 +640,7 @@ def _saludo(nombre: str) -> str:
 
 
 def _respuesta_ticket(correo, usuario, ticket, config) -> Respuesta:
-    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    enlace = f"{config.app_url}/tickets/{ticket.id}"
     return Respuesta(
         para=correo.remitente,
         asunto=f"Ticket #{ticket.id} creado: {ticket.title}",
@@ -661,7 +661,7 @@ def _respuesta_ticket(correo, usuario, ticket, config) -> Respuesta:
 
 
 def _respuesta_comentario(correo, usuario, ticket, config) -> Respuesta:
-    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    enlace = f"{config.app_url}/tickets/{ticket.id}"
     return Respuesta(
         para=correo.remitente,
         asunto=f"Comentario agregado al ticket #{ticket.id}",
@@ -692,7 +692,7 @@ def _respuesta_cerrado(correo, usuario, ticket) -> Respuesta:
 def _respuesta_asignado(asignado, autor, ticket, config) -> Respuesta:
     """Aviso al asignado de un ticket creado desde un correo enviado
     (solo con ``AVISAR_ASIGNADO``)."""
-    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    enlace = f"{config.app_url}/tickets/{ticket.id}"
     return Respuesta(
         para=asignado.email,
         asunto=f"[Ticket #{ticket.id}] Se le asignó el ticket #{ticket.id}: {ticket.title}",
@@ -727,7 +727,7 @@ def _respuesta_sin_cuenta(correo, config) -> Respuesta:
 
 def _aviso_comentario(destinatario, autor, ticket, comentario, config) -> Respuesta:
     """Aviso de un comentario hecho desde la app (``AVISAR_COMENTARIOS``)."""
-    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    enlace = f"{config.app_url}/tickets/{ticket.id}"
     return Respuesta(
         para=destinatario.email,
         asunto=f"[Ticket #{ticket.id}] Nuevo comentario en el ticket #{ticket.id}",
@@ -749,7 +749,7 @@ def _aviso_estado(destinatario, autor, ticket, anterior, nuevo, motivo, config,
     """Aviso de un cambio de estado hecho desde la app (``AVISAR_ESTADOS``),
     con el motivo si lo escribió. Si pasó a Cerrado, avisa que ya no admite
     cambios (una respuesta no se agrega como comentario)."""
-    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    enlace = f"{config.app_url}/tickets/{ticket.id}"
     cerrado = nuevo == TicketState.CLOSED.value
     partes = [
         _saludo(destinatario.name),
@@ -780,7 +780,7 @@ def _aviso_estado(destinatario, autor, ticket, anterior, nuevo, motivo, config,
 
 def _aviso_asignado(asignado, autor, ticket, config) -> Respuesta:
     """Al nuevo asignado de un ticket asignado desde la app (``AVISAR_ASIGNADO``)."""
-    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    enlace = f"{config.app_url}/tickets/{ticket.id}"
     return Respuesta(
         para=asignado.email,
         asunto=f"[Ticket #{ticket.id}] Se le asignó el ticket #{ticket.id}",
@@ -800,7 +800,7 @@ def _aviso_asignado(asignado, autor, ticket, config) -> Respuesta:
 
 def _aviso_asignado_al_solicitante(solicitante, asignado, autor, ticket, config) -> Respuesta:
     """Al solicitante: a quién se asignó su ticket (``AVISAR_ASIGNADO``)."""
-    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    enlace = f"{config.app_url}/tickets/{ticket.id}"
     return Respuesta(
         para=solicitante.email,
         asunto=f"[Ticket #{ticket.id}] El ticket #{ticket.id} fue asignado a {asignado.name}",
@@ -1863,7 +1863,7 @@ def avisar_estado(session, ticket: Ticket, anterior: str, autor: User, motivo: s
 
 
 def _aviso_cierre_automatico(destinatario, ticket, config) -> Respuesta:
-    enlace = f"{config.app_url}/detalle.html?id={ticket.id}"
+    enlace = f"{config.app_url}/tickets/{ticket.id}"
     partes = [
         _saludo(destinatario.name),
         f"El ticket #{ticket.id} se cerró automáticamente por falta de respuesta. Si el problema "
@@ -2153,7 +2153,7 @@ def _guardar_adjuntos(session_factory, config: ConfigCorreo, cliente: ClienteGra
         return respuesta
     if resultado is None or not resultado.omitidos:
         return respuesta
-    enlace = f"{config.app_url}/detalle.html?id={respuesta.ticket_id}"
+    enlace = f"{config.app_url}/tickets/{respuesta.ticket_id}"
     return correo_adjuntos.agregar_nota(respuesta, resultado.omitidos, enlace)
 
 

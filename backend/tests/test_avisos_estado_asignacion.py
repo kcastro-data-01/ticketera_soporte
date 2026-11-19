@@ -97,7 +97,7 @@ def test_estado_avisa_al_solicitante_y_al_asignado(client, session, graph, gente
         assert asunto == f"[Ticket #{ticket.id}] El ticket #{ticket.id} pasó a «En proceso»"
         assert texto.startswith(f"Hola {nombre},\n\nKristin Castro cambió el estado del ticket #{ticket.id}.")
         assert "Título: La impresora no imprime\nEstado: Nuevo → En proceso" in texto
-        assert f"Puede verlo aquí: {APP_URL}/detalle.html?id={ticket.id}" in texto
+        assert f"Puede verlo aquí: {APP_URL}/tickets/{ticket.id}" in texto
         assert f"debe mantener «[Ticket #{ticket.id}]»" in texto
         assert "Motivo:" not in texto and "quedó cerrado" not in texto
         assert texto.endswith("Mesa de ayuda")
@@ -209,11 +209,11 @@ def test_reasignar_avisa_al_nuevo_asignado_y_al_solicitante(client, session, gra
     assert asunto_juan == f"[Ticket #{ticket.id}] Se le asignó el ticket #{ticket.id}"
     assert texto_juan.startswith(f"Hola Juan Solís,\n\nKristin Castro le asignó el ticket #{ticket.id}.")
     assert "Título: La impresora no imprime\nPrioridad: Alta" in texto_juan
-    assert f"Puede verlo aquí: {APP_URL}/detalle.html?id={ticket.id}" in texto_juan
+    assert f"Puede verlo aquí: {APP_URL}/tickets/{ticket.id}" in texto_juan
     assert asunto_ana == f"[Ticket #{ticket.id}] El ticket #{ticket.id} fue asignado a Juan Solís"
     assert texto_ana.startswith(
         f"Hola Ana Pérez,\n\nKristin Castro asignó su ticket #{ticket.id} a Juan Solís.")
-    assert "Prioridad: Alta" in texto_ana and f"{APP_URL}/detalle.html?id={ticket.id}" in texto_ana
+    assert "Prioridad: Alta" in texto_ana and f"{APP_URL}/tickets/{ticket.id}" in texto_ana
     registros = session.scalars(select(ProcessedEmail.ticket_id).where(ProcessedEmail.result == "aviso_app"))
     assert registros.all() == [ticket.id, ticket.id]
 

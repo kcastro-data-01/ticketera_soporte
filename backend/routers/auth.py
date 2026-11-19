@@ -164,7 +164,7 @@ def renovar_sesion(
     summary="Datos públicos para iniciar sesión",
 )
 def login_config() -> LoginConfigResponse:
-    """Public: what login.html needs to start the Microsoft login (MSAL.js)
+    """Public: what the login page (/login) needs to start the Microsoft login (MSAL.js)
     and whether the password form is enabled (``LOGIN_LOCAL``)."""
     return LoginConfigResponse(
         tenant=login_microsoft.tenant(),

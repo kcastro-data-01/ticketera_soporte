@@ -63,7 +63,7 @@ describe("sesión deslizante (control.js)", () => {
     await vi.advanceTimersByTimeAsync(2 * MIN);
     expect(localStorage.getItem("access_token")).toBeNull();
     expect(localStorage.getItem("sesion_cierre")).toBe("inactividad");
-    expect(navegador.ir).toHaveBeenCalledWith("/react/login");
+    expect(navegador.ir).toHaveBeenCalledWith("/login");
   });
 
   it("«Seguir conectado» cierra el aviso y renueva", async () => {
@@ -95,7 +95,7 @@ describe("sesión deslizante (control.js)", () => {
   });
 
   it("401 al renovar: sesión vencida, vuelve al login con la ruta actual", async () => {
-    window.history.replaceState(null, "", "/react/?estado=Nuevo");
+    window.history.replaceState(null, "", "/?estado=Nuevo");
     entrar();
     vi.stubGlobal("fetch", vi.fn(async () => respuesta({ detail: "No autenticado" }, { status: 401 })));
     iniciarSesion({ tiempos: SESION_TIEMPOS });
@@ -103,7 +103,7 @@ describe("sesión deslizante (control.js)", () => {
     mover();
     await vi.advanceTimersByTimeAsync(2000);
     expect(localStorage.getItem("sesion_cierre")).toBe("vencida");
-    expect(navegador.ir).toHaveBeenCalledWith("/react/login?volver=%2F%3Festado%3DNuevo");
+    expect(navegador.ir).toHaveBeenCalledWith("/login?volver=%2F%3Festado%3DNuevo");
     window.history.replaceState(null, "", "/");
   });
 
@@ -113,7 +113,7 @@ describe("sesión deslizante (control.js)", () => {
     iniciarSesion({ tiempos: SESION_TIEMPOS });
     localStorage.removeItem("access_token");
     window.dispatchEvent(new StorageEvent("storage", { key: "access_token" }));
-    expect(navegador.ir).toHaveBeenCalledWith("/react/login");
+    expect(navegador.ir).toHaveBeenCalledWith("/login");
   });
 
   it("otra pestaña con actividad mantiene viva esta", async () => {

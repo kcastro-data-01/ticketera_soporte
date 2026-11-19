@@ -42,8 +42,4 @@ Thumbs.db
 /adjuntos/
 .env*
 
-# Build de React copiado para Vercel (lo arma vercel.json)
-/frontend/react/
 
-# Capturas de scripts/comparar_react.sh
-/scripts/comparar/capturas/

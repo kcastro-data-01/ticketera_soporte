@@ -1,46 +1,190 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "npm --prefix frontend-react ci --no-audit --no-fund && npm --prefix frontend-react run build && rm -rf frontend/react && cp -r frontend-react/dist frontend/react",
-  "outputDirectory": "frontend",
+  "buildCommand": "npm --prefix frontend-react ci --no-audit --no-fund && npm --prefix frontend-react run build",
+  "outputDirectory": "frontend-react/dist",
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
-      "excludeFiles": "{frontend/**,frontend-react/**,backend/tests/**,docs/**,backups/**,*.db}"
+      "excludeFiles": "{frontend-react/**,backend/tests/**,docs/**,backups/**,*.db}"
     }
   },
   "redirects": [
-    { "source": "/react", "destination": "/react/", "permanent": false }
-  ],
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/index" },
-    { "source": "/react/:path*", "destination": "/react/index.html" },
-    { "source": "/health", "destination": "/api/index" }
-  ],
-  "headers": [
     {
-      "source": "/((?!msal/silencioso\\.html).*)",
-      "headers": [
-        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "same-origin" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" },
-        { "key": "Content-Security-Policy-Report-Only", "value": "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://login.microsoftonline.com; frame-src 'self' https://login.microsoftonline.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" }
-      ]
+      "source": "/detalle.html",
+      "has": [
+        {
+          "type": "query",
+          "key": "id",
+          "value": "(?<id>[1-9][0-9]*)"
+        }
+      ],
+      "destination": "/tickets/:id",
+      "statusCode": 301
+    },
+    {
+      "source": "/detalle.html",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/index.html",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/login.html",
+      "destination": "/login",
+      "statusCode": 301
+    },
+    {
+      "source": "/crear.html",
+      "destination": "/crear",
+      "statusCode": 301
+    },
+    {
+      "source": "/metricas.html",
+      "destination": "/metricas",
+      "statusCode": 301
+    },
+    {
+      "source": "/departamentos.html",
+      "destination": "/departamentos",
+      "statusCode": 301
+    },
+    {
+      "source": "/historial.html",
+      "destination": "/historial",
+      "statusCode": 301
+    },
+    {
+      "source": "/usuarios.html",
+      "destination": "/usuarios",
+      "statusCode": 301
+    },
+    {
+      "source": "/cuenta.html",
+      "destination": "/cuenta",
+      "statusCode": 301
+    },
+    {
+      "source": "/ayuda.html",
+      "destination": "/ayuda",
+      "statusCode": 301
+    },
+    {
+      "source": "/sin-permiso.html",
+      "destination": "/sin-permiso",
+      "statusCode": 301
+    },
+    {
+      "source": "/404.html",
+      "destination": "/",
+      "statusCode": 301
     },
     {
       "source": "/msal/silencioso.html",
+      "destination": "/msal/silencioso",
+      "statusCode": 301
+    },
+    {
+      "source": "/react",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/react/:path*",
+      "destination": "/:path*",
+      "statusCode": 301
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/msal/silencioso",
+      "destination": "/msal/silencioso.html"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/((?!msal/silencioso$).*)",
       "headers": [
-        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "same-origin" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" },
-        { "key": "Content-Security-Policy", "value": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" },
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" }
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains"
+        },
+        {
+          "key": "Content-Security-Policy-Report-Only",
+          "value": "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://login.microsoftonline.com; frame-src 'self' https://login.microsoftonline.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=()"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        }
+      ]
+    },
+    {
+      "source": "/msal/silencioso",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        }
       ]
     }
   ]

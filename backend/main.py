@@ -1,10 +1,10 @@
 """FastAPI application entry point for the support ticket system."""
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db
 from backend.cabeceras import CabecerasSeguridad
@@ -82,30 +82,12 @@ app.include_router(explicacion_router)
 app.include_router(metricas_router)
 app.include_router(cron_router)
 
-# Serve the frontend (Task 11) from the same origin as the API, so the
-# browser can call /api/* without CORS. Registered last: every route above
-# keeps its priority over this catch-all mount. On Vercel the CDN serves the
-# frontend (vercel.json) and the folder is not inside the function.
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-
-
-class FrontendSinCopiasViejas(StaticFiles):
-    """El frontend con ``Cache-Control: no-cache``: el navegador guarda la
-    copia pero la revalida en cada visita (con el ETag, 304 si no cambió).
-    Sin este encabezado el navegador puede seguir usando un ``.js`` viejo
-    con el HTML nuevo (pasó con ayuda.js: los botones no hacían nada)."""
-
-    async def get_response(self, path, scope):
-        response = await super().get_response(path, scope)
-        response.headers.setdefault("Cache-Control", "no-cache")
-        return response
-
-
-# La app React (migración por etapas) bajo /react/, antes del frontend
-# actual para que su mount «/» no la tape. Solo si está compilada
-# (Dockerfile; en local, ``npm run build`` en frontend-react/).
-REACT_DIST_DIR = Path(__file__).resolve().parent.parent / "frontend-react" / "dist"
+# El frontend (la app React compilada) desde el mismo origen que la API, así
+# el navegador llama a /api/* sin CORS. Va al final: cada ruta de arriba
+# tiene prioridad sobre el montaje en «/». Las direcciones viejas
+# (index.html, detalle.html?id=N, /react/…) redirigen con 301. En Vercel el
+# frontend lo sirve la CDN (vercel.json) y la carpeta no está en la función.
+# FRONTEND_DIST: otra carpeta con el build (las pruebas usan uno falso).
+REACT_DIST_DIR = Path(os.environ.get("FRONTEND_DIST")
+                      or Path(__file__).resolve().parent.parent / "frontend-react" / "dist")
 montar_react(app, REACT_DIST_DIR)
-
-if FRONTEND_DIR.is_dir():
-    app.mount("/", FrontendSinCopiasViejas(directory=str(FRONTEND_DIR), html=True), name="frontend")

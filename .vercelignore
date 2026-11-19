@@ -1,4 +1,4 @@
-# Lo que no se sube a Vercel (el frontend sí: lo sirve la CDN).
+# Lo que no se sube a Vercel (el frontend se compila allá y lo sirve la CDN).
 .venv
 .pytest_cache
 **/__pycache__
@@ -7,7 +7,7 @@
 backups
 docs
 backend/tests
-frontend/tests
+frontend-react/src/**/*.test.*
 ticketera_soporte
 INVENTARIO.md
 .env
@@ -17,4 +17,3 @@ docker-compose.yml
 .dockerignore
 frontend-react/node_modules
 frontend-react/dist
-frontend/react

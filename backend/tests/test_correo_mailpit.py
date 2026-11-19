@@ -196,7 +196,7 @@ def test_comentario_en_la_app_avisa_por_mailpit(client, session, entorno_mailpit
         assert correo["Subject"] == f"[Ticket #{ticket.id}] Nuevo comentario en el ticket #{ticket.id}"
         texto = correo.get_content()
         assert "Kristin Castro agregó un comentario" in texto and "Ya pedí el repuesto." in texto
-        assert f"{APP_URL}/detalle.html?id={ticket.id}" in texto
+        assert f"{APP_URL}/tickets/{ticket.id}" in texto
         assert correo["X-Ticketera"] == "1"
 
     # Mismo registro que con Graph: aviso_app con el Message-ID y el ticket.

@@ -132,7 +132,7 @@ def test_registered_sender_gets_ticket_and_confirmation(modo, entorno, factory, 
     assert (ticket.created_by_id, ticket.assigned_to_id) == (gente["ana"].id, gente["yo"].id)
     [(_, enviado)] = graph.respuestas
     assert enviado["message"]["subject"] == f"Ticket #{ticket.id} creado: {ticket.title}"
-    assert f"{APP_URL}/detalle.html?id={ticket.id}" in enviado["message"]["body"]["content"]
+    assert f"{APP_URL}/tickets/{ticket.id}" in enviado["message"]["body"]["content"]
     assert graph.no_leidos() == []
 
 
@@ -155,7 +155,7 @@ def test_sent_ticket_prefix_creates_assigned_ticket_and_notice(modo, entorno, fa
     mensaje = aviso["message"]
     assert mensaje["toRecipients"] == [{"emailAddress": {"address": "pedro@data.cr"}}]
     assert mensaje["subject"].startswith(f"[Ticket #{ticket.id}] Se le asignó el ticket #{ticket.id}")
-    assert f"{APP_URL}/detalle.html?id={ticket.id}" in mensaje["body"]["content"]
+    assert f"{APP_URL}/tickets/{ticket.id}" in mensaje["body"]["content"]
     assert {"name": "X-Ticketera", "value": "1"} in mensaje["internetMessageHeaders"]
 
 
@@ -328,7 +328,7 @@ def test_app_comment_notifies_requester_and_assignee(modo, client, session, ento
         assert mensaje["subject"] == f"[Ticket #{ticket.id}] Nuevo comentario en el ticket #{ticket.id}"
         texto = mensaje["body"]["content"]
         assert "Kristin Castro agregó un comentario" in texto and "Ya pedí el repuesto." in texto
-        assert f"{APP_URL}/detalle.html?id={ticket.id}" in texto
+        assert f"{APP_URL}/tickets/{ticket.id}" in texto
         assert {"name": "X-Auto-Response-Suppress", "value": "All"} in mensaje["internetMessageHeaders"]
         assert {"name": "X-Ticketera", "value": "1"} in mensaje["internetMessageHeaders"]
 

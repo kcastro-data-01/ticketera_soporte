@@ -277,7 +277,7 @@ def test_explain_ticket_interpreted_shows_the_ticket_card(client, ia, tickets):
     ia.json = _json("explicar_ticket", ticket=t["Nuevo"].id)
     respuesta = _respuesta(ask(client, headers, f"q kiere decir el tiket {t['Nuevo'].id}"), "directa")
     assert f"«{t['Nuevo'].title}»" in respuesta.splitlines()[0]
-    assert respuesta.endswith(f"(detalle.html?id={t['Nuevo'].id}&pestana=ia).")
+    assert respuesta.endswith(f"(/tickets/{t['Nuevo'].id}?pestana=ia).")
 
 
 def test_free_ai_gets_the_counts_by_state(client, ia, tickets):

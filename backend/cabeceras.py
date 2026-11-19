@@ -7,7 +7,7 @@ CDN delante de FastAPI, así que las agrega este middleware. Son las mismas
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
-PAGINA_SILENCIOSA = "/msal/silencioso.html"
+PAGINA_SILENCIOSA = "/msal/silencioso"
 
 CABECERAS = {
     "X-Robots-Tag": "noindex, nofollow",

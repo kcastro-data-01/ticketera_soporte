@@ -530,7 +530,7 @@ class AsistenteRequest(BaseModel):
     """Conversation sent by the chat: alternating turns ending in ``user``."""
 
     messages: list[AsistenteMensaje]
-    # Ticket abierto en pantalla (detalle.html?id=N): permite preguntar por
+    # Ticket abierto en pantalla (/tickets/N): permite preguntar por
     # «este ticket». El servidor comprueba que el usuario pueda verlo.
     ticket_id: int | None = Field(default=None, gt=0)
 
@@ -582,7 +582,7 @@ class MicrosoftLoginRequest(BaseModel):
 
 
 class LoginConfigResponse(BaseModel):
-    """Public data for login.html (``GET /api/auth/config``)."""
+    """Public data for the login page (``GET /api/auth/config``)."""
 
     tenant: str
     client_id: str

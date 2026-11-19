@@ -91,7 +91,8 @@ def test_the_permission_is_in_the_help_and_in_the_chat():
         assert "ver la pantalla «Departamentos»" in PERMISOS_POR_ROL[rol].split("No puede")[1], rol
     assert "ver la pantalla «Departamentos»" in PERMISOS_POR_ROL["Administrador"]
     assert "Solo el Administrador ve la pantalla «Departamentos»" in REGLA_AREAS
-    ayuda = (Path(__file__).resolve().parents[2] / "frontend" / "ayuda.html").read_text(encoding="utf-8")
+    from backend.tests.textos_frontend import AYUDA
+    ayuda = AYUDA.read_text(encoding="utf-8")
     assert "<tr><td>Ver departamentos</td><td>Sí</td><td>No</td><td>No</td></tr>" in ayuda
 
 

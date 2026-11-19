@@ -259,7 +259,7 @@ def test_tipo_no_permitido_y_muy_grande_no_se_descargan_y_se_avisan(factory, ses
     assert [a.filename for a in adjuntos_en_bd(session)] == ["factura.pdf"]
     assert graph.descargas == ["factura.pdf"]
 
-    enlace = f"http://ticketera.data.cr/detalle.html?id={ticket.id}"
+    enlace = f"http://ticketera.data.cr/tickets/{ticket.id}"
     nota = (f"No se guardaron 2 adjuntos (tipo no permitido o más de 4 MB). "
             f"Puede subirlos desde la ticketera: {enlace}")
     respuesta = texto_respuesta(graph)
@@ -352,7 +352,7 @@ def test_el_comentario_por_correo_guarda_sus_adjuntos_en_el_ticket(factory, sess
     texto = texto_respuesta(graph2)
     assert texto.startswith("Hola Ana Pérez,\n\nAgregamos tu mensaje como comentario")
     assert (f"No se guardó 1 adjunto (tipo no permitido o más de 4 MB). Puede subirlos desde la "
-            f"ticketera: http://ticketera.data.cr/detalle.html?id={ticket.id}\n\nMesa de ayuda") in texto
+            f"ticketera: http://ticketera.data.cr/tickets/{ticket.id}\n\nMesa de ayuda") in texto
 
 
 def test_en_ticket_cerrado_no_se_guardan(factory, session, usuario, log):
@@ -454,10 +454,10 @@ def test_migracion_agrega_source_a_la_tabla_de_la_parte_1(tmp_path):
 
 
 def test_nota_singular_plural_y_motivos():
-    enlace = "http://x/detalle.html?id=3"
+    enlace = "http://x/tickets/3"
     assert ca.nota_omitidos([("a.exe", ca.MOTIVO_TIPO)], enlace) == (
         "No se guardó 1 adjunto (tipo no permitido o más de 4 MB). Puede subirlos desde la "
-        "ticketera: http://x/detalle.html?id=3")
+        "ticketera: http://x/tickets/3")
     assert ca.nota_omitidos([("a.pdf", ca.MOTIVO_GRANDE), ("b.pdf", ca.MOTIVO_GRANDE)], enlace).startswith(
         "No se guardaron 2 adjuntos (tipo no permitido o más de 4 MB).")
     assert ca.nota_omitidos([("a", ca.MOTIVO_CANTIDAD), ("b", ca.MOTIVO_TOTAL), ("c", ca.MOTIVO_GRANDE)],

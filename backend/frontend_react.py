@@ -1,33 +1,94 @@
-"""La app React (``frontend-react/``, compilada en ``frontend-react/dist``).
+"""El frontend: la app React compilada (``frontend-react/dist``), en la raíz.
 
-Mientras dura la migración vive bajo ``/react/``: para cualquier ruta
-``/react/*`` que no sea un archivo del build se devuelve ``index.html`` y la
-resuelve React Router (fallback de SPA). Los archivos de ``assets/`` llevan
-un hash en el nombre: se guardan un año (``immutable``); lo demás
-(``index.html``, ``tema.js``) se revalida siempre, como el frontend actual.
-
-En la etapa final la app pasa a la raíz y las direcciones viejas se
-redirigen con 301 usando :func:`ruta_nueva` (todavía no se usa).
+- Un archivo del build se sirve tal cual; los de ``assets/`` llevan un hash
+  en el nombre y se guardan un año (``immutable``); lo demás (``index.html``,
+  ``tema.js``…) se revalida siempre (``no-cache``).
+- Cualquier otra ruta devuelve ``index.html`` y la resuelve React Router
+  (fallback de SPA), salvo ``/api/*`` y ``/health``: ahí una ruta que no
+  existe sigue siendo 404 y no una página.
+- ``/msal/silencioso`` es la página vacía a la que vuelve el iframe de MSAL
+  (con sus cabeceras de iframe, ver ``cabeceras.py``).
+- Las direcciones viejas redirigen con 301 (:func:`ruta_nueva`):
+  ``detalle.html?id=N`` → ``/tickets/N``, ``index.html`` → ``/``,
+  ``/react/…`` → ``/…``, ``/msal/silencioso.html`` → ``/msal/silencioso``.
+  Se conserva la consulta; el ``#fragmento`` no llega al servidor y el
+  navegador lo vuelve a poner en la dirección nueva.
 """
 
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode
 
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
-PREFIJO = "/react"
 CACHE_ASSETS = "public, max-age=31536000, immutable"
+PAGINA_SILENCIOSA = "/msal/silencioso"
+ARCHIVO_SILENCIOSA = "msal/silencioso.html"
+FUERA_DE_LA_APP = ("api/", "api", "health", "docs", "redoc", "openapi.json")
+
+# Dirección vieja → nueva (la de React).
+RUTAS_VIEJAS = {
+    "/index.html": "/",
+    "/login.html": "/login",
+    "/crear.html": "/crear",
+    "/metricas.html": "/metricas",
+    "/departamentos.html": "/departamentos",
+    "/historial.html": "/historial",
+    "/usuarios.html": "/usuarios",
+    "/cuenta.html": "/cuenta",
+    "/ayuda.html": "/ayuda",
+    "/sin-permiso.html": "/sin-permiso",
+    "/404.html": "/",
+    "/msal/silencioso.html": PAGINA_SILENCIOSA,
+}
+
+
+def ruta_nueva(ruta: str, consulta: str = "") -> str | None:
+    """``/detalle.html?id=5`` → ``/tickets/5``; ``/index.html?estado=Nuevo`` →
+    ``/?estado=Nuevo``; ``/react/tickets/5`` → ``/tickets/5``; None si no es
+    una dirección vieja. La consulta se conserva (en el detalle, sin el id)."""
+    parametros = parse_qsl(consulta, keep_blank_values=True)
+    if ruta == "/detalle.html":
+        ticket = dict(parametros).get("id", "")
+        resto = [(k, v) for k, v in parametros if k != "id"]
+        nueva = f"/tickets/{ticket}" if ticket.isdigit() and int(ticket) > 0 else "/"
+    elif ruta == "/react" or ruta.startswith("/react/"):
+        nueva = "/" + ruta[len("/react/"):] if ruta.startswith("/react/") else "/"
+        resto = parametros
+    elif ruta in RUTAS_VIEJAS:
+        nueva = RUTAS_VIEJAS[ruta]
+        resto = parametros
+    else:
+        return None
+    return f"{nueva}?{urlencode(resto)}" if resto else nueva
+
+
+def _redirigir(request: Request) -> RedirectResponse:
+    destino = ruta_nueva(request.url.path, request.url.query) or "/"
+    return RedirectResponse(destino, status_code=301)
+
+
+def registrar_redirecciones(app: FastAPI) -> None:
+    """Las 301 de las direcciones viejas (también sin el build)."""
+    metodos = ["GET", "HEAD"]
+    for ruta in [*RUTAS_VIEJAS, "/detalle.html", "/react", "/react/{resto:path}"]:
+        app.add_api_route(ruta, _redirigir, methods=metodos, include_in_schema=False)
 
 
 class FrontendReact(StaticFiles):
-    """Archivos del build y, si no existe, ``index.html`` (rutas de React).
-    Un ``assets/…`` que falta sí responde 404: devolver HTML en lugar de un
-    .js solo confundiría al navegador."""
+    """Archivos del build y, si no existe, ``index.html`` (rutas de React)."""
 
     async def get_response(self, path, scope):
+        # Primero el método, como StaticFiles: un POST a una ruta de la API
+        # que solo acepta GET sigue siendo 405 (y no 404).
+        if scope["method"] not in ("GET", "HEAD"):
+            raise HTTPException(status_code=405)
+        if path == "." or path == "":
+            path = "index.html"
+        if path.startswith(FUERA_DE_LA_APP):
+            raise HTTPException(status_code=404)
         try:
             response = await super().get_response(path, scope)
         except HTTPException as error:
@@ -46,43 +107,18 @@ class FrontendReact(StaticFiles):
 
 
 def montar_react(app: FastAPI, carpeta: Path) -> bool:
-    """Monta el build en ``/react`` si existe (antes del frontend actual).
-    Devuelve True si lo montó."""
+    """Las redirecciones y, si el build existe, la página silenciosa y la
+    app en ``/`` (va al final: las rutas de la API tienen prioridad).
+    Devuelve True si montó la app."""
+    registrar_redirecciones(app)
     if not (carpeta / "index.html").is_file():
         return False
 
-    @app.get(PREFIJO, include_in_schema=False)
-    def react_sin_barra() -> RedirectResponse:
-        return RedirectResponse(f"{PREFIJO}/", status_code=307)
+    silenciosa = carpeta / ARCHIVO_SILENCIOSA
 
-    app.mount(PREFIJO, FrontendReact(directory=str(carpeta), html=True), name="frontend-react")
+    @app.api_route(PAGINA_SILENCIOSA, methods=["GET", "HEAD"], include_in_schema=False)
+    def pagina_silenciosa() -> FileResponse:
+        return FileResponse(silenciosa, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-cache"})
+
+    app.mount("/", FrontendReact(directory=str(carpeta), html=True), name="frontend")
     return True
-
-
-# --- Etapa final: direcciones viejas → nuevas (301) ---
-RUTAS_VIEJAS = {
-    "/index.html": "/",
-    "/login.html": "/login",
-    "/crear.html": "/crear",
-    "/metricas.html": "/metricas",
-    "/departamentos.html": "/departamentos",
-    "/historial.html": "/historial",
-    "/usuarios.html": "/usuarios",
-    "/cuenta.html": "/cuenta",
-    "/ayuda.html": "/ayuda",
-    "/sin-permiso.html": "/sin-permiso",
-}
-
-
-def ruta_nueva(ruta: str, consulta: str = "") -> str | None:
-    """``/detalle.html?id=5`` → ``/tickets/5``; ``/index.html?estado=Nuevo`` →
-    ``/?estado=Nuevo``; None si no es una dirección vieja. Igual que
-    ``rutaNuevaDe`` en ``frontend-react/src/rutas.js``."""
-    parametros = parse_qsl(consulta, keep_blank_values=False)
-    if ruta == "/detalle.html":
-        ticket = dict(parametros).get("id", "")
-        return f"/tickets/{ticket}" if ticket.isdigit() else "/"
-    nueva = RUTAS_VIEJAS.get(ruta)
-    if nueva is None:
-        return None
-    return f"{nueva}?{urlencode(parametros)}" if parametros else nueva

@@ -25,7 +25,7 @@ from backend.services.asistente_service import (
 from backend.tests.test_asistente import ask, login_as
 from backend.tests.test_asistente_interpretacion import _respuesta, ia  # noqa: F401
 
-AYUDA = Path(__file__).resolve().parents[2] / "frontend" / "ayuda.html"
+from backend.tests.textos_frontend import AYUDA  # noqa: E402
 ROLES = ("Administrador", "Técnico", "Solicitante")
 
 

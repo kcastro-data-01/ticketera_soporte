@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import logo from "../../../frontend/images/logo-circular.jpg";
+import logo from "../images/logo-circular.jpg";
 import { useClaseBody, useTitulo } from "../componentes/claseBody.js";
 
 function PaginaError({ titulo, codigo, icono, mensaje }) {

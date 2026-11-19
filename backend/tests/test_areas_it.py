@@ -212,10 +212,12 @@ def test_no_role_can_create_rename_deactivate_or_delete_areas(client, session, a
 def test_the_areas_page_and_menu_link_are_gone():
     from pathlib import Path
 
-    frontend = Path(__file__).resolve().parents[2] / "frontend"
-    assert not (frontend / "areas.html").exists()
-    for pagina in frontend.glob("*.html"):
-        assert "areas.html" not in pagina.read_text(encoding="utf-8"), pagina.name
+    from backend.tests.textos_frontend import SRC, paginas
+
+    assert not (SRC / "paginas" / "Areas.jsx").exists()
+    for pagina in paginas():
+        texto = pagina.read_text(encoding="utf-8")
+        assert "areas.html" not in texto and '"/areas"' not in texto, pagina.name
 
 
 # --- Crear ticket: área obligatoria y reparto ----------------------------------
@@ -517,7 +519,8 @@ def test_help_and_chat_say_the_same():
     from backend.constants import IT_AREA_SCOPE
     from backend.services import asistente_service as asis
 
-    ayuda = (Path(__file__).resolve().parents[2] / "frontend" / "ayuda.html").read_text(encoding="utf-8")
+    from backend.tests.textos_frontend import AYUDA
+    ayuda = AYUDA.read_text(encoding="utf-8")
     for area, atiende in IT_AREA_SCOPE.items():
         assert f"<strong>{area}</strong>: {atiende}." in ayuda, area
         assert f"{area} ({atiende})" in asis.REGLA_AREAS, area
@@ -564,7 +567,8 @@ def test_the_help_and_the_chat_say_it_only_changes_in_nuevo():
 
     from backend.services import asistente_service as asis
 
-    ayuda = (Path(__file__).resolve().parents[2] / "frontend" / "ayuda.html").read_text(encoding="utf-8")
+    from backend.tests.textos_frontend import AYUDA
+    ayuda = AYUDA.read_text(encoding="utf-8")
     assert "solo mientras el ticket está en Nuevo" in ayuda
     assert "En los demás estados esa sección no aparece; el departamento se ve en «Detalles»." in ayuda
     assert "Departamento actual" not in ayuda
@@ -590,12 +594,14 @@ def test_the_support_department_is_called_soporte_it_everywhere():
     assert CATEGORY_IT_AREA["Hardware"] == CATEGORY_IT_AREA["Software"] == "Soporte IT"
     assert "Soporte IT" in IT_AREA_SCOPE
     raiz = Path(__file__).resolve().parents[2]
-    textos = {nombre: (raiz / nombre).read_text(encoding="utf-8") for nombre in (
-        "frontend/ayuda.html", "frontend/crear.html", "frontend/usuarios.html", "README.md", "docs/api.md")}
+    from backend.tests.textos_frontend import AYUDA, CREAR, USUARIOS
+
+    textos = {nombre: (raiz / nombre).read_text(encoding="utf-8") for nombre in ("README.md", "docs/api.md")}
+    textos.update({"ayuda": AYUDA.read_text(), "crear": CREAR.read_text(), "usuarios": USUARIOS.read_text()})
     textos["chat"] = asis.GUIA_APP + asis.REGLA_AREAS + asis.REGLAS_PARA_IA
     viejo = re.compile(r"→ Soporte(?! IT)|Soporte \(|<strong>Soporte</strong>|fijos: Soporte,|"
                        r"Soporte → |\| Soporte \|")
     for nombre, texto in textos.items():
         assert not viejo.search(texto), nombre
-    for nombre in ("frontend/ayuda.html", "frontend/crear.html", "chat"):
+    for nombre in ("ayuda", "crear", "chat"):
         assert "Soporte IT" in textos[nombre], nombre

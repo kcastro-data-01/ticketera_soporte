@@ -66,7 +66,7 @@ def test_known_user_gets_a_ticket_and_a_reply(session, usuario):
     assert "Recibido por correo de ana@data.cr" in ticket.description
     assert respuesta.para == "ana@data.cr"
     assert f"#{ticket.id}" in respuesta.asunto
-    assert f"http://ticketera.data.cr/detalle.html?id={ticket.id}" in respuesta.texto
+    assert f"http://ticketera.data.cr/tickets/{ticket.id}" in respuesta.texto
 
 
 def test_company_sender_without_account_gets_a_notice_and_no_ticket(session, log_correo):
@@ -590,7 +590,7 @@ def test_registered_sender_creates_ticket_as_requester_and_gets_confirmation(fac
     [(respondido, enviado)] = graph.respuestas
     assert respondido == mensaje["id"]  # en el mismo hilo
     assert enviado["message"]["subject"] == f"Ticket #{ticket.id} creado: {ticket.title}"
-    assert f"/detalle.html?id={ticket.id}" in enviado["message"]["body"]["content"]
+    assert f"/tickets/{ticket.id}" in enviado["message"]["body"]["content"]
     assert graph.no_leidos() == []
 
 

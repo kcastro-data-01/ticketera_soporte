@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 /* Los mismos estilos de la ticketera actual (una sola copia en frontend/css). */
-import "../../frontend/css/estilos.css";
+import "./css/estilos.css";
 import "./raiz.css";
 import App from "./App.jsx";
 

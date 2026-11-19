@@ -9,6 +9,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 import pytest
+
+from backend.tests.test_frontend_react import build_falso
 from sqlalchemy.orm import sessionmaker
 
 from backend import cabeceras, database
@@ -102,25 +104,29 @@ CODIGO_CLIENTE = (
     "from backend.main import app\n"
     "with TestClient(app) as c:\n"
     "    salud = c.get('/health')\n"
-    "    pagina = c.get('/login.html')\n"
-    "    silenciosa = c.get('/msal/silencioso.html')\n"
+    "    pagina = c.get('/login')\n"
+    "    silenciosa = c.get('/msal/silencioso')\n"
+    "    vieja = c.get('/msal/silencioso.html', follow_redirects=False)\n"
     "    print(json.dumps({'salud': [salud.status_code, salud.json(), dict(salud.headers)],\n"
     "                      'docs': c.get('/docs').status_code,\n"
     "                      'local': c.post('/api/auth/login', json={'email': 'a@data.cr', 'password': 'x'}).status_code,\n"
     "                      'pagina': [pagina.status_code, dict(pagina.headers)],\n"
-    "                      'silenciosa': [silenciosa.status_code, dict(silenciosa.headers)]}))\n"
+    "                      'silenciosa': [silenciosa.status_code, dict(silenciosa.headers)],\n"
+    "                      'vieja': [vieja.status_code, vieja.headers.get('location')]}))\n"
 )
 
 
-def test_render_health_sin_docs_ni_contrasena_y_con_cabeceras():
+def test_render_health_sin_docs_ni_contrasena_y_con_cabeceras(tmp_path):
     resultado = correr(CODIGO_CLIENTE, MODO_PRODUCCION="1", JWT_SECRET_KEY="x" * 40,
-                       LOGIN_LOCAL="true", DATABASE_URL="sqlite:///:memory:")
+                       LOGIN_LOCAL="true", DATABASE_URL="sqlite:///:memory:",
+                       FRONTEND_DIST=str(build_falso(tmp_path / "dist")))
     assert resultado.returncode == 0, resultado.stderr
     datos = json.loads(resultado.stdout.strip().splitlines()[-1])
     assert datos["salud"][:2] == [200, {"status": "ok"}]
     assert datos["docs"] == 404
     assert datos["local"] != 200
     assert datos["pagina"][0] == 200 and datos["silenciosa"][0] == 200
+    assert datos["vieja"] == [301, "/msal/silencioso"]
     for nombre, valor in cabeceras.CABECERAS.items():
         assert datos["pagina"][1][nombre.lower()] == valor, nombre
         assert datos["salud"][2][nombre.lower()] == valor, nombre
@@ -130,8 +136,8 @@ def test_render_health_sin_docs_ni_contrasena_y_con_cabeceras():
     assert datos["silenciosa"][1]["x-frame-options"] == "SAMEORIGIN"
 
 
-def test_docker_no_agrega_cabeceras():
-    resultado = correr(CODIGO_CLIENTE, DATABASE_URL="sqlite:///:memory:")
+def test_docker_no_agrega_cabeceras(tmp_path):
+    resultado = correr(CODIGO_CLIENTE, DATABASE_URL="sqlite:///:memory:", FRONTEND_DIST=str(build_falso(tmp_path / "dist")))
     assert resultado.returncode == 0, resultado.stderr
     datos = json.loads(resultado.stdout.strip().splitlines()[-1])
     assert "strict-transport-security" not in datos["pagina"][1]
@@ -140,8 +146,8 @@ def test_docker_no_agrega_cabeceras():
 def test_las_cabeceras_son_las_de_vercel_json():
     reglas = json.loads((RAIZ / "vercel.json").read_text())["headers"]
     por_fuente = {r["source"]: {h["key"]: h["value"] for h in r["headers"]} for r in reglas}
-    assert por_fuente["/msal/silencioso.html"] == cabeceras.CABECERAS_SILENCIOSA
-    generales = next(v for k, v in por_fuente.items() if k != "/msal/silencioso.html")
+    assert por_fuente["/msal/silencioso"] == cabeceras.CABECERAS_SILENCIOSA
+    generales = next(v for k, v in por_fuente.items() if k != "/msal/silencioso")
     assert generales == cabeceras.CABECERAS
 
 

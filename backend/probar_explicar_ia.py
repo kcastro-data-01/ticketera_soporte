@@ -88,7 +88,7 @@ def main(argv=None) -> int:
             print(f"Claridad (servidor): {datos['claridad']} — {datos['motivo_claridad']}")
             print(f"Explicación: {datos['explicacion']['explicacion']}")
             print(json.dumps(datos["explicacion"], ensure_ascii=False, indent=2))
-            print(f"Ábrelo en la app: http://localhost:8000/detalle.html?id={ticket.id}")
+            print(f"Ábrelo en la app: http://localhost:8000/tickets/{ticket.id}")
 
         if args.borrar:
             for ticket_id in creados:

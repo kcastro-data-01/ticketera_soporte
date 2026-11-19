@@ -13,8 +13,8 @@ describe("estructura de la página", () => {
   it("#raiz usa display: contents y se carga después de estilos.css", () => {
     expect(fs.readFileSync(path.join(SRC, "raiz.css"), "utf8")).toMatch(/#raiz\s*\{\s*display:\s*contents;/);
     const main = fs.readFileSync(path.join(SRC, "main.jsx"), "utf8");
-    expect(main.indexOf("frontend/css/estilos.css")).toBeGreaterThan(-1);
-    expect(main.indexOf("./raiz.css")).toBeGreaterThan(main.indexOf("frontend/css/estilos.css"));
+    expect(main.indexOf("./css/estilos.css")).toBeGreaterThan(-1);
+    expect(main.indexOf("./raiz.css")).toBeGreaterThan(main.indexOf("./css/estilos.css"));
   });
 
   it("mismo árbol que index.html: body.app > aside.barra-lateral + .app-principal > cabecera, main.contenido, pie", async () => {

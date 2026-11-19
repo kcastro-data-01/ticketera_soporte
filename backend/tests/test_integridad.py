@@ -23,7 +23,7 @@ from backend.tests.test_asistente import ask, login_as
 from backend.tests.test_asistente_interpretacion import _respuesta, ia  # noqa: F401
 from backend.tests.test_correo import CONFIG, FakeGraph, crear_correo, procesar
 
-AYUDA = Path(__file__).resolve().parents[2] / "frontend" / "ayuda.html"
+from backend.tests.textos_frontend import AYUDA  # noqa: E402
 CERRADO = "El ticket #{id} está Cerrado y no admite cambios."
 
 

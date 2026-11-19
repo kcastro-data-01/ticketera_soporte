@@ -203,7 +203,7 @@ def test_avisar_asignado_prepares_the_mail_when_enabled(session, yo, equipo):
     assert aviso.para == "pedro@data.cr"
     assert aviso.asunto == f"[Ticket #{ticket.id}] Se le asignó el ticket #{ticket.id}: {ticket.title}"
     assert f"Se le asignó el ticket #{ticket.id}" in aviso.texto
-    assert f"http://ticketera.data.cr/detalle.html?id={ticket.id}" in aviso.texto
+    assert f"http://ticketera.data.cr/tickets/{ticket.id}" in aviso.texto
 
 
 def test_avisar_asignado_comes_from_the_environment():

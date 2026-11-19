@@ -17,8 +17,8 @@ from backend.tests.test_explicacion import ollama, tecnico  # noqa: F401
 from backend.tests.textos_asistente import es_forma, negrita
 
 LINEA_IA = ("Si necesita más información, como las posibles causas y qué revisar primero, "
-            "[abra el ticket y use «Explicar con IA»](detalle.html?id={id}&pestana=ia).")
-LINEA_DETALLE = "Puede ver el [detalle completo en el ticket](detalle.html?id={id})."
+            "[abra el ticket y use «Explicar con IA»](/tickets/{id}?pestana=ia).")
+LINEA_DETALLE = "Puede ver el [detalle completo en el ticket](/tickets/{id})."
 LARGA = ("La impresora del segundo piso no imprime desde ayer en la tarde y marca una luz naranja. "
          "Ya la apagamos y la volvimos a encender, también revisamos el papel y el tóner, pero sigue "
          "igual y hoy tenemos que imprimir los contratos del cliente para la reunión de las tres.")

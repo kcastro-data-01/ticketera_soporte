@@ -43,9 +43,8 @@ filtrarlos, y consultar su historial de cambios.
   con desplazamiento explícito.
 - Ejecución local y con Docker (`docker compose up --build`), con persistencia
   de SQLite en un volumen.
-- Suite de pruebas con pytest (294 pruebas), pruebas del frontend con
-  `node:test` (52 pruebas en cuatro ficheros) y documentación en
-  [docs/api.md](docs/api.md).
+- Suite de pruebas con pytest, pruebas del frontend con Vitest y React
+  Testing Library, y documentación en [docs/api.md](docs/api.md).
 
 - **Departamentos fijos** (la ticketera es de IT): Soporte IT, Redes e
   Infraestructura, Ciberseguridad y Programación. Cada Técnico pertenece a un
@@ -60,7 +59,7 @@ filtrarlos, y consultar su historial de cambios.
   pasa a Técnico a quien todavía tenga el rol Supervisor, que ya no existe
   (queda en el log), y la API responde `422` si se intenta usar.
 - Permisos por rol: el servidor aplica la tabla de permisos (ver
-  `ayuda.html`) y la interfaz oculta los botones y menús que el rol no puede
+  la Ayuda, `/ayuda`) y la interfaz oculta los botones y menús que el rol no puede
   usar. El Solicitante solo ve, comenta y consulta el historial de los tickets
   que creó (`tickets.created_by_id`, migración automática al arrancar).
 
@@ -105,7 +104,7 @@ API es abierta; los usuarios solo sirven para asignación y firma).
 |------|------------|
 | Backend | Python + FastAPI |
 | Base de datos | SQLite |
-| Frontend | HTML / CSS / JavaScript (migrando a React + Vite en `frontend-react/`) |
+| Frontend | React + Vite (JavaScript) en `frontend-react/` |
 | Infraestructura | Docker |
 | Control de versiones | Git / GitHub |
 
@@ -132,16 +131,16 @@ ticketera_soporte/
 │   ├── routers/                # Endpoints de la API
 │   ├── services/               # Lógica de negocio y auditoría
 │   └── tests/                  # Pruebas con pytest
-├── frontend-react/             # La app en React (Vite), bajo /react/
-│   ├── src/                    # Páginas, componentes y pruebas (Vitest)
-│   └── vite.config.js
-└── frontend/
-    ├── index.html              # Listado con búsqueda y filtros
-    ├── crear.html              # Alta de tickets
-    ├── detalle.html            # Detalle y gestión del ticket
-    ├── css/
-    ├── js/
-    └── tests/                  # Pruebas del frontend (node:test)
+└── frontend-react/             # El frontend: React + Vite (lo sirve FastAPI en /)
+    ├── index.html
+    ├── public/                 # tema.js, favicon, robots.txt, msal/silencioso.html
+    ├── src/
+    │   ├── paginas/            # Una por pantalla (Tickets, Detalle, Crear, …)
+    │   ├── componentes/        # Menú lateral, cabecera, diálogos…
+    │   ├── css/                # estilos.css y login.css
+    │   ├── images/
+    │   └── pruebas/            # Ayudas y pruebas generales (Vitest)
+    └── vite.config.js
 ```
 
 ## Decisiones de diseño
@@ -222,213 +221,64 @@ contenedor. Solo `docker compose down -v` (o borrar el volumen con
 `DATABASE_URL`, se usa el valor por defecto: `ticketera.db` en la raíz del
 proyecto.
 
-### Frontend
+### Frontend (React)
 
-Con la API arrancada, abre <http://127.0.0.1:8000/> en el navegador. FastAPI
-sirve los archivos de `frontend/` desde el mismo origen que la API (montaje
-estático añadido al final de `backend/main.py`), por lo que no hace falta
-CORS ni otro servidor: abrir el HTML con `file://` o con
-`python -m http.server` bloquearía los `fetch` a la API por ser cross-origin.
+El frontend es una app **React** (JavaScript, con Vite y React Router) en
+`frontend-react/`. FastAPI la sirve compilada (`frontend-react/dist`) desde el
+mismo origen que la API, así el navegador llama a `/api/*` sin CORS. Los
+estilos son `frontend-react/src/css/estilos.css` y `login.css`; las
+imágenes, `frontend-react/src/images/`.
 
-La pantalla permite:
-
-- ver el listado de tickets (ID, título, categoría, prioridad, estado,
-  persona asignada y fecha de creación);
-- buscar por título o descripción (usa el parámetro `search`);
-- filtrar por categoría, prioridad y estado (parámetros `category`,
-  `priority` y `state`), con opción "Todos/Todas" en cada selector;
-- combinar búsqueda y filtros con **Buscar** (solo se envían los parámetros
-  con valor) y volver al listado completo con **Limpiar filtros**.
-
-Estados visibles: `Cargando...`, `No hay tickets para mostrar.` y
-`Error al comunicarse con la API.`. El nombre de la persona asignada se
-resuelve con `GET /api/users` (si no es posible, se muestra `Usuario #id`;
-si el ticket no está asignado, `—`).
-
-El botón **Nuevo ticket** de la cabecera abre `/crear.html`, un formulario
-(título, descripción, categoría y prioridad) que da de alta tickets con
-`POST /api/tickets`: valida en el navegador que título y descripción no
-estén vacíos, muestra `Guardando...` mientras envía e impide envíos
-duplicados, presenta el detalle de validación si la API responde `422`, un
-mensaje de error si falla la red o el servidor, y al crearse el ticket
-muestra la confirmación y redirige al listado.
-
-El **ID** de cada fila del listado abre `/detalle.html?id={id}`, la pantalla
-de detalle y gestión: muestra los 9 datos del ticket (ID, título, descripción,
-categoría, prioridad, estado, persona asignada y fechas de creación y
-actualización) con `GET /api/tickets/{id}` — si no existe se muestra un
-mensaje claro — y permite, con los endpoints existentes:
-
-- **editar** título, descripción, categoría y prioridad (`PATCH
-  /api/tickets/{id}`): valida en el navegador los campos vacíos, presenta el
-  detalle de validación si la API responde `422` y, tras un cambio exitoso,
-  recarga el ticket para actualizar la información en pantalla;
-- **asignar o desasignar** una persona: el selector se llena con
-  `GET /api/users` e incluye la opción "Sin asignar" (`PATCH
-  /api/tickets/{id}/assign`); si no hay usuarios, se muestra la nota
-  «No hay usuarios disponibles. Puedes crear uno desde Usuarios» y el
-  guardado queda bloqueado, y si `GET /api/users` falla se desactiva el
-  selector con un error claro;
-- **cambiar el estado** (`PATCH /api/tickets/{id}/state`): muestra el estado
-  actual y solo ofrece los destinos posibles desde él — `Nuevo → En proceso →
-  Resuelto → Cerrado` —, con confirmación si el cambio se aplica (`200`),
-  mensaje del backend si la transición no está permitida (`409`) y una nota
-  cuando el ticket está `Cerrado` (estado final, sin transiciones); el
-  selector se desactiva en ese caso y el backend vuelve a validar siempre;
-- **agregar y consultar comentarios** (`POST /api/tickets/{id}/comments` y
-  `GET /api/tickets/{id}/comments`): lista los comentarios de más antiguo a
-  más reciente con autor, hora local de Costa Rica y texto, con estados de
-  carga, lista vacía y error diferenciados; al agregar un comentario, la
-  lista se actualiza sola sin recargar la página;
-- **consultar el historial de cambios** con el botón **Ver historial**
-  (`GET /api/tickets/{id}/history`): muestra una tabla con fecha y hora,
-  persona (`—` si no hay), acción y detalle (`campo: anterior → nuevo`) en
-  orden cronológico; maneja historial vacío (`No hay cambios registrados
-  para este ticket.`), ticket inexistente (`404` del backend), error HTTP y
-  fallo de red. Cada cambio de estado exitoso crea una entrada de historial
-  (acción `Cambio de estado`) desde el backend, en la misma operación que la
-  actualización del ticket; el resto de acciones (creación, edición,
-  asignación, comentarios) todavía no deja registro, por lo que esas
-  operaciones no aparecen en la tabla.
-
-Todos los botones se deshabilitan mientras hay una operación en curso para
-evitar envíos duplicados.
-
-### Frontend en React (migración por etapas)
-
-La ticketera se está pasando a **React** (JavaScript, con Vite) en
-`frontend-react/`, **sin tocar `frontend/`**: la versión actual sigue
-funcionando igual en <http://localhost:8000/> y la nueva vive, mientras dura la
-migración, en <http://localhost:8000/react/>. Usa los mismos estilos e
-imágenes (los importa de `frontend/css` y `frontend/images`, no hay copia), la
-misma API y las mismas claves de `localStorage`, así que la sesión, el modo
-oscuro, la vista, la densidad y el orden se comparten entre las dos.
-
-**Etapa 1 (lista):** base (React Router con direcciones limpias, un cliente
-de API único con el token y el manejo de 401, sesión y tema, menú lateral por
-rol con el contador), inicio de sesión (Microsoft con `@azure/msal-browser` y
-contraseña con `LOGIN_LOCAL=true`), sesión deslizante igual que `sesion.js`
-(renovación, máximo de horas, «¿Sigue ahí?» y entrada en silencio) y la
-pantalla de Tickets (tabla, tablero, filtros, orden, densidad y vista del
-Solicitante).
-
-**Etapa 2 (lista):** Detalle del ticket en `/tickets/:id` (ficha, recorrido
-de estados con confirmación y motivo, edición según permisos, asignación
-solo a Técnicos y Administradores, cambio de departamento solo en Nuevo,
-comentarios como conversación, adjuntos con vista ampliada, descarga y
-borrado según permisos, historial, «Explicar con IA» y pestañas con
-`?pestana=ia`, eliminar e imprimir; Cerrado de solo lectura), Nuevo ticket
-en `/crear` (mismas validaciones, adjuntos y «Ir al ticket y reintentar» si
-alguno falla) y los avisos flotantes en todas las pantallas React
-(`src/avisos/Avisos.jsx`, con la misma clave `aviso_pendiente`). El menú y los
-botones llevan a las pantallas React que ya existen; solo las que faltan
-abrían la versión actual.
-
-**Etapa 3 (lista):** todas las pantallas que faltaban: Historial
-(`/historial`, agrupado por persona, con período, búsqueda y `#persona=…`),
-Departamentos (`/departamentos`, con «Requieren atención» y los enlaces a la
-lista filtrada `/?area=…&estado=…`), Métricas (`/metricas`, con Chart.js
-4.4.1 empaquetado en vez del CDN), Usuarios (`/usuarios`: agregar, editar,
-rol, departamento, desactivar y reactivar; contraseña solo con
-`LOGIN_LOCAL=true`), Mi cuenta (`/cuenta`), Ayuda (`/ayuda`, con `#tema`) y
-el chat del asistente en todas las pantallas (los enlaces a tickets llevan a
-`/tickets/N`; también los viejos `detalle.html?id=N` guardados en una
-conversación). Ningún menú, botón ni enlace de la app React abre ya la
-versión vieja.
-
-Direcciones (dentro de `/react/`): `/`, `/login`, `/tickets/:id`, `/crear`,
-`/metricas`, `/departamentos`, `/historial`, `/usuarios`, `/cuenta`, `/ayuda`,
-`/sin-permiso`. Están en `frontend-react/src/rutas.js`, junto con el mapa de
-direcciones viejas → nuevas que usará la etapa final.
+Direcciones: `/` (Tickets), `/login`, `/tickets/:id` (también
+`?pestana=ia`), `/crear`, `/historial`, `/departamentos`, `/metricas`,
+`/usuarios`, `/cuenta`, `/ayuda` (con `#tema`, por ejemplo `/ayuda#correo`) y
+`/sin-permiso`. Cada pantalla pide el mismo permiso por rol que el servidor;
+el chat del asistente está en todas las pantallas con sesión.
 
 ```bash
 cd frontend-react
 npm ci            # dependencias (una vez)
 npm test          # pruebas (Vitest + React Testing Library)
-npm run build     # compila en frontend-react/dist
-npm run dev       # desarrollo con recarga: http://localhost:5173/react/
+npm run build     # compila en frontend-react/dist (lo sirve FastAPI)
+npm run dev       # desarrollo con recarga en http://localhost:5173/ (API en :8000)
 ```
 
-Para comparar a ojo y al píxel las pantallas actuales con las de React
-(todas: Tickets, Detalle —normal, con `?pestana=ia` y Cerrado—, Nuevo
-ticket, Historial, Departamentos, Métricas, Usuarios —también con la ventana
-de edición abierta—, Mi cuenta, Ayuda —también `#correo`— y el chat abierto
-con una conversación; capturas con Playwright en 1366x768 y 390x844, claro y
-oscuro, con la misma API simulada; para un rol sin permiso se compara
-«Acceso restringido»), después de `npm run build`:
+Con uvicorn sin Docker hay que correr `npm run build` una vez para que
+FastAPI tenga qué servir (sin build, la API funciona y las pantallas no).
+En Docker no hace falta: el `Dockerfile` tiene dos etapas, una con Node que
+compila `frontend-react/` y la de Python que copia el `dist`; igual en
+Render (`render.yaml` usa el mismo Dockerfile). En Vercel compila
+`vercel.json` (`buildCommand`) y sirve la CDN desde `frontend-react/dist`.
 
-```bash
-scripts/comparar_react.sh Administrador Técnico Solicitante
-scripts/comparar_react.sh Técnico --paginas detalle,crear   # una parte
-```
+**Cómo se sirve** (`backend/frontend_react.py`):
 
-Deja las capturas en `scripts/comparar/capturas/` (no se suben) y termina con
-error si alguna difiere. La página actual de Métricas baja Chart.js del CDN,
-así que esa comparación necesita internet.
-
-`npm run dev` necesita la app en `localhost:8000` (Docker o uvicorn): le pasa
-`/api`, `/msal` y las páginas `.html` viejas. Para entrar con Microsoft desde
-el puerto 5173 hay que registrar también esas URI (ver abajo); con
-`LOGIN_LOCAL=true` alcanza con la contraseña.
-
-**Cómo se sirve.** `backend/frontend_react.py` monta `frontend-react/dist` en
-`/react` (antes del frontend actual): un archivo del build se sirve tal cual
-(los de `assets/` llevan hash y se guardan un año) y cualquier otra ruta
-`/react/*` devuelve `index.html` para que la resuelva React Router. Si no hay
-build (por ejemplo, uvicorn sin haber corrido `npm run build`), `/react/` no
-existe y lo demás funciona igual. El `Dockerfile` tiene dos etapas: una con
-Node que compila `frontend-react/` y la de Python de siempre, que copia el
-`dist`; así funciona igual en Docker local, en Render (mismo Dockerfile,
-`render.yaml` sin cambios) y en el servidor. En Vercel, `vercel.json` compila
-el build y lo copia a `frontend/react` (lo sirve la CDN, con la reescritura
-`/react/*` → `/react/index.html`).
-
-**Microsoft Entra ID.** En la app registrada, plataforma **Aplicación de
-página única (SPA)**, agregar estas URI de redirección:
-
-| Entorno | URI nueva |
-|---------|-----------|
-| Local (Docker) | `http://localhost:8000/react/login` |
-| Render | `https://ticketera-soporte-tyx2.onrender.com/react/login` |
-| Vercel | `https://tickets-americandata.vercel.app/react/login` |
-| `npm run dev` (opcional) | `http://localhost:5173/react/login` y `http://localhost:5173/msal/silencioso.html` |
-
-La renovación silenciosa reutiliza la página que ya existe,
-`/msal/silencioso.html` (con sus cabeceras para el iframe), así que no hace
-falta una nueva: alcanza con que sigan registradas
-`http://localhost:8000/msal/silencioso.html`,
-`https://ticketera-soporte-tyx2.onrender.com/msal/silencioso.html` y
-`https://tickets-americandata.vercel.app/msal/silencioso.html`.
+- Un archivo del build se sirve tal cual; los de `assets/` llevan hash y se
+  guardan un año (`immutable`); lo demás se revalida siempre (`no-cache`).
+- Cualquier otra ruta devuelve `index.html` y la resuelve React Router
+  (fallback de SPA), salvo `/api/*` y `/health`, que siguen dando 404.
+- `/msal/silencioso` es la página vacía a la que vuelve el iframe de MSAL al
+  renovar la sesión en silencio, con sus cabeceras de iframe.
+- **Redirecciones 301** (`ruta_nueva()`), conservando la consulta (el
+  `#fragmento` lo vuelve a poner el navegador): `index.html` → `/`,
+  `detalle.html?id=N` → `/tickets/N` (con `&pestana=ia` → `?pestana=ia`),
+  `crear.html` → `/crear`, `login.html` → `/login`, `metricas.html`,
+  `departamentos.html`, `historial.html`, `usuarios.html`, `cuenta.html`,
+  `ayuda.html`, `sin-permiso.html` → sin `.html`, `404.html` → `/`,
+  `/react/…` → `/…` y `/msal/silencioso.html` → `/msal/silencioso`. Las
+  mismas están en `vercel.json` (`redirects`). Así siguen andando los
+  enlaces de correos viejos y los marcadores.
+- Los correos que arma el servidor enlazan a `APP_URL/tickets/N` y el chat a
+  `/tickets/N` (y `/tickets/N?pestana=ia`); el chat también acepta los
+  `detalle.html?id=N` guardados en conversaciones de antes.
 
 **Seguridad.** Sin scripts ni estilos en línea (la CSP los prohíbe; el modo
-oscuro antes de pintar va en `public/tema.js`), sin `dangerouslySetInnerHTML`
-ni `innerHTML`: todo lo que escriben los usuarios se muestra como texto
+oscuro antes de pintar va en `public/tema.js` y los anchos y colores que
+dependen de los datos se ponen por CSSOM), sin `dangerouslySetInnerHTML` ni
+`innerHTML`: todo lo que escriben los usuarios se muestra como texto
 (`src/pruebas/seguridad.test.js` lo revisa).
 
-**Etapa final (pendiente).**
-
-1. React en la raíz: `BASE = "/"` en `frontend-react/vite.config.js` (el
-   `basename` del router sale de ahí) y `montar_react` en `/` en lugar del
-   frontend actual (`backend/main.py`); en `vercel.json`, `outputDirectory`
-   al build y la reescritura de cualquier ruta a `/index.html`.
-2. Redirecciones 301 desde las direcciones viejas con
-   `backend/frontend_react.py → ruta_nueva()` (ya probada:
-   `detalle.html?id=N` → `/tickets/N`, `index.html?…` → `/?…`, etc.), también
-   en `vercel.json` (`redirects`). Los correos de aviso que arma el servidor
-   con `detalle.html?id=N` siguen funcionando por la redirección; conviene
-   cambiarlos a `/tickets/N` (y el chat del servidor, que hoy manda
-   `[texto](detalle.html?id=N)`: el frontend React ya acepta los dos).
-3. Mover `/msal/silencioso.html` a `frontend-react/public/msal/` (misma
-   dirección, mismas cabeceras de `cabeceras.py` y `vercel.json`).
-4. Quitar `frontend/` viejo: antes, mover `frontend/css` e `frontend/images`
-   a `frontend-react/` (hoy se importan de ahí), pasar a Vitest o borrar las
-   pruebas de `frontend/tests` y las de `frontend/tests/navegador`, y quitar
-   del `Dockerfile` la copia de `frontend/`.
-5. Microsoft Entra: agregar las URI de la raíz (`…/login` en local, Render y
-   Vercel), mantener `…/msal/silencioso.html`, y cuando nadie use la versión
-   vieja ni `/react/`, quitar `…/login.html` y `…/react/login`.
-6. `scripts/comparar_react.sh` deja de tener sentido (ya no hay versión
-   vieja): se puede quitar o dejar como prueba visual contra capturas guardadas.
+**Microsoft Entra** (plataforma «Aplicación de página única»): ver
+«Inicio de sesión con Microsoft → Requisitos en Microsoft Entra ID».
 
 ### Health check
 
@@ -629,34 +479,19 @@ categorías vigentes.
 ### Pruebas
 
 ```bash
-.venv/bin/python -m pytest -q
-# o, con pytest instalado en el entorno activo:
-pytest
-
-# Pruebas del frontend (Node.js, sin dependencias):
-node --test frontend/tests/app_errors.test.js
-node --test frontend/tests/detalle_flujo.test.js
-node --test frontend/tests/usuarios_ui.test.js
+.venv/bin/python -m pytest -q        # backend (o en un contenedor, ver abajo)
+cd frontend-react && npm test        # frontend (Vitest + React Testing Library)
 ```
 
-La suite completa (294 pruebas) usa bases de datos temporales por test y no
-modifica `ticketera.db`. Las pruebas del frontend (52 en total) cargan los
-scripts reales en un contexto aislado con `node:test`:
-`frontend/tests/app_errors.test.js` (10) verifica el manejo de errores de
-`fetchTickets()` (conexión, error HTTP, respuesta inválida y casos de
-éxito), comprobando en cada caso que una ejecución realiza exactamente una
-petición HTTP; `frontend/tests/detalle_flujo.test.js` (20) cubre la hora
-de Costa Rica en el detalle y el listado, el listado de comentarios
-(carga, vacío, errores y refresco tras agregar) y la asignación de
-usuarios (detalle del backend, desasignación, usuarios no disponibles y
-lista vacía); `frontend/tests/usuarios_ui.test.js` (13) cubre el listado
-de usuarios (éxito, vacío y errores), las validaciones del formulario
-(nombre, correo y rol) y el alta (éxito con recarga, email duplicado y
-datos inválidos); y `frontend/tests/historial_ui.test.js` (9) cubre la
-pantalla de historial global: que la petición se envía con `fetchWithAuth`
-y el Bearer token de la sesión (regresión del 401 sin token), el pintado
-de las siete columnas con el autor real, los estados vacío/error HTTP/
-JSON inválido/sin conexión y la limpieza de sesión ante un 401.
+La suite del backend usa bases de datos temporales por test y no modifica
+`ticketera.db`; las pruebas del frontend servido usan un build falso en una
+carpeta temporal (no hace falta compilar React). Las del frontend prueban
+cada pantalla con la API simulada (permisos por rol, filtros, estados,
+comentarios, adjuntos, crear, historial, departamentos, métricas, usuarios,
+ayuda, chat, sesión y login) y, en `src/pruebas/estilos.test.js`, las reglas
+de `estilos.css` que venían de las pruebas viejas (`node:test`) del frontend
+anterior. Una de ellas («el gris claro ya no se usa para textos») queda
+anotada como pendiente: fallaba desde antes y arreglarla cambia colores.
 
 ### Documentación de la API
 
@@ -680,7 +515,7 @@ cuándo). En cualquier otro caso la API responde `403` con el motivo, por
 ejemplo «Solo puede editar el ticket mientras está «Nuevo»; ahora está «En
 proceso». Pídale el cambio a un Administrador.» La regla está en
 `ticket_service.edit_denied_reason` y su espejo en `puedeEditarTicket`
-(`frontend/js/auth.js`).
+(`frontend-react/src/sesion/permisos.js`).
 
 **Un ticket `Cerrado` es de solo lectura para todos**, también para el
 Administrador: no se edita, no se reasigna, no se comenta, no se elimina y no
@@ -750,12 +585,12 @@ Reglas:
 7. **Filtro «Departamento»** en la lista (también «Sin departamento») y en las
    métricas. El departamento se ve en el detalle y su cambio queda en el
    historial («Cambió el departamento: Soporte IT → Programación»).
-8. **Pantalla «Departamentos»** (`departamentos.html`, solo Administrador:
+8. **Pantalla «Departamentos»** (`/departamentos`, solo Administrador:
    permiso «Ver departamentos»; en el menú debajo de «Métricas»): una fila por
    departamento y otra «Sin departamento» con el total de tickets, los
    abiertos (Nuevo + En proceso), cada estado y los Técnicos activos; arriba,
    el total de abiertos y el departamento con más abiertos. Cada número abre
-   la lista filtrada (`index.html?area=ID&estado=…`; `area=sin` es «Sin
+   la lista filtrada (`/?area=ID&estado=…`; `area=sin` es «Sin
    departamento» y `estado=abiertos`, Nuevo y En proceso: el filtro «Estado»
    tiene también la opción «Abiertos»).
 
@@ -801,7 +636,7 @@ correo; miniatura en las imágenes, que se abre en grande al tocarla) con
 el celular, **Sacar foto** abre la cámara. Las fotos de más de 2000 px de lado
 se achican en el navegador antes de subirlas (y una foto HEIC pasa a JPG).
 
-**Al crear el ticket** (`crear.html`) están los mismos botones: lo elegido se
+**Al crear el ticket** (`/crear`) están los mismos botones: lo elegido se
 lista con su tamaño y ✕ para quitarlo, con los mismos tipos y límites. Al
 pulsar «Crear ticket» primero se crea el ticket y después se suben los
 archivos uno por uno con el mismo `POST …/adjuntos`. Si alguno falla, el
@@ -970,7 +805,7 @@ con la API apagada.
 
 ## Métricas
 
-El menú **«Métricas»** (`metricas.html`) lo ve solo el
+El menú **«Métricas»** (`/metricas`) lo ve solo el
 **Administrador**; a los demás roles no les aparece y la API les responde `403`.
 Todos los números los calcula el servidor (sin IA) y se filtran por un rango de
 días en hora de Costa Rica (por defecto, los últimos 30 días contando hoy;
@@ -1214,7 +1049,7 @@ categoría, quién lo reporta, a quién está asignado, cuándo se creó y los
 primeros ~200 caracteres de la descripción). Al final, el equipo ve «Si
 necesita más información, como las posibles causas y qué revisar primero,
 abra el ticket y use «Explicar con IA».», con un enlace que abre el detalle en
-la pestaña de la explicación (`detalle.html?id=N&pestana=ia`); el Solicitante
+la pestaña de la explicación (`/tickets/N?pestana=ia`); el Solicitante
 ve «Puede ver el detalle completo en el ticket.» con el enlace al detalle. Si
 el ticket no existe o la persona no puede verlo, responde «No encontré el
 ticket…». El chat no muestra la fuente debajo de cada mensaje (el campo
@@ -1238,7 +1073,7 @@ Se entra **solo con la cuenta de Microsoft de la empresa** (Entra ID), con la
 misma app registrada del correo (`CORREO_M365_TENANT` y
 `CORREO_M365_CLIENT_ID`). No hay usuario y contraseña propios ni registro.
 
-1. `login.html` tiene un solo botón, «Iniciar sesión con Microsoft». Usa
+1. `/login` tiene un solo botón, «Iniciar sesión con Microsoft». Usa
    MSAL.js (`@azure/msal-browser@4.30.0` desde jsDelivr, versión fija con hash
    de integridad) con el flujo de código con PKCE y los scopes `openid`,
    `profile`, `email` y `User.Read`.
@@ -1257,7 +1092,7 @@ misma app registrada del correo (`CORREO_M365_TENANT` y
 
 - **Sesión deslizante.** El token de la app dura `JWT_EXPIRATION_MINUTES` (60)
   y lleva cuándo empezó la sesión (`ini`) y su límite (`max`). Mientras la
-  persona usa la app, `frontend/js/sesion.js` lo renueva solo con
+  persona usa la app, `frontend-react/src/sesion/control.js` lo renueva solo con
   `POST /api/auth/renovar` (token vigente → token nuevo con el mismo `ini`),
   como mucho cada 5 minutos y solo si hubo actividad. Nunca pasa de
   `SESION_MAXIMA_HORAS` (10) desde el inicio: después responde 401 y hay que
@@ -1270,16 +1105,16 @@ misma app registrada del correo (`CORREO_M365_TENANT` y
   todas («Su sesión se cerró por inactividad» en el login). Los tiempos están
   en `SESION_TIEMPOS`, al principio de `sesion.js`.
 - **Al volver a la pestaña o desde otra página.** Si la sesión venció (y no se
-  cerró a mano, por inactividad ni por el máximo), `login.html` vuelve a
+  cerró a mano, por inactividad ni por el máximo), `/login` vuelve a
   entrar en silencio con MSAL: primero `acquireTokenSilent` con la caché de
   MSAL (en `localStorage`, la cifra MSAL), y si no hay, `ssoSilent` con un
-  iframe oculto que vuelve a `msal/silencioso.html` (página vacía; es la única
+  iframe oculto que vuelve a `/msal/silencioso` (página vacía; es la única
   que se puede enmarcar, y solo desde la misma ticketera). Manda el `ini`
   anterior, así el máximo sigue contando desde el primer inicio de sesión, y
   regresa a la misma página (`?volver=`, solo páginas propias). Si falla,
   queda el botón de siempre.
 - **Probar en local sin esperar.** Abra
-  <http://localhost:8000/index.html?sesion_rapida=1>: 2 minutos de inactividad
+  <http://localhost:8000/?sesion_rapida=1>: 2 minutos de inactividad
   y 30 segundos de aviso (renueva cada 20 s), recordado en ese navegador y
   **solo en localhost**. `?sesion_rapida=0` vuelve a lo normal. Para probar el
   máximo, `SESION_MAXIMA_HORAS=0.1` (6 minutos) en el `.env` y
@@ -1287,10 +1122,25 @@ misma app registrada del correo (`CORREO_M365_TENANT` y
 
 ### Requisitos en Microsoft Entra ID
 
-En la app registrada: plataforma **Aplicación de página única** con las URI de
-redirección `http://localhost:8000/login.html` y
-`http://localhost:8000/msal/silencioso.html` (o las mismas con `APP_URL`) y el
-permiso `User.Read` con consentimiento de administrador. No hace falta secreto.
+En la app registrada: plataforma **Aplicación de página única (SPA)** con el
+permiso `User.Read` (consentimiento de administrador; no hace falta secreto) y
+estas URI de redirección, dos por origen (`/login` para entrar y
+`/msal/silencioso` para renovar la sesión en silencio):
+
+| Entorno | URI |
+|---------|-----|
+| Local | `http://localhost:8000/login` |
+| Local | `http://localhost:8000/msal/silencioso` |
+| Render | `https://ticketera-soporte-tyx2.onrender.com/login` |
+| Render | `https://ticketera-soporte-tyx2.onrender.com/msal/silencioso` |
+| Vercel | `https://tickets-americandata.vercel.app/login` |
+| Vercel | `https://tickets-americandata.vercel.app/msal/silencioso` |
+| `npm run dev` (opcional) | `http://localhost:5173/login` y `http://localhost:5173/msal/silencioso` |
+
+MSAL compara la URI exacta (sin la redirección 301), así que las viejas ya no
+se usan: `…/login.html`, `…/msal/silencioso.html`, `…/react/login` (y
+`http://localhost:5173/react/login`) se pueden borrar una vez publicada esta
+versión en cada entorno. Con otro dominio, las mismas dos con `APP_URL`.
 
 ### Configuración
 
@@ -1302,7 +1152,7 @@ ADMIN_INICIAL=kcastro@data.cr
 LOGIN_LOCAL=false
 ```
 
-`GET /api/auth/config` (público) le pasa a `login.html` el tenant, el client id
+`GET /api/auth/config` (público) le pasa a `/login` el tenant, el client id
 y si `LOGIN_LOCAL` está activo. Con `LOGIN_LOCAL=true` vuelve el formulario de
 contraseña (`POST /api/auth/login`) y, en Usuarios, los campos de contraseña;
 con `false` (por defecto) `/api/auth/login` no existe (404).
@@ -1719,7 +1569,7 @@ valores por defecto (cada uno se puede forzar con su variable):
 | `/docs` y `/openapi.json` | visibles | apagados |
 | Contraseña (`LOGIN_LOCAL`) | según `.env` | siempre apagada |
 
-Archivos: `vercel.json` (frontend estático desde `frontend/`, `/api/*` y
+Archivos: `vercel.json` (frontend compilado en `frontend-react/dist`, `/api/*` y
 `/health` a la función `api/index.py`, encabezado `X-Robots-Tag: noindex`),
 `.vercelignore` y `.python-version`. Docker no los usa.
 
@@ -1809,8 +1659,8 @@ se ve, sin «Volver a explicar»).
    iniciada o venció» (contraseña cambiada, sesión revocada, ~90 días sin uso).
 8. **Microsoft Entra ID.** *App registrations →* la app de la ticketera *→
    Authentication →* en la plataforma **Single-page application** agregar la
-   URI `https://tickets-americandata.vercel.app/login.html` y
-   `https://tickets-americandata.vercel.app/msal/silencioso.html` (para volver
+   URI `https://tickets-americandata.vercel.app/login` y
+   `https://tickets-americandata.vercel.app/msal/silencioso` (para volver
    a entrar en silencio; dejar las de `http://localhost:8000` para Docker) y
    guardar. En *Overview*,
    *Supported account types* tiene que ser «Accounts in this organizational
@@ -1887,8 +1737,8 @@ la rama). Diferencias con Vercel:
   corta a los 30 s: la siguiente ya responde); 512 MB de memoria.
 
 Pasos: crear el Blueprint, cargar las variables de la tabla, agregar en
-Microsoft Entra ID (plataforma SPA) `https://<servicio>.onrender.com/login.html`
-y `https://<servicio>.onrender.com/msal/silencioso.html`, y cambiar la URL del
+Microsoft Entra ID (plataforma SPA) `https://<servicio>.onrender.com/login`
+y `https://<servicio>.onrender.com/msal/silencioso`, y cambiar la URL del
 cronjob a `https://<servicio>.onrender.com/api/cron/correo` (mismo encabezado
 `Authorization: Bearer <CRON_SECRET>` con el valor nuevo). La sesión del
 buzón ya está en Neon (tabla `msal_cache`): no hace falta `correo_login`.

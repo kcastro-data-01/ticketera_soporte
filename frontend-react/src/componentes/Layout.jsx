@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import logo from "../../../frontend/images/logo-circular.jpg";
+import logo from "../images/logo-circular.jpg";
 import { useSesion } from "../contexto/SesionContext.jsx";
 import { useSesionDeslizante } from "../sesion/useSesionDeslizante.js";
 import Asistente from "../chat/Asistente.jsx";

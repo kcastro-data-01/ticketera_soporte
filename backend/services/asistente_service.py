@@ -2165,8 +2165,8 @@ def linea_mas_informacion(ticket: Ticket, user: User) -> str:
     """La línea final cuando se explica un ticket: «Explicar con IA» (con
     enlace a esa pestaña) para quien tiene el permiso; si no, el detalle."""
     if puede_explicar_ia(user):
-        return LINEA_EXPLICAR_IA.format(enlace=f"detalle.html?id={ticket.id}&pestana=ia")
-    return LINEA_VER_DETALLE.format(enlace=f"detalle.html?id={ticket.id}")
+        return LINEA_EXPLICAR_IA.format(enlace=f"/tickets/{ticket.id}?pestana=ia")
+    return LINEA_VER_DETALLE.format(enlace=f"/tickets/{ticket.id}")
 
 
 def ficha_ticket(ticket: Ticket, user: User) -> Directa:

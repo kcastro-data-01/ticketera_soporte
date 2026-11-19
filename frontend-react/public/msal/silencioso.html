@@ -6,8 +6,9 @@
   <title>Reconectando · American Data Networks</title>
 </head>
 <!-- Página vacía a la que vuelve el iframe oculto de MSAL (ssoSilent) al
-     reconectar la sesión en silencio. No carga scripts: MSAL lee la
-     respuesta desde login.html. Es la única que se puede mostrar en un
-     iframe, y solo desde la misma ticketera (vercel.json). -->
+     reconectar la sesión en silencio; se sirve en /msal/silencioso. No carga
+     scripts: MSAL lee la respuesta desde /login. Es la única que se puede
+     mostrar en un iframe, y solo desde la misma ticketera (cabeceras de
+     backend/cabeceras.py y vercel.json). -->
 <body></body>
 </html>

@@ -85,7 +85,7 @@ def test_two_tickets_give_two_different_prompts_with_full_content(client, sessio
         # El servidor agrega la línea final con el enlace a «Explicar con IA».
         assert resp.json() == {
             "respuesta": "Respuesta de Qwen\n\nSi necesita más información, como las posibles causas y qué "
-                         f"revisar primero, [abra el ticket y use «Explicar con IA»](detalle.html?id={t.id}&pestana=ia).",
+                         f"revisar primero, [abra el ticket y use «Explicar con IA»](/tickets/{t.id}?pestana=ia).",
             "fuente": "ia",
         }
 

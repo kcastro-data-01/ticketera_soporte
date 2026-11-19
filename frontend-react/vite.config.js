@@ -1,27 +1,29 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-/* La app React vive bajo /react/ mientras dura la migración (FastAPI
-   devuelve index.html para cualquier /react/*). En la etapa final pasa a la
-   raíz: cambiar BASE a "/" (y el basename del router sale de aquí). */
-const BASE = "/react/";
+/* La app vive en la raíz. El basename del router sale de aquí
+   (import.meta.env.BASE_URL, ver src/rutas.js). */
+const BASE = "/";
 const SERVIDOR = "http://localhost:8000";
+
+/* En desarrollo, /msal/silencioso (sin .html, como la sirve FastAPI) es la
+   página vacía de public/msal/silencioso.html, no la app. */
+const paginaSilenciosa = {
+  name: "pagina-silenciosa",
+  configureServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      if (/^\/msal\/silencioso(\?|#|$)/.test(req.url || "")) req.url = req.url.replace("/msal/silencioso", "/msal/silencioso.html");
+      next();
+    });
+  },
+};
 
 export default defineConfig({
   base: BASE,
-  plugins: [react()],
+  plugins: [react(), paginaSilenciosa],
   server: {
-    /* Los estilos e imágenes se importan de ../frontend (una sola copia). */
-    fs: { allow: [".."] },
-    /* npm run dev: la API y las páginas viejas las sirve FastAPI. */
-    proxy: {
-      "/api": SERVIDOR,
-      "/msal": SERVIDOR,
-      "/css": SERVIDOR,
-      "/js": SERVIDOR,
-      "/images": SERVIDOR,
-      "^/[a-z-]+\\.html": SERVIDOR,
-    },
+    /* npm run dev: la API la sirve FastAPI. */
+    proxy: { "/api": SERVIDOR, "/health": SERVIDOR },
   },
   build: { outDir: "dist", emptyOutDir: true },
   test: {

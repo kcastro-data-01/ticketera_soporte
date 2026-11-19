@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PublicClientApplication } from "@azure/msal-browser";
-import "../../../frontend/css/login.css";
-import imagenLogin from "../../../frontend/images/login-sistema-tickets.jpg";
-import logo from "../../../frontend/images/logo-circular.jpg";
+import "../css/login.css";
+import imagenLogin from "../images/login-sistema-tickets.jpg";
+import logo from "../images/logo-circular.jpg";
 import { useSesion } from "../contexto/SesionContext.jsx";
 import { useClaseBody, useTitulo } from "../componentes/claseBody.js";
 import { IconoMicrosoft, IconoOjo } from "../componentes/iconos.jsx";
@@ -20,7 +20,7 @@ const API_BASE = "/api/auth";
 export const SCOPES = ["openid", "profile", "email", "User.Read"];
 /* Página vacía a la que vuelve el iframe oculto de ssoSilent: la misma que
    usa la ticketera actual (ya registrada en Entra, con sus cabeceras). */
-export const RUTA_SILENCIOSA = "/msal/silencioso.html";
+export const RUTA_SILENCIOSA = "/msal/silencioso";
 
 const MENSAJES_CIERRE = {
   inactividad: "Su sesión se cerró por inactividad.",

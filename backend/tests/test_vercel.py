@@ -391,9 +391,9 @@ def test_docker_keeps_docs():
 
 
 def test_robots_and_noindex_on_every_page():
-    frontend = database.PROJECT_ROOT / "frontend"
-    assert (frontend / "robots.txt").read_text().splitlines() == ["User-agent: *", "Disallow: /"]
-    for pagina in frontend.glob("*.html"):
+    frontend = database.PROJECT_ROOT / "frontend-react"
+    assert (frontend / "public" / "robots.txt").read_text().splitlines() == ["User-agent: *", "Disallow: /"]
+    for pagina in (frontend / "index.html", frontend / "public" / "msal" / "silencioso.html"):
         assert '<meta name="robots" content="noindex, nofollow">' in pagina.read_text(), pagina.name
     config = json.loads((database.PROJECT_ROOT / "vercel.json").read_text())
     encabezados = {h["key"]: h["value"] for regla in config["headers"] for h in regla["headers"]}

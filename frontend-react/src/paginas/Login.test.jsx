@@ -45,13 +45,13 @@ beforeEach(() => {
 });
 
 describe("Login", () => {
-  it("configura MSAL con el tenant, el client id y /react/login, sin formulario de contraseña", async () => {
+  it("configura MSAL con el tenant, el client id y /login, sin formulario de contraseña", async () => {
     servidor();
     renderApp("/login");
     await waitFor(() => expect(msal.config).not.toBeNull());
     expect(msal.config.auth.clientId).toBe("c-456");
     expect(msal.config.auth.authority).toBe("https://login.microsoftonline.com/t-123");
-    expect(msal.config.auth.redirectUri).toBe(`${window.location.origin}/react/login`);
+    expect(msal.config.auth.redirectUri).toBe(`${window.location.origin}/login`);
     expect(msal.config.cache.cacheLocation).toBe("localStorage");
     expect(document.getElementById("form-login")).not.toHaveClass("activo");
     expect(document.body).toHaveClass("pagina-login");
@@ -141,7 +141,7 @@ describe("Login", () => {
       renderApp("/login?volver=%2Ftickets%2F9");
       await waitFor(() => expect(localStorage.getItem("access_token")).toBeTruthy());
       const pedido = msal.acquireTokenSilent.mock.calls[0][0];
-      expect(pedido.redirectUri).toBe(`${window.location.origin}/msal/silencioso.html`);
+      expect(pedido.redirectUri).toBe(`${window.location.origin}/msal/silencioso`);
       expect(pedido.forceRefresh).toBe(true);
       const cuerpo = JSON.parse(llamadas.find((l) => l.url === "/api/auth/microsoft").opciones.body);
       expect(cuerpo.id_token).toBe("silencioso");
